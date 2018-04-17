@@ -1,4 +1,0 @@
-service nn_vpu /vendor/bin/hw/android.hardware.neuralnetworks@1.0-service-vpudriver
-    class hal
-    user root
-    group root
