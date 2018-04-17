@@ -1,7 +1,7 @@
 # Intel® Movidius™ Neural Networks HAL
 
 ## Introduction
-The Intel® Movidius™ Neural Network Hardware Abstraction Layer (NN HAL) provides the hardware accelration for Android Neural Networks (NN) API. Intel Movidius NN HAL takes the advantage of the Intel Movidius NCS hardware, enables high performance and low power implementation of Neural Networks API. More information about Movidius NCS is available on [Intel® Movidius™ NCS] (https://developer.movidius.com/) page and Android NN API is on [Neural Networks API] (https://developer.android.com/ndk/guides/neuralnetworks/index.html).
+The Intel® Movidius™ Neural Network Hardware Abstraction Layer (NN HAL) provides the hardware accelration for Android Neural Networks (NN) API. Intel Movidius NN HAL takes the advantage of the Intel Movidius NCS hardware, enables high performance and low power implementation of Neural Networks API. More information about Movidius NCS is available on [Intel® Movidius™ NCS](https://developer.movidius.com/) page and Android NN API is on [Neural Networks API](https://developer.android.com/ndk/guides/neuralnetworks/index.html).
 
 ## Supported Operations
 Intel Movidius NCS HAL supports essential Android Neural Networks Operations.
@@ -20,6 +20,11 @@ Below are the operations supported by Intel Movidius NN HAL
 
 ## Known issues
 To be updated
+
+## License
+Intel® Movidius™ Neural Networks HAL is distributed under the Apache License, Version 2.0
+You may obtain a copy of the License at:
+http://www.apache.org/licenses/LICENSE-2.0
 
 ## How to provide feedback
 By default, please submit an issue using native github.com interface:
