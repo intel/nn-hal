@@ -35,3 +35,22 @@ LOCAL_MODULE_PATH := $(PRODUCT_OUT)/vendor/firmware/mvnc
 LOCAL_SRC_FILES := src/mvnc/MvNCAPI.mvcmd
 
 include $(BUILD_PREBUILT)
+
+
+include $(CLEAR_VARS)
+LOCAL_MODULE := ncs_test1_app
+LOCAL_SRC_FILES := ncs_tests/ncs_test1.cpp
+
+LOCAL_C_INCLUDES +=  \
+                 $(LOCAL_PATH) \
+                 $(LOCAL_PATH)/../ncsdk/include
+
+LOCAL_CFLAGS += -fexceptions
+
+LOCAL_SHARED_LIBRARIES := \
+                    libutils \
+                    liblog \
+                    libcutils \
+                    libmvnc
+
+include $(BUILD_EXECUTABLE)

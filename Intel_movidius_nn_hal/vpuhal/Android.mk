@@ -74,27 +74,3 @@ LOCAL_SHARED_LIBRARIES := \
 
 include $(BUILD_EXECUTABLE)
 
-include $(CLEAR_VARS)
-LOCAL_MODULE := app_ncs_test1
-LOCAL_SRC_FILES := tests/ncs_test/ncs_test1.cpp
-
-LOCAL_C_INCLUDES +=  \
-                 $(LOCAL_PATH) \
-                 $(LOCAL_PATH)/../ncsdk/include
-
-LOCAL_CFLAGS += -fexceptions
-
-LOCAL_SHARED_LIBRARIES := \
-                    libhidlbase \
-                    libhidltransport \
-                    libutils \
-                    liblog \
-                    libcutils \
-                    libhardware \
-                    libbase \
-                    libcutils \
-                    libhidlmemory \
-                    libmvnc
-
-
-include $(BUILD_EXECUTABLE)
