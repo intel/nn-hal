@@ -450,7 +450,7 @@ bool validateRequest(const Request& request, const Model& model) {
                                   "output"));
 }
 
-#ifdef NN_DEBUGGABLE
+
 uint32_t getProp(const char* str, uint32_t defaultValue) {
     const std::string propStr = android::base::GetProperty(str, "");
     if (propStr.size() > 0) {
@@ -459,7 +459,6 @@ uint32_t getProp(const char* str, uint32_t defaultValue) {
         return defaultValue;
     }
 }
-#endif  // NN_DEBUGGABLE
 
 }  // namespace vpu_driver
 }  // namespace V1_0

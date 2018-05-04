@@ -49,7 +49,11 @@ Blob_Stage_data get_DEPTHWISE_CONV_2D_stage_data(Operation_inputs_info curr_stag
 
   stage_depth_conv2d.padX =  0;
   stage_depth_conv2d.padY =  0;
-  stage_depth_conv2d.padStyle_value = 3; //TODO update with proper data
+  if(depth_conv2d_stage_info.padding_left == 0 && depth_conv2d_stage_info.padding_right == 0 &&
+    depth_conv2d_stage_info.padding_top == 0 && depth_conv2d_stage_info.padding_bottom == 0 )
+    stage_depth_conv2d.padStyle_value = 1; //padding is tfvalid
+  else
+    stage_depth_conv2d.padStyle_value = 3; //padding is tfsame
 
   if(depth_conv2d_stage_info.input_shape[1]!=0)
      stage_depth_conv2d.inputDimX = depth_conv2d_stage_info.input_shape[1]; //TODO update from Android
@@ -71,8 +75,18 @@ Blob_Stage_data get_DEPTHWISE_CONV_2D_stage_data(Operation_inputs_info curr_stag
   stage_depth_conv2d.tapDimY = depth_conv2d_stage_info.input_shape[3];
   stage_depth_conv2d.tapDimZ = depth_conv2d_stage_info.kernel_shape[3] * depth_conv2d_stage_info.kernel_shape[2];
 
-  stage_depth_conv2d.outputDimX = (uint32_t) std::ceil((double)stage_depth_conv2d.inputDimX/(double)stage_depth_conv2d.strideX);
-  stage_depth_conv2d.outputDimY = (uint32_t) std::ceil((double)stage_depth_conv2d.inputDimY/(double)stage_depth_conv2d.strideY);
+  if(stage_depth_conv2d.padStyle_value == 1){ //padding is tfvalid
+    stage_depth_conv2d.outputDimX = (uint32_t) std::ceil((double)(stage_depth_conv2d.inputDimX - stage_depth_conv2d.radixX +1)/(double)stage_depth_conv2d.strideX);
+    stage_depth_conv2d.outputDimY = (uint32_t) std::ceil((double)(stage_depth_conv2d.inputDimY - stage_depth_conv2d.radixY +1)/(double)stage_depth_conv2d.strideY);
+  }
+  else if(stage_depth_conv2d.padStyle_value == 3){
+    stage_depth_conv2d.outputDimX = (uint32_t) std::ceil((double)stage_depth_conv2d.inputDimX/(double)stage_depth_conv2d.strideX);
+    stage_depth_conv2d.outputDimY = (uint32_t) std::ceil((double)stage_depth_conv2d.inputDimY/(double)stage_depth_conv2d.strideY);
+  }
+  else{//TODO update the outputDimX & outputDimY for padStyle_value = 2
+    stage_depth_conv2d.outputDimX = (uint32_t) std::ceil((double)stage_depth_conv2d.inputDimX/(double)stage_depth_conv2d.strideX);
+    stage_depth_conv2d.outputDimY = (uint32_t) std::ceil((double)stage_depth_conv2d.inputDimY/(double)stage_depth_conv2d.strideY);
+  }
   stage_depth_conv2d.outputDimZ = stage_depth_conv2d.tapDimZ;
 
   stage_depth_conv2d.inputStrideX = 2 * stage_depth_conv2d.inputDimZ;

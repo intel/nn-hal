@@ -26,7 +26,7 @@
 // Global Variables
 #define NCS_NUM 1
 #define NAME_SIZE 100
-
+#define NCS_CHECK_TIMES 5
 
 //TODO Check what is needed
 
@@ -88,6 +88,7 @@ mvncStatus ncs_deinit(){
   {
       ALOGE("Error - Could not close NCS device ErrorCode: %d",retCode);
   }
+  ALOGD("NCS device closed");
   return retCode;
 }//end of deinit
 
@@ -105,10 +106,12 @@ void *LoadgraphFile(const char *path, unsigned int *length){
   fseek(fp, 0, SEEK_END);
   *length = ftell(fp);
   rewind(fp);
+
   if(!(buf = (char*) malloc(*length)))
   {
     ALOGE("unable to create graph buffer");
   }
+  memset(buf, 0, *length);
   if(fread(buf, 1, *length, fp) != *length)
   {
     fclose(fp);
@@ -139,8 +142,9 @@ mvncStatus ncs_rungraph(float *input_data, uint32_t input_num_of_elements,
 
                       //allocate fp16 input1 with inpu1 shape
                       ip1_fp16 = (half*) malloc(sizeof(*ip1_fp16) * input_num_of_elements);
+                      ALOGD("Converting input from Float to FP16 Begin");
                       floattofp16((unsigned char *)ip1_fp16, input_data, input_num_of_elements);
-
+                      ALOGD("Converting input from Float to FP16 end");
                       lenip1_fp16 = input_num_of_elements * sizeof(*ip1_fp16);
 
                       // start the inference with mvncLoadTensor()
@@ -151,11 +155,19 @@ mvncStatus ncs_rungraph(float *input_data, uint32_t input_num_of_elements,
                       }
                       ALOGD("Input Tensor Loaded successfully!");
                       retCode = mvncGetResult(graphHandle, &resultData16, &lenResultData, &userParam);
+
                       if (retCode != MVNC_OK){
                         ALOGE("NCS could not return result %d",retCode);
+                        retCode = mvncDeallocateGraph(graphHandle);
+                        if (retCode != MVNC_OK){
+                          ALOGE("NCS could not Deallocate Graph %d",retCode);
+                          return retCode;
+                        }
+                        ALOGD("Graph Deallocated successfully!");
+                        graphHandle = NULL;
                         return retCode;
                       }
-
+                      ALOGD("Got the Result");
                       retCode = mvncDeallocateGraph(graphHandle);
                       if (retCode != MVNC_OK){
                         ALOGE("NCS could not Deallocate Graph %d",retCode);
@@ -164,9 +176,15 @@ mvncStatus ncs_rungraph(float *input_data, uint32_t input_num_of_elements,
                       ALOGD("Graph Deallocated successfully!");
                       graphHandle = NULL;
                       int numResults = lenResultData / sizeof(half);
-
-                      fp16tofloat(output_data, (unsigned char*)resultData16, numResults);
-
+                      float *output_data_buffer = (float *)malloc(numResults*sizeof(float));
+                      if(output_data_buffer==NULL)
+                      ALOGE("unable to allocate output_data_buffer");
+                      memset(output_data_buffer,0,numResults*sizeof(float));
+                      ALOGD("Converting output from FP16 to Float Begin");
+                      fp16tofloat(output_data_buffer, (unsigned char*)resultData16, numResults);
+                      ALOGD("Converting output from FP16 to Float end");
+                      memcpy(output_data,output_data_buffer,numResults*sizeof(float));
+                      free(output_data_buffer);
                       free(graphFileBuf);
                       free(ip1_fp16);
                       ALOGD("Error code end of the rungraph is : %d",retCode);
@@ -175,7 +193,8 @@ mvncStatus ncs_rungraph(float *input_data, uint32_t input_num_of_elements,
                     }
 
 int ncs_execute(float *input_data, uint32_t input_num_of_elements,float *output_data, uint32_t output_num_of_elements){
-
+  int fail_count = 0;
+RUN_GRAPH:
   if (device_online != true) {
     if (ncs_init(NCS_NUM) != MVNC_OK){
       ALOGE("Device Unavilable");
@@ -183,7 +202,19 @@ int ncs_execute(float *input_data, uint32_t input_num_of_elements,float *output_
     }
   }
   ALOGD("Device avilable");
+
   status = ncs_rungraph((float*) input_data, input_num_of_elements, output_data, output_num_of_elements);
+  if(status != MVNC_OK){
+      fail_count++;
+      ncs_deinit();
+      device_online =false;
+      if(fail_count < NCS_CHECK_TIMES)
+       goto RUN_GRAPH;
+      else
+       goto END;
+    }
+
+END:
   /*
   if (ncs_deinit() != MVNC_OK){
     ALOGE("Device not Closed properly");

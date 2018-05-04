@@ -21,6 +21,7 @@
 #include "VpuExecutor.h"
 #include <log/log.h>
 #include "Blob.h"
+#include <stdio.h>
 #include "vpu_lib.h"
 //TODO check this file is required or not
 
@@ -443,7 +444,6 @@ Operation_inputs_info VpuExecutor::get_operation_operands_info(const Operation& 
      stage_info.bias_data = true;
      stage_info.op_params_data = false;
 
-#if file_dump
      //TODO temporary fix
      stage_info.kernel_shape[0] = (stage_info.kernel_shape[0] == 0 ) ? 1: stage_info.kernel_shape[0];
      stage_info.kernel_shape[1] = (stage_info.kernel_shape[1] == 0 ) ? 1: stage_info.kernel_shape[1];
@@ -451,11 +451,14 @@ Operation_inputs_info VpuExecutor::get_operation_operands_info(const Operation& 
      stage_info.kernel_shape[3] = (stage_info.kernel_shape[3] == 0 ) ? 1: stage_info.kernel_shape[3];
      uint32_t nk_ele = stage_info.kernel_shape[0] * stage_info.kernel_shape[1] * stage_info.kernel_shape[2] * stage_info.kernel_shape[3];
 
+
      stage_info.bias_shape[0] = (stage_info.bias_shape[0] == 0 ) ? 1: stage_info.bias_shape[0];
      stage_info.bias_shape[1] = (stage_info.bias_shape[1] == 0 ) ? 1: stage_info.bias_shape[1];
      stage_info.bias_shape[2] = (stage_info.bias_shape[2] == 0 ) ? 1: stage_info.bias_shape[2];
      stage_info.bias_shape[3] = (stage_info.bias_shape[3] == 0 ) ? 1: stage_info.bias_shape[3];
      uint32_t nb_ele = stage_info.bias_shape[0] * stage_info.bias_shape[1] * stage_info.bias_shape[2] * stage_info.bias_shape[3];
+
+#if file_dump
 
      FILE *fp;
 
@@ -478,7 +481,7 @@ Operation_inputs_info VpuExecutor::get_operation_operands_info(const Operation& 
      }
 #endif
      bool DEBUG_CONV_2D = false;
-     //DEBUG_CONV_2D = true;  //un comment this line to get CONV_2D layer debug data
+     DEBUG_CONV_2D = true;  //un comment this line to get CONV_2D layer debug data
      if(DEBUG_CONV_2D){
 
        VLOG(VPUEXE) << " CONV_2D padding_left: " << padding_left;
@@ -614,6 +617,40 @@ Operation_inputs_info VpuExecutor::get_operation_operands_info(const Operation& 
      stage_info.kernel_data = true;
      stage_info.bias_data = true;
      stage_info.op_params_data = false;
+
+     bool DEBUG_DEPTHWISE_CONV_2D = false;
+     DEBUG_DEPTHWISE_CONV_2D = true;  //un comment this line to get DEPTHWISE_CONV_2D layer debug data
+     if(DEBUG_DEPTHWISE_CONV_2D){
+
+       VLOG(VPUEXE) << " DEPTHWISE_CONV_2D stride_width: " << stage_info.stride_width;
+       VLOG(VPUEXE) << " DEPTHWISE_CONV_2D stride_height: " << stage_info.stride_height;
+       VLOG(VPUEXE) << " DEPTHWISE_CONV_2D depth_multiplier: " << stage_info.depth_multiplier;
+
+       VLOG(VPUEXE) << " DEPTHWISE_CONV_2D padding_left: " << padding_left;
+       VLOG(VPUEXE) << "DEPTHWISE_CONV_2D padding_right: " << padding_right;
+       VLOG(VPUEXE) << " DEPTHWISE_CONV_2D padding_top: " << padding_top;
+       VLOG(VPUEXE) << "DEPTHWISE_CONV_2D padding_bottom: " << padding_bottom;
+
+       VLOG(VPUEXE) << "DEPTHWISE_CONV_2D input_shape[0]: " << stage_info.input_shape[0];
+       VLOG(VPUEXE) << "DEPTHWISE_CONV_2D input_shape[1]: " << stage_info.input_shape[1];
+       VLOG(VPUEXE) << "DEPTHWISE_CONV_2D input_shape[2]: " << stage_info.input_shape[2];
+       VLOG(VPUEXE) << "DEPTHWISE_CONV_2D input_shape[3]: " << stage_info.input_shape[3];
+
+       VLOG(VPUEXE) << "DEPTHWISE_CONV_2D kernel_shape[0]: " << stage_info.kernel_shape[0];
+       VLOG(VPUEXE) << "DEPTHWISE_CONV_2D kernel_shape[1]: " << stage_info.kernel_shape[1];
+       VLOG(VPUEXE) << "DEPTHWISE_CONV_2D kernel_shape[2]: " << stage_info.kernel_shape[2];
+       VLOG(VPUEXE) << "DEPTHWISE_CONV_2D kernel_shape[3]: " << stage_info.kernel_shape[3];
+
+       VLOG(VPUEXE) << "DEPTHWISE_CONV_2D bias_shape[0]: " << stage_info.bias_shape[0];
+       VLOG(VPUEXE) << "DEPTHWISE_CONV_2D bias_shape[1]: " << stage_info.bias_shape[1];
+       VLOG(VPUEXE) << "DEPTHWISE_CONV_2D bias_shape[2]: " << stage_info.bias_shape[2];
+       VLOG(VPUEXE) << "DEPTHWISE_CONV_2D bias_shape[3]: " << stage_info.bias_shape[3];
+
+       VLOG(VPUEXE) << "DEPTHWISE_CONV_2D output_shape[0]: " << stage_info.output_shape[0];
+       VLOG(VPUEXE) << "DEPTHWISE_CONV_2D output_shape[1]: " << stage_info.output_shape[1];
+       VLOG(VPUEXE) << "DEPTHWISE_CONV_2D output_shape[2]: " << stage_info.output_shape[2];
+       VLOG(VPUEXE) << "DEPTHWISE_CONV_2D output_shape[3]: " << stage_info.output_shape[3];
+     }
 
 #if file_dump
   //TODO temporary fix
@@ -984,15 +1021,10 @@ int VpuExecutor::run(const Model& model, const Request& request,
     VLOG(VPUEXE) << "Before setInfoAndAllocateIfNeeded Input Num of Elements: " << input_num_elements;
     const float *network_input_buffer;
     network_input_buffer = (float *)malloc(sizeof(float) * input_num_elements);
+    if(network_input_buffer == NULL)
+    LOG(ERROR) << "Unable to allocate network_input_buffer";
     network_input_buffer = reinterpret_cast<float*>(network_input.buffer);
-    /*
-    for(uint32_t i=0;i<input_num_elements;i++){
-      ALOGD("Model Input is buffer[%d]:%f",i,*(reinterpret_cast<float*>(network_input.buffer)+i));
-    }
 
-    for(uint32_t i=0;i<input_num_elements;i++){
-      ALOGD("Model Network Input buffer[%d]:%f",i,*(network_input_buffer+i));
-    }*/
 
     const hidl_vec<uint32_t>& network_outputs = model.operations[nn_ops_vectors.size()-1].outputs;
     RunTimeOperandInfo& network_output = mOperands[network_outputs[0]];
@@ -1000,17 +1032,33 @@ int VpuExecutor::run(const Model& model, const Request& request,
     uint32_t output_num_elements = getNumberOfElements(nw_output_shape);
     float *network_output_buffer;
     network_output_buffer = (float *)malloc(sizeof(float) * output_num_elements);
-    network_output_buffer = reinterpret_cast<float*>(network_output.buffer);
+    if(network_output_buffer == NULL)
+    LOG(ERROR) << "Unable to allocate network_output_buffer";
+    memset(network_output_buffer,0,sizeof(float) * output_num_elements);
 
     VLOG(VPUEXE) << "Before setInfoAndAllocateIfNeeded Output Num of Elements: " << output_num_elements;
 
     int val = ncs_execute((float*)network_input_buffer,input_num_elements,network_output_buffer, output_num_elements);
+    memcpy(reinterpret_cast<float*>(network_output.buffer),network_output_buffer,output_num_elements*sizeof(float));
 
-    /*
-    for(uint32_t i=0;i<output_num_elements;i++){
-      ALOGD("NCS Output is buffer[%d]:%f",i,*(network_output_buffer+i));
-      ALOGD("Model Output is buffer[%d]:%f",i,*(reinterpret_cast<float*>(network_output.buffer)+i));
-    }*/
+#if 1
+
+    FILE *fp;
+    fp=fopen("/data/ncs_output","w");
+    if(!fp) ALOGE("unable to open the file /data/ncs_output ");
+    fseek(fp, 0, SEEK_END);
+    fwrite(network_output_buffer,sizeof(float),output_num_elements,fp);
+    fclose(fp);
+
+#endif
+
+   if(output_num_elements<50){
+     for(uint32_t i=0;i<output_num_elements;i++){
+       ALOGD("SRISTI: NCS Output is buffer[%d]:%f",i,*(network_output_buffer+i));
+       ALOGD("SRISTI: Model Output is buffer[%d]:%f",i,*(reinterpret_cast<float*>(network_output.buffer)+i));
+     }
+   }
+
 
     for (auto runtimeInfo : modelPoolInfos) {
         runtimeInfo.update();
@@ -1022,6 +1070,7 @@ int VpuExecutor::run(const Model& model, const Request& request,
     mModel = nullptr;
     mRequest = nullptr;
     VLOG(VPUEXE) << "Completed run normally";
+    
     return ANEURALNETWORKS_NO_ERROR;
 }
 

@@ -17,10 +17,14 @@
 #define LOG_TAG "VpuDriver"
 
 #include <android-base/logging.h>
+#include <android-base/properties.h>
+#include <android-base/strings.h>
+#include <sys/system_properties.h>
 #include <hidl/LegacySupport.h>
 #include <thread>
 
 #include "VpuDriver.h"
+#include "VpuUtils.h"
 #include "VpuPreparedModel.h"
 #include "HalInterfaces.h"
 
@@ -58,10 +62,23 @@ Return<void> VpuDriver::getSupportedOperations(const Model& model,
       }
       else
       {
+        const char kVLogPropKey[] = "nn.vpu.disable";
+
+        const uint32_t vLogSetting = getProp(kVLogPropKey);
+        ALOGD("vLogSetting: %d", vLogSetting);
+
+        if(vLogSetting == 1){
+          for (int i = 0; i < count; i++) {
+              const auto& operation = model.operations[i];
+              supported[i] = false;
+          }
+        }
+        else{
           for (int i = 0; i < count; i++) {
               const auto& operation = model.operations[i];
               supported[i] = VpuPreparedModel::isOperationSupported(operation, model);
-          }
+            }
+        }
         cb(ErrorStatus::NONE, supported);
       }
       return Void();

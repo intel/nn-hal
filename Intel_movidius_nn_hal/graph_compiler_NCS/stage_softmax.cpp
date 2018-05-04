@@ -10,9 +10,8 @@ Blob_Stage_data get_Softmax_stage_data(Operation_inputs_info curr_stage_info){
 
   Blob_Stage_data stage_softmax;
   Operation_inputs_info softmax_stage_info;
-
   softmax_stage_info = curr_stage_info;
-
+  uint32_t size;
   //initialize stage variables
   stage_softmax.stage_name = "SoftMax Layer";
   stage_softmax.op_val = 3;
@@ -29,25 +28,36 @@ Blob_Stage_data get_Softmax_stage_data(Operation_inputs_info curr_stage_info){
   stage_softmax.padY =  0;
   stage_softmax.padStyle_value = 0; //No Padding Support
 
+  if(softmax_stage_info.input_shape[0] ==0)
+     softmax_stage_info.input_shape[0] = 1;
+  if(softmax_stage_info.input_shape[1] ==0)
+     softmax_stage_info.input_shape[1] = 1;
+  if(softmax_stage_info.input_shape[2] ==0)
+     softmax_stage_info.input_shape[2] = 1;
+  if(softmax_stage_info.input_shape[3] ==0)
+     softmax_stage_info.input_shape[3] = 1;
+  else
+     stage_softmax.inputDimX = 1; //TODO update from Android
+
   if(softmax_stage_info.input_shape[1]!=0)
-     stage_softmax.inputDimX = softmax_stage_info.input_shape[1]; //TODO update from Android
+     stage_softmax.inputDimX = 1; //TODO update from Android
   else
      stage_softmax.inputDimX = 1; //TODO update from Android
 
   if(softmax_stage_info.input_shape[2]!=0)
-    stage_softmax.inputDimY = softmax_stage_info.input_shape[2]; //TODO update from Android
+    stage_softmax.inputDimY = 1; //TODO update from Android
   else
      stage_softmax.inputDimY = 1; //TODO update from Android
 
   if(softmax_stage_info.input_shape[3]!=0)
-     stage_softmax.inputDimZ = softmax_stage_info.input_shape[3]; //TODO update from Android
+     stage_softmax.inputDimZ = softmax_stage_info.input_shape[0] * softmax_stage_info.input_shape[1] * softmax_stage_info.input_shape[2] * softmax_stage_info.input_shape[3]; //TODO update from Android
   else
     stage_softmax.inputDimZ = 1; //TODO update from Android
 
-
-  stage_softmax.tapDimX = softmax_stage_info.kernel_shape[0];
-  stage_softmax.tapDimY = softmax_stage_info.kernel_shape[0];
-  stage_softmax.tapDimZ = stage_softmax.inputDimY;
+  size = softmax_stage_info.input_shape[0] * softmax_stage_info.input_shape[1] * softmax_stage_info.input_shape[2] * softmax_stage_info.input_shape[3]; //TODO update from Android
+  stage_softmax.tapDimX = 0;
+  stage_softmax.tapDimY = size;
+  stage_softmax.tapDimZ = size;
 
   stage_softmax.outputDimX = stage_softmax.inputDimX;
   stage_softmax.outputDimY = stage_softmax.inputDimY;

@@ -22,12 +22,12 @@
 
 #define LOG_TAG "NCS_GRAPH_COMPILER"
 #define VCS_FIX true
-#define DEBUG_get_header_buffer true
+#define DEBUG_get_header_buffer false
 #define DEBUG_get_stage_buffer false
 #define DEBUG_generate_graph false
 #define DEBUG_get_input_stage_buffer false
 #define DEBUG_get_last_stage_buffer false
-#define DEBUG_get_one_stage_buffer false
+#define DEBUG_get_one_stage_buffer true
 #define DEBUG_get_first_stage_buffer false
 
 typedef unsigned short half;

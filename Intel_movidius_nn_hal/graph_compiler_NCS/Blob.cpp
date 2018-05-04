@@ -1853,7 +1853,7 @@ bool wrtie_post_stage_data(Blobconfig blob_config, Myriadconfig mconfig){
 
 bool write_kernel_bias_data_buffer_to_file(Operation_inputs_info curr_stage_info){
   float *kernel_data_buffer, *bias_data_buffer, *op_params_buffer,*final_float_data_buffer;
-
+  float *kernel_data_buffer_android;
   uint32_t buf_index = 0, kenrel_data_size = 0, bias_data_size = 0;
   uint32_t op_params_size = 0, final_data_size = 0;
 
@@ -1873,6 +1873,33 @@ bool write_kernel_bias_data_buffer_to_file(Operation_inputs_info curr_stage_info
 
     kenrel_data_size = dtype_android * curr_stage_info.kernel_shape[0] * curr_stage_info.kernel_shape[1] *
                                       curr_stage_info.kernel_shape[2] * curr_stage_info.kernel_shape[3];
+#if 1
+
+    kernel_data_buffer_android = (float *)malloc(kenrel_data_size);
+    if(kernel_data_buffer_android == NULL){
+       ALOGE("unable to allocate buffer");
+       kernel_data_buffer_android = nullptr;
+    }else{
+      memset(kernel_data_buffer_android,0, kenrel_data_size);
+      ALOGD("curr_stage_info.kernel_shape[0]:%u",curr_stage_info.kernel_shape[0]);
+      ALOGD("curr_stage_info.kernel_shape[1]:%u",curr_stage_info.kernel_shape[1]);
+      ALOGD("curr_stage_info.kernel_shape[2]:%u",curr_stage_info.kernel_shape[2]);
+      ALOGD("curr_stage_info.kernel_shape[3]:%u",curr_stage_info.kernel_shape[3]);
+
+      uint32_t INCH = curr_stage_info.kernel_shape[2];
+      uint32_t OUTCH = curr_stage_info.kernel_shape[3];
+      uint32_t FILTER_HEIGHT = curr_stage_info.kernel_shape[0];
+      uint32_t FILTER_WIDTH = curr_stage_info.kernel_shape[1];
+      uint32_t index =0;
+      for(int i =0;i<(INCH*FILTER_HEIGHT*FILTER_WIDTH);i++){
+        for(int j=0;j<OUTCH;j++){
+          *(kernel_data_buffer_android+index)= *(curr_stage_info.kernel_buffer+j*(INCH*FILTER_HEIGHT*FILTER_WIDTH)+i);
+          index = index+1;
+        }
+      }
+    }
+
+#endif
     kenrel_data_size_align = kenrel_data_size + align_size(kenrel_data_size,128);
 
     kernel_data_buffer = (float *)malloc(kenrel_data_size_align);
@@ -1881,16 +1908,16 @@ bool write_kernel_bias_data_buffer_to_file(Operation_inputs_info curr_stage_info
     if(curr_stage_info.kernel_buffer == NULL)
     ALOGE(" curr_stage_info.kernel_buffer is null ");
     memset(kernel_data_buffer,0,kenrel_data_size_align);
-    memcpy(kernel_data_buffer,curr_stage_info.kernel_buffer,kenrel_data_size);
-#if 1
+    //memcpy(kernel_data_buffer,curr_stage_info.kernel_buffer,kenrel_data_size);
+    memcpy(kernel_data_buffer,kernel_data_buffer_android,kenrel_data_size);
     buffer_fp16 = (half*) malloc(kenrel_data_size_align/2);
+    memset(buffer_fp16,0,kenrel_data_size_align/2);
     if( buffer_fp16 == NULL)
     ALOGE("unable to allocate buffer_fp16 exit");
     else
     ALOGD("buffer_fp16 allocation success");
     floattofp16((unsigned char *)buffer_fp16, kernel_data_buffer, kenrel_data_size_align/4);
-#endif
-#if 1
+
     fp = fopen("/data/ncs_graph","ab+");
     if(fp == NULL)
     ALOGE("unable to open ncs_graph file for kernel_data writing");
@@ -1899,7 +1926,6 @@ bool write_kernel_bias_data_buffer_to_file(Operation_inputs_info curr_stage_info
     fseek(fp,0,SEEK_END);
     fwrite((unsigned char *)buffer_fp16,kenrel_data_size_align/2,1,fp);
     fclose(fp);
-#endif
   ALOGD("copied kernel_data_buffer %u bytes....",kenrel_data_size_align/2);
   free(buffer_fp16);
   }
@@ -1912,7 +1938,10 @@ bool write_kernel_bias_data_buffer_to_file(Operation_inputs_info curr_stage_info
 
     bias_data_size = dtype_android * curr_stage_info.bias_shape[0] * curr_stage_info.bias_shape[1] *
                                       curr_stage_info.bias_shape[2] * curr_stage_info.bias_shape[3];
+
+
     bias_data_size_align = bias_data_size + align_size(bias_data_size,128);
+
     bias_data_buffer = (float *)malloc(bias_data_size_align);
 
     if(bias_data_buffer == NULL)
@@ -1920,17 +1949,18 @@ bool write_kernel_bias_data_buffer_to_file(Operation_inputs_info curr_stage_info
     if(curr_stage_info.bias_buffer == NULL)
     ALOGE(" curr_stage_info.bias_buffer is null ");
 
+
     memset(bias_data_buffer,0,bias_data_size_align);
     memcpy(bias_data_buffer,curr_stage_info.bias_buffer,bias_data_size);
-#if 1
+
     buffer_fp16 = (half*) malloc(bias_data_size_align/2);
+    memset(buffer_fp16,0,bias_data_size_align/2);
     if( buffer_fp16 == NULL)
     ALOGE("unable to allocate buffer_fp16 exit");
     else
     ALOGD("buffer_fp16 allocation success");
     floattofp16((unsigned char *)buffer_fp16, bias_data_buffer, bias_data_size_align/4);
-#endif
-#if 1
+
     fp = fopen("/data/ncs_graph","ab+");
     if(fp == NULL)
     ALOGE("unable to open ncs_graph file for bias_data writing");
@@ -1939,7 +1969,7 @@ bool write_kernel_bias_data_buffer_to_file(Operation_inputs_info curr_stage_info
     fseek(fp,0,SEEK_END);
     fwrite((unsigned char *)buffer_fp16,bias_data_size_align/2,1,fp);
     fclose(fp);
-#endif
+
     ALOGD("copied bias_data_buffer %u bytes....",bias_data_size_align/2);
     free(buffer_fp16);
   }
@@ -1947,21 +1977,36 @@ bool write_kernel_bias_data_buffer_to_file(Operation_inputs_info curr_stage_info
   if(curr_stage_info.op_params_data == true){
     op_params_size_align = 128;
     op_params_buffer = (float *)malloc(op_params_size_align);
+    uint32_t index = 0;
 
     if(op_params_buffer == NULL)
     ALOGE("unable to allocate bias_data_buffer exit");
     if(curr_stage_info.beta == NULL)
     ALOGE(" curr_stage_info.beta is null ");
-
+    float Beta = curr_stage_info.beta;
     memset(op_params_buffer,0,op_params_size_align);
-    memcpy(op_params_buffer,&curr_stage_info.beta,1);
+
+    *(op_params_buffer) = Beta;
+    ALOGD("op_params_buffer[0]: %f",*(op_params_buffer));
 #if 1
     buffer_fp16 = (half*) malloc(op_params_size_align/2);
     if( buffer_fp16 == NULL)
     ALOGE("unable to allocate buffer_fp16 exit");
     else
     ALOGD("buffer_fp16 allocation success");
-    floattofp16((unsigned char *)buffer_fp16, op_params_buffer, op_params_size_align/4);
+    memset(buffer_fp16,0,op_params_size_align/2);
+    *buffer_fp16 = 1;
+
+    fp = fopen("/data/ncs_graph_data","w");
+    if(fp == NULL)
+    ALOGE("unable to open ncs_graph file for op_params_data writing");
+    else
+    ALOGD("ncs_graph file is open for op_params_data writing");
+    fseek(fp,0,SEEK_END);
+    fwrite(op_params_buffer,op_params_size_align,1,fp);
+    fclose(fp);
+
+    //floattofp16((unsigned char *)buffer_fp16, op_params_buffer, op_params_size_align/4);
 #endif
 #if 1
     fp = fopen("/data/ncs_graph","ab+");
@@ -1978,6 +2023,7 @@ bool write_kernel_bias_data_buffer_to_file(Operation_inputs_info curr_stage_info
   }
 
   if(curr_stage_info.kernel_data == true) free(kernel_data_buffer);
+  if(curr_stage_info.kernel_data == true) free(kernel_data_buffer_android);
   if(curr_stage_info.bias_data == true) free(bias_data_buffer);
   if(curr_stage_info.op_params_data == true) free(op_params_buffer);
 

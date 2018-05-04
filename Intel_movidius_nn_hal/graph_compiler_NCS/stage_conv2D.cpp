@@ -148,7 +148,7 @@ Blob_Stage_data get_CONV_2D_stage_data(Operation_inputs_info curr_stage_info){
 
   stage_conv2d.post_strideX = 0;
   stage_conv2d.post_strideY = 0;
-    
+
   if(update_taps_Pointer_g(new_bias_Pointer)!=true)
     ALOGE("unable to update taps_Pointer global");
 
@@ -247,7 +247,7 @@ Blob_Stage_data get_CONV_1D_stage_data(Operation_inputs_info curr_stage_info){
     stage_conv1d.output_Index = get_output_Index_global()+1;
 
     stage_conv1d.preOp_value = 5;
-    stage_conv1d.postOp_value = 9;
+    stage_conv1d.postOp_value = 5;
 
     stage_conv1d.post_param1[0] = 0x00;
     stage_conv1d.post_param1[1] = 0x00;

@@ -109,6 +109,7 @@ private:
     // is being executed.
     const Model* mModel = nullptr;
     const Request* mRequest = nullptr;
+    float *kernel_data_buffer;
 
     // We're copying the list of all the dimensions from the model, as
     // these may be modified when we run the operatins.  Since we're

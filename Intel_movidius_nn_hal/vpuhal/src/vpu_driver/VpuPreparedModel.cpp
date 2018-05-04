@@ -220,7 +220,7 @@ bool VpuPreparedModel::isOperationSupported(const Operation& operation, const Mo
         {
           VLOG(DRIVER) << "SOFTMAX is supported operation ";
           break;
-        }
+        }/*
         case OperationType::FULLY_CONNECTED:
         {
           VLOG(DRIVER) << "FULLY_CONNECTED is supported operation ";
@@ -230,7 +230,7 @@ bool VpuPreparedModel::isOperationSupported(const Operation& operation, const Mo
         {
           VLOG(DRIVER) << "L2_NORMALIZATION is supported operation ";
           break;
-        }
+        }*/
         case OperationType::RESHAPE:
         {
           VLOG(DRIVER) << "RESHAPE is supported operation "; //ANEURALNETWOKRS_RESHAPE

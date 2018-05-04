@@ -153,9 +153,9 @@ inline size_t getSizeFromInts(int lower, int higher) {
     return (uint32_t)(lower) + ((uint64_t)(uint32_t)(higher) << 32);
 }
 
-#ifdef NN_DEBUGGABLE
+
 uint32_t getProp(const char* str, uint32_t defaultValue = 0);
-#endif  // NN_DEBUGGABLE
+
 
 }  // namespace vpu_driver
 }  // namespace V1_0
