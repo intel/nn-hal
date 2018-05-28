@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2018 The Android Open Source Project
+ * Copyright (c) 2018 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +15,6 @@
  * limitations under the License.
  */
 
-
-
 #define LOG_TAG "VpuExecutor"
 
 #include "VpuExecutor.h"
@@ -23,7 +22,7 @@
 #include "Blob.h"
 #include <stdio.h>
 #include "vpu_lib.h"
-//TODO check this file is required or not
+
 
 #include "VpuOperations.h"
 
@@ -907,6 +906,7 @@ Operation_inputs_info VpuExecutor::get_operation_operands_info(const Operation& 
   return stage_info;
 }
 
+
 // Ignore the .pools entry in model and request.  This will have been taken care of
 // by the caller.
 int VpuExecutor::run(const Model& model, const Request& request,
@@ -918,8 +918,11 @@ int VpuExecutor::run(const Model& model, const Request& request,
 
     mModel = &model;
     mRequest = &request; // TODO check if mRequest is needed
+
     initializeRunTimeInfo(modelPoolInfos, requestPoolInfos);
+
     // The model has serialized the operation in execution order.
+#if 0
 #if file_dump
     FILE *fp;
     fp = fopen("/data/ncs_graph_data","rb");
@@ -1013,18 +1016,24 @@ int VpuExecutor::run(const Model& model, const Request& request,
 
     VLOG(VPUEXE) << "Model Compiling for VPU Driver: completed";
 
+#endif
+    Oertaion_vector nn_ops_vectors;
+    for (const auto& operation : model.operations) {
+      nn_ops_vectors.push_back(operation.type);
+    }
 
     const hidl_vec<uint32_t>& network_inputs = model.operations[0].inputs;
     const RunTimeOperandInfo& network_input = mOperands[network_inputs[0]];
     Shape nw_input_shape = network_input.shape();
     uint32_t input_num_elements = getNumberOfElements(nw_input_shape);
-    VLOG(VPUEXE) << "Before setInfoAndAllocateIfNeeded Input Num of Elements: " << input_num_elements;
-    const float *network_input_buffer;
+    VLOG(VPUEXE) << "Input Num of Elements: " << input_num_elements;
+
+    float *network_input_buffer;
     network_input_buffer = (float *)malloc(sizeof(float) * input_num_elements);
     if(network_input_buffer == NULL)
     LOG(ERROR) << "Unable to allocate network_input_buffer";
-    network_input_buffer = reinterpret_cast<float*>(network_input.buffer);
-
+    memset(network_input_buffer, 0, sizeof(float) * input_num_elements);
+    memcpy(network_input_buffer,reinterpret_cast<float*>(network_input.buffer), sizeof(float) * input_num_elements);
 
     const hidl_vec<uint32_t>& network_outputs = model.operations[nn_ops_vectors.size()-1].outputs;
     RunTimeOperandInfo& network_output = mOperands[network_outputs[0]];
@@ -1036,33 +1045,25 @@ int VpuExecutor::run(const Model& model, const Request& request,
     LOG(ERROR) << "Unable to allocate network_output_buffer";
     memset(network_output_buffer,0,sizeof(float) * output_num_elements);
 
-    VLOG(VPUEXE) << "Before setInfoAndAllocateIfNeeded Output Num of Elements: " << output_num_elements;
+
+    VLOG(VPUEXE) << "Output Num of Elements: " << output_num_elements;
+
+    VLOG(VPUEXE) << "Got the input data request Starting to execute on VPU!";
 
     int val = ncs_execute((float*)network_input_buffer,input_num_elements,network_output_buffer, output_num_elements);
+
+
     memcpy(reinterpret_cast<float*>(network_output.buffer),network_output_buffer,output_num_elements*sizeof(float));
+    VLOG(VPUEXE) << "Got the output result fro VPU!";
 
-#if 1
-
-    FILE *fp;
-    fp=fopen("/data/ncs_output","w");
-    if(!fp) ALOGE("unable to open the file /data/ncs_output ");
-    fseek(fp, 0, SEEK_END);
-    fwrite(network_output_buffer,sizeof(float),output_num_elements,fp);
-    fclose(fp);
-
-#endif
-
-   if(output_num_elements<50){
-     for(uint32_t i=0;i<output_num_elements;i++){
-       ALOGD("SRISTI: NCS Output is buffer[%d]:%f",i,*(network_output_buffer+i));
-       ALOGD("SRISTI: Model Output is buffer[%d]:%f",i,*(reinterpret_cast<float*>(network_output.buffer)+i));
-     }
-   }
+    free(network_input_buffer);
+    free(network_output_buffer);
 
 
     for (auto runtimeInfo : modelPoolInfos) {
         runtimeInfo.update();
     }
+
     for (auto runtimeInfo : requestPoolInfos) {
         runtimeInfo.update();
     }
@@ -1070,7 +1071,7 @@ int VpuExecutor::run(const Model& model, const Request& request,
     mModel = nullptr;
     mRequest = nullptr;
     VLOG(VPUEXE) << "Completed run normally";
-    
+
     return ANEURALNETWORKS_NO_ERROR;
 }
 

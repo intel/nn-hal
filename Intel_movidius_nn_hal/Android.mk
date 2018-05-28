@@ -15,5 +15,4 @@
 # limitations under the License.
 #
 LOCAL_PATH := $(my-dir)
-
 include $(call all-subdir-makefiles, $(LOCAL_PATH))

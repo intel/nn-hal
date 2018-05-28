@@ -19,7 +19,8 @@ Below are the operations supported by Intel Movidius NN HAL
 * ANEURALNETWORKS_RESHAPE
 
 ## Known issues
-To be updated
+* Neural Network Model Compilation is performed during the Model Execution (i.e. when ANeuralNetworksExecution_startCompute API is called) phase, it is casuing the performance drop
+* Model Compilation task need to be moved under PrepareModel Class
 
 ## License
 Intel® Movidius™ Neural Networks HAL is distributed under the Apache License, Version 2.0

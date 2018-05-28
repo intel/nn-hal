@@ -1,4 +1,4 @@
-// Copyright 2017 Intel Corporation.
+// Copyright 2018 Intel Corporation.
 // The source code, information and material ("Material") contained herein is
 // owned by Intel Corporation or its suppliers or licensors, and title to such
 // Material remains with Intel Corporation or its suppliers or licensors.

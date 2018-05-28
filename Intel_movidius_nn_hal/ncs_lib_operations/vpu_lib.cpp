@@ -1,20 +1,18 @@
-// Copyright 2018 Intel Corporation.
-// The source code, information and material ("Material") contained herein is
-// owned by Intel Corporation or its suppliers or licensors, and title to such
-// Material remains with Intel Corporation or its suppliers or licensors.
-// The Material contains proprietary information of Intel or its suppliers and
-// licensors. The Material is protected by worldwide copyright laws and treaty
-// provisions.
-// No part of the Material may be used, copied, reproduced, modified, published,
-// uploaded, posted, transmitted, distributed or disclosed in any way without
-// Intel's prior express written permission. No license under any patent,
-// copyright or other intellectual property rights in the Material is granted to
-// or conferred upon you, either expressly, by implication, inducement, estoppel
-// or otherwise.
-// Any license under such intellectual property rights must be express and
-// approved by Intel in writing.
-
-
+/*
+ * Copyright (c) 2018 Intel Corporation
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 #include <stdio.h>
 #include <stdlib.h>
 #include <iostream>
@@ -137,13 +135,16 @@ mvncStatus ncs_rungraph(float *input_data, uint32_t input_num_of_elements,
                       }
                       ALOGD("Graph Allocated successfully!");
                       //convert inputs from fp32 to fp16
-
-
+                      float *input_data_buffer = (float *)malloc(input_num_of_elements*sizeof(float));
+                      if(input_data_buffer==NULL)
+                      ALOGE("unable to allocate input_data_buffer");
+                      memset(input_data_buffer,0,input_num_of_elements*sizeof(float));
+                      memcpy(input_data_buffer,input_data,input_num_of_elements*sizeof(float));
 
                       //allocate fp16 input1 with inpu1 shape
                       ip1_fp16 = (half*) malloc(sizeof(*ip1_fp16) * input_num_of_elements);
                       ALOGD("Converting input from Float to FP16 Begin");
-                      floattofp16((unsigned char *)ip1_fp16, input_data, input_num_of_elements);
+                      floattofp16((unsigned char *)ip1_fp16, input_data_buffer, input_num_of_elements);
                       ALOGD("Converting input from Float to FP16 end");
                       lenip1_fp16 = input_num_of_elements * sizeof(*ip1_fp16);
 
@@ -176,14 +177,17 @@ mvncStatus ncs_rungraph(float *input_data, uint32_t input_num_of_elements,
                       ALOGD("Graph Deallocated successfully!");
                       graphHandle = NULL;
                       int numResults = lenResultData / sizeof(half);
-                      float *output_data_buffer = (float *)malloc(numResults*sizeof(float));
+
+                      float *output_data_buffer = (float *)malloc(output_num_of_elements*sizeof(float));
                       if(output_data_buffer==NULL)
                       ALOGE("unable to allocate output_data_buffer");
-                      memset(output_data_buffer,0,numResults*sizeof(float));
+                      memset(output_data_buffer,0,output_num_of_elements*sizeof(float));
                       ALOGD("Converting output from FP16 to Float Begin");
-                      fp16tofloat(output_data_buffer, (unsigned char*)resultData16, numResults);
+                      fp16tofloat(output_data_buffer, (unsigned char*)resultData16, output_num_of_elements);
                       ALOGD("Converting output from FP16 to Float end");
-                      memcpy(output_data,output_data_buffer,numResults*sizeof(float));
+                      memcpy(output_data,output_data_buffer,output_num_of_elements*sizeof(float));
+                      ALOGD("Output data is copied");
+                      free(input_data_buffer);
                       free(output_data_buffer);
                       free(graphFileBuf);
                       free(ip1_fp16);
@@ -195,15 +199,17 @@ mvncStatus ncs_rungraph(float *input_data, uint32_t input_num_of_elements,
 int ncs_execute(float *input_data, uint32_t input_num_of_elements,float *output_data, uint32_t output_num_of_elements){
   int fail_count = 0;
 RUN_GRAPH:
+  ALOGD("device_online: %d", device_online);
   if (device_online != true) {
     if (ncs_init(NCS_NUM) != MVNC_OK){
       ALOGE("Device Unavilable");
       exit(-1);
     }
+    ALOGD("Device avilable");
+  }else{
+    ALOGD("Device already avilable");
   }
-  ALOGD("Device avilable");
-
-  status = ncs_rungraph((float*) input_data, input_num_of_elements, output_data, output_num_of_elements);
+  status = ncs_rungraph(input_data, input_num_of_elements, output_data, output_num_of_elements);
   if(status != MVNC_OK){
       fail_count++;
       ncs_deinit();

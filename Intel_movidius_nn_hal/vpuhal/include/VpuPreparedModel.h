@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2018 The Android Open Source Project
+ * Copyright (c) 2018 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -51,7 +52,7 @@ class VpuPreparedModel : public IPreparedModel {
             : // Make a copy of the model, as we need to preserve it.
               mModel(model) {} //, cpu_engine(nullptr) {} //TODO check do we need vpu_engine(nullptr)
       ~VpuPreparedModel() override {deinitialize();}
-      bool initialize();
+      bool initialize(const Model& model);
       Return<ErrorStatus> execute(const Request& request,
                                   const sp<IExecutionCallback>& callback) override;
       static bool isOperationSupported(const Operation& operation, const Model& model);
@@ -60,19 +61,11 @@ class VpuPreparedModel : public IPreparedModel {
 
 private:
         void deinitialize();
-
+        Operation_inputs_info get_operation_operands_info_model(const Model& model, const Operation& operation);
         void asyncExecute(const Request& request, const sp<IExecutionCallback>& callback);
 
         Model mModel;
         std::vector<RunTimePoolInfo> mPoolInfos;
-
-/*      //TODO check do we need the below items?
-
-        std::vector<RunTimeOperandInfo> mOperands;
-        std::vector<RunTimePoolInfo> mPoolInfos;
-        std::vector<primitive> mNet;
-        engine *cpu_engine;
-*/
 };
 
 }  // namespace vpu_driver

@@ -1,5 +1,6 @@
 /*
- * Copyright (C) 2017 The Android Open Source Project
+ * Copyright (C) 2018 The Android Open Source Project
+ * Copyright (c) 2018 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +22,6 @@
 #include "VpuUtils.h"
 #include "ActivationFunctor.h"
 #include "ncs_lib.h"
-
 #include <cmath>
 
 namespace android {
@@ -54,7 +54,6 @@ uint32_t getNumberOfElements(const Shape& shape) {
     uint32_t count = 1;
     for (size_t i = 0; i < shape.dimensions.size(); i++) {
         count *= shape.dimensions[i];
-        ALOGD("count:%d, i: %d",shape.dimensions[i],i);
     }
     return count;
 }

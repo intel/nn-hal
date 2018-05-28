@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2018 The Android Open Source Project
+ * Copyright (c) 2018 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -107,7 +108,7 @@ Return<ErrorStatus> VpuDriver::prepareModel(const Model& model,
 
     // TODO: make asynchronous later
     sp<VpuPreparedModel> preparedModel = new VpuPreparedModel(model);
-    if (!preparedModel->initialize()) {
+    if (!preparedModel->initialize(model)) {
         ALOGE("failed to initialize preparedmodel");
         callback->notify(ErrorStatus::GENERAL_FAILURE, nullptr);
         return ErrorStatus::INVALID_ARGUMENT;

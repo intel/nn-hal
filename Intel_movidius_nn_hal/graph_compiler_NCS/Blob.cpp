@@ -1,3 +1,18 @@
+/*
+ * Copyright (c) 2018 Intel Corporation
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 #include<stdio.h>
 #include<stdlib.h>
 #include<string.h>
@@ -1881,10 +1896,11 @@ bool write_kernel_bias_data_buffer_to_file(Operation_inputs_info curr_stage_info
        kernel_data_buffer_android = nullptr;
     }else{
       memset(kernel_data_buffer_android,0, kenrel_data_size);
+      /*
       ALOGD("curr_stage_info.kernel_shape[0]:%u",curr_stage_info.kernel_shape[0]);
       ALOGD("curr_stage_info.kernel_shape[1]:%u",curr_stage_info.kernel_shape[1]);
       ALOGD("curr_stage_info.kernel_shape[2]:%u",curr_stage_info.kernel_shape[2]);
-      ALOGD("curr_stage_info.kernel_shape[3]:%u",curr_stage_info.kernel_shape[3]);
+      ALOGD("curr_stage_info.kernel_shape[3]:%u",curr_stage_info.kernel_shape[3]);*/
 
       uint32_t INCH = curr_stage_info.kernel_shape[2];
       uint32_t OUTCH = curr_stage_info.kernel_shape[3];
@@ -2006,9 +2022,6 @@ bool write_kernel_bias_data_buffer_to_file(Operation_inputs_info curr_stage_info
     fwrite(op_params_buffer,op_params_size_align,1,fp);
     fclose(fp);
 
-    //floattofp16((unsigned char *)buffer_fp16, op_params_buffer, op_params_size_align/4);
-#endif
-#if 1
     fp = fopen("/data/ncs_graph","ab+");
     if(fp == NULL)
     ALOGE("unable to open ncs_graph file for op_params_data writing");
@@ -2115,10 +2128,6 @@ uint32_t calculate_data_buffer_size(){
 
     final_data_size_align = kenrel_data_size_align + bias_data_size_align + op_params_size_align;
     data_buf_size += final_data_size_align;
-    ALOGD("calculate_data_buffer_size kenrel_data_size_align %lu",kenrel_data_size_align);
-    ALOGD("calculate_data_buffer_size bias_data_size_align %lu",bias_data_size_align);
-    ALOGD("calculate_data_buffer_size op_params_size_align %lu",op_params_size_align);
-    ALOGD("calculate_data_buffer_size final_data_size_align %lu",final_data_size_align);
   }
   return data_buf_size;
 }
@@ -2128,7 +2137,7 @@ uint32_t align_size(uint32_t fsize, unsigned int align_to){
   if((fsize%align_to)!=0)
     return (align_to - fsize%align_to);
   else
-    return 0; // TODO fix me later
+    return 0;
 }
 
 void get_header_buffer(char *buf_Herader, Blobconfig blob_config, Myriadconfig mconfig){
@@ -2156,7 +2165,7 @@ void get_header_buffer(char *buf_Herader, Blobconfig blob_config, Myriadconfig m
   memcpy((buf_Herader+index),blob_config.network_name.c_str(),SIZE_OF_NETOWRK_NAME); //(buf_Herader+index++) = blob_config.network_name;
   index += SIZE_OF_NETOWRK_NAME; // move the index pointer by SIZE_OF_NETOWRK_NAME
   memset((buf_Herader+index),0,SIZE_OF_DIR_NAME);
-  //memcpy((buf_Herader+index),blob_config.blob_report_dir.c_str(),SIZE_OF_DIR_NAME); //(buf_Herader+index++) = blob_config.blob_report_dir;
+
   index += SIZE_OF_DIR_NAME; // move the index pointer by SIZE_OF_NETOWRK_NAME
   *(buf_Herader+index) = blob_config.stage_count;
   index += sizeof(blob_config.stage_count);
@@ -2205,13 +2214,7 @@ char* generate_graph(char* graph_buf, Blobconfig blob_config, Myriadconfig mconf
   ALOGD("Netowrk Size: %d",network_operations.size());
   for(int i=0; i<network_operations.size();i++)
   ALOGD("Operation number is %d",network_operations.at(i));
-#if 0
-  if (network_operations.size() == 1 && nwk_vector_stages_info.size() == 1){
-    switch (nwk_vector_stages_info.at(0).main_operation) {
-      case RELU:
-    }
-  }
-#endif
+
   //TODO copy the get_header_buffer data to
   char* buf_Herader ;
   buf_Herader = (char *)malloc(SIZE_HEADER);
