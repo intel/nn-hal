@@ -10,6 +10,7 @@ Below are the operations supported by Intel Movidius NN HAL
 * ANEURALNETWORKS_CONV_2D
 * ANEURALNETWORKS_DEPTHWISE_CONV_2D
 * ANEURALNETWORKS_AVERAGE_POOL_2D
+* ANEURALNETWORKS_MAX_POOL_2D
 * ANEURALNETWORKS_LOGISTIC
 * ANEURALNETWORKS_RELU
 * ANEURALNETWORKS_RELU1
@@ -18,9 +19,12 @@ Below are the operations supported by Intel Movidius NN HAL
 * ANEURALNETWORKS_SOFTMAX
 * ANEURALNETWORKS_RESHAPE
 
-## Known issues
-* Neural Network Model Compilation is performed during the Model Execution (i.e. when ANeuralNetworksExecution_startCompute API is called) phase, it is casuing the performance drop
-* Model Compilation task need to be moved under PrepareModel Class
+## Validated Models
+*  [Mobilenet_v1 Float paper](https://arxiv.org/pdf/1704.04861.pdf) [Mobilenet_v1 Float model](http://download.tensorflow.org/models/mobilenet_v1_2018_02_22/mobilenet_v1_1.0_224.tgz)
+
+## Known Issues
+* After performing git clone to integrate the HAL into your Android build remove the other HAL directory using below command
+  rm -rf vpu-hal2 
 
 ## License
 Intel® Movidius™ Neural Networks HAL is distributed under the Apache License, Version 2.0
