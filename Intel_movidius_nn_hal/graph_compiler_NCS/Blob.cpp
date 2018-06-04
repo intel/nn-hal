@@ -48,6 +48,7 @@ Blob_Stage_data input_stage_data;
 Network_Vector_Stageinfo nwk_vector_stages_info;
 unsigned int stage_count=1;
 
+
 uint32_t zero_data_offset_g = 0;
 uint16_t buffer_index_g = 0;
 
@@ -611,6 +612,7 @@ void get_stage_buffer(char *stage_buffer, NCSoperations curr_operation, unsigned
     case CONV_2D : current_stage_data = get_CONV_2D_stage_data(curr_stage_info); break;
     case DEPTHWISE_CONV_2D : current_stage_data = get_DEPTHWISE_CONV_2D_stage_data(curr_stage_info); break;
     case AVERAGE_POOL_2D : current_stage_data = get_AVG_POOL_stage_data(curr_stage_info); break;
+	case MAX_POOL_2D : current_stage_data = get_MAX_POOL_stage_data(curr_stage_info); break;
     case RESHAPE : current_stage_data = get_Reshape_stage_data(curr_stage_info); break;
     case SOFTMAX : current_stage_data = get_Softmax_stage_data(curr_stage_info); break;
     default: break;
@@ -898,6 +900,7 @@ void get_first_stage_buffer(char *stage_buffer, NCSoperations curr_operation, un
     case CONV_2D : current_stage_data = get_CONV_2D_stage_data(curr_stage_info); break;
     case DEPTHWISE_CONV_2D : current_stage_data = get_DEPTHWISE_CONV_2D_stage_data(curr_stage_info); break;
     case AVERAGE_POOL_2D : current_stage_data = get_AVG_POOL_stage_data(curr_stage_info); break;
+	case MAX_POOL_2D : current_stage_data = get_MAX_POOL_stage_data(curr_stage_info); break;
     case RESHAPE : current_stage_data = get_Reshape_stage_data(curr_stage_info); break;
     case SOFTMAX : current_stage_data = get_Softmax_stage_data(curr_stage_info); break;
     default: break;
@@ -1192,7 +1195,8 @@ void get_last_stage_buffer(char *stage_buffer, NCSoperations curr_operation, uns
     case CONV_2D : current_stage_data = get_CONV_2D_stage_data(curr_stage_info); break;
     case DEPTHWISE_CONV_2D : current_stage_data = get_DEPTHWISE_CONV_2D_stage_data(curr_stage_info); break;
     case AVERAGE_POOL_2D : current_stage_data = get_AVG_POOL_stage_data(curr_stage_info); break;
-    case RESHAPE : current_stage_data = get_Reshape_stage_data(curr_stage_info); break;
+    case MAX_POOL_2D : current_stage_data = get_MAX_POOL_stage_data(curr_stage_info); break;
+	case RESHAPE : current_stage_data = get_Reshape_stage_data(curr_stage_info); break;
     case SOFTMAX : current_stage_data = get_Softmax_stage_data(curr_stage_info); break;
     default: break;
   }
@@ -1485,6 +1489,7 @@ void get_one_stage_buffer(char *stage_buffer, NCSoperations curr_operation, unsi
     case CONV_2D : current_stage_data = get_CONV_2D_stage_data(curr_stage_info); break;
     case DEPTHWISE_CONV_2D : current_stage_data = get_DEPTHWISE_CONV_2D_stage_data(curr_stage_info); break;
     case AVERAGE_POOL_2D : current_stage_data = get_AVG_POOL_stage_data(curr_stage_info); break;
+	case MAX_POOL_2D : current_stage_data = get_MAX_POOL_stage_data(curr_stage_info); break;
     case RESHAPE : current_stage_data = get_Reshape_stage_data(curr_stage_info); break;
     case SOFTMAX : current_stage_data = get_Softmax_stage_data(curr_stage_info); break;
     default: break;

@@ -23,6 +23,7 @@
 #include <android-base/logging.h>
 #include <hidl/LegacySupport.h>
 #include <thread>
+#include "ncs_lib.h"
 
 #define DISABLE_ALL_QUANT 1
 #define file_dump false
@@ -52,21 +53,6 @@ namespace neuralnetworks {
 namespace V1_0 {
 namespace vpu_driver {
 
-  // setRunTimePoolInfosFromHidlMemories() function
-/*
-  bool setRunTimePoolInfosFromHidlMemories(std::vector<RunTimePoolInfo>* poolInfos,
-                                           const hidl_vec<hidl_memory>& pools) {
-      poolInfos->resize(pools.size());
-      for (size_t i = 0; i < pools.size(); i++) {
-          auto& poolInfo = (*poolInfos)[i];
-          if (!poolInfo.set(pools[i])) {
-              ALOGE("Could not map pool");
-              return false;
-          }
-      }
-      return true;
-  }  //TODO Move to VpuExecutor.cpp
-*/
 
 template <typename T>
 T getOperandConstVal(const Model& model, const Operand& operand)
@@ -75,21 +61,6 @@ T getOperandConstVal(const Model& model, const Operand& operand)
     return data[0];
 }
 
-/*
-template <typename T>
-const T* getOperandbuffer(const Model& model, const Operand& operand)
-{
-  const T* data;
-    if(operand.type == OperandType::TENSOR_FLOAT32 && operand.lifetime == OperandLifeTime::CONSTANT_COPY)
-        data = reinterpret_cast<const T *>(&model.operandValues[operand.location.offset]);
-    else if(operand.type == OperandType::TENSOR_FLOAT32 && operand.lifetime == OperandLifeTime::CONSTANT_REFERENCE){
-      auto poolIndex = operand.location.poolIndex;
-      auto& r = mPoolInfos[poolIndex];
-      data = reinterpret_cast<const  T *>(r.buffer+operand.location.offset);
-    }
-    return data;
-}
-*/
 
 // initialize() function
 
@@ -104,8 +75,7 @@ bool VpuPreparedModel::initialize(const Model& model) {
       return false;
     }
 
-// code begin for understand model
-#if 1
+    // code begin for understand model
     VLOG(MODEL) << "Model Compiling for VPU Driver begin ";
     Oertaion_vector nn_ops_vectors;
     network_operations_vector nn_ncs_network;
@@ -122,11 +92,9 @@ bool VpuPreparedModel::initialize(const Model& model) {
         case OperationType::CONV_2D: nn_ncs_operation = CONV_2D;break;
         case OperationType::DEPTHWISE_CONV_2D: nn_ncs_operation = DEPTHWISE_CONV_2D;break;
         case OperationType::AVERAGE_POOL_2D: nn_ncs_operation = AVERAGE_POOL_2D;break;
-        case OperationType::L2_POOL_2D: nn_ncs_operation = L2_POOL_2D;break;
         case OperationType::MAX_POOL_2D: nn_ncs_operation = MAX_POOL_2D;break;
         case OperationType::SOFTMAX: nn_ncs_operation = SOFTMAX;break;
         case OperationType::FULLY_CONNECTED: nn_ncs_operation = FULLY_CONNECTED;break;
-        case OperationType::L2_NORMALIZATION: nn_ncs_operation = L2_NORMALIZATION;break;
         case OperationType::RESHAPE: nn_ncs_operation = RESHAPE;break;
         default: nn_ncs_operation = NONE;break;
       }
@@ -137,7 +105,7 @@ bool VpuPreparedModel::initialize(const Model& model) {
     bool status;
     status = get_nn_network_from_android(nn_ncs_network);
     if(!status)
-      return ANEURALNETWORKS_INCOMPLETE;
+      return false;
 
     Operation_inputs_info operation_operand_info;
 
@@ -149,20 +117,32 @@ bool VpuPreparedModel::initialize(const Model& model) {
       bool status = parse_stage_from_android(operation_operand_info);
       VLOG(MODEL) << "Status " << status;
       if(!status){
-        nnAssert(false);
-        break;
+        return false;
       }
     }
     status = prepare_blob();
     if(!status){
       VLOG(MODEL) << "Unable to prepare NCS graph";
-      nnAssert(false);
+      return false;
     }
 
     VLOG(MODEL) << "Model Compiling for VPU Driver: completed";
+    //code end for understand model
 
-#endif //code end for understand model
-    return success;
+    int val;
+    val = ncs_init();
+    if (val!=0){
+      LOG(ERROR) << "unable to initialize NCS device";
+      return false;
+    }
+
+    val = ncs_load_graph();
+    if (val!=0){
+      LOG(ERROR) << "unable to Load graph into NCS device";
+      return false;
+    }
+
+    return true;
   }
 
 
@@ -997,6 +977,138 @@ Operation_inputs_info VpuPreparedModel::get_operation_operands_info_model(const 
             }
         } break;//AVERAGE_POOL_2D end
 
+        case OperationType::MAX_POOL_2D: {
+        VLOG(MODEL) << toString(operation);
+        const size_t inCount = operation.inputs.size();
+        const auto input = model.operands[operation.inputs[0]];
+        auto output = model.operands[operation.outputs[0]];
+
+        Shape inputShape, outputShape;
+
+        inputShape.type = input.type;
+        inputShape.dimensions = input.dimensions;
+        inputShape.scale = input.scale;
+        inputShape.offset = input.location.offset;
+
+        outputShape.type = output.type;
+        outputShape.dimensions = output.dimensions;
+        outputShape.scale = output.scale;
+        outputShape.offset = output.location.offset;
+
+        int32_t padding_left, padding_right;
+        int32_t padding_top, padding_bottom;
+        int32_t stride_width, stride_height;
+        int32_t filter_width, filter_height;
+        int32_t activation;
+
+        if (inCount == 10) {
+          padding_left     = getOperandConstVal<int32_t>(model,model.operands[operation.inputs[1]]);
+          padding_right    = getOperandConstVal<int32_t>(model,model.operands[operation.inputs[2]]);
+          padding_top      = getOperandConstVal<int32_t>(model,model.operands[operation.inputs[3]]);
+          padding_bottom   = getOperandConstVal<int32_t>(model,model.operands[operation.inputs[4]]);
+          stride_width     = getOperandConstVal<int32_t>(model,model.operands[operation.inputs[5]]);
+          stride_height    = getOperandConstVal<int32_t>(model,model.operands[operation.inputs[6]]);
+          filter_width     = getOperandConstVal<int32_t>(model,model.operands[operation.inputs[7]]);
+          filter_height    = getOperandConstVal<int32_t>(model,model.operands[operation.inputs[8]]);
+          activation       = getOperandConstVal<int32_t>(model,model.operands[operation.inputs[9]]);
+              }
+              else {
+          int32_t padding_implicit = getOperandConstVal<int32_t>(model,model.operands[operation.inputs[1]]);
+          stride_width     = getOperandConstVal<int32_t>(model,model.operands[operation.inputs[2]]);
+          stride_height    = getOperandConstVal<int32_t>(model,model.operands[operation.inputs[3]]);
+          filter_width     = getOperandConstVal<int32_t>(model,model.operands[operation.inputs[4]]);
+          filter_height    = getOperandConstVal<int32_t>(model,model.operands[operation.inputs[5]]);
+          activation       = getOperandConstVal<int32_t>(model,model.operands[operation.inputs[6]]);
+
+          int32_t input_width  = input.dimensions[2];
+          int32_t input_height = input.dimensions[1];
+
+                  calculateExplicitPadding(input_width, stride_width,
+                                     filter_width, padding_implicit,
+                                     &padding_left, &padding_right);
+                  calculateExplicitPadding(input_height, stride_height,
+                                     filter_height, padding_implicit,
+                                     &padding_top, &padding_bottom);
+              }
+
+        if (input.type == OperandType::TENSOR_FLOAT32){
+                  success = genericPoolingPrepare(inputShape,
+                               padding_left, padding_right,
+                               padding_top, padding_bottom,
+                               stride_width, stride_height,
+                               filter_width, filter_height,
+                               &outputShape);
+                  if(!success)
+                      nnAssert(false);
+              }
+
+              stage_info.main_operation = MAX_POOL_2D;
+              stage_info.input_shape[0] = input.dimensions[0];
+              stage_info.input_shape[1] = input.dimensions[1];
+              stage_info.input_shape[2] = input.dimensions[2];
+              stage_info.input_shape[3] = input.dimensions[3];
+
+              stage_info.kernel_shape[0] = filter_width;
+              stage_info.kernel_shape[1] = filter_height;
+              stage_info.kernel_shape[2] = 1;
+              stage_info.kernel_shape[3] = 1;
+
+              stage_info.output_shape[0] = output.dimensions[0];
+              stage_info.output_shape[1] = output.dimensions[1];
+              stage_info.output_shape[2] = output.dimensions[2];
+              stage_info.output_shape[3] = output.dimensions[3];
+
+              stage_info.kernel_buffer = nullptr;
+              stage_info.bias_buffer = nullptr;
+              stage_info.depth_multiplier = 0;
+
+
+              stage_info.stride_width = stride_width;
+              stage_info.stride_height = stride_height;
+
+              stage_info.padding_left = padding_left;
+              stage_info.padding_right = padding_right;
+              stage_info.padding_top = padding_top;
+              stage_info.padding_bottom = padding_bottom;
+
+              switch (activation) {
+                  case 0: stage_info.post_operation = NONE; break;
+                  case 1: stage_info.post_operation = RELU; break;
+                  case 2: stage_info.post_operation = RELU1; break;
+                  case 3: stage_info.post_operation = RELU6; break;
+                  default: stage_info.post_operation = NONE; break;
+             }
+              stage_info.kernel_data = false;
+              stage_info.bias_data = false;
+              stage_info.op_params_data = false;
+
+          bool DEBUG_MAX_POOL_2D = false;
+          //DEBUG_MAX_POOL_2D = true;  //un comment this line to get MAX_POOL_2D layer debug data
+          if(DEBUG_MAX_POOL_2D){
+              VLOG(MODEL) << " MAX_POOL_2D padding_left: " << padding_left;
+              VLOG(MODEL) << " MAX_POOL_2D padding_right: " << padding_right;
+              VLOG(MODEL) << " MAX_POOL_2D padding_top: " << padding_top;
+              VLOG(MODEL) << " MAX_POOL_2D padding_bottom: " << padding_bottom;
+              VLOG(MODEL) << " MAX_POOL_2D stride_width: " << stage_info.stride_width;
+              VLOG(MODEL) << " MAX_POOL_2D stride_height: " << stage_info.stride_height;
+
+              VLOG(MODEL) << " MAX_POOL_2D input_shape[0]: " << stage_info.input_shape[0];
+              VLOG(MODEL) << " MAX_POOL_2D input_shape[1]: " << stage_info.input_shape[1];
+              VLOG(MODEL) << " MAX_POOL_2D input_shape[2]: " << stage_info.input_shape[2];
+              VLOG(MODEL) << " MAX_POOL_2D input_shape[3]: " << stage_info.input_shape[3];
+
+              VLOG(MODEL) << " MAX_POOL_2D kernel_shape[0]: " << stage_info.kernel_shape[0];
+              VLOG(MODEL) << " MAX_POOL_2D kernel_shape[1]: " << stage_info.kernel_shape[1];
+              VLOG(MODEL) << " MAX_POOL_2D kernel_shape[2]: " << stage_info.kernel_shape[2];
+              VLOG(MODEL) << " MAX_POOL_2D kernel_shape[3]: " << stage_info.kernel_shape[3];
+
+              VLOG(MODEL) << " MAX_POOL_2D output_shape[0]: " << stage_info.output_shape[0];
+              VLOG(MODEL) << " MAX_POOL_2D output_shape[1]: " << stage_info.output_shape[1];
+              VLOG(MODEL) << " MAX_POOL_2D output_shape[2]: " << stage_info.output_shape[2];
+              VLOG(MODEL) << " MAX_POOL_2D output_shape[3]: " << stage_info.output_shape[3];
+              }
+          } break;//MAX_POOL_2D end
+
         case OperationType::SOFTMAX: {//SOFTMAX begin
         VLOG(MODEL) << toString(operation);
         /*
@@ -1070,17 +1182,6 @@ Operation_inputs_info VpuPreparedModel::get_operation_operands_info_model(const 
 
           for(int i=0; i< 4;i++)
           VLOG(MODEL) << " SOFTMAX output_shape[]:" << stage_info.output_shape[i];
-
-          /*
-			      VLOG(MODEL) << " SOFTMAX input_shape[0]: " << stage_info.input_shape[0];
-            VLOG(MODEL) << " SOFTMAX input_shape[1]: " << stage_info.input_shape[1];
-            VLOG(MODEL) << " SOFTMAX input_shape[2]: " << stage_info.input_shape[2];
-            VLOG(MODEL) << " SOFTMAX input_shape[3]: " << stage_info.input_shape[3];
-
-            VLOG(MODEL) << " SOFTMAX output_shape[0]: " << stage_info.output_shape[0];
-            VLOG(MODEL) << " SOFTMAX output_shape[1]: " << stage_info.output_shape[1];
-            VLOG(MODEL) << " SOFTMAX output_shape[2]: " << stage_info.output_shape[2];
-            VLOG(MODEL) << " SOFTMAX output_shape[3]: " << stage_info.output_shape[3];*/
         }
         } break; //SOFTMAX_END
         case OperationType::RESHAPE: {//RESHAPE begin
@@ -1144,17 +1245,9 @@ Operation_inputs_info VpuPreparedModel::get_operation_operands_info_model(const 
         if(DEBUG_RESHAPE){
             for(int i=0; i<input.dimensions.size();i++)
 			      VLOG(MODEL) << " RESHAPE input_shape[" << i << "]: " << stage_info.input_shape[i];
-            //VLOG(MODEL) << " RESHAPE input_shape[1]: " << stage_info.input_shape[1];
-            //VLOG(MODEL) << " RESHAPE input_shape[2]: " << stage_info.input_shape[2];
-            //VLOG(MODEL) << " RESHAPE input_shape[3]: " << stage_info.input_shape[3];
 
             for(int i=0; i< output.dimensions.size();i++)
 			      VLOG(MODEL) << " RESHAPE output_shape[" << i << "]: " << stage_info.output_shape[i];
-
-            //VLOG(MODEL) << " RESHAPE output_shape[0]: " << stage_info.output_shape[0];
-            //VLOG(MODEL) << " RESHAPE output_shape[1]: " << stage_info.output_shape[1];
-            //VLOG(MODEL) << " RESHAPE output_shape[2]: " << stage_info.output_shape[2];
-            //VLOG(MODEL) << " RESHAPE output_shape[3]: " << stage_info.output_shape[3];
         }
       } break; //RESHAPE_END
     }
@@ -1166,7 +1259,18 @@ Operation_inputs_info VpuPreparedModel::get_operation_operands_info_model(const 
 bool VpuPreparedModel::isOperationSupported(const Operation& operation, const Model& model)
 {
 
-  VLOG(DRIVER) << "Check for Operation support on VPU:  " << getOperationName(operation.type);
+  VLOG(MODEL) << "Check for Operation support on VPU:  " << getOperationName(operation.type);
+
+  VLOG(MODEL) << toString(operation);
+  const auto input = model.operands[operation.inputs[0]];
+  auto output = model.operands[operation.outputs[0]];
+  VLOG(MODEL) << "SRISTI Input dimensions: ( " << input.dimensions[0] << ", "<< input.dimensions[1] << ", "<< input.dimensions[2] << ", "<< input.dimensions[3] << ")";
+  VLOG(MODEL) << "SRISTI Output dimensions: ( " << output.dimensions[0] << ", "<< output.dimensions[1] << ", "<< output.dimensions[2] << ", "<< output.dimensions[3] << ")";
+
+  if(operation.type == OperationType::CONV_2D){
+        const auto input1 = model.operands[operation.inputs[1]];
+        VLOG(MODEL) << "SRISTI Filter dimensions: ( " << input1.dimensions[0] << ", "<< input1.dimensions[1] << ", "<< input1.dimensions[2] << ", "<< input1.dimensions[3] << ")";
+  }
 
 #define VLOG_CHECKFAIL(fail) ALOGD("Check failed:ANEURALNETWORKS_TENSOR_QUANT8_ASYMM Operand is not supported by VPU %s", fail)
 
@@ -1191,77 +1295,77 @@ bool VpuPreparedModel::isOperationSupported(const Operation& operation, const Mo
 
         case OperationType::RELU:
         {
-          VLOG(DRIVER) << "RELU is supported operation ";
+          VLOG(MODEL) << "RELU is supported operation ";
           break;
         }
         case OperationType::RELU1:
         {
-          VLOG(DRIVER) << "RELU1 is supported operation ";
+          VLOG(MODEL) << "RELU1 is supported operation ";
           break;
         }
         case OperationType::RELU6:
         {
-          VLOG(DRIVER) << "RELU6 is supported operation ";
+          VLOG(MODEL) << "RELU6 is supported operation ";
           break;
         }
         case OperationType::TANH:
         {
-          VLOG(DRIVER) << "TANH is supported operation ";
+          VLOG(MODEL) << "TANH is supported operation ";
           break;
         }
         case OperationType::LOGISTIC:
         {
-          VLOG(DRIVER) << "LOGISTIC is supported operation ";
+          VLOG(MODEL) << "LOGISTIC is supported operation ";
           break;
         }
         case OperationType::CONV_2D:
         {
-          VLOG(DRIVER) << "CONV_2D is supported operation ";
+          VLOG(MODEL) << "CONV_2D is supported operation ";
           break;
         }
         case OperationType::DEPTHWISE_CONV_2D:
         {
-          VLOG(DRIVER) << "DEPTHWISE_CONV_2D is supported operation ";
+          VLOG(MODEL) << "DEPTHWISE_CONV_2D is supported operation ";
           break;
         }
         case OperationType::AVERAGE_POOL_2D:
         {
-          VLOG(DRIVER) << "AVERAGE_POOL_2D is supported operation ";
+          VLOG(MODEL) << "AVERAGE_POOL_2D is supported operation ";
           break;
-        }
+        }/*
         case OperationType::L2_POOL_2D:
         {
-          VLOG(DRIVER) << "L2_POOL_2D is supported operation ";
+          VLOG(MODEL) << "L2_POOL_2D is supported operation ";
           break;
-        }
+        }*/
         case OperationType::MAX_POOL_2D:
         {
-          VLOG(DRIVER) << "MAX_POOL_2D is supported operation ";
+          VLOG(MODEL) << "MAX_POOL_2D is supported operation ";
           break;
         }
         case OperationType::SOFTMAX:
         {
-          VLOG(DRIVER) << "SOFTMAX is supported operation ";
+          VLOG(MODEL) << "SOFTMAX is supported operation ";
           break;
         }/*
         case OperationType::FULLY_CONNECTED:
         {
-          VLOG(DRIVER) << "FULLY_CONNECTED is supported operation ";
+          VLOG(MODEL) << "FULLY_CONNECTED is supported operation ";
           break;
         }
         case OperationType::L2_NORMALIZATION:
         {
-          VLOG(DRIVER) << "L2_NORMALIZATION is supported operation ";
+          VLOG(MODEL) << "L2_NORMALIZATION is supported operation ";
           break;
         }*/
         case OperationType::RESHAPE:
         {
-          VLOG(DRIVER) << "RESHAPE is supported operation "; //ANEURALNETWOKRS_RESHAPE
+          VLOG(MODEL) << "RESHAPE is supported operation "; //ANEURALNETWOKRS_RESHAPE
           break;
         }
 
         default:
-           VLOG(DRIVER) << getOperationName(operation.type) << " Operation not supported on VPU";
+           VLOG(MODEL) << getOperationName(operation.type) << " Operation not supported on VPU";
            return false;
     }
 
@@ -1468,6 +1572,14 @@ Return<ErrorStatus> VpuPreparedModel::execute(const Request& request,
 void VpuPreparedModel::deinitialize()
 {
     VLOG(MODEL) << "deinitialize";
+    int val;
+    val = ncs_unload_graph();
+    if (val != 0)
+    VLOG(MODEL) << "unable to unload graph from NCS";
+
+    val = ncs_deinit();
+    if (val != 0)
+    VLOG(MODEL) << "unable to deinitialize NCS device";
 }
 
 void VpuPreparedModel::asyncExecute(const Request& request,
@@ -1481,7 +1593,7 @@ void VpuPreparedModel::asyncExecute(const Request& request,
     VpuExecutor executor;
     int n = executor.run(mModel, request, mPoolInfos, requestPoolInfos);
 
-    VLOG(DRIVER) << "executor.run returned " << n;
+    VLOG(MODEL) << "executor.run returned " << n;
     ErrorStatus executionStatus =
             n == ANEURALNETWORKS_NO_ERROR ? ErrorStatus::NONE : ErrorStatus::GENERAL_FAILURE;
     Return<void> returned = callback->notify(executionStatus);

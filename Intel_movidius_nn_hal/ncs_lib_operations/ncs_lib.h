@@ -27,9 +27,23 @@ extern "C"
 
 #include <mvnc.h>
 
-mvncStatus ncs_init(int ncs_num);
+/*
+NO ERROR - 0
+INCOMPLETE - 2
+BAD STATE - 6
+*/
+int ncs_register();
+int ncs_deregister();
 
-mvncStatus ncs_deinit();
+int ncs_init();
+
+int ncs_deinit();
+
+int ncs_load_graph();
+
+int ncs_unload_graph();
+
+//void ncs_reset();
 
 mvncStatus ncs_rungraph(float *input_data, uint32_t input_num_of_elements,
                     float *output_data, uint32_t output_num_of_elements);

@@ -19,10 +19,10 @@
 #include <mvnc.h>
 #include <log/log.h>
 #include "fp.h"
-#include "vpu_lib.h"
+#include "ncs_lib.h"
 
 // Global Variables
-#define NCS_NUM 1
+#define NCS_NUM 0
 #define NAME_SIZE 100
 #define NCS_CHECK_TIMES 5
 
@@ -30,8 +30,11 @@
 
 mvncStatus retCode;
 void *deviceHandle;
+void* graphHandle;
+void* graphFileBuf;
 bool device_online = false;
-char devName[100];
+bool graph_load = false;
+char devName[NAME_SIZE];
 unsigned int graphFileLen;
 
 
@@ -39,57 +42,15 @@ void* resultData16;
 void* userParam;
 unsigned int lenResultData;
 
-unsigned int lenip1_fp16, lenip2_fp16;
+unsigned int lenip1_fp16;
 
 // 16 bits.  will use this to store half precision floats since C++ has no
 // built in support for it.
 typedef unsigned short half;
-mvncStatus status;
 half *ip1_fp16;
+void *LoadgraphFile(const char *path, unsigned int *length);
 
-//mvncStatus init(int ncs_num);
-
-mvncStatus ncs_init(int ncs_num){
-
-  if(!device_online){
-    retCode = mvncGetDeviceName(ncs_num-1, devName, NAME_SIZE);
-
-    if (retCode != MVNC_OK)
-    {   // failed to get device name, maybe none plugged in.
-        ALOGE("Error- No NCS Device found ErrorCode: %d",retCode); //printf("Error - No NCS devices found.\n");
-        device_online = false;
-        return retCode;
-    }else{
-      ALOGE("NCS Device found with ErrorCode: %d",retCode);
-      device_online = true;
-    }
-
-    retCode = mvncOpenDevice(devName, &deviceHandle);
-
-    if (retCode != MVNC_OK)
-    {   // failed to open the device.
-        ALOGE("Error - Could not open NCS device ErrorCode: %d",retCode); //printf("Error - Could not open NCS device.\n");
-        device_online = false;
-        return retCode;
-    }
-    device_online = true;
-  }
-  return retCode;
-}
-
-//mvncStatus deinit();
-
-mvncStatus ncs_deinit(){
-  retCode = mvncCloseDevice(deviceHandle);
-  deviceHandle = NULL;
-  if (retCode != MVNC_OK)
-  {
-      ALOGE("Error - Could not close NCS device ErrorCode: %d",retCode);
-  }
-  ALOGD("NCS device closed");
-  return retCode;
-}//end of deinit
-
+//----------------------------------- Declaration is done
 
 //graph file loading
 void *LoadgraphFile(const char *path, unsigned int *length){
@@ -119,25 +80,66 @@ void *LoadgraphFile(const char *path, unsigned int *length){
   return buf;
 }
 
+//ncs_init() begin
+int ncs_init(){
+
+  if(!device_online){
+    retCode = mvncGetDeviceName(NCS_NUM, devName, NAME_SIZE);
+    if (retCode != MVNC_OK)
+    {   // failed to get device name, maybe none plugged in.
+        ALOGE("Error- No NCS Device found ErrorCode: %d",retCode); //printf("Error - No NCS devices found.\n");
+        device_online = false;
+        return 6;
+    }
+
+    retCode = mvncOpenDevice(devName, &deviceHandle);
+
+    if (retCode != MVNC_OK)
+    {   // failed to open the device.
+        ALOGE("Error - Could not open NCS device ErrorCode: %d",retCode); //printf("Error - Could not open NCS device.\n");
+        device_online = false;
+        return 6;
+    }
+    device_online = true;
+  }
+  return 0;
+}
+//ncs_init() end
+
+
+int ncs_load_graph(){
+
+  if(!graph_load){
+    char *path;
+    path="/data/ncs_graph";
+    graphFileBuf = LoadgraphFile(path, &graphFileLen);
+
+    // allocate the graph
+    retCode = mvncAllocateGraph(deviceHandle, &graphHandle, graphFileBuf, graphFileLen);
+    if (retCode != MVNC_OK){
+      ALOGE("Could not allocate graph for file: %d",retCode);
+      graph_load = false;
+      return 6;
+    }
+    ALOGD("Graph Allocated successfully!");
+    graph_load = true;
+  }else{
+    ALOGD("Graph already Allocated");
+  }
+  return 0;
+}
+
 mvncStatus ncs_rungraph(float *input_data, uint32_t input_num_of_elements,
-                    float *output_data, uint32_t output_num_of_elements){
+                    float *output_data, uint32_t output_num_of_elements)
+                    {
 
-                      char *path;
-                      path="/data/ncs_graph";
-                      void* graphHandle;
-                      void* graphFileBuf = LoadgraphFile(path, &graphFileLen);
-
-                      // allocate the graph
-                      retCode = mvncAllocateGraph(deviceHandle, &graphHandle, graphFileBuf, graphFileLen);
-                      if (retCode != MVNC_OK){
-                        ALOGE("Could not allocate graph for file: %d",retCode);
-                        return retCode;
-                      }
-                      ALOGD("Graph Allocated successfully!");
                       //convert inputs from fp32 to fp16
                       float *input_data_buffer = (float *)malloc(input_num_of_elements*sizeof(float));
-                      if(input_data_buffer==NULL)
-                      ALOGE("unable to allocate input_data_buffer");
+                      if(input_data_buffer==NULL){
+                        ALOGE("unable to allocate input_data_buffer");
+                        return MVNC_ERROR;
+                      }
+
                       memset(input_data_buffer,0,input_num_of_elements*sizeof(float));
                       memcpy(input_data_buffer,input_data,input_num_of_elements*sizeof(float));
 
@@ -159,75 +161,63 @@ mvncStatus ncs_rungraph(float *input_data, uint32_t input_num_of_elements,
 
                       if (retCode != MVNC_OK){
                         ALOGE("NCS could not return result %d",retCode);
-                        retCode = mvncDeallocateGraph(graphHandle);
-                        if (retCode != MVNC_OK){
-                          ALOGE("NCS could not Deallocate Graph %d",retCode);
-                          return retCode;
-                        }
-                        ALOGD("Graph Deallocated successfully!");
-                        graphHandle = NULL;
                         return retCode;
                       }
                       ALOGD("Got the Result");
-                      retCode = mvncDeallocateGraph(graphHandle);
-                      if (retCode != MVNC_OK){
-                        ALOGE("NCS could not Deallocate Graph %d",retCode);
-                        return retCode;
-                      }
-                      ALOGD("Graph Deallocated successfully!");
-                      graphHandle = NULL;
-                      int numResults = lenResultData / sizeof(half);
 
                       float *output_data_buffer = (float *)malloc(output_num_of_elements*sizeof(float));
-                      if(output_data_buffer==NULL)
-                      ALOGE("unable to allocate output_data_buffer");
+                      if(output_data_buffer==NULL){
+                        ALOGE("unable to allocate output_data_buffer");
+                        return MVNC_ERROR;
+                      }
+
                       memset(output_data_buffer,0,output_num_of_elements*sizeof(float));
                       ALOGD("Converting output from FP16 to Float Begin");
                       fp16tofloat(output_data_buffer, (unsigned char*)resultData16, output_num_of_elements);
                       ALOGD("Converting output from FP16 to Float end");
                       memcpy(output_data,output_data_buffer,output_num_of_elements*sizeof(float));
                       ALOGD("Output data is copied");
+
                       free(input_data_buffer);
                       free(output_data_buffer);
-                      free(graphFileBuf);
                       free(ip1_fp16);
                       ALOGD("Error code end of the rungraph is : %d",retCode);
 
                       return retCode;
                     }
 
+
 int ncs_execute(float *input_data, uint32_t input_num_of_elements,float *output_data, uint32_t output_num_of_elements){
-  int fail_count = 0;
-RUN_GRAPH:
-  ALOGD("device_online: %d", device_online);
-  if (device_online != true) {
-    if (ncs_init(NCS_NUM) != MVNC_OK){
-      ALOGE("Device Unavilable");
-      exit(-1);
-    }
-    ALOGD("Device avilable");
-  }else{
-    ALOGD("Device already avilable");
+  retCode = ncs_rungraph(input_data, input_num_of_elements, output_data, output_num_of_elements);
+  if (retCode != MVNC_OK){
+    ALOGE("NCS unable to executeGraph with ErrorCode: %d",retCode);
+    return 6;
   }
-  status = ncs_rungraph(input_data, input_num_of_elements, output_data, output_num_of_elements);
-  if(status != MVNC_OK){
-      fail_count++;
-      ncs_deinit();
-      device_online =false;
-      if(fail_count < NCS_CHECK_TIMES)
-       goto RUN_GRAPH;
-      else
-       goto END;
-    }
+  return 0;
+}
 
-END:
-  /*
-  if (ncs_deinit() != MVNC_OK){
-    ALOGE("Device not Closed properly");
-    exit(-1);
+int ncs_unload_graph(){
+  retCode = mvncDeallocateGraph(graphHandle);
+  if (retCode != MVNC_OK){
+    ALOGE("NCS could not Deallocate Graph %d",retCode);
+    return 6;
   }
+  ALOGD("Graph Deallocated successfully!");
+  free(graphFileBuf);
+  graphHandle = NULL;
+  graph_load = false;
+  return 0;
+}
 
-  ALOGD("Device Closed properly");
-  */
+int ncs_deinit(){
+  retCode = mvncCloseDevice(deviceHandle);
+  if (retCode != MVNC_OK)
+  {
+      ALOGE("Error - Could not close NCS device ErrorCode: %d",retCode);
+      return 6;
+  }
+  deviceHandle = NULL;
+  ALOGD("NCS device closed");
+  device_online = false;
   return 0;
 }

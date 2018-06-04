@@ -97,13 +97,13 @@ public:
             const std::vector<RunTimePoolInfo>& requestPoolInfos);
 
 private:
-    
+
     bool initializeRunTimeInfo(const std::vector<RunTimePoolInfo>& modelPoolInfos,
                                const std::vector<RunTimePoolInfo>& requestPoolInfos);
     // Runs one operation of the graph.
     int executeOperation(const Operation& entry);
     Operation_inputs_info get_operation_operands_info(const Operation& operation);
-    //int get_operation_operands_info(const Operation& entry);
+
     // Decrement the usage count for the operands listed.  Frees the memory
     // allocated for any temporary variable with a count of zero.
     void freeNoLongerUsedOperands(const std::vector<uint32_t>& inputs);
@@ -114,12 +114,6 @@ private:
     const Request* mRequest = nullptr;
     float *kernel_data_buffer;
 
-    // We're copying the list of all the dimensions from the model, as
-    // these may be modified when we run the operatins.  Since we're
-    // making a full copy, the indexes used in the operand description
-    // stay valid.
-    //    std::vector<uint32_t> mDimensions;
-    // Runtime information about all the operands.
     std::vector<RunTimeOperandInfo> mOperands;
 };
 

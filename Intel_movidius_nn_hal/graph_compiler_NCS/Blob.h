@@ -132,6 +132,7 @@ Blob_Stage_data get_RELU6_stage_data(Operation_inputs_info curr_stage_info);
 Blob_Stage_data get_CONV_2D_stage_data(Operation_inputs_info curr_stage_info);
 Blob_Stage_data get_DEPTHWISE_CONV_2D_stage_data(Operation_inputs_info curr_stage_info);
 Blob_Stage_data get_AVG_POOL_stage_data(Operation_inputs_info curr_stage_info);
+Blob_Stage_data get_MAX_POOL_stage_data(Operation_inputs_info curr_stage_info);
 Blob_Stage_data get_Softmax_stage_data(Operation_inputs_info curr_stage_info);
 Blob_Stage_data get_Reshape_stage_data(Operation_inputs_info curr_stage_info);
 
