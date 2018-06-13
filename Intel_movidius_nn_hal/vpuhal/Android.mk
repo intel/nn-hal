@@ -52,7 +52,7 @@ LOCAL_SHARED_LIBRARIES := \
                     libhidlmemory \
                     android.hardware.neuralnetworks@1.0 \
                     android.hidl.allocator@1.0 \
-                    libmvnc \
+                    libncsdk \
                     libncs_nn_operation \
 										libncs_graph_compiler \
                     android.hidl.memory@1.0

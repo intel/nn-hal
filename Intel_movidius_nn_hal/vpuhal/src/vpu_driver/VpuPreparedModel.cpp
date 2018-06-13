@@ -1471,77 +1471,6 @@ bool VpuPreparedModel::validModel(const Model& model)
         validOperandIndexes(model.outputIndexes, operandCount));
 }
 
-/*
-// validRequestArguments() function
-bool validRequestArguments(const hidl_vec<RequestArgument>& arguments,
-                           const hidl_vec<uint32_t>& operandIndexes,
-                           const hidl_vec<Operand>& operands, size_t poolCount,
-                           const char* type) {
-    const size_t argumentCount = arguments.size();
-    if (argumentCount != operandIndexes.size()) {
-        LOG(ERROR) << "Request specifies " << argumentCount << " " << type << "s but the model has "
-                   << operandIndexes.size();
-        return false;
-    }
-    for (size_t argumentIndex = 0; argumentIndex < argumentCount; argumentIndex++) {
-        const RequestArgument& argument = arguments[argumentIndex];
-        const uint32_t operandIndex = operandIndexes[argumentIndex];
-        const Operand& operand = operands[operandIndex];
-        if (argument.hasNoValue) {
-            if (argument.location.poolIndex != 0 ||
-                argument.location.offset != 0 ||
-                argument.location.length != 0 ||
-                argument.dimensions.size() != 0) {
-                LOG(ERROR) << "Request " << type << " " << argumentIndex
-                           << " has no value yet has details.";
-                return false;
-            }
-        }
-        if (argument.location.poolIndex >= poolCount) {
-            LOG(ERROR) << "Request " << type << " " << argumentIndex << " has an invalid poolIndex "
-                       << argument.location.poolIndex << "/" << poolCount;
-            return false;
-        }
-        // TODO: Validate that we are within the pool.
-        uint32_t rank = argument.dimensions.size();
-        if (rank > 0) {
-            if (rank != operand.dimensions.size()) {
-                LOG(ERROR) << "Request " << type << " " << argumentIndex
-                           << " has number of dimensions (" << rank
-                           << ") different than the model's (" << operand.dimensions.size() << ")";
-                return false;
-            }
-            for (size_t i = 0; i < rank; i++) {
-                if (argument.dimensions[i] != operand.dimensions[i] &&
-                    operand.dimensions[i] != 0) {
-                    LOG(ERROR) << "Request " << type << " " << argumentIndex
-                               << " has dimension " << i << " of " << operand.dimensions[i]
-                               << " different than the model's " << operand.dimensions[i];
-                    return false;
-                }
-                if (argument.dimensions[i] == 0) {
-                    LOG(ERROR) << "Request " << type << " " << argumentIndex
-                               << " has dimension " << i << " of zero";
-                    return false;
-                }
-            }
-        }
-    }
-    return true;
-}*/
-
-
-// TODO doublecheck
-// validateRequest() function
-/*
-bool validateRequest(const Request& request, const Model& model) {
-    const size_t poolCount = request.pools.size();
-    return (validRequestArguments(request.inputs, model.inputIndexes, model.operands, poolCount,
-                                  "input") &&
-            validRequestArguments(request.outputs, model.outputIndexes, model.operands, poolCount,
-                                  "output"));
-}
-*/
 
 // execute() function
 
@@ -1592,8 +1521,6 @@ void VpuPreparedModel::asyncExecute(const Request& request,
 
     VpuExecutor executor;
     int n = executor.run(mModel, request, mPoolInfos, requestPoolInfos);
-
-    VLOG(MODEL) << "executor.run returned " << n;
     ErrorStatus executionStatus =
             n == ANEURALNETWORKS_NO_ERROR ? ErrorStatus::NONE : ErrorStatus::GENERAL_FAILURE;
     Return<void> returned = callback->notify(executionStatus);

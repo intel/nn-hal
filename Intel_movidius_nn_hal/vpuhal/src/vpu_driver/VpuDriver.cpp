@@ -29,7 +29,7 @@
 #include "VpuPreparedModel.h"
 #include "HalInterfaces.h"
 
-#include "vpu_lib.h"
+#include "ncs_lib.h"
 #define NCS_NUM 1
 
 namespace android {
@@ -122,10 +122,10 @@ Return<ErrorStatus> VpuDriver::prepareModel(const Model& model,
 
 Return<DeviceStatus> VpuDriver::getStatus() {
 
-  mvncStatus status;
+  int status;
   ALOGD("VpuDriver getStatus()");
-  status = ncs_init(NCS_NUM);
-  if (status != MVNC_OK){
+  status = ncs_init();
+  if (!status){
     return DeviceStatus::OFFLINE;
     ALOGE("VPU Device Unavilable");
   }else{

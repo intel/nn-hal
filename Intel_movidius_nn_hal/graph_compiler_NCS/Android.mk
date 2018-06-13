@@ -32,7 +32,7 @@ LOCAL_SRC_FILES := Blob.cpp \
 LOCAL_C_INCLUDES += $(LOCAL_PATH) \
 										$(LOCAL_PATH)/../ncs_lib_operations
 
-LOCAL_SHARED_LIBRARIES := libmvnc libncs_nn_operation liblog libutils
+LOCAL_SHARED_LIBRARIES := libncsdk libncs_nn_operation liblog libutils
 LOCAL_CPPFLAGS := -fexceptions
 LOCAL_MODULE := libncs_graph_compiler
 

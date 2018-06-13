@@ -33,7 +33,7 @@ LOCAL_CFLAGS += -O2 -Wall -pthread -fPIC -MMD -MP
 
 LOCAL_SHARED_LIBRARIES := libusb
 
-LOCAL_MODULE := libmvnc
+LOCAL_MODULE := libncsdk
 
 include $(BUILD_SHARED_LIBRARY)
 
@@ -67,6 +67,6 @@ LOCAL_SHARED_LIBRARIES := \
                     libutils \
                     liblog \
                     libcutils \
-                    libmvnc
+                    libncsdk
 
 include $(BUILD_EXECUTABLE)

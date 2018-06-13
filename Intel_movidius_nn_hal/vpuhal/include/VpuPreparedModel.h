@@ -50,14 +50,14 @@ class VpuPreparedModel : public IPreparedModel {
   public:
       VpuPreparedModel(const Model& model)
             : // Make a copy of the model, as we need to preserve it.
-              mModel(model) {} //, cpu_engine(nullptr) {} //TODO check do we need vpu_engine(nullptr)
+              mModel(model) {}
       ~VpuPreparedModel() override {deinitialize();}
       bool initialize(const Model& model);
       Return<ErrorStatus> execute(const Request& request,
                                   const sp<IExecutionCallback>& callback) override;
       static bool isOperationSupported(const Operation& operation, const Model& model);
       static bool validModel(const Model& model);  //TODO Utils.cpp validateModel was changed to validModel
-      //static bool validateRequest(const Request& request, const Model& model); //TODO Utils.cpp
+
 
 private:
         void deinitialize();
