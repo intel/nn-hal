@@ -93,7 +93,7 @@ LOCAL_SHARED_LIBRARIES := \
 
 
 #LOCAL_MULTILIB := both
-#LOCAL_MULTILIB := 64
+LOCAL_MULTILIB := 64
 
 include $(BUILD_EXECUTABLE)
 #############################################################
