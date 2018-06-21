@@ -26,6 +26,9 @@
 #include "Blob.h"
 //#include "stage_header.h"
 #define LOG_TAG "BLOB"
+
+std::vector<std::string> graph_file_names_vector;
+std::string graph_filename;
 //#define dump_blob_to_file true
 /*
 
@@ -1771,7 +1774,7 @@ void get_one_stage_buffer(char *stage_buffer, NCSoperations curr_operation, unsi
 }
 
 
-bool prepare_blob(){
+bool prepare_blob(std::string str,int graph_count){
 
   Blobconfig blob1;
   Myriadconfig mconfig;
@@ -1780,7 +1783,7 @@ bool prepare_blob(){
   network_operations = get_network_operations_details();
 
   blob1.version = 2;
-  blob1.network_name = "android-nn-model-v1";
+  blob1.network_name = str;
   blob1.blob_report_dir = "";
   blob1.stage_count = network_operations.size()+1;
   blob1.filesize = estimate_file_size(true, blob1.stage_count);
@@ -1792,32 +1795,28 @@ bool prepare_blob(){
   mconfig.leonMemSize = 0;
   mconfig.dmaAgent = 0;
 
+  ALOGD("network_name: %s",blob1.network_name.c_str());
+
   char* graph_buffer;
-  ALOGD("filesize %lu",blob1.filesize);
-  ALOGD("filesize_without_data %lu",blob1.filesize_without_data);
-  ALOGD("filesize_of_data %lu",blob1.filesize -blob1.filesize_without_data);
 
   graph_buffer = (char*)malloc(blob1.filesize_without_data);
   if(graph_buffer == NULL)
   ALOGE("unable to allocate graph_buffer");
   memset(graph_buffer,0,blob1.filesize_without_data);
-#if 0
-  post_data_buffer = (float*)malloc((blob1.filesize -blob1.filesize_without_data)*2);
-  if(post_data_buffer == NULL)
-  ALOGE("unable to allocate post_data_buffer");
 
-  ALOGD("allocated buffer of %lu Bytes ", (blob1.filesize -blob1.filesize_without_data)*2);
-#endif
 
+  graph_filename = "/data/ncs_graph"; //+std::to_string(graph_count);
   graph_buffer = generate_graph(graph_buffer, blob1, mconfig);
+
   FILE *fp;
-  fp=fopen("/data/ncs_graph","wb");
+  fp=fopen(graph_filename.c_str(),"wb");
 
   if(fp == NULL)
     {
-        ALOGE("unable to open file /data/ncs_graph");
-        exit(1);
+        ALOGE("unable to open file %s",graph_filename.c_str());
+        return false;
     }
+  graph_file_names_vector.push_back(graph_filename);
   fwrite(graph_buffer,blob1.filesize_without_data,1,fp);
   fclose(fp);
 
@@ -1866,7 +1865,7 @@ bool wrtie_post_stage_data(Blobconfig blob_config, Myriadconfig mconfig){
       ALOGD("nwk_vector_stages_info.at(i).main_operation %d", nwk_vector_stages_info.at(i).main_operation);
       status = write_kernel_bias_data_buffer_to_file(nwk_vector_stages_info.at(i));
     }
-  ALOGD("wrtie_post_stage_data status %d", status);
+  //ALOGD("wrtie_post_stage_data status %d", status);
   }
   return status;
 }
@@ -1939,7 +1938,7 @@ bool write_kernel_bias_data_buffer_to_file(Operation_inputs_info curr_stage_info
     ALOGD("buffer_fp16 allocation success");
     floattofp16((unsigned char *)buffer_fp16, kernel_data_buffer, kenrel_data_size_align/4);
 
-    fp = fopen("/data/ncs_graph","ab+");
+    fp = fopen(graph_filename.c_str(),"ab+");
     if(fp == NULL)
     ALOGE("unable to open ncs_graph file for kernel_data writing");
     else
@@ -1982,7 +1981,7 @@ bool write_kernel_bias_data_buffer_to_file(Operation_inputs_info curr_stage_info
     ALOGD("buffer_fp16 allocation success");
     floattofp16((unsigned char *)buffer_fp16, bias_data_buffer, bias_data_size_align/4);
 
-    fp = fopen("/data/ncs_graph","ab+");
+    fp = fopen(graph_filename.c_str(),"ab+");
     if(fp == NULL)
     ALOGE("unable to open ncs_graph file for bias_data writing");
     else
@@ -2009,7 +2008,7 @@ bool write_kernel_bias_data_buffer_to_file(Operation_inputs_info curr_stage_info
 
     *(op_params_buffer) = Beta;
     ALOGD("op_params_buffer[0]: %f",*(op_params_buffer));
-#if 1
+
     buffer_fp16 = (half*) malloc(op_params_size_align/2);
     if( buffer_fp16 == NULL)
     ALOGE("unable to allocate buffer_fp16 exit");
@@ -2018,16 +2017,7 @@ bool write_kernel_bias_data_buffer_to_file(Operation_inputs_info curr_stage_info
     memset(buffer_fp16,0,op_params_size_align/2);
     *buffer_fp16 = 1;
 
-    fp = fopen("/data/ncs_graph_data","w");
-    if(fp == NULL)
-    ALOGE("unable to open ncs_graph file for op_params_data writing");
-    else
-    ALOGD("ncs_graph file is open for op_params_data writing");
-    fseek(fp,0,SEEK_END);
-    fwrite(op_params_buffer,op_params_size_align,1,fp);
-    fclose(fp);
-
-    fp = fopen("/data/ncs_graph","ab+");
+    fp = fopen(graph_filename.c_str(),"ab+");
     if(fp == NULL)
     ALOGE("unable to open ncs_graph file for op_params_data writing");
     else
@@ -2035,7 +2025,7 @@ bool write_kernel_bias_data_buffer_to_file(Operation_inputs_info curr_stage_info
     fseek(fp,0,SEEK_END);
     fwrite((unsigned char *)buffer_fp16,op_params_size_align/2,1,fp);
     fclose(fp);
-#endif
+
     ALOGD("copied op_params_buffer %u bytes....",op_params_size_align/2);
     free(buffer_fp16);
   }
@@ -2216,9 +2206,10 @@ char* generate_graph(char* graph_buf, Blobconfig blob_config, Myriadconfig mconf
   uint32_t nw_stage_count = blob_config.stage_count;
 
   network_operations = get_network_operations_details();
-  ALOGD("Netowrk Size: %d",network_operations.size());
-  for(int i=0; i<network_operations.size();i++)
-  ALOGD("Operation number is %d",network_operations.at(i));
+
+  //ALOGD("Netowrk Size: %d",network_operations.size());
+  //for(int i=0; i<network_operations.size();i++)
+  //ALOGD("Operation number is %d",network_operations.at(i));
 
   //TODO copy the get_header_buffer data to
   char* buf_Herader ;
@@ -2289,4 +2280,17 @@ char* generate_graph(char* graph_buf, Blobconfig blob_config, Myriadconfig mconf
 
 
   return graph_buf;
+}
+
+bool delete_graphs(){
+  int size = graph_file_names_vector.size();
+  int perror;
+  for(int i=0;i<size;i++){
+    perror = std::remove(graph_file_names_vector.at(i).c_str());
+    if(perror==0)
+    return true;
+    else
+    return false;
+  }
+  return true;
 }

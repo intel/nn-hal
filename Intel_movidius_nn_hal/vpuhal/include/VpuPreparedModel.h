@@ -29,7 +29,7 @@
 
 #include <sys/mman.h>
 #include <string>
-
+#include <iostream>
 
 #include "HalInterfaces.h"
 #include "NeuralNetworks.h"
@@ -48,9 +48,10 @@ namespace vpu_driver {
 class VpuPreparedModel : public IPreparedModel {
 
   public:
+      static int network_count_ex;
       VpuPreparedModel(const Model& model)
             : // Make a copy of the model, as we need to preserve it.
-              mModel(model) {}
+              mModel(model) {network_count_ex++;}
       ~VpuPreparedModel() override {deinitialize();}
       bool initialize(const Model& model);
       Return<ErrorStatus> execute(const Request& request,
@@ -68,10 +69,13 @@ private:
         std::vector<RunTimePoolInfo> mPoolInfos;
 };
 
+
+
 }  // namespace vpu_driver
 }  // namespace V1_0
 }  // namespace neuralnetworks
 }  // namespace hardware
 }  // namespace android
+
 
 #endif //ANDROID_ML_NN_VPU_PREPAREDMODEL_H

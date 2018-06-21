@@ -215,7 +215,9 @@ int VpuExecutor::run(const Model& model, const Request& request,
 
     free(network_input_buffer);
     free(network_output_buffer);
+    nn_ops_vectors.clear();
 
+    
 
     for (auto runtimeInfo : modelPoolInfos) {
         runtimeInfo.update();

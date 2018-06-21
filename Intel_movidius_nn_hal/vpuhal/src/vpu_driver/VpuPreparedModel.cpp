@@ -20,9 +20,13 @@
 #include "VpuPreparedModel.h"
 #include "VpuUtils.h"
 #include <string>
+#include <ctime>
 #include <android-base/logging.h>
 #include <hidl/LegacySupport.h>
 #include <thread>
+#include <iostream>
+#include <stdio.h>
+
 #include "ncs_lib.h"
 
 #define DISABLE_ALL_QUANT 1
@@ -61,12 +65,31 @@ T getOperandConstVal(const Model& model, const Operand& operand)
     return data[0];
 }
 
+/*
+bool VpuPreparedModel::update_network_count(){
+  VpuPreparedModel::network_count = VpuPreparedModel::network_count +1;
+  return true;
+}
 
+int VpuPreparedModel::get_network_count(){
+  return VpuPreparedModel::network_count;
+}
+
+*/
 // initialize() function
+int VpuPreparedModel::network_count_ex =0;
 
 bool VpuPreparedModel::initialize(const Model& model) {
     VLOG(MODEL)<<"VpuPreparedModel::initialize()";
     bool success = false;
+
+
+    if(VpuPreparedModel::network_count_ex>1){
+      VLOG(MODEL) << "More than one graph is required to generate for given model, Model count is " << VpuPreparedModel::network_count_ex;
+      VpuPreparedModel::network_count_ex =0;
+      return false;
+    }
+
 
     success = setRunTimePoolInfosFromHidlMemories(&mPoolInfos, mModel.pools);
 
@@ -80,6 +103,13 @@ bool VpuPreparedModel::initialize(const Model& model) {
     Oertaion_vector nn_ops_vectors;
     network_operations_vector nn_ncs_network;
     NCSoperations nn_ncs_operation;
+
+    if(!nn_ops_vectors.empty())
+    nn_ops_vectors.clear();
+
+    if(!nn_ncs_network.empty())
+    nn_ncs_network.clear();
+
 
     for (const auto& operation : model.operations) {
 
@@ -120,7 +150,14 @@ bool VpuPreparedModel::initialize(const Model& model) {
         return false;
       }
     }
-    status = prepare_blob();
+
+    //VpuPreparedModel::network_count = VpuPreparedModel::network_count + 1;
+    std::string network_name = "android-nn-model-";
+    std::string network_name_final;
+    network_name_final = network_name + std::to_string(network_count_ex);
+    VLOG(MODEL) << "Current Network Count is " << network_count_ex << "Model Name is " << network_name_final;
+
+    status = prepare_blob(network_name_final,network_count_ex);
     if(!status){
       VLOG(MODEL) << "Unable to prepare NCS graph";
       return false;
@@ -128,6 +165,9 @@ bool VpuPreparedModel::initialize(const Model& model) {
 
     VLOG(MODEL) << "Model Compiling for VPU Driver: completed";
     //code end for understand model
+    nn_ops_vectors.clear();
+    nn_ncs_network.clear();
+
 
     int val;
     val = ncs_init();
@@ -1119,7 +1159,7 @@ Operation_inputs_info VpuPreparedModel::get_operation_operands_info_model(const 
         const auto input = model.operands[operation.inputs[0]];
         auto output = model.operands[operation.outputs[0]];
 		    Shape inputShape, outputShape;
-		    float beta = getOperandConstVal<int32_t>(model,model.operands[operation.inputs[1]]);
+		    float beta = getOperandConstVal<float>(model,model.operands[operation.inputs[1]]);
 
 		    inputShape.type = input.type;
         inputShape.dimensions = input.dimensions;
@@ -1177,6 +1217,7 @@ Operation_inputs_info VpuPreparedModel::get_operation_operands_info_model(const 
 		    bool DEBUG_SOFTMAX = false;
         DEBUG_SOFTMAX = true;  /*un comment this line to get SOFTMAX layer debug data*/
         if(DEBUG_SOFTMAX){
+          VLOG(MODEL) << " SOFTMAX beta:"  << stage_info.beta;
           for(int i=0; i<4;i++)
           VLOG(MODEL) << " SOFTMAX input_shape[]:"  << stage_info.input_shape[i];
 
@@ -1325,6 +1366,18 @@ bool VpuPreparedModel::isOperationSupported(const Operation& operation, const Mo
         }
         case OperationType::DEPTHWISE_CONV_2D:
         {
+          const size_t inCount = operation.inputs.size();
+          int32_t depth_multiplier;
+          if(inCount==11)
+          depth_multiplier = getOperandConstVal<int32_t>(model,model.operands[operation.inputs[9]]);
+          else
+          depth_multiplier = getOperandConstVal<int32_t>(model,model.operands[operation.inputs[6]]);
+
+          if(depth_multiplier!=1){
+            VLOG(MODEL) << "depth_multiplier: "<< depth_multiplier;
+            VLOG(MODEL) << "DEPTHWISE_CONV_2D is not supported operation ";
+            return false;
+          }
           VLOG(MODEL) << "DEPTHWISE_CONV_2D is supported operation ";
           break;
         }
@@ -1345,6 +1398,14 @@ bool VpuPreparedModel::isOperationSupported(const Operation& operation, const Mo
         }
         case OperationType::SOFTMAX:
         {
+          float beta = getOperandConstVal<float>(model,model.operands[operation.inputs[1]]);
+
+
+          if(beta!=1.0){
+            VLOG(MODEL) << "SOFTMAX beta : " << beta;
+            VLOG(MODEL) << "SOFTMAX is not supported operation ";
+            return false;
+          }
           VLOG(MODEL) << "SOFTMAX is supported operation ";
           break;
         }/*
@@ -1479,6 +1540,8 @@ Return<ErrorStatus> VpuPreparedModel::execute(const Request& request,
 
         ALOGD("Begin to execute on VPU");
 
+
+
         if (callback.get() == nullptr) {
             ALOGE("invalid callback passed to execute");
             return ErrorStatus::INVALID_ARGUMENT;
@@ -1527,6 +1590,7 @@ void VpuPreparedModel::asyncExecute(const Request& request,
     if (!returned.isOk()) {
         LOG(ERROR) << " hidl callback failed to return properly: " << returned.description();
     }
+    VpuPreparedModel::network_count_ex = 0;
 }
 
 }  // namespace vpu_driver

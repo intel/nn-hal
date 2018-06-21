@@ -42,10 +42,11 @@
 #define DEBUG_generate_graph false
 #define DEBUG_get_input_stage_buffer false
 #define DEBUG_get_last_stage_buffer false
-#define DEBUG_get_one_stage_buffer true
+#define DEBUG_get_one_stage_buffer false
 #define DEBUG_get_first_stage_buffer false
 
 typedef unsigned short half;
+
 
 bool update_post_data_buffer(uint32_t size, float *buf);
 bool update_global_buffer_index(uint32_t value);
@@ -99,7 +100,7 @@ uint16_t get_output_Index_global();
 uint32_t estimate_file_size(bool with_buf_size,uint32_t stage_count);
 uint32_t align_size(uint32_t fsize, unsigned int align_to);
 
-bool prepare_blob();//TODO update required
+bool prepare_blob(std::string str, int graph_count);//TODO update required
 
 char* generate_graph(char *buf, Blobconfig blob_config, Myriadconfig mconfig);
 
@@ -138,7 +139,7 @@ Blob_Stage_data get_Reshape_stage_data(Operation_inputs_info curr_stage_info);
 
 
 bool parse_logistic_from_android(Operation_inputs_info sig_stage_android);
-
+bool delete_graphs();
 
 Operation_inputs_info parse_logistic_stage_info();
 Operation_inputs_info parse_tanh_stage_info();
