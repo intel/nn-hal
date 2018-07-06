@@ -24,8 +24,9 @@ Below are the operations supported by Intel Movidius NN HAL
 
 ## Known Issues
 * After performing git clone to integrate the HAL into your Android build remove the other HAL directory using below command
-  rm -rf vpu-hal2 
-
+```
+rm -rf vpu-hal2 
+```
 ## License
 Intel® Movidius™ Neural Networks HAL is distributed under the Apache License, Version 2.0
 You may obtain a copy of the License at:
