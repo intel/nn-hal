@@ -19,6 +19,34 @@ Below are the operations supported by Intel Movidius NN HAL
 * ANEURALNETWORKS_SOFTMAX
 * ANEURALNETWORKS_RESHAPE
 
+## Prerequisite
+
+[Intel® Movidius™ NCSDK](https://github.com/movidius/ncsdk)
+
+## Integrating Intel® Movidius™ NCSDK into Intel® Movidius™ Neural Networks HAL
+
+To integrate [Intel® Movidius™ NCSDK](https://github.com/movidius/ncsdk) into Intel® Movidius™ Neural Networks HAL follow the below steps
+
+
+* Download and extract the [Intel® Movidius™ NCSDK](https://github.com/movidius/ncsdk) -version 1.12.00.01 as mentioned on the [Intel® Movidius™ NCSDK website](https://github.com/movidius/ncsdk) 
+* Copy the extracted ncsdk to the specified location as shown below
+```
+cp <DIR>/ncsdk-1.12.00.01 <DIR>/Intel_movidius_nn_hal/libncs/ncsdk-1.12.00.01 -rf
+```
+* Perform the code changes to the files shown below
+
+* Open the file **_libncs/ncsdk-1.12.00.01/api/src/mvnc_api.c_** and add a line of code after the code **// Load the mvnc executable** as shown below 
+```
+strcpy(mv_cmd_file, "/vendor/firmware/mvnc/MvNCAPI.mvcmd");
+```
+and save the changes
+
+
+* Open the file **_libncs/ncsdk-1.12.00.01/api/src/usb_link_vsc.c_** and comment the header file definition or remove the line of code which contain this string **#include <sys/timeb.h>** 
+
+* Make sure the **ncsdk-1.12.00.01** directory is located under **Intel_movidius_nn_hal/libncs**
+
+
 ## Validated Models
 *  [Mobilenet_v1 Float paper](https://arxiv.org/pdf/1704.04861.pdf) [Mobilenet_v1 Float model](http://download.tensorflow.org/models/mobilenet_v1_2018_02_22/mobilenet_v1_1.0_224.tgz)
 

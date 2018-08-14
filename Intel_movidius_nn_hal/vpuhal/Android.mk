@@ -30,7 +30,7 @@ LOCAL_SRC_FILES := \
 LOCAL_C_INCLUDES += \
 	$(LOCAL_PATH) \
   $(LOCAL_PATH)/include \
-  $(LOCAL_PATH)/../ncsdk/include \
+  $(LOCAL_PATH)/../libncs/ncsdk-1.12.00.01/api/include \
   $(LOCAL_PATH)/../ncs_lib_operations \
 	$(LOCAL_PATH)/../graph_compiler_NCS \
 	frameworks/ml/nn/runtime/include
