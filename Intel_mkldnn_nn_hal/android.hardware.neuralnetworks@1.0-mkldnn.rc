@@ -1,0 +1,4 @@
+service neuralnetworks-hal-1-0-mkldnn /vendor/bin/hw/android.hardware.neuralnetworks@1.0-mkldnn-service
+    class hal
+    user system
+    group system
