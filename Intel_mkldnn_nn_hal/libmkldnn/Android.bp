@@ -1,0 +1,61 @@
+cc_library_headers {
+    name: "libmkldnn_headers",
+    host_supported: false,
+    vendor_available: true,
+    export_include_dirs: [
+        "mkl-dnn/include",
+        "mkl-dnn/src/common/",
+        "mkl-dnn/src/",
+        "mkl-dnn/src/cpu/xbyak/",
+    ],
+}
+
+
+cc_library {
+    name: "libmkldnn",
+    vendor_available: true,
+    openmp: false,
+
+    srcs: [
+        "mkl-dnn/src/cpu/*.cpp",
+        "mkl-dnn/src/common/*.cpp",
+    ],
+
+    cflags: [
+        "-std=c++11",
+        "-fvisibility-inlines-hidden",
+        "-Wall",
+        "-Werror",
+        "-Wno-unknown-pragmas",
+        "-fvisibility=internal",
+        "-Wno-strict-overflow",
+        "-fPIC",
+        "-Wformat",
+        "-Wformat-security",
+        "-fstack-protector-all",
+        "-O3",
+        "-DNDEBUG",
+        "-D_FORTIFY_SOURCE=2",
+        "-Wno-unused-variable",
+        "-Wno-unused-parameter",
+        "-Wno-non-virtual-dtor",
+        "-Wno-missing-field-initializers",
+        "-Wno-shift-count-overflow",
+        "-fexceptions",
+        "-DMKLDNN_DLL",
+        "-DMKLDNN_DLL_EXPORTS",
+        "-D__STDC_CONSTANT_MACROS",
+        "-D__STDC_LIMIT_MACROS",
+        "-Dmkldnn_EXPORTS",
+        "-Rpass-analysis=loop-vectorize",
+    ],
+
+    shared_libs: [
+        "liblog",
+    ],
+
+    header_libs: [
+        "libmkldnn_headers",
+    ],
+}
+
