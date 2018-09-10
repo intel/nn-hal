@@ -1005,9 +1005,6 @@ bool MklDnnPreparedModel::importOperationConcat(const Operation& operation)
     std::vector<primitive::at> primitive_inputs;
     for (uint32_t i = 0; i < in_counts - 1; i++) {
         RunTimeOperandInfo& input = mOperands[ins[i]];
-        if (dims_size == 3) {
-           input.dims.push_back(1);
-        }
         initializeInput(&input, format_input);
 
         //based on nchw
@@ -1031,9 +1028,6 @@ bool MklDnnPreparedModel::importOperationConcat(const Operation& operation)
                 }
             }
         }
-        if (dims_size == 3) {
-           input.dims.pop_back();
-        }
     }
 
     RunTimeOperandInfo& output = mOperands[outs[0]];
@@ -1048,9 +1042,6 @@ bool MklDnnPreparedModel::importOperationConcat(const Operation& operation)
     mNet.push_back(mkldnn::concat(primitive_desc_concat, primitive_inputs, *output.pmem));
 
     finalizeOutput(&output, format_output);
-    if (dims_size == 3) {
-       output.dims.pop_back();
-    }
     return true;
 }
 

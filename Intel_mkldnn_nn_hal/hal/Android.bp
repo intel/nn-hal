@@ -1,0 +1,35 @@
+cc_binary {
+     name: "android.hardware.neuralnetworks@1.0-mkldnn-service",
+     init_rc: ["android.hardware.neuralnetworks@1.0-mkldnn.rc"],
+     proprietary: true,
+     relative_install_path: "hw",
+     srcs: [
+         "MklDnnDriver.cpp",
+         "MklDnnPreparedModel.cpp",
+         "service.cpp",
+     ],
+
+     cflags: [
+         "-fexceptions",
+         "-Wno-unused-parameter",
+     ],
+
+     shared_libs: [
+         "libbase",
+         "libcutils",
+         "libhidlbase",
+         "libhidlmemory",
+         "libhardware",
+         "liblog",
+         "libcutils",
+         "libhidltransport",
+         "libutils",
+         "android.hidl.allocator@1.0",
+         "android.hardware.neuralnetworks@1.0",
+         "android.hidl.memory@1.0",
+         "libmkldnn",
+    ],
+
+    header_libs: ["libmkldnn_headers"],
+}
+
