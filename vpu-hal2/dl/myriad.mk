@@ -36,6 +36,6 @@ LOCAL_CFLAGS += -DENABLE_VPU -DENABLE_MYRIAD -DAKS -DIMPLEMENT_INFERENCE_ENGINE_
 
 LOCAL_STATIC_LIBRARIES := libgraph_transformer libvpu_common
 
-LOCAL_SHARED_LIBRARIES := libmvnc libinference_engine libusb1.0 liblog
+LOCAL_SHARED_LIBRARIES := libmvnc libinference_engine liblog
 
 include $(BUILD_SHARED_LIBRARY)

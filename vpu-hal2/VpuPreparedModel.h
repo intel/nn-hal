@@ -14,20 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_ML_NN_VPU_PREPAREDMODEL_H
-#define ANDROID_ML_NN_VPU_PREPAREDMODEL_H
-
-//#include "halinterfaces.h"
-/*
-#include <android/hardware/neuralnetworks/1.0/IDevice.h>
-#include <android/hardware/neuralnetworks/1.0/IExecutionCallback.h>
-#include <android/hardware/neuralnetworks/1.0/IPreparedModel.h>
-#include <android/hardware/neuralnetworks/1.0/IPreparedModelCallback.h>
-#include <android/hardware/neuralnetworks/1.0/types.h>
-#include <android/hidl/allocator/1.0/IAllocator.h>
-#include <android/hidl/memory/1.0/IMemory.h>
-#include <hidlmemory/mapping.h>
-*/
+#ifndef ANDROID_ML_NN_PREPAREDMODEL_H
+#define ANDROID_ML_NN_PREPAREDMODEL_H
 
 #include <android/hardware/neuralnetworks/1.0/IPreparedModel.h>
 #include <android/hidl/memory/1.0/IMemory.h>
@@ -35,12 +23,9 @@
 #include <hardware/hardware.h>
 #include <sys/mman.h>
 #include <string>
-
-//#include <mvnc.h>
-
-//vpu include
-#include "vpu_plugin.hpp"
 #include <fstream>
+
+#include "IENetwork.h"
 
 using ::android::hidl::memory::V1_0::IMemory;
 using namespace IRBuilder;
@@ -50,7 +35,7 @@ namespace android {
 namespace hardware {
 namespace neuralnetworks {
 namespace V1_0 {
-namespace vpu_driver {
+namespace driver {
 
 template <class T> using  vec = std::vector<T>;
 typedef uint8_t * memory;
@@ -119,13 +104,24 @@ bool setRunTimePoolInfosFromHidlMemories(std::vector<RunTimePoolInfo>* poolInfos
 //
 // Since these drivers simulate hardware, they must run the computations
 // on the CPU.  An actual driver would not do that.
-class VpuPreparedModel : public IPreparedModel {
+class PreparedModel : public IPreparedModel {
 public:
-    VpuPreparedModel(const Model& model)
-          : // Make a copy of the model, as we need to preserve it.
-            mModel(model), mNet("nnNet") {
-	}
-    ~VpuPreparedModel() override {deinitialize();}
+    PreparedModel(const Model& model)
+          :mTargetDevice(TargetDevice::eMYRIAD), mModel(model), mNet("nnNet") {
+        IRBuilder::g_layer_precision = InferenceEngine::Precision::FP16;
+    }
+
+    PreparedModel(const TargetDevice device, const Model& model)
+          :mTargetDevice(device), mModel(model), mNet("nnNet") {
+        if (mTargetDevice == TargetDevice::eCPU)
+           IRBuilder::g_layer_precision = InferenceEngine::Precision::FP32;
+        else if (mTargetDevice == TargetDevice::eMYRIAD)
+           IRBuilder::g_layer_precision = InferenceEngine::Precision::FP16;
+        else
+           IRBuilder::g_layer_precision = InferenceEngine::Precision::UNSPECIFIED;
+    }
+
+    ~PreparedModel() override {deinitialize();}
     bool initialize();
     Return<ErrorStatus> execute(const Request& request,
                                 const sp<IExecutionCallback>& callback) override;
@@ -133,7 +129,7 @@ public:
     static bool validModel(const Model& model);
     static bool validateRequest(const Request& request, const Model& model);
 
-private:
+protected:
     void deinitialize();
     bool initializeRunTimeOperandInfo();
     void asyncExecute(const Request& request, const sp<IExecutionCallback>& callback);
@@ -168,32 +164,51 @@ private:
     std::vector<T> GetConstVecFromBuffer(const uint8_t *buf, uint32_t len);
     const uint8_t *GetOperandMemory(const Model &model, uint32_t index, uint32_t &len_out);
     template <typename T>
+    T ParseOperationInput(const Model &model, const Operation& operation, uint32_t index);
+    template <typename T>
     T GetConstOperand(const Model &model, uint32_t index);
     template <typename T>
     std::vector<T> GetConstVecOperand(const Model &model, uint32_t index);
-    IRBlob::Ptr GetConstOperandAsTensor(uint32_t index);
-    Blob::Ptr/*IRBlob::Ptr*/ GetInOutOperandAsBlob(RunTimeOperandInfo& op, const uint8_t *buf, uint32_t& len);
+    virtual Blob::Ptr GetConstOperandAsTensor(uint32_t index);
+    virtual Blob::Ptr GetInOutOperandAsBlob(RunTimeOperandInfo& op, const uint8_t *buf, uint32_t& len);
     void SetOperandMemory(const Model &model, uint32_t index, uint32_t &len_out, const uint8_t *buf);
-    void SetOperandFromTensor(uint8_t* buf, uint32_t &length, IRBlob::Ptr infOutput);
-//    void SetOperandFromTensor(uint8_t* buf, uint32_t &length, TBlob<float>::Ptr infOutput);
+    void SetOperandFromTensor(uint8_t* buf, uint32_t &length, Blob::Ptr infOutput);
     bool isConst(int index);
     OutputPort getPort(int index);
 
+    TargetDevice mTargetDevice;
     Model mModel;
     std::vector<RunTimeOperandInfo> mOperands;
     std::vector<RunTimePoolInfo> mPoolInfos;
     IRDocument mNet;
     std::vector<OutputPort> mPorts;  //typedef std::shared_ptr<Data> DataPtr;
     ExecuteNetwork* enginePtr;
-//    std::vector<InferenceEngine::DataPtr> mPorts;
-
 };
 
+class VpuPreparedModel : public PreparedModel {
+public:
+    VpuPreparedModel(const Model& model)
+          :PreparedModel(TargetDevice::eMYRIAD, model) {
+    }
 
-}  // namespace vpu_driver
+    virtual Blob::Ptr GetConstOperandAsTensor(uint32_t index) override;
+    virtual Blob::Ptr GetInOutOperandAsBlob(RunTimeOperandInfo& op, const uint8_t *buf, uint32_t& len) override;
+};
+
+class CpuPreparedModel : public PreparedModel {
+public:
+    CpuPreparedModel(const Model& model)
+          :PreparedModel(TargetDevice::eCPU, model) {
+    }
+
+    virtual Blob::Ptr GetConstOperandAsTensor(uint32_t index) override;
+    virtual Blob::Ptr GetInOutOperandAsBlob(RunTimeOperandInfo& op, const uint8_t *buf, uint32_t& len) override;
+};
+
+}  // namespace driver
 }  // namespace V1_0
 }  // namespace neuralnetworks
 }  // namespace hardware
 }  // namespace android
 
-#endif // ANDROID_ML_NN_VPU_PREPAREDMODEL_H
+#endif // ANDROID_ML_NN_PREPAREDMODEL_H
