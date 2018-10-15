@@ -41,14 +41,14 @@
 
 #ifdef NNLOG
 #include <android/log.h>
-//#include <android-base/logging.h>
-#include <cutils/log.h>
+#include <log/log.h>
 #endif
 
 namespace IRBuilder
 {
 
 extern int layer_name_count;
+extern InferenceEngine::Precision g_layer_precision;
 
 inline OutputPort addOutput(const IRLayer &layer, const InferenceEngine::SizeVector &dims)
 {
@@ -63,25 +63,14 @@ inline OutputPort addOutput(const IRLayer &layer, const InferenceEngine::SizeVec
     if(dims.size() == 2)
     {
         std::cout << "addOutput dims size 2"<< std::endl;
-
-/*
-        data = std::make_shared<InferenceEngine::Data>(d_name,
-                                                       dims,
-                                                       InferenceEngine::Precision::FP16, InferenceEngine::Layout::NC);
-*/
-        InferenceEngine::TensorDesc td(InferenceEngine::Precision::FP16, dims, InferenceEngine::Layout::NC);
+        InferenceEngine::TensorDesc td(g_layer_precision, dims, InferenceEngine::Layout::NC);
         data = std::make_shared<InferenceEngine::Data>(d_name, td);
 
     }
     else
     {
         std::cout << "addOutput dims size "<< dims.size()<<std::endl;
-/*
-        data = std::make_shared<InferenceEngine::Data>(d_name,
-                                                       dims,
-                                                       InferenceEngine::Precision::FP16);
-*/
-        InferenceEngine::TensorDesc td(InferenceEngine::Precision::FP16, dims, InferenceEngine::Layout::ANY);
+        InferenceEngine::TensorDesc td(g_layer_precision, dims, InferenceEngine::Layout::ANY);
         data = std::make_shared<InferenceEngine::Data>(d_name, td);
 
     }
@@ -89,8 +78,8 @@ inline OutputPort addOutput(const IRLayer &layer, const InferenceEngine::SizeVec
     layer->outData.push_back(data);
     data->creatorLayer = layer;
 
-    std::vector<size_t> outdims = data->getDims();
     #ifdef NNLOG
+    std::vector<size_t> outdims = data->getDims();
     for (int i=0; i< outdims.size(); i++) {
       ALOGI("addOutput data dims[%d] = %lu ", i, outdims[i]);
     }
@@ -120,7 +109,7 @@ inline IRLayer Generic(const std::string &type) {
     std::string name = type + "-";  // todo: make it unique
     name = name << layer_name_count++;
     InferenceEngine::LayerParams prms;
-    prms.precision = InferenceEngine::Precision::FP16;
+    prms.precision = g_layer_precision;
     prms.name = name;
     prms.type = type;
     return std::make_shared<InferenceEngine::CNNLayer>(prms);
@@ -131,7 +120,7 @@ inline IRLayer Generic(const std::string &type, const OutputPort &src)
     std::string name = type + "-"; // todo: make it unique
     name = name << layer_name_count++;
     InferenceEngine::LayerParams prms;
-    prms.precision = InferenceEngine::Precision::FP16;
+    prms.precision = g_layer_precision;
     prms.name = name;
     auto layer = std::make_shared<InferenceEngine::CNNLayer>(prms);
     layer->type = type;
@@ -174,7 +163,7 @@ static IRLayer create(const IRBlob::Ptr &weights, const OutputPort &src)
     std::string name = "FC-"; // todo: make it unique
     name = name << layer_name_count++;
     InferenceEngine::LayerParams prm;
-    prm.precision = InferenceEngine::Precision::FP16;
+    prm.precision = g_layer_precision;
     prm.name = name;
 
     //auto inDims = src->getDims(); // (batch, IFM)
@@ -239,7 +228,7 @@ static OutputPort ScaleShiftNode(const OutputPort &src, const IRBlob::Ptr &scale
     std::string name = "ConstMul-";  // todo: make it unique
     name = name << layer_name_count++;
     InferenceEngine::LayerParams prm;
-    prm.precision = InferenceEngine::Precision::FP16;
+    prm.precision = g_layer_precision;
     prm.name = name;
     prm.type = "ScaleShift";
     auto l = std::make_shared<InferenceEngine::ScaleShiftLayer>(prm);
@@ -303,7 +292,7 @@ static IRLayer create(const OutputPort &src)
 {
     std::string name = "Conv-"; // todo: make it unique
     InferenceEngine::LayerParams prm;
-    prm.precision = InferenceEngine::Precision::FP16;
+    prm.precision = g_layer_precision;
     name = name << layer_name_count++;
     prm.name = name;
     auto conv_layer = std::make_shared<InferenceEngine::ConvolutionLayer>(prm);
@@ -403,7 +392,7 @@ inline IRLayer BatchNormalization(const OutputPort &src, BatchNormParams &prms)
     std::string name = "BatchNormalization-"; // todo: make it unique
     name = name << layer_name_count++;
     InferenceEngine::LayerParams prm;
-    prm.precision = InferenceEngine::Precision::FP16;
+    prm.precision = g_layer_precision;
     prm.name = name;
     auto l = std::make_shared<InferenceEngine::BatchNormalizationLayer>(prm);
     l->type = "BatchNormalization";
@@ -421,7 +410,7 @@ inline OutputPort LRN(const OutputPort &src, float alpha, float beta, int local_
     std::string name = "Norm-"; // todo: make it unique
     name = name << layer_name_count++;
     InferenceEngine::LayerParams prm;
-    prm.precision = InferenceEngine::Precision::FP16;
+    prm.precision = g_layer_precision;
     prm.name = name;
     auto l = std::make_shared<InferenceEngine::NormLayer>(prm);
     l->type = "Norm";
@@ -444,7 +433,7 @@ inline OutputPort Crop(const OutputPort &src,
     std::string name = "Crop-"; // todo: make it unique
     name = name << layer_name_count++;
     InferenceEngine::LayerParams prm;
-    prm.precision = InferenceEngine::Precision::FP16;
+    prm.precision = g_layer_precision;
     prm.name = name;
     auto l = std::make_shared<InferenceEngine::CropLayer>(prm);
     l->type = "Crop";
@@ -466,7 +455,7 @@ inline OutputPort Pooling(const OutputPort &inp,
     std::string name = "Pooling-"; // todo: make it unique
     name = name << layer_name_count++;
     InferenceEngine::LayerParams prm;
-    prm.precision = InferenceEngine::Precision::FP16;
+    prm.precision = g_layer_precision;
     prm.name = name;
     auto ret = std::make_shared<InferenceEngine::PoolingLayer>(prm);
     ret->type = "Pooling";
@@ -483,7 +472,7 @@ inline OutputPort Pooling(const OutputPort &inp,
 
     Point2D in_size = {static_cast<int>(inDims[3]), static_cast<int>(inDims[2])};
     // todo: handle uneven padding
-    Point2D out_size = (in_size + pad + pad - kernel + stride + -1) / stride + 1; // add stride-1 to round ceiling
+    Point2D out_size = (in_size + pad + pad - kernel + stride) / stride;
     src >> ret;
     return addOutput(ret, {inDims[0], inDims[1], (size_t) out_size.y, (size_t) out_size.x});
 }
@@ -499,7 +488,7 @@ inline OutputPort Pooling(const OutputPort &inp,
         std::string name = "Pooling-"; // todo: make it unique
         name = name << layer_name_count++;
         InferenceEngine::LayerParams prm;
-        prm.precision = InferenceEngine::Precision::FP16;
+        prm.precision = g_layer_precision;
         prm.name = name;
         auto ret = std::make_shared<InferenceEngine::PoolingLayer>(prm);
         ret->type = "Pooling";
@@ -516,7 +505,7 @@ inline OutputPort Pooling(const OutputPort &inp,
 
         Point2D in_size = {static_cast<int>(inDims[3]), static_cast<int>(inDims[2])};
         // todo: handle uneven padding
-        Point2D out_size = (in_size + pad_start + pad_end - kernel + stride + -1) / stride + 1; // add stride-1 to round ceiling
+        Point2D out_size = (in_size + pad_start + pad_end - kernel + stride) / stride; // add stride-1 to round ceiling
         src >> ret;
         return addOutput(ret, {inDims[0], inDims[1], (size_t) out_size.y, (size_t) out_size.x});
     }
@@ -529,7 +518,7 @@ namespace SumLayer
        std::string name = "Sum-"; // todo: make it unique
        name = name << layer_name_count++;
        InferenceEngine::LayerParams prm;
-       prm.precision = InferenceEngine::Precision::FP16;
+       prm.precision = g_layer_precision;
        prm.name = name;
        auto sum = std::make_shared<InferenceEngine::EltwiseLayer>(prm);
        sum->type = "Eltwise";
@@ -548,7 +537,7 @@ static IRLayer create(const OutputPort &src1, const OutputPort &src2)
     std::string name = "Mul-"; // todo: make it unique
     name = name << layer_name_count++;
     InferenceEngine::LayerParams prm;
-    prm.precision = InferenceEngine::Precision::FP16;
+    prm.precision = g_layer_precision;
     prm.name = name;
     auto mul = std::make_shared<InferenceEngine::EltwiseLayer>(prm);
     mul->type = "Mul";
@@ -574,7 +563,7 @@ static OutputPort Diagnoal(const Vector &weights, const OutputPort &src)
     std::string name = "ConstMul-"; // todo: make it unique
     name = name << layer_name_count++;
     InferenceEngine::LayerParams prm;
-    prm.precision = InferenceEngine::Precision::FP16;
+    prm.precision = g_layer_precision;
     prm.name = name;
     auto l = std::make_shared<InferenceEngine::ScaleShiftLayer>(prm);
     l->type = "ConstMul";
@@ -594,7 +583,7 @@ static InferenceEngine::CNNLayer::Ptr create(OutputPort src,
     std::string name = "ConstMul-"; // todo: make it unique
     name = name << layer_name_count++;
     InferenceEngine::LayerParams prm;
-    prm.precision = InferenceEngine::Precision::FP16;
+    prm.precision = g_layer_precision;
     prm.name = name;
     auto l = std::make_shared<InferenceEngine::ScaleShiftLayer>(prm);
     l->type = "ScaleShift";
@@ -633,7 +622,7 @@ static IRLayer create(const OutputPort &src, const std::string &type)
     if((strncasecmp(type.c_str(), "relu", type.size()) == 0))
     {
         InferenceEngine::LayerParams prm;
-        prm.precision = InferenceEngine::Precision::FP16;
+        prm.precision = g_layer_precision;
         prm.name = name;
         layer = std::make_shared<InferenceEngine::ReLULayer>(prm);
         layer->type = "ReLU";
@@ -641,7 +630,7 @@ static IRLayer create(const OutputPort &src, const std::string &type)
     else if((strncasecmp(type.c_str(), "tanh", type.size()) == 0))
     {
         InferenceEngine::LayerParams prm;
-        prm.precision = InferenceEngine::Precision::FP16;
+        prm.precision = g_layer_precision;
         prm.name = name;
         layer = std::make_shared<InferenceEngine::ReLULayer>(prm);
         layer->type = "TanH";
@@ -649,7 +638,7 @@ static IRLayer create(const OutputPort &src, const std::string &type)
     else if((strncasecmp(type.c_str(), "sigmoid", type.size()) == 0))
     {
         InferenceEngine::LayerParams prm;
-        prm.precision = InferenceEngine::Precision::FP16;
+        prm.precision = g_layer_precision;
         prm.name = name;
         layer = std::make_shared<InferenceEngine::ReLULayer>(prm);
         layer->type = "Sigmoid";
@@ -657,7 +646,7 @@ static IRLayer create(const OutputPort &src, const std::string &type)
     else
     {
         InferenceEngine::LayerParams prm;
-        prm.precision = InferenceEngine::Precision::FP16;
+        prm.precision = g_layer_precision;
         prm.name = name;
         layer = std::make_shared<InferenceEngine::CNNLayer>(prm);
         layer->type = "Activation";
@@ -710,7 +699,7 @@ static IRLayer create(int size, const OutputPort &src, int axis = 1)
     std::string name = "Split-"; // todo: make it unique
     name = name << layer_name_count++;
     InferenceEngine::LayerParams prm;
-    prm.precision = InferenceEngine::Precision::FP16;
+    prm.precision = g_layer_precision;
     prm.name = name;
     auto me = std::make_shared<InferenceEngine::SplitLayer>(prm);
     me->type = "Split";
@@ -744,7 +733,7 @@ inline OutputPort Concat(const std::vector<OutputPort> inputs, int axis = 1)
     std::string name = "Concat-"; // todo: make it unique
     name = name << layer_name_count++;
     InferenceEngine::LayerParams prm;
-    prm.precision = InferenceEngine::Precision::FP16;
+    prm.precision = g_layer_precision;
     prm.name = name;
     auto ret = std::make_shared<InferenceEngine::ConcatLayer>(prm);
     ret->type = "Concat";
@@ -766,9 +755,17 @@ inline OutputPort Concat(const std::vector<OutputPort> inputs, int axis = 1)
 //template<typename T>
 inline OutputPort Clamp(const OutputPort &src, float min, float max)
 {
-    auto layer = Generic("Clamp", src);
-    addAttr(layer, "min", min);
-    addAttr(layer, "max", max);
+    std::string name = "Clamp-"; // todo: make it unique
+    name = name << layer_name_count++;
+    InferenceEngine::LayerParams prms;
+    prms.precision = g_layer_precision;
+    prms.name = name;
+    auto layer = std::make_shared<InferenceEngine::ClampLayer>(prms);
+    layer->type = "Clamp";
+    layer->min_value = min;
+    layer->max_value = max;
+    src >> layer;
+    addOutput(layer, src->getDims());
     return output(layer);
 }
 
@@ -789,7 +786,16 @@ inline OutputPort Reshape(const TensorDims &newDims, const OutputPort &src)
         return src;
     }
 
-    auto op = output(Generic("Reshape", src));
+    std::string name = "Reshape-"; // todo: make it unique
+    name = name << layer_name_count++;
+    InferenceEngine::LayerParams prms;
+    prms.precision = g_layer_precision;
+    prms.name = name;
+    auto layer = std::make_shared<InferenceEngine::ReshapeLayer>(prms);
+    layer->type = "Reshape";
+    src >> layer;
+    addOutput(layer, src->getDims());
+    auto op = output(layer);
     op->setDims(newDims);
     return op;
 }
@@ -799,7 +805,7 @@ static OutputPort Softmax(const OutputPort &src)
     std::string name = "Softmax-"; // todo: make it unique
     name = name << layer_name_count++;
     InferenceEngine::LayerParams prm;
-    prm.precision = InferenceEngine::Precision::FP16;
+    prm.precision = g_layer_precision;
     prm.name = name;
     auto l = std::make_shared<InferenceEngine::SoftMaxLayer>(prm);
     l->type = "SoftMax";
@@ -813,7 +819,7 @@ inline OutputPort Gather(const std::vector<OutputPort> inputs, int axis = 1)
     std::string name = "Gather-"; // todo: make it unique
     name = name << layer_name_count++;
     InferenceEngine::LayerParams prm;
-    prm.precision = InferenceEngine::Precision::FP16;
+    prm.precision = g_layer_precision;
     prm.name = name;
     auto ret = std::make_shared<InferenceEngine::GenericLayer>(prm);
     ret->type = "Gather";

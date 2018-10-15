@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "neuralnetworks-vpu"
+#define LOG_TAG "neuralnetworks-hal-service"
 
 #include <hidl/HidlTransportSupport.h>
 #include <hidl/LegacySupport.h>
@@ -24,18 +24,21 @@
 
 using android::hardware::configureRpcThreadpool;
 using android::hardware::joinRpcThreadpool;
-using android::hardware::neuralnetworks::V1_0::vpu_driver::VpuDriver;
+using android::hardware::neuralnetworks::V1_0::driver::Driver;
 
- int main(int /* argc */, char* /* argv */ []) {
-//     android::sp<VpuDriver> vpu = new VpuDriver("vpu-driver");
-     android::sp<VpuDriver> vpu = new VpuDriver();
+int main(int argc, char* argv[]) {
+    if (argc > 2 && strlen(argv[2]) > 0) {
+	if(strcmp(argv[1], "-D") != 0) return 0;
+        const char* deviceType = argv[2];
+        android::sp<Driver> device = new Driver(deviceType);
+        ALOGD("NN-HAL(%s) is ready.", deviceType);
+        configureRpcThreadpool(4, true);
+        android::status_t status = device->registerAsService(deviceType);
+        LOG_ALWAYS_FATAL_IF(
+            status != android::OK,
+            "Error while registering as service for %s: %d", deviceType, status);
+        joinRpcThreadpool();
+    }
 
-     configureRpcThreadpool(4, true);
-     android::status_t status = vpu->registerAsService("myriad-vpu");
-     LOG_ALWAYS_FATAL_IF(
-             status != android::OK,
-             "Error while registering as service: %d", status);
-     joinRpcThreadpool();
-
-     return 0;
- }
+    return 0;
+}

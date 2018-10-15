@@ -8,7 +8,7 @@
 #include "vpu_plugin_config.hpp"
 
 #include <android/log.h>
-#include <cutils/log.h>
+#include <log/log.h>
 
 using namespace IRBuilder;
 using namespace InferenceEngine;
@@ -180,9 +180,15 @@ static void setConfig(std::map<std::string, std::string> &config) {
 //    config[VPUConfigParams::LAST_SHAVE] = "11";
 //    config[VPUConfigParams::MEMORY_OPTIMIZATION] = CONFIG_VALUE(NO);//InferenceEngine::PluginConfigParams::YES;
 //    config[VPUConfigParams::COPY_OPTIMIZATION] = CONFIG_VALUE(NO);//InferenceEngine::PluginConfigParams::YES;
+#ifdef ENABLE_MYRIAD
     config[CONFIG_KEY(LOG_LEVEL)] = CONFIG_VALUE(LOG_INFO);
     config[VPUConfigParams::KEY_VPU_LOG_LEVEL] = CONFIG_VALUE(LOG_DEBUG);
     config[CONFIG_KEY(LOG_LEVEL)] = CONFIG_VALUE(LOG_DEBUG);
+#elif ENABLE_MKLDNN
+    config[PluginConfigParams::KEY_CPU_BIND_THREAD] = PluginConfigParams::NO;
+    config[PluginConfigParams::KEY_EXCLUSIVE_ASYNC_REQUESTS] = PluginConfigParams::NO;
+    config[PluginConfigParams::KEY_DYN_BATCH_LIMIT] = "1";
+#endif
     //config[VPU_CONFIG_KEY(LOG_LEVEL)] = CONFIG_VALUE(LOG_DEBUG);
     //config[InferenceEngine::PluginConfigParams::CONFIG_KEY(LOG_LEVEL)] = InferenceEngine::PluginConfigParams::LOG_DEBUG;
     //config[VPUConfigParams::VPU_LOG_LEVEL] = CONFIG_VALUE(LOG_DEBUG);
@@ -245,6 +251,7 @@ public:
         enginePtr = dispatcher.getSuitablePlugin(target);
 
         network = doc.getNetwork();
+        network->setTargetDevice(target);
         network->getInputsInfo(inputInfo);
         network->getOutputsInfo(outputInfo);
         printf("aks Execute Network intialized\n");
@@ -263,8 +270,11 @@ public:
         std::map<std::string, std::string> networkConfig;
         setConfig(networkConfig);
 
+        printf("Create plugin\n");
         InferencePlugin plugin(enginePtr);
+        printf("Plugin load network\n");
         executable_network = plugin.LoadNetwork(*network, networkConfig);
+        printf("Plugin loaded network\n");
         std::cout << "Network loaded" << std::endl;
 
         inferRequest = executable_network.CreateInferRequest();

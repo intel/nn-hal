@@ -37,6 +37,8 @@ using namespace IRBuilder;
 
 int IRBuilder::layer_name_count = 0;
 
+InferenceEngine::Precision IRBuilder::g_layer_precision = InferenceEngine::Precision::UNSPECIFIED;
+
 const std::string ActivationLayer::Sigmoid("sigmoid");
 
 const std::string ActivationLayer::Tanh("tanh");

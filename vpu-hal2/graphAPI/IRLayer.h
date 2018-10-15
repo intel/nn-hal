@@ -84,14 +84,7 @@ std::string operator<<(const std::string &src, T i)
 
 typedef InferenceEngine::CNNLayer::Ptr 	IRLayer;
 typedef InferenceEngine::DataPtr 	OutputPort;
-
-//typedef InferenceEngine::TBlob<float> 	IRBlob;
-//typedef InferenceEngine::Blob IRBlob;
-typedef InferenceEngine::TBlob<short> 	IRBlob;
-//	struct Matrix
-//	{
-//		static IRBlob::Ptr read(const char* fileName, uint32_t rows, uint32_t cols);
-//	};
+typedef InferenceEngine::Blob 		IRBlob;
 
 struct Vector
 {
@@ -121,22 +114,26 @@ inline void operator>>(const InferenceEngine::CNNLayerPtr &lhs, const InferenceE
     lhs->outData[0] >> rhs;
 }
 
-inline IRBlob::Ptr readBlobFromFile(const std::string &file)
+template <typename T>
+IRBlob::Ptr readBlobFromFile(const std::string &file)
 {
-	auto fs = FileUtils::fileSize(file);
-	if (fs <= 0) THROW("blob file ") << file << " not found or empty";
-	auto ret = IRBlob::Ptr(new InferenceEngine::TBlob<short>(InferenceEngine::Precision::FP16, InferenceEngine::C,  { static_cast<size_t>(fs / sizeof(short)) }));
-	ret->allocate();
-	FileUtils::readAllFile(file, ret->data(), fs);
-	return ret;
+    auto fs = FileUtils::fileSize(file);
+    if (fs <= 0) THROW("blob file ") << file << " not found or empty";
+    InferenceEngine::Precision precision = sizeof(T) == sizeof(short)
+        ? InferenceEngine::Precision::FP16 : InferenceEngine::Precision::FP32;
+    auto ret = typename InferenceEngine::TBlob<T>::Ptr(
+        new InferenceEngine::TBlob<T>(precision, InferenceEngine::C,
+        { static_cast<size_t>(fs / sizeof(T)) }));
+    ret->allocate();
+    FileUtils::readAllFile(file, ret->data(), fs);
+    return ret;
 }
 
-inline IRBlob::Ptr readBlobFromFile(const std::string &file, const TensorDims &dims, InferenceEngine::Layout l)
+template <typename T>
+IRBlob::Ptr readBlobFromFile(const std::string &file, const TensorDims &dims, InferenceEngine::Layout l)
 {
-    auto data = readBlobFromFile(file);
-	  //void reshape(const SizeVector &dims, Layout layout = Layout::ANY);
-    //data->getTensorDesc().reshape(dims, l);
-		data->Reshape(dims, l);
+    auto data = readBlobFromFile<T>(file);
+    data->Reshape(dims, l);
     return data;
 }
 
