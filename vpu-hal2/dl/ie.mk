@@ -53,6 +53,7 @@ LOCAL_CFLAGS += -std=c++11  -Wall -Wno-unknown-pragmas -Wno-strict-overflow -fPI
 LOCAL_CFLAGS += -Wno-unused-variable -Wno-unused-parameter -Wno-non-virtual-dtor -Wno-missing-field-initializers  -fexceptions -frtti -Wno-error
 LOCAL_CFLAGS += -DENABLE_VPU -DENABLE_MYRIAD -DAKS -DNDEBUG -DIMPLEMENT_INFERENCE_ENGINE_API -fvisibility=default -std=gnu++11 -D_FORTIFY_SOURCE=2 -fPIE -DUSE_STATIC_IE
 #LOCAL_CFLAGS += -DAKS -DNNLOG
+LOCAL_CFLAGS += -DENABLE_MKL_DNN
 
 LOCAL_SHARED_LIBRARIES := liblog
 LOCAL_STATIC_LIBRARIES := libpugixml libade

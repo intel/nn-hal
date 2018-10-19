@@ -13,12 +13,11 @@
 // limitations under the License.
 
 /**
- * @brief A header that defines advanced related properties for VPU plugins.
- * These properties should be used in SetConfig() and LoadNetwork() methods of plugins
+ * @brief A header that defines advanced related properties for CPU plugins.
+ * These properties should be used in SetConfig() and LoadNetwork() methods
  *
- * @file vpu_plugin.hpp
+ * @file ie_helpers.hpp
  */
-//#define LOG_TAG "vpu_plugin"
 
 #pragma once
 
@@ -37,7 +36,7 @@
 #include <fstream>
 
 #include <android/log.h>
-#include <cutils/log.h>
+#include <log/log.h>
 
 using namespace InferenceEngine::details;
 using namespace IRBuilder;
@@ -122,12 +121,12 @@ public:
         network->getInputsInfo(inputInfo);
         network->getOutputsInfo(outputInfo);
 
-        size_t batch = 1;
-        network->setBatchSize(batch);
+        //size_t batch = 1;
+        //network->setBatchSize(batch);
 
-    		#ifdef NNLOG
-            ALOGI("Myriad Plugin loaded");
-    		#endif
+        #ifdef NNLOG
+        ALOGI("%s Plugin loaded",InferenceEngine::TargetDeviceInfo::name(target));
+        #endif
     }
 
     ExecuteNetwork(ExecutableNetwork& exeNet) : ExecuteNetwork(){
@@ -146,7 +145,7 @@ public:
         InferencePlugin plugin(enginePtr);
         executable_network = plugin.LoadNetwork(*network, networkConfig);
         //std::cout << "Network loaded" << std::endl;
-		    ALOGI("Network loaded");
+	ALOGI("Network loaded");
 
         inferRequest = executable_network.CreateInferRequest();
         //std::cout << "infer request created" << std::endl;

@@ -2,8 +2,11 @@
 #include <fstream>
 
 #include <android/log.h>
-#include <cutils/log.h>
+#include <log/log.h>
 
+using namespace IRBuilder;
+
+template <typename T>
 void createAlexNet(IRDocument &doc)
 {
 	auto input = doc.createInput("in1", { 1,3,227,227});
@@ -18,12 +21,12 @@ void createAlexNet(IRDocument &doc)
 
 	ConvolutionParams prms;
 	//<convolution_data stride-x="4" stride-y="4" pad-x="0" pad-y="0" kernel-x="11" kernel-y="11" output="96" group="1"/>
-	prms.weights = readBlobFromFile("AlexNet-bins/conv1_weights.bin");
+	prms.weights = readBlobFromFile<T>("AlexNet-bins/conv1_weights.bin");
 	prms.kernel = { 11,11 };
 	prms.stride = { 4,4 };
 	prms.num_output_planes = 96;
 
-	auto b1 = readBlobFromFile("AlexNet-bins/conv1_bias.bin");
+	auto b1 = readBlobFromFile<T>("AlexNet-bins/conv1_bias.bin");
 	auto c1 = Convolution(input->getInputData(), prms) + b1;
 	auto r1 = ReLU(c1);
     //<norm_data alpha = "9.9999997e-05" beta = "0.75" local-size = "5" region = "across" / >
@@ -40,10 +43,10 @@ void createAlexNet(IRDocument &doc)
 	prms.pad_end = { 2,2 };
 	prms.num_output_planes = 128;
 
-	prms.weights = readBlobFromFile("AlexNet-bins/conv2_0_weights.bin");
-	auto c2_0 = Convolution(s1[0], prms) + readBlobFromFile("AlexNet-bins/conv2_0_bias.bin");
-	prms.weights = readBlobFromFile("AlexNet-bins/conv2_1_weights.bin");
-	auto c2_1 = Convolution(s1[1], prms) + readBlobFromFile("AlexNet-bins/conv2_1_bias.bin");
+	prms.weights = readBlobFromFile<T>("AlexNet-bins/conv2_0_weights.bin");
+	auto c2_0 = Convolution(s1[0], prms) + readBlobFromFile<T>("AlexNet-bins/conv2_0_bias.bin");
+	prms.weights = readBlobFromFile<T>("AlexNet-bins/conv2_1_weights.bin");
+	auto c2_1 = Convolution(s1[1], prms) + readBlobFromFile<T>("AlexNet-bins/conv2_1_bias.bin");
 	auto c2 = Concat({ c2_0, c2_1 });
 	auto relu2 = ReLU(c2);
 	auto n2 = LRN(relu2, 0.0001f, 0.75f, 5, true);
@@ -57,40 +60,40 @@ void createAlexNet(IRDocument &doc)
 	prms.pad_start = { 1,1 };
 	prms.pad_end = { 1,1 };
 	prms.num_output_planes = 384;
-	prms.weights = readBlobFromFile("AlexNet-bins/conv3_weights.bin");
-	auto c3 = ReLU(Convolution(p2, prms)+ readBlobFromFile("AlexNet-bins/conv3_bias.bin"));
+	prms.weights = readBlobFromFile<T>("AlexNet-bins/conv3_weights.bin");
+	auto c3 = ReLU(Convolution(p2, prms)+ readBlobFromFile<T>("AlexNet-bins/conv3_bias.bin"));
 
 	// 4th part
 	auto s4 = Split(c3, 2);
 	//<convolution_data stride-x="1" stride-y="1" pad-x="1" pad-y="1" kernel-x="3" kernel-y="3" output="192" group="1"/>
 	prms.num_output_planes = 192;
-	prms.weights = readBlobFromFile("AlexNet-bins/conv4_0_weights.bin");
-	auto c4_0 = ReLU(Convolution(s4[0], prms) + readBlobFromFile("AlexNet-bins/conv4_0_bias.bin"));
-	prms.weights = readBlobFromFile("AlexNet-bins/conv4_1_weights.bin");
-	auto c4_1 = ReLU(Convolution(s4[1], prms) + readBlobFromFile("AlexNet-bins/conv4_1_bias.bin"));
+	prms.weights = readBlobFromFile<T>("AlexNet-bins/conv4_0_weights.bin");
+	auto c4_0 = ReLU(Convolution(s4[0], prms) + readBlobFromFile<T>("AlexNet-bins/conv4_0_bias.bin"));
+	prms.weights = readBlobFromFile<T>("AlexNet-bins/conv4_1_weights.bin");
+	auto c4_1 = ReLU(Convolution(s4[1], prms) + readBlobFromFile<T>("AlexNet-bins/conv4_1_bias.bin"));
 
 	// 5th part
 	//<convolution_data stride-x="1" stride-y="1" pad-x="1" pad-y="1" kernel-x="3" kernel-y="3" output="128" group="1"/>
 	prms.num_output_planes = 128;
-	prms.weights = readBlobFromFile("AlexNet-bins/conv5_0_weights.bin");
-	auto c5_0 = ReLU(Convolution(c4_0, prms) + readBlobFromFile("AlexNet-bins/conv5_0_bias.bin"));
-	prms.weights = readBlobFromFile("AlexNet-bins/conv5_1_weights.bin");
-	auto c5_1 = ReLU(Convolution(c4_1, prms) + readBlobFromFile("AlexNet-bins/conv5_1_bias.bin"));
+	prms.weights = readBlobFromFile<T>("AlexNet-bins/conv5_0_weights.bin");
+	auto c5_0 = ReLU(Convolution(c4_0, prms) + readBlobFromFile<T>("AlexNet-bins/conv5_0_bias.bin"));
+	prms.weights = readBlobFromFile<T>("AlexNet-bins/conv5_1_weights.bin");
+	auto c5_1 = ReLU(Convolution(c4_1, prms) + readBlobFromFile<T>("AlexNet-bins/conv5_1_bias.bin"));
 	auto c5 = Concat({ c5_0, c5_1 });
 
 	//<pooling_data kernel-x="3" kernel-y="3" pad-x="0" pad-y="0" stride-x="2" stride-y="2" rounding-type="ceil" pool-method="max"/>
 	auto p5 = Pooling(c5, { 3,3 }, { 2,2 }, { 0,0 }, PoolingLayer::MAX);
 
 	//fc6
-	auto m = readBlobFromFile("AlexNet-bins/fc6_weights.bin");
-	auto fc6 = ReLU(m * Reshape({ 1, 9216 }, p5)+readBlobFromFile("AlexNet-bins/fc6_bias.bin"));
+	auto m = readBlobFromFile<T>("AlexNet-bins/fc6_weights.bin");
+	auto fc6 = ReLU(m * Reshape({ 1, 9216 }, p5)+readBlobFromFile<T>("AlexNet-bins/fc6_bias.bin"));
 
 	// fc7
-	m = readBlobFromFile("AlexNet-bins/fc7_weights.bin");
-	auto fc7 = ReLU(m * fc6 + readBlobFromFile("AlexNet-bins/fc7_bias.bin"));
+	m = readBlobFromFile<T>("AlexNet-bins/fc7_weights.bin");
+	auto fc7 = ReLU(m * fc6 + readBlobFromFile<T>("AlexNet-bins/fc7_bias.bin"));
 	//fc8
-	m = readBlobFromFile("AlexNet-bins/fc8_weights.bin");
-	auto fc8 = m * fc7 + readBlobFromFile("AlexNet-bins/fc8_bias.bin");
+	m = readBlobFromFile<T>("AlexNet-bins/fc8_weights.bin");
+	auto fc8 = m * fc7 + readBlobFromFile<T>("AlexNet-bins/fc8_bias.bin");
 
 	const OutputPort &output = Softmax(fc8);
 	doc.addOutput(output);
@@ -117,7 +120,11 @@ bool testAlexNet()
 	std::cout << "starting from: " << tmpStr << std::endl;
 	try
 	{
-		createAlexNet(doc);
+#ifdef ENABLE_MYRIAD
+		createAlexNet<short>(doc);
+#elif ENABLE_MKLDNN
+		createAlexNet<float>(doc);
+#endif
 	}
 	catch (const InferenceEngine::details::InferenceEngineException &ex)
 	{
@@ -138,7 +145,11 @@ bool testAlexNet()
 
 	// try it out
 	try {
-		auto in = readBlobFromFile("AlexNet-bins/input.bin", {1, 3, 227,227 }, InferenceEngine::NCHW);
+#ifdef ENABLE_MYRIAD
+		auto in = readBlobFromFile<short>("AlexNet-bins/input.bin", {1, 3, 227,227 }, InferenceEngine::NCHW);
+#elif ENABLE_MKLDNN
+		auto in = readBlobFromFile<float>("AlexNet-bins/input.bin", {1, 3, 227,227 }, InferenceEngine::NCHW);
+#endif
 /*
 		InfEng eng(TargetDevice::eMYRIAD);
 
@@ -147,7 +158,11 @@ bool testAlexNet()
 		auto ob = exe.Infer(in);
 */
 printf("aks initialize ExecuteNetwork\n");
+#ifdef ENABLE_MYRIAD
 ExecuteNetwork executeNet(doc, TargetDevice::eMYRIAD);
+#elif ENABLE_MKLDNN
+ExecuteNetwork executeNet(doc, TargetDevice::eCPU);
+#endif
 executeNet.prepareInput();
 executeNet.prepareOutput();
 printf("load network\n");
@@ -164,6 +179,7 @@ auto ob = executeNet.Infer(in);
 
         const auto mem = ob->readOnly();
 
+        //const float *pf = mem.as<const float*>();
         const float *pf = mem.as<const float*>();
 
 		for (int i=0; i<top10.size(); i++)
@@ -201,6 +217,7 @@ bool testAffineLayer()
 
 		vec<uint32_t> wdims = { 1, 5 };
 		//vec<uint32_t> wdims = { 5, 1 };
+#ifdef ENABLE_MYRIAD
 		TensorDesc td(InferenceEngine::Precision::FP16, toDims(wdims), Layout::NC);
 
 		InferenceEngine::TBlob<short>::Ptr weightsBlob = std::make_shared<InferenceEngine::TBlob<short>>(td);
@@ -214,6 +231,12 @@ bool testAffineLayer()
 		printf("weights nelement %u\n", nelem);
 
     f32tof16Arrays(fp16Array, (float *)buf, nelem);  //void f32tof16Arrays(short *dst, const float *src, uint32_t& nelem, float scale = 1, float bias = 0)
+#elif ENABLE_MKLDNN
+		TensorDesc td(InferenceEngine::Precision::FP32, toDims(wdims), Layout::NC);
+
+		InferenceEngine::TBlob<float>::Ptr weightsBlob = std::make_shared<InferenceEngine::TBlob<float>>(td);
+		weightsBlob->set(wdata);
+#endif
 
 		//auto weights = make_shared_blob<short>(Precision::FP32, Layout::C, std::vector<float>({ 2.0f,3.0f,0.1f,5.0f,1.0f }));
 		//auto weights = make_shared_blob<short>(Precision::FP16, Layout::NC, std::vector<short>({ 2,3,1,5,1 }));
@@ -224,6 +247,7 @@ bool testAffineLayer()
 		float* buf1 = bData.data();
 
 		vec<uint32_t> bdims = { 1 };
+#ifdef ENABLE_MYRIAD
 		TensorDesc td1(InferenceEngine::Precision::FP16, toDims(bdims), /*Layout::ANY*/Layout::C);
 
 		InferenceEngine::TBlob<short>::Ptr biasBlob = std::make_shared<InferenceEngine::TBlob<short>>(td1);
@@ -236,6 +260,12 @@ bool testAffineLayer()
 		//printf("bias nelement %u\n", nelem);
 
     f32tof16Arrays(fp16Array1, (float *)buf1, nelem1);  //void f32tof16Arrays(short *dst, const float *src, uint32_t& nelem, float scale = 1, float bias = 0)
+#elif ENABLE_MKLDNN
+		TensorDesc td1(InferenceEngine::Precision::FP32, toDims(bdims), /*Layout::ANY*/Layout::C);
+
+		InferenceEngine::TBlob<float>::Ptr biasBlob = std::make_shared<InferenceEngine::TBlob<float>>(td1);
+		biasBlob->set(bData);
+#endif
 
 
 		//auto bias = make_shared_blob<short>(Precision::FP32, Layout::C, std::vector<float>({ -1.0f }));
@@ -288,7 +318,11 @@ bool testAffineLayer()
 
 
 		printf("aks initialize ExecuteNetwork\n");
+#ifdef ENABLE_MYRIAD
 		ExecuteNetwork executeNet(doc, TargetDevice::eMYRIAD);
+#elif ENABLE_MKLDNN
+		ExecuteNetwork executeNet(doc, TargetDevice::eCPU);
+#endif
 		executeNet.prepareInput();
 		executeNet.prepareOutput();
 		printf("load network\n");
@@ -332,7 +366,7 @@ bool testAffineLayer()
 	}
 }
 
-
+template <typename T>
 bool testMKLBug()
 {
 	std::string tmpStr;
@@ -343,12 +377,12 @@ bool testMKLBug()
 
 		ConvolutionParams prms;
 		//<convolution_data stride-x="4" stride-y="4" pad-x="0" pad-y="0" kernel-x="11" kernel-y="11" output="96" group="1"/>
-		prms.weights = readBlobFromFile("AlexNet-bins/conv1_weights.bin");
+		prms.weights = readBlobFromFile<T>("AlexNet-bins/conv1_weights.bin");
 		prms.kernel = { 11,11 };
 		prms.stride = { 4,4 };
 		prms.num_output_planes = 96;
 
-		auto b1 = readBlobFromFile("AlexNet-bins/conv1_bias.bin");
+		auto b1 = readBlobFromFile<T>("AlexNet-bins/conv1_bias.bin");
 		auto r1 = ReLU(Convolution(input->getInputData(), prms) + b1);
 		//<norm_data alpha = "9.9999997e-05" beta = "0.75" local-size = "5" region = "across" / >
 		auto n1 = LRN(r1, 0.0001f, 0.75f, 5, true);
@@ -363,10 +397,10 @@ bool testMKLBug()
 		prms.pad_end = prms.pad_start = { 2,2 };
 		prms.num_output_planes = 128;
 
-		prms.weights = readBlobFromFile("AlexNet-bins/conv2_0_weights.bin");
-		auto c2_0 = Convolution(s1[0], prms) + readBlobFromFile("AlexNet-bins/conv2_0_bias.bin");
-		prms.weights = readBlobFromFile("AlexNet-bins/conv2_1_weights.bin");
-		auto c2_1 = Convolution(s1[1], prms) + readBlobFromFile("AlexNet-bins/conv2_1_bias.bin");
+		prms.weights = readBlobFromFile<T>("AlexNet-bins/conv2_0_weights.bin");
+		auto c2_0 = Convolution(s1[0], prms) + readBlobFromFile<T>("AlexNet-bins/conv2_0_bias.bin");
+		prms.weights = readBlobFromFile<T>("AlexNet-bins/conv2_1_weights.bin");
+		auto c2_1 = Convolution(s1[1], prms) + readBlobFromFile<T>("AlexNet-bins/conv2_1_bias.bin");
 		auto conv2 = Concat({ c2_0, c2_1 });
 		auto c2 = ReLU(conv2);
 		auto n2 = LRN(c2, 0.0001f, 0.75f, 5, true);
@@ -376,7 +410,7 @@ bool testMKLBug()
 		doc.addOutput(c2);
 		doc.addOutput(p2);
 
-		auto in = readBlobFromFile("AlexNet-bins/input.bin", {1,3,227,227}, Layout::NCHW);
+		auto in = readBlobFromFile<T>("AlexNet-bins/input.bin", {1,3,227,227}, Layout::NCHW);
 /*
 		InfEng eng(TargetDevice::eMYRIAD);
 
@@ -402,10 +436,17 @@ int main(int argc, const char *argv[])
 {
 	std::string inp;
 
-
+#ifdef ENABLE_MYRIAD
+        IRBuilder::g_layer_precision = InferenceEngine::Precision::FP16;
 	//testAlexNet();
+	//testMKLBug<short>();
+#elif ENABLE_MKLDNN
+        IRBuilder::g_layer_precision = InferenceEngine::Precision::FP32;
+	//testAlexNet();
+	//testMKLBug<float>();
+#endif
+
 	testAffineLayer();
-	//testMKLBug();
 
 	prompt("enter string to exit\n");
 	return 0;

@@ -40,8 +40,7 @@
 
 #ifdef NNLOG
 #include <android/log.h>
-//#include <android-base/logging.h>
-#include <cutils/log.h>
+#include <log/log.h>
 #endif
 
 using namespace IRBuilder;
@@ -55,7 +54,7 @@ public:
     InternalNetworkImpl(){}
     InternalNetworkImpl(const std::string netName):InternalNetworkImpl()
     {
-        setPrecision(Precision::FP16);
+        setPrecision(IRBuilder::g_layer_precision);
         setName(netName);
     }
 
@@ -172,7 +171,7 @@ void IRDocument::optimize()
 void IRDocument::build()
 {
     if(_processed) return;
-    network->setPrecision(Precision::FP16);
+    network->setPrecision(IRBuilder::g_layer_precision);
     InputsDataMap inputs;
     network->getInputsInfo(inputs);
     for(auto i : inputs)
@@ -232,7 +231,7 @@ IRDocument::saveBlobToIR(std::ostream &binFile, const /*IRBlob::Ptr*/InferenceEn
         binFile.write(reinterpret_cast<const char *>(fp), blob->byteSize());
     }
     //node.append_attribute("precision").set_value("FP16");
-	node.append_attribute("precision").set_value(blob->precision().name());
+    node.append_attribute("precision").set_value(blob->precision().name());
 }
 
 void IRDocument::save(std::ostream &xml_os, std::ostream &bin_os)
@@ -330,7 +329,7 @@ InferenceEngine::InputInfo::Ptr IRDocument::createInput(const std::string &name,
         layout = InferenceEngine::Layout::NC;
     }
     std::cout << "createInput input data dims[0] "<<dims[0]<< "dims[1]" <<dims[1]<< std::endl;
-    TensorDesc td(InferenceEngine::Precision::FP16, dims, layout);
+    TensorDesc td(IRBuilder::g_layer_precision, dims, layout);
 
     auto inputData = std::make_shared<InferenceEngine::Data>(name, td);
     InferenceEngine::InputInfo::Ptr info(new InferenceEngine::InputInfo());
@@ -418,7 +417,7 @@ void IRDocument::saveToIR(std::ostream &binFile, pugi::xml_node &parent, const I
     layer.append_attribute("name").set_value(irLayer->name.c_str());
     layer.append_attribute("type").set_value(irLayer->type.c_str());
     layer.append_attribute("id").set_value(irLayer->userValue.v_int);
-    layer.append_attribute("precision").set_value("FP16");
+    layer.append_attribute("precision").set_value(IRBuilder::g_layer_precision==Precision::FP16 ? "FP16" : "FP32");
 
     if(!irLayer->params.empty())
     {

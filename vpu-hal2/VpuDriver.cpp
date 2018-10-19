@@ -14,13 +14,11 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "VpuDriver"
+#define LOG_TAG "Driver"
 
 #include "VpuDriver.h"
 #include "VpuPreparedModel.h"
-//#include "Utils.h"
 #include <android-base/logging.h>
-#include <hidl/LegacySupport.h>
 #include <thread>
 
 
@@ -28,26 +26,41 @@ namespace android {
 namespace hardware {
 namespace neuralnetworks {
 namespace V1_0 {
-namespace vpu_driver {
+namespace driver {
 
-Return<ErrorStatus> VpuDriver::prepareModel(const Model& model,
+static sp<PreparedModel> ModelFactory(const char* name, const Model& model) {
+    sp<PreparedModel> preparedModel = NULL;
+    if (strcmp(name, "CPU") ==0)
+        preparedModel = new CpuPreparedModel(model);
+    else if (strcmp(name, "VPU") ==0)
+        preparedModel = new VpuPreparedModel(model);
+
+    return preparedModel;
+}
+
+Return<ErrorStatus> Driver::prepareModel(const Model& model,
                                              const sp<IPreparedModelCallback>& callback)
 {
-    ALOGI("VpuDriver::prepareModel");
+    ALOGI("Driver::prepareModel");
 
     if (callback.get() == nullptr) {
         ALOGI("invalid callback passed to prepareModel");
         return ErrorStatus::INVALID_ARGUMENT;
     }
 
-    if (!VpuPreparedModel::validModel(model)) {
+    if (!PreparedModel::validModel(model)) {
         ALOGI("model is not valid");
         callback->notify(ErrorStatus::INVALID_ARGUMENT, nullptr);
         return ErrorStatus::INVALID_ARGUMENT;
     }
 
     // TODO: make asynchronous later
-    sp<VpuPreparedModel> preparedModel = new VpuPreparedModel(model);
+    sp<PreparedModel> preparedModel = ModelFactory(mName.c_str(), model);
+    if (preparedModel == NULL) {
+        ALOGI("failed to create preparedmodel");
+        return ErrorStatus::INVALID_ARGUMENT;
+    }
+
     if (!preparedModel->initialize()) {
         ALOGI("failed to initialize preparedmodel");
         callback->notify(ErrorStatus::GENERAL_FAILURE, nullptr);
@@ -56,68 +69,35 @@ Return<ErrorStatus> VpuDriver::prepareModel(const Model& model,
 
     callback->notify(ErrorStatus::NONE, preparedModel);
     return ErrorStatus::NONE;
-/*
-    if (VLOG_IS_ON(DRIVER)) {
-        VLOG(DRIVER) << "prepareModel";
-        logModelToInfo(model);
-    }
-    if (callback.get() == nullptr) {
-        LOG(ERROR) << "invalid callback passed to prepareModel";
-        return ErrorStatus::INVALID_ARGUMENT;
-    }
-    if (!VpuPreparedModel::validModel(model)) {
-        callback->notify(ErrorStatus::INVALID_ARGUMENT, nullptr);
-        return ErrorStatus::INVALID_ARGUMENT;
-    }
-
-    // TODO: make asynchronous later
-    sp<VpuPreparedModel> preparedModel = new VpuPreparedModel(model);
-    if (!preparedModel->initialize()) {
-       callback->notify(ErrorStatus::INVALID_ARGUMENT, nullptr);
-       return ErrorStatus::INVALID_ARGUMENT;
-    }
-    callback->notify(ErrorStatus::NONE, preparedModel);
-    return ErrorStatus::NONE;
-*/
 }
 
-Return<DeviceStatus> VpuDriver::getStatus() {
-
+Return<DeviceStatus> Driver::getStatus() {
     ALOGI("DeviceStatus::AVAILABLE");
     return DeviceStatus::AVAILABLE;
 }
 
-/*
-int VpuDriver::run() {
-    android::hardware::configureRpcThreadpool(4, true);
-    if (registerAsService(mName) != android::OK) {
-        LOG(ERROR) << "Could not register service";
-        return 1;
-    }
-    android::hardware::joinRpcThreadpool();
-    LOG(ERROR) << "Service exited!";
-    return 1;
-}
-*/
-
-Return<void> VpuDriver::getCapabilities(getCapabilities_cb cb) {
-    //android::nn::initVLogMask();
-    //VLOG(DRIVER) << "getCapabilities()";
-    ALOGI("vpu driver getCapabilities()");
-    Capabilities capabilities = {.float32Performance = {.execTime = 1.1f, .powerUsage = 1.1f},
+Return<void> Driver::getCapabilities(getCapabilities_cb cb) {
+    if (mName.compare("CPU") ==0) {
+        ALOGI("Cpu driver getCapabilities()");
+        Capabilities capabilities = {.float32Performance = {.execTime = 1.1f, .powerUsage = 1.1f}};
+        cb(ErrorStatus::NONE, capabilities);
+    } else {
+        ALOGI("Myriad driver getCapabilities()");
+        Capabilities capabilities = {.float32Performance = {.execTime = 1.1f, .powerUsage = 1.1f},
                                  .quantized8Performance = {.execTime = 1.1f, .powerUsage = 1.1f}};
-    cb(ErrorStatus::NONE, capabilities);
+        cb(ErrorStatus::NONE, capabilities);
+    }
     return Void();
 }
 
-Return<void> VpuDriver::getSupportedOperations(const Model& model,
+Return<void> Driver::getSupportedOperations(const Model& model,
                                                      getSupportedOperations_cb cb) {
     //VLOG(DRIVER) << "getSupportedOperations()";
-    ALOGI("vpu driver getSupportedOperations()");
+    ALOGI("Driver getSupportedOperations()");
     int count = model.operations.size();
     std::vector<bool> supported(count, false);
 
-    if (!VpuPreparedModel::validModel(model)) {
+    if (!PreparedModel::validModel(model)) {
         ALOGI("model is not valid");
         cb(ErrorStatus::INVALID_ARGUMENT, supported);
         return Void();
@@ -125,28 +105,15 @@ Return<void> VpuDriver::getSupportedOperations(const Model& model,
 
     for (int i = 0; i < count; i++) {
         const auto& operation = model.operations[i];
-        supported[i] = VpuPreparedModel::isOperationSupported(operation, model);
+        supported[i] = PreparedModel::isOperationSupported(operation, model);
     }
 
     cb(ErrorStatus::NONE, supported);
     return Void();
-
-/*
-    if (!VpuPreparedModel::validModel(model)) {
-        const size_t count = model.operations.size();
-        std::vector<bool> supported(count, true);
-        cb(ErrorStatus::NONE, supported);
-    } else {
-        std::vector<bool> supported;
-        cb(ErrorStatus::INVALID_ARGUMENT, supported);
-    }
-    return Void();
-*/
-
 }
 
 
-}  // namespace vpu_driver
+}  // namespace driver
 }  // namespace V1_0
 }  // namespace neuralnetworks
 }  // namespace hardware
