@@ -89,6 +89,23 @@ Return<void> VpuDriver::getSupportedOperations(const Model& model,
 
 Return<ErrorStatus> VpuDriver::prepareModel(const Model& model,
                                                const sp<IPreparedModelCallback>& callback) {
+    char devName[100];
+    mvncStatus retCode;
+    void *deviceHandle;
+
+    retCode = mvncGetDeviceName(NCS_NUM, devName, 100);
+    if (retCode != MVNC_OK)
+    {
+        ALOGD("VpuDriver returning since no NN device is found.");
+        return ErrorStatus::DEVICE_UNAVAILABLE;
+    }
+
+    retCode = mvncOpenDevice(devName, &deviceHandle);
+    if (retCode != MVNC_OK)
+    {
+        ALOGD("VpuDriver returning since it cannot open the NN device.");
+        return ErrorStatus::DEVICE_UNAVAILABLE;
+    }
 
     if (VLOG_IS_ON(DRIVER)) {
       VLOG(DRIVER) << "VpuDriver::prepareModel begin";
