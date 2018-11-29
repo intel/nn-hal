@@ -1814,7 +1814,7 @@ bool MklDnnPreparedModel::isOperationSupported(const Operation& operation, const
                 VLOG_CHECKFAIL("dims not in group");
                 return false;
             }
-            if (activationPass(inputn) == false) {
+            if (inputn.lifetime != OperandLifeTime::CONSTANT_COPY || activationPass(inputn) == false) {
                 return false;
             }
             break;
@@ -1842,9 +1842,19 @@ bool MklDnnPreparedModel::isOperationSupported(const Operation& operation, const
         }
         case OperationType::AVERAGE_POOL_2D:
         case OperationType::MAX_POOL_2D:
+        {
+            if (inputn.lifetime != OperandLifeTime::CONSTANT_COPY || activationPass(inputn) == false) {
+                return false;
+            }
+            break;
+        }
         case OperationType::FULLY_CONNECTED:
         {
-            if (activationPass(inputn) == false) {
+            const auto& input1 = model.operands[operation.inputs[1]];
+            if (inputn.lifetime != OperandLifeTime::CONSTANT_COPY || activationPass(inputn) == false) {
+                return false;
+            }
+            if (input0.dimensions[1] != input1.dimensions[1]) {
                 return false;
             }
             break;
@@ -1857,7 +1867,7 @@ bool MklDnnPreparedModel::isOperationSupported(const Operation& operation, const
                 return false;
             }
 
-            if (activationPass(inputn) == false) {
+            if (inputn.lifetime != OperandLifeTime::CONSTANT_COPY || activationPass(inputn) == false) {
                 return false;
             }
             break;
