@@ -15,6 +15,7 @@ cc_library {
     name: "libmkldnn",
     vendor_available: true,
     openmp: false,
+    compile_multilib: "64",
 
     srcs: [
         "mkl-dnn/src/cpu/*.cpp",

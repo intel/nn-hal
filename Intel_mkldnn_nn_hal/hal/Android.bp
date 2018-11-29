@@ -3,6 +3,7 @@ cc_binary {
      init_rc: ["android.hardware.neuralnetworks@1.0-mkldnn.rc"],
      proprietary: true,
      relative_install_path: "hw",
+     compile_multilib: "64",
      srcs: [
          "MklDnnDriver.cpp",
          "MklDnnPreparedModel.cpp",
