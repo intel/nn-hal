@@ -136,6 +136,7 @@ public:
 
     }
 
+    //~ExecuteNetwork(){ }
     void loadNetwork()
     {
 
@@ -233,7 +234,9 @@ public:
         #endif
         inferRequest.StartAsync();  //for async infer
         //ALOGI("async wait");
-        inferRequest.Wait(1000);
+        //inferRequest.Wait(1000);
+        inferRequest.Wait(10000); //check right value to infer
+        //inferRequest.Wait(IInferRequest::WaitMode::RESULT_READY);
 
         //std::cout << "output name : " << firstOutName << std::endl;
         #ifdef NNLOG

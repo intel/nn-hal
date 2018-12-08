@@ -59,7 +59,9 @@ private:
     size_t _layer_id_cnt = 1;
     bool _processed = false;
 
-    std::map<const float *, size_t> _segmentsMap;
+    std::map<const float *, size_t> _segmentsMap; //org
+
+    //std::map<const short*, size_t> _segmentsMap;
 
     static bool shouldRemove(const IRLayer &l);
     void process(const IRLayer &value);

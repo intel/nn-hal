@@ -4,11 +4,16 @@ include $(CLEAR_VARS)
 
 LOCAL_MODULE := libMKLDNNPlugin
 LOCAL_PROPRIETARY_MODULE := true
-LOCAL_MULTILIB := both
+#LOCAL_MULTILIB := both
+LOCAL_MULTILIB := 64
 LOCAL_MODULE_OWNER := intel
 
 LOCAL_C_INCLUDES += \
-	$(LOCAL_PATH)/inference-engine/thirdparty/mkl-dnn/include
+	$(LOCAL_PATH)/inference-engine/thirdparty/mkl-dnn/include \
+	$(LOCAL_PATH)/inference-engine/thirdparty/mkl-dnn/src/common \
+	$(LOCAL_PATH)/inference-engine/thirdparty/mkl-dnn/src/cpu \
+	$(LOCAL_PATH)/inference-engine/thirdparty/mkl-dnn/src/cpu/gemm \
+	$(LOCAL_PATH)/inference-engine/thirdparty/mkl-dnn/src/cpu/xbyak
 
 LOCAL_C_INCLUDES += \
 	$(LOCAL_PATH)/inference-engine/include \
@@ -44,10 +49,12 @@ LOCAL_CFLAGS += \
 LOCAL_CFLAGS += \
 	-DENABLE_MKL_DNN \
 	-DMKLDNN_OPENMP \
+	-DIE_THREAD=1 \
+	-DIE_THREAD_OMP=1 \
 	-DMKL_VERSION=\"v0.15_beta\" \
 	-DMKLDNN_DEPRECATED_ROI \
 	-DNDEBUG \
-	-DAKS -DNNLOG -DDEBUG \
+	-D__ANDROID__ -DNNLOG -DDEBUG \
 	-DIMPLEMENT_INFERENCE_ENGINE_API
 
 LOCAL_STATIC_LIBRARIES := libomp
@@ -70,14 +77,15 @@ LOCAL_SRC_FILES += \
 	inference-engine/src/mkldnn_plugin/mkldnn_memory.cpp \
 	inference-engine/src/mkldnn_plugin/mkldnn_node.cpp \
 	inference-engine/src/mkldnn_plugin/mkldnn_plugin.cpp \
+	inference-engine/src/mkldnn_plugin/mkldnn_primitive.cpp \
 	inference-engine/src/mkldnn_plugin/mkldnn/iml_type_mapper.cpp \
 	inference-engine/src/mkldnn_plugin/nodes/mkldnn_activation_node.cpp \
 	inference-engine/src/mkldnn_plugin/nodes/mkldnn_batchnorm_node.cpp \
-	inference-engine/src/mkldnn_plugin/nodes/mkldnn_clamp_node.cpp \
 	inference-engine/src/mkldnn_plugin/nodes/mkldnn_concat_node.cpp \
 	inference-engine/src/mkldnn_plugin/nodes/mkldnn_conv_node.cpp \
 	inference-engine/src/mkldnn_plugin/nodes/mkldnn_crop_node.cpp \
 	inference-engine/src/mkldnn_plugin/nodes/mkldnn_deconv_node.cpp \
+	inference-engine/src/mkldnn_plugin/nodes/mkldnn_depthwise_node.cpp \
 	inference-engine/src/mkldnn_plugin/nodes/mkldnn_eltwise_node.cpp \
 	inference-engine/src/mkldnn_plugin/nodes/mkldnn_fullyconnected_node.cpp \
 	inference-engine/src/mkldnn_plugin/nodes/mkldnn_generic_node.cpp \
@@ -89,9 +97,10 @@ LOCAL_SRC_FILES += \
 	inference-engine/src/mkldnn_plugin/nodes/mkldnn_power_node.cpp \
 	inference-engine/src/mkldnn_plugin/nodes/mkldnn_reorder_node.cpp \
 	inference-engine/src/mkldnn_plugin/nodes/mkldnn_reshape_node.cpp \
-	inference-engine/src/mkldnn_plugin/nodes/mkldnn_scaleshift_node.cpp \
+	inference-engine/src/mkldnn_plugin/nodes/mkldnn_roi_pooling_node.cpp \
 	inference-engine/src/mkldnn_plugin/nodes/mkldnn_softmax_node.cpp \
 	inference-engine/src/mkldnn_plugin/nodes/mkldnn_split_node.cpp \
 	inference-engine/src/mkldnn_plugin/nodes/mkldnn_tile_node.cpp
+
 
 include $(BUILD_SHARED_LIBRARY)

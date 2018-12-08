@@ -44,6 +44,7 @@
 #include "ie_blob.h"
 #include "ie_layers.h"
 #include "pugixml.hpp"
+#include "ie_layers_property.hpp"
 
 #ifdef _WIN32
 #define strncasecmp _strnicmp

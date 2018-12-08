@@ -82,7 +82,7 @@ public:
     {
         addData(data);
 
-        auto docdatadims = data->getDims();
+        auto docdatadims = data->getTensorDesc().getDims();
         #ifdef NNLOG
         for (auto i = 0; i < docdatadims.size(); i++)
         ALOGI("doc addOutput data dims[%d] = %d", i, docdatadims[i]);
@@ -108,6 +108,9 @@ IRDocument::~IRDocument() {
 
 void IRDocument::add(const IRLayer &ir_layer)
 {
+    #ifdef NNLOG
+    ALOGI("add ir_layer = %s", ir_layer->name.c_str());
+    #endif
     network->addLayer(ir_layer);
     _layers.push_back(ir_layer);
 }
@@ -205,24 +208,33 @@ InferenceEngine::ICNNNetwork *IRDocument::getNetwork()
  * \param name
  */
 
-void
-IRDocument::saveBlobToIR(std::ostream &binFile, const /*IRBlob::Ptr*/InferenceEngine::Blob::Ptr &blob, pugi::xml_node &layer, const std::string &name)
+void IRDocument::saveBlobToIR(std::ostream &binFile, const /*IRBlob::Ptr*/InferenceEngine::Blob::Ptr &blob, pugi::xml_node &layer, const std::string &name)
 {
 
-    //const float *fp = static_cast<const float *>(blob->readOnly());
-    const void *fp = static_cast<const void *>(blob->cbuffer());
+/*
+    const void* fp = static_cast<const void *>(blob->cbuffer()); //org
     auto fit = _segmentsMap.find((float*)fp);
+*/
+
+    //if(IRBuilder::g_layer_precision == Precision::FP16)  //fix me: handle float case
+    //const short* fp = blob->cbuffer().as<const short*>();
+    //else
+    const float* fp = blob->cbuffer().as<const float*>();
+
+    auto fit = _segmentsMap.find(fp);
     bool newBlob = fit == _segmentsMap.end();
     size_t offset;
     if(newBlob)
     {
         offset = binFile.tellp();
-        _segmentsMap[(float*)fp] = offset;
+        //_segmentsMap[(float*)fp] = offset;
+        _segmentsMap[fp] = offset;
     }
     else
     {
         offset = fit->second;
     }
+
     auto node = layer.append_child(name.c_str());
     node.append_attribute("offset").set_value(offset);
     node.append_attribute("size").set_value(blob->byteSize());
@@ -259,8 +271,12 @@ void IRDocument::save(std::ostream &xml_os, std::ostream &bin_os)
         inputLayer->outData.push_back(input_data);
         saveToIR(bin_os, layers, inputLayer);
     }
+
     for(auto &cnn_layer : _layers)
     {
+        #ifdef NNLOG
+        ALOGI("save cnn_layer name = %s", cnn_layer->name.c_str());
+        #endif
         cnn_layer->userValue.v_int = ++id_cnt;
         int pcnt = 0;
         for(auto output : cnn_layer->outData) output->userObject.v_int = pcnt++;
@@ -321,13 +337,13 @@ void IRDocument::crateDotFile(std::ostream &dot) const
 }
 
 
-
 InferenceEngine::InputInfo::Ptr IRDocument::createInput(const std::string &name, const TensorDims &dims) const
 {
-    Layout layout = NCHW;
-    if (dims.size() == 2) {
-        layout = InferenceEngine::Layout::NC;
-    }
+    Layout layout;
+    if (dims.size() == 4) layout = NCHW;
+    else if (dims.size() == 2) layout = InferenceEngine::Layout::NC;
+    else layout = InferenceEngine::Layout::C;
+
     std::cout << "createInput input data dims[0] "<<dims[0]<< "dims[1]" <<dims[1]<< std::endl;
     TensorDesc td(IRBuilder::g_layer_precision, dims, layout);
 
@@ -446,6 +462,10 @@ void IRDocument::saveToIR(std::ostream &binFile, pugi::xml_node &parent, const I
 
     for(auto blob : irLayer->blobs)
     {
+        #ifdef NNLOG
+        ALOGI("blob name = %s", blob.first.c_str());
+        #endif
+
         auto fb = blob.second;
         saveBlobToIR(binFile, fb, layer, blob.first);
     }

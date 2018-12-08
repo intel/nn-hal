@@ -18,6 +18,7 @@
 
 #include "VpuDriver.h"
 #include "VpuPreparedModel.h"
+#include "Executor.h"
 #include <android-base/logging.h>
 #include <thread>
 
@@ -77,14 +78,27 @@ Return<DeviceStatus> Driver::getStatus() {
 }
 
 Return<void> Driver::getCapabilities(getCapabilities_cb cb) {
-    if (mName.compare("CPU") ==0) {
+    if (mName.compare("CPU") == 0) {
         ALOGI("Cpu driver getCapabilities()");
         Capabilities capabilities = {.float32Performance = {.execTime = 1.1f, .powerUsage = 1.1f}};
         cb(ErrorStatus::NONE, capabilities);
-    } else {
+    } else { /* mName.compare("VPU") == 0 */
         ALOGI("Myriad driver getCapabilities()");
+        //OMR1 V1_0
+
+        Capabilities capabilities = {.float32Performance = {.execTime = 0.9f, .powerUsage = 0.9f},
+                                 .quantized8Performance = {.execTime = 0.9f, .powerUsage = 0.9f}};
+
+        //Capabilities capabilities = {.float32Performance = {.execTime = 0.9f, .powerUsage = 0.9f}};
+        ALOGI("Myriad driver Capabilities .execTime = 0.9f, .powerUsage = 0.9f");
+        //P MR0 V1_1
+        /*
         Capabilities capabilities = {.float32Performance = {.execTime = 1.1f, .powerUsage = 1.1f},
-                                 .quantized8Performance = {.execTime = 1.1f, .powerUsage = 1.1f}};
+                                    .quantized8Performance = {.execTime = 1.1f, .powerUsage = 1.1f},
+                                    .relaxedFloat32toFloat16Performance =
+                                        {.execTime = 1.1f, .powerUsage = 1.1f}};
+        */
+
         cb(ErrorStatus::NONE, capabilities);
     }
     return Void();

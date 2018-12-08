@@ -22,7 +22,9 @@
 #include <log/log.h>
 #include <thread>
 #include <fstream>
-#include "PreparedModel.h"
+#include "Executor.h"
+#include "VpuPreparedModel.h"
+
 
 #define DISABLE_ALL_QUANT
 #define NN_DEBUG
@@ -249,6 +251,132 @@ std::vector<uint32_t>& shapeToDims(const TensorDims& shape, Layout layout)
 
     VLOGDIMS(L3, dims, "dims");
     return dims;
+}
+
+
+unsigned short float2half(unsigned f)
+{
+    unsigned f_exp, f_sig;
+    unsigned short h_sgn, h_exp, h_sig;
+
+    h_sgn = (unsigned short) ((f&0x80000000u) >> 16);
+    f_exp = (f&0x7f800000u);
+
+    /* Exponent overflow/NaN converts to signed inf/NaN */
+    if (f_exp >= 0x47800000u) {
+        if (f_exp == 0x7f800000u) {
+            /* Inf or NaN */
+            f_sig = (f&0x007fffffu);
+            if (f_sig != 0) {
+                /* NaN - propagate the flag in the significand... */
+                unsigned short ret = (unsigned short) (0x7c00u + (f_sig >> 13));
+                /* ...but make sure it stays a NaN */
+                if (ret == 0x7c00u) {
+                    ret++;
+                }
+                return h_sgn + ret;
+            } else {
+                /* signed inf */
+                return (unsigned short) (h_sgn + 0x7c00u);
+            }
+        } else {
+            /* overflow to signed inf */
+#if NPY_HALF_GENERATE_OVERFLOW
+            npy_set_floatstatus_overflow();
+#endif
+            return (unsigned short) (h_sgn + 0x7c00u);
+        }
+    }
+
+    /* Exponent underflow converts to a subnormal half or signed zero */
+    if (f_exp <= 0x38000000u) {
+        /*
+         * Signed zeros, subnormal floats, and floats with small
+         * exponents all convert to signed zero halfs.
+         */
+        if (f_exp < 0x33000000u) {
+#if NPY_HALF_GENERATE_UNDERFLOW
+            /* If f != 0, it underflowed to 0 */
+            if ((f&0x7fffffff) != 0) {
+                npy_set_floatstatus_underflow();
+            }
+#endif
+            return h_sgn;
+        }
+        /* Make the subnormal significand */
+        f_exp >>= 23;
+        f_sig = (0x00800000u + (f&0x007fffffu));
+#if NPY_HALF_GENERATE_UNDERFLOW
+        /* If it's not exactly represented, it underflowed */
+        if ((f_sig&(((unsigned)1 << (126 - f_exp)) - 1)) != 0) {
+            npy_set_floatstatus_underflow();
+        }
+#endif
+        f_sig >>= (113 - f_exp);
+        /* Handle rounding by adding 1 to the bit beyond half precision */
+#if NPY_HALF_ROUND_TIES_TO_EVEN
+        /*
+         * If the last bit in the half significand is 0 (already even), and
+         * the remaining bit pattern is 1000...0, then we do not add one
+         * to the bit after the half significand.  In all other cases, we do.
+         */
+        if ((f_sig&0x00003fffu) != 0x00001000u) {
+            f_sig += 0x00001000u;
+        }
+#else
+        f_sig += 0x00001000u;
+#endif
+        h_sig = (unsigned short) (f_sig >> 13);
+        /*
+         * If the rounding causes a bit to spill into h_exp, it will
+         * increment h_exp from zero to one and h_sig will be zero.
+         * This is the correct result.
+         */
+        return (unsigned short) (h_sgn + h_sig);
+    }
+
+    /* Regular case with no overflow or underflow */
+    h_exp = (unsigned short) ((f_exp - 0x38000000u) >> 13);
+    /* Handle rounding by adding 1 to the bit beyond half precision */
+    f_sig = (f&0x007fffffu);
+#if NPY_HALF_ROUND_TIES_TO_EVEN
+    /*
+     * If the last bit in the half significand is 0 (already even), and
+     * the remaining bit pattern is 1000...0, then we do not add one
+     * to the bit after the half significand.  In all other cases, we do.
+     */
+    if ((f_sig&0x00003fffu) != 0x00001000u) {
+        f_sig += 0x00001000u;
+    }
+#else
+    f_sig += 0x00001000u;
+#endif
+    h_sig = (unsigned short) (f_sig >> 13);
+    /*
+     * If the rounding causes a bit to spill into h_exp, it will
+     * increment h_exp by one and h_sig will be zero.  This is the
+     * correct result.  h_exp may increment to 15, at greatest, in
+     * which case the result overflows to a signed inf.
+     */
+#if NPY_HALF_GENERATE_OVERFLOW
+    h_sig += h_exp;
+    if (h_sig == 0x7c00u) {
+        npy_set_floatstatus_overflow();
+    }
+    return h_sgn + h_sig;
+#else
+    return h_sgn + h_exp + h_sig;
+#endif
+}
+void floattofp16(short *dst, float *src, unsigned nelem)
+{
+	unsigned i;
+	unsigned short *_dst = (unsigned short *)dst;
+	unsigned *_src = (unsigned *)src;
+
+	for(i = 0; i < nelem; i++)
+		_dst[i] = float2half(_src[i]);
+
 }
 
 
@@ -481,6 +609,8 @@ bool RunTimePoolInfo::update() {
     return true;
 }
 
+#ifndef AT_RUNTIME
+
 bool setRunTimePoolInfosFromHidlMemories(std::vector<RunTimePoolInfo>* poolInfos,
                                          const hidl_vec<hidl_memory>& pools) {
     poolInfos->resize(pools.size());
@@ -494,6 +624,7 @@ bool setRunTimePoolInfosFromHidlMemories(std::vector<RunTimePoolInfo>* poolInfos
     return true;
 }
 
+#endif
 // Updates the RunTimeOperandInfo with the newly calculated shape.
 // Allocate the buffer if we need to.
 static bool setInfoAndAllocateIfNeeded(RunTimeOperandInfo* info, const Shape& shape) {
@@ -642,7 +773,8 @@ template<typename T>
 T PreparedModel::GetConstFromBuffer(const uint8_t *buf, uint32_t len) {
     VLOG(L1, "buf: %p, len: %d", buf, len);
     if (len != sizeof(T)) {
-        VLOG(L1, "typeid(T).name() should be %d bytes", sizeof(T));
+        VLOG(L1, "fix me: typeid(T).name() should be %d bytes", sizeof(T));
+        //fix me if buffer is of type float and if float and OperandLifeTime::CONSTANT_REFERENCE
         nnAssert(false);
     }
     return *(T *)(buf);
@@ -702,10 +834,18 @@ const uint8_t* PreparedModel::GetOperandMemory(const Model &model, uint32_t inde
         len_out = sizeOfData(op.type, op.dimensions);
         return nullptr;
     }
-
+    else if (op.lifetime == OperandLifeTime::TEMPORARY_VARIABLE)
+    {
+        //return const_cast<uint8_t*>(op.buffer);
+        VLOG(L1, "operand lifetime OperandLifeTime::TEMPORARY_VARIABLE");
+        VLOG(L1, "operand is expected to be const, but lifetime is %d", op.lifetime);
+        len_out = sizeOfData(op.type, op.dimensions);
+        //nnAssert(false);
+        return nullptr;
+    }
 
     ALOGE("operand is expected to be const, but lifetime is %d", op.lifetime);
-    nnAssert(false);
+    nnAssert(false); //temp fix since some time const operand set as TEMPORARY_VARIABLE
     return nullptr;
 }
 
@@ -1075,11 +1215,9 @@ bool PreparedModel::initializeRunTimeOperandInfo() {
     return true;
 }
 
-/*
-bool PreparedModel::initialize() {
-    return setRunTimePoolInfosFromHidlMemories(&mPoolInfos, mModel.pools);
-}
-*/
+
+#ifndef AT_RUNTIME
+
 bool PreparedModel::initialize()
 {
     VLOG(L1, "initialize");
@@ -1173,6 +1311,7 @@ bool PreparedModel::initialize()
         VLOG(L1, "convert operation %d success", operation.type);
     }
 
+    initializeInput();
     finalizeOutput();
 
     //initialize IE operation input/output ports
@@ -1194,6 +1333,14 @@ bool PreparedModel::initialize()
     return true;
 }
 
+#else
+
+bool PreparedModel::initialize() {
+    return executor::setRunTimePoolInfosFromHidlMemories(&mPoolInfosExe, mModel.pools);
+}
+
+#endif //end of AT_RUNTIME
+
 void PreparedModel::deinitialize()
 {
     VLOG(L1, "deinitialize");
@@ -1212,6 +1359,7 @@ void PreparedModel::deinitialize()
     }
     VLOG(L1, "free engine");
 }
+
 
 #ifdef NN_DEBUG
 template <typename T>
@@ -1257,6 +1405,8 @@ void printOperandbuf(int level, const uint8_t* buffer, const std::vector<uint32_
 
 #endif
 
+#ifndef AT_RUNTIME
+
 void PreparedModel::asyncExecute(const Request& request,
                                        const sp<IExecutionCallback>& callback)
 {
@@ -1278,12 +1428,22 @@ void PreparedModel::asyncExecute(const Request& request,
             auto poolIndex = arg.location.poolIndex;
             nnAssert(poolIndex < requestPoolInfos.size());
             auto& r = requestPoolInfos[poolIndex];
+            if (arg.dimensions.size() > 0) {
+                // It's the responsibility of the caller to validate that
+                // from.dimensions only modifies the dimensions that were
+                // unspecified in the model.  That's the case in SampleDriver.cpp
+                // with the call to validateRequest().
+                operand.dimensions = arg.dimensions;
+            }
+            operand.buffer = r.buffer + arg.location.offset; //r.getBuffer()
+            operand.length = arg.location.length;//sizeOfData(operand.type, operand.dimensions);
+
             VLOG(L1, "Copy request input/output to model input/output");
             //std::ostringstream operandName; operandName << "operand."<<indexes[i]; //use mPort[i]->name
             if (inputFromRequest){
                 //model/request oputput pointer pass to inference engine input
                 //memcpy(operand.buffer, r.buffer + arg.location.offset, operand.length)
-                //auto in = GetOperandAsTensor(operand, operand.buffer, operand.length);
+
                 auto inputBlob = GetInOutOperandAsBlob(operand, const_cast<uint8_t*>(r.buffer + arg.location.offset), operand.length); //if not doing memcpy
                 VLOG(L1, "setBlob for mPorts[%d]->name %s", indexes[i], mPorts[indexes[i]]->name.c_str());
                 enginePtr->setBlob(mPorts[indexes[i]]->name, inputBlob); //setInputBlob(const std::string &,IRBlob::Ptr);
@@ -1293,9 +1453,19 @@ void PreparedModel::asyncExecute(const Request& request,
                 //inference engine output pointer pass to model/request oputput
                 //copy model oputput to request output
                 //memcpy(r.buffer + arg.location.offset, operand.buffer, operand.length);
+/*
+                auto outputDims = mPorts[indexes[i]]->getTensorDesc().getDims();
+                auto nelem = sizeOf(outputDims);
+                auto lenght = 4*nelem;
+                uint8_t* tmpbuffer = new uint8_t[lenght];
+                TensorDesc td(InferenceEngine::Precision::FP32, outputDims, Layout::ANY); //nhwc
+
+                InferenceEngine::TBlob<float>::Ptr outputBlob = InferenceEngine::make_shared_blob<float>(td, (float *)tmpbuffer, lenght);
+*/
                 auto outputBlob = GetInOutOperandAsBlob(operand, const_cast<uint8_t*>(r.buffer + arg.location.offset), operand.length); //if not doing memcpy
                 enginePtr->setBlob(mPorts[indexes[i]]->name, outputBlob);
 
+                //memcpy(r.buffer + arg.location.offset, tmpbuffer, operand.length);
               }
 
         }
@@ -1359,6 +1529,8 @@ void PreparedModel::asyncExecute(const Request& request,
         memcpy(input.buffer, inbuf, input.length);
         printOperandbuf(L4, input.buffer, input.dimensions, 20);
         */
+
+        /* //commented to run for MobileNet model and this only applicable for single cts opeation test
         for(const auto& op : mModel.operations) {
             const auto& o = mOperands[op.outputs[0]];
             InferenceEngine::TBlob<float>::Ptr opBlob = enginePtr->getBlob(mPorts[op.outputs[0]]->name);
@@ -1369,7 +1541,7 @@ void PreparedModel::asyncExecute(const Request& request,
             VLOG(L1, "operation output Blob elements %d = %f", i, opBlob->readOnly()[i]);
             }
             //printOperandbuf(L4, o.buffer, o.dimensions, 20);
-        }
+        } */
     }
 #endif
 
@@ -1381,18 +1553,44 @@ void PreparedModel::asyncExecute(const Request& request,
 
 }
 
+#else //ifdef AT_RUNTIME
+
+void PreparedModel::asyncExecute(const Request& request,
+                                       const sp<IExecutionCallback>& callback)
+{
+    std::vector<executor::RunTimePoolInfo> requestPoolInfos;
+    if (!executor::setRunTimePoolInfosFromHidlMemories(&requestPoolInfos, request.pools)) {
+        callback->notify(ErrorStatus::GENERAL_FAILURE);
+        return;
+    }
+
+    executor::VpuExecutor executor;
+    int n = executor.run(mModel, request, mPoolInfosExe, requestPoolInfos);
+
+    Return<void> returned = callback->notify(ErrorStatus::NONE);
+    if (!returned.isOk()) {
+        ALOGE("hidl callback failed to return properly: %s", returned.description().c_str());
+    }
+
+
+}
+
+#endif //end of AT_RUNTIME
+
+
+
 Return<ErrorStatus> PreparedModel::execute(const Request& request,
                                                  const sp<IExecutionCallback>& callback)
 {
 
     VLOG(L1, "Begin to execute");
-
+/*
     if (mPorts.size() == 0) {
         ALOGE("No primitive to execute");
         callback->notify(ErrorStatus::INVALID_ARGUMENT);
         return ErrorStatus::INVALID_ARGUMENT;
     }
-
+*/
     if (callback.get() == nullptr) {
         ALOGE("invalid callback passed to execute");
         return ErrorStatus::INVALID_ARGUMENT;
@@ -1413,46 +1611,7 @@ Return<ErrorStatus> PreparedModel::execute(const Request& request,
     return ErrorStatus::NONE;
 }
 
-/*
-void PreparedModel::asyncExecute(const Request& request,
-                                       const sp<IExecutionCallback>& callback) {
-    std::vector<RunTimePoolInfo> requestPoolInfos;
-    if (!setRunTimePoolInfosFromHidlMemories(&requestPoolInfos, request.pools)) {
-        callback->notify(ErrorStatus::GENERAL_FAILURE);
-        return;
-    }
 
-    VpuExecutor executor;
-    int n = executor.run(mModel, request, mPoolInfos, requestPoolInfos);
-//    VLOG(DRIVER) << "executor.run returned " << n;
-    VLOG(L1, "executor.run returned %d", n);
-    ErrorStatus executionStatus =
-            n == ANEURALNETWORKS_NO_ERROR ? ErrorStatus::NONE : ErrorStatus::GENERAL_FAILURE;
-    Return<void> returned = callback->notify(executionStatus);
-    if (!returned.isOk()) {
-        LOG(ERROR) << " hidl callback failed to return properly: " << returned.description();
-    }
-}
-
-Return<ErrorStatus> PreparedModel::execute(const Request& request,
-                                                 const sp<IExecutionCallback>& callback) {
-//    VLOG(DRIVER) << "execute(" << toString(request) << ")";
-    if (callback.get() == nullptr) {
-        LOG(ERROR) << "invalid callback passed to execute";
-        return ErrorStatus::INVALID_ARGUMENT;
-    }
-    if (!validateRequest(request, mModel)) {
-        callback->notify(ErrorStatus::INVALID_ARGUMENT);
-        return ErrorStatus::INVALID_ARGUMENT;
-    }
-
-    // This thread is intentionally detached because the vpu driver service
-    // is expected to live forever.
-    std::thread([this, request, callback]{ asyncExecute(request, callback); }).detach();
-
-    return ErrorStatus::NONE;
-}
-*/
 
 template <typename T>
 T getOperandConstVal(const Model& model, const Operand& operand)
@@ -1516,6 +1675,19 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
     const auto& inputn = model.operands[operation.inputs[operation.inputs.size() - 1]];
 
     switch(operation.type) {
+
+        case OperationType::CONV_2D:
+        {
+            const auto& input1 = model.operands[operation.inputs[1]];
+            //filter in == channel
+            if (input0.dimensions[3] != input1.dimensions[3]) {
+                VLOG_CHECKFAIL("filter in not equals channel");
+                return false;
+            }
+            break;
+            //continue to check actication.
+        }
+
         case OperationType::DEPTHWISE_CONV_2D:
         {
             const auto& input1 = model.operands[operation.inputs[1]];
@@ -1529,28 +1701,21 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
             }
             break;
         }
+
         case OperationType::SOFTMAX:
         {
             const auto& input1 = model.operands[operation.inputs[1]];
             float beta = getOperandConstVal<float>(model, input1);
             //beta need = 1.0f
-            if (beta != 1.0f) {
-                VLOG_CHECKFAIL("beta not 1.0f");
+            //if (beta != 1.0f) {
+            if (beta <= 0.0f) {
+                VLOG_CHECKFAIL("beta must be positive for softmax");
                 return false;
             }
+
             break;
         }
-        case OperationType::CONV_2D:
-        {
-            const auto& input1 = model.operands[operation.inputs[1]];
-            //filter in == channel
-            if (input0.dimensions[3] != input1.dimensions[3]) {
-                VLOG_CHECKFAIL("filter in not equals channel");
-                return false;
-            }
-            break;
-            //continue to check actication.
-        }
+
         case OperationType::AVERAGE_POOL_2D:
         case OperationType::MAX_POOL_2D:
         case OperationType::FULLY_CONNECTED:
@@ -1560,22 +1725,10 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
             }
             break;
         }
-        case OperationType::ADD:
-        {
-            const auto& input1 = model.operands[operation.inputs[1]];
-            if (input0.dimensions != input1.dimensions) {
-                VLOG_CHECKFAIL("dims not match");
-                return false;
-            }
 
-            if (activationPass(inputn) == false) {
-                return false;
-            }
-            break;
-        }
         case OperationType::RELU:
         case OperationType::RELU1:
-        case OperationType::RELU6:
+        case OperationType::RELU6: break;
         case OperationType::LOGISTIC:
         case OperationType::TANH:
         case OperationType::LOCAL_RESPONSE_NORMALIZATION:
@@ -1583,6 +1736,18 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
         case OperationType::L2_NORMALIZATION:
         case OperationType::RESHAPE:
              break;
+        case OperationType::ADD: {
+           const auto& input1 = model.operands[operation.inputs[1]];
+           if (input0.dimensions != input1.dimensions) {
+               VLOG_CHECKFAIL("dims not match");
+               return false;
+           }
+
+           if (activationPass(inputn) == false) {
+               return false;
+           }
+           break;
+        }
         default:
            VLOG(L1, "unsupport opration %d", operation.type);
            return false;
@@ -1641,28 +1806,256 @@ bool PreparedModel::operationAdd(const Operation& operation)
 bool PreparedModel::operationAveragePool2D(const Operation& operation)
 {
   VLOG(L1, "OperationType::AVERAGE_POOL_2D");
-  /*
-   * * Inputs:
-   * 0: A 4-D tensor, of shape [batches, height, width, depth], specifying the input.
-   * 1: An INT32 value, specifying the padding on the left, in the ‘width’ dimension.
-   * 2: An INT32 value, specifying the padding on the right,in the ‘width’ dimension.
-   * 3: An INT32 value, specifying the padding on the top, in the ‘height’ dimension.
-   * 4: An INT32 value, specifying the padding on the bottom, in the ‘height’ dimension.
-   * 5: An INT32 value, specifying the output stride in the ‘width’ dimension.
-   * 6: An INT32 value, specifying the output stride in the ‘height’ dimension.
-   * 7: An INT32 value, specifying the filter width.
-   * 8: An INT32 value, specifying the filter height.
-   * 9: An INT32 value, and has to be one of the {@link FusedActivationFunc} values.
-   *    Specifies the activation to invoke on the result of each addition.
+  /**
+   * Performs a 2-D average pooling operation.
+   *
+   * The output dimensions are functions of the filter dimensions, stride, and
+   * padding.
+   *
+   * The values in the output tensor are computed as:
+   *
+   *     output[batch, row, col, channel] =
+   *         sum_{i, j}(input[batch, row + i, col + j, channel]) / sum(1)
+   *
+   * Supported tensor {@link OperandType}:
+   * * {@link OperandType::TENSOR_FLOAT32}
+   * * {@link OperandType::TENSOR_QUANT8_ASYMM}
+   *
+   * Supported tensor rank: 4, with "NHWC" (i.e., Num_samples, Height, Width,
+   * and Channels) data layout.
+   *
+   * Both explicit padding and implicit padding are supported.
+   *
+   * Inputs (explicit padding):
+   * * 0: A 4-D tensor, of shape [batches, height, width, depth], specifying
+   *      the input.
+   * * 1: An {@link OperandType::INT32} scalar, specifying the padding on
+   *      the left, in the ‘width’ dimension.
+   * * 2: An {@link OperandType::INT32} scalar, specifying the padding on
+   *      the right, in the ‘width’ dimension.
+   * * 3: An {@link OperandType::INT32} scalar, specifying the padding on
+   *      the top, in the ‘height’ dimension.
+   * * 4: An {@link OperandType::INT32} scalar, specifying the padding on
+   *      the bottom, in the ‘height’ dimension.
+   * * 5: An {@link OperandType::INT32} scalar, specifying the stride when
+   *      walking through input in the ‘width’ dimension.
+   * * 6: An {@link OperandType::INT32} scalar, specifying the stride when
+   *      walking through input in the ‘height’ dimension.
+   * * 7: An {@link OperandType::INT32} scalar, specifying the filter
+   *      width.
+   * * 8: An {@link OperandType::INT32} scalar, specifying the filter
+   *      height.
+   * * 9: An {@link OperandType::INT32} scalar, and has to be one of the
+   *      {@link FusedActivationFunc} values. Specifies the activation to
+   *      invoke on the result.
+   *
+   * Inputs (implicit padding):
+   * * 0: A 4-D tensor, of shape [batches, height, width, depth], specifying
+   *      the input.
+   * * 1: An {@link OperandType::INT32} scalar, specifying the implicit
+   *      padding scheme, has to be one of the
+   *      following values: {0 (NONE), 1 (SAME), 2 (VALID)}.
+   * * 2: An {@link OperandType::INT32} scalar, specifying the stride when
+   *      walking through input in the ‘width’ dimension.
+   * * 3: An {@link OperandType::INT32} scalar, specifying the stride when
+   *      walking through input in the ‘height’ dimension.
+   * * 4: An {@link OperandType::INT32} scalar, specifying the filter
+   *      width.
+   * * 5: An {@link OperandType::INT32} scalar, specifying the filter
+   *      height.
+   * * 6: An {@link OperandType::INT32} scalar, and has to be one of the
+   *      {@link FusedActivationFunc} values. Specifies the activation to
+   *      invoke on the result.
+   *
+   * Outputs:
+   * * 0: The output 4-D tensor, of shape
+          [batches, out_height, out_width, depth].
    */
-  Point2D pad_start = {PARAM_I32(1),PARAM_I32(3)};
-  Point2D pad_end = {PARAM_I32(2), PARAM_I32(4)};
-  Point2D stride = {PARAM_I32(5),PARAM_I32(6)};
-  Point2D kernel = {PARAM_I32(7), PARAM_I32(8)};
-  auto out = Pooling(getPort(operation.inputs[0]), kernel, stride, pad_start, pad_end, InferenceEngine::PoolingLayer::PoolType::AVG);
-  mPorts[operation.outputs[0]] = handleFusion(out, PARAM_I32(9));
 
-  return true;
+    auto input = getPort(operation.inputs[0]);
+    const auto indims = input->getTensorDesc().getDims();
+
+    Point2D pad_start;
+    Point2D pad_end;
+    Point2D stride;
+    Point2D kernel;
+    int  fusion_index = -1;
+
+    if (operation.inputs.size() == 10) {
+      pad_start = {PARAM_I32(1),PARAM_I32(3)};
+      pad_end = {PARAM_I32(2), PARAM_I32(4)};
+      stride = {PARAM_I32(5),PARAM_I32(6)};
+      kernel = {PARAM_I32(7), PARAM_I32(8)};
+      fusion_index = 9;
+      } else if (operation.inputs.size() == 7) {//PAD SAME
+            const auto pad_type = PARAM_I32(1);
+            int stride_width = PARAM_I32(2);
+            int stride_height = PARAM_I32(3);
+            int filter_width = PARAM_I32(4);
+            int filter_height = PARAM_I32(5);
+            fusion_index = 6;
+            stride = {stride_width, stride_height};
+            kernel = {filter_width, filter_height};
+
+            int input_width = indims[3];
+            int input_height = indims[2];
+
+            int padding_left, padding_right;
+            int padding_top, padding_bottom;
+
+            if (pad_type == kPaddingSame) {
+                /**
+                 * SAME padding.
+                 * Padding on both ends are the "same":
+                 *     padding_to_beginning =  total_padding / 2
+                 *     padding_to_end       = (total_padding + 1)/2.
+                 * i.e., for even number of padding, padding to both ends are exactly
+                 * the same; for odd number of padding, padding to the ending is bigger
+                 * than the padding to the beginning by 1.
+                 *
+                 * total_padding is a function of input, stride and filter size.
+                 * It could be computed as follows:
+                 *    out_size = (input + stride - 1) / stride;
+                 *    needed_input = (out_size - 1) * stride + filter_size
+                 *    total_padding = max(0, needed_input - output_size)
+                 *  The computation is the same for the horizontal and vertical directions.
+                 */
+
+                calculateExplicitPadding(input_width, stride_width,
+                                         filter_width, pad_type /*padding_implicit*/,
+                                         &padding_left, &padding_right);
+                calculateExplicitPadding(input_height, stride_height,
+                                         filter_height, pad_type /*padding_implicit*/,
+                                         &padding_top, &padding_bottom);
+
+                pad_start = {padding_left, padding_top};
+                pad_end = {padding_right, padding_bottom};
+
+            } else if (pad_type == kPaddingValid) {
+                /**
+                 * VALID padding.
+                 * No padding. When the input size is not evenly divisible by
+                 * the filter size, the input at the end that could not fill
+                 * the whole filter tile will simply be ignored.
+                 */
+                pad_start = {0, 0};
+                pad_end = {0, 0};
+            }
+
+          }
+
+      auto out = Pooling(input, kernel, stride, pad_start, pad_end, InferenceEngine::PoolingLayer::PoolType::AVG);
+      mPorts[operation.outputs[0]] = handleFusion(out, PARAM_I32(fusion_index));
+
+      return true;
+}
+
+bool PreparedModel::operationMaxPool2D(const Operation& operation)
+{
+  VLOG(L1, "OperationType::MAX_POOL_2D");
+    /*
+     *  * Inputs:
+     * 0: A 4-D tensor, of shape [batches, height, width, depth], specifying the input.
+     * 1: An INT32 value, specifying the padding on the left, in the ‘width’ dimension.
+     * 2: An INT32 value, specifying the padding on the right,in the ‘width’ dimension.
+     * 3: An INT32 value, specifying the padding on the top, in the ‘height’ dimension.
+     * 4: An INT32 value, specifying the padding on the bottom, in the ‘height’ dimension.
+     * 5: An INT32 value, specifying the output stride in the ‘width’ dimension.
+     * 6: An INT32 value, specifying the output stride in the ‘height’ dimension.
+     * 7: An INT32 value, specifying the filter width.
+     * 8: An INT32 value, specifying the filter height.
+     * 9: An INT32 value, and has to be one of the {@link FusedActivationFunc} values.
+     *    Specifies the activation to invoke on the result of each addition.
+     */
+
+/* //first implementation with input parameter 10
+
+    Point2D pad_start = {PARAM_I32(1),PARAM_I32(3)};
+    Point2D pad_end = {PARAM_I32(2), PARAM_I32(4)};
+    Point2D stride = {PARAM_I32(5),PARAM_I32(6)};
+    Point2D kernel = {PARAM_I32(7), PARAM_I32(8)};
+    auto out = Pooling(getPort(operation.inputs[0]), kernel, stride, pad_start, pad_end,
+                       InferenceEngine::PoolingLayer::PoolType::MAX);
+    mPorts[operation.outputs[0]] = handleFusion(out, PARAM_I32(9));
+*/
+/* 2nd impl supporting 10 & 7 input params*/
+
+    auto input = getPort(operation.inputs[0]);
+    const auto indims = input->getTensorDesc().getDims();
+
+    Point2D pad_start;
+    Point2D pad_end;
+    Point2D stride;
+    Point2D kernel;
+    int  fusion_index = -1;
+
+    if (operation.inputs.size() == 10) {
+      pad_start = {PARAM_I32(1),PARAM_I32(3)};
+      pad_end = {PARAM_I32(2), PARAM_I32(4)};
+      stride = {PARAM_I32(5),PARAM_I32(6)};
+      kernel = {PARAM_I32(7), PARAM_I32(8)};
+      fusion_index = 9;
+      } else if (operation.inputs.size() == 7) {//PAD SAME
+            const auto pad_type = PARAM_I32(1);
+            int stride_width = PARAM_I32(2);
+            int stride_height = PARAM_I32(3);
+            int filter_width = PARAM_I32(4);
+            int filter_height = PARAM_I32(5);
+            fusion_index = 6;
+            stride = {stride_width, stride_height};
+            kernel = {filter_width, filter_height};
+
+            int input_width = indims[3];
+            int input_height = indims[2];
+
+            int padding_left, padding_right;
+            int padding_top, padding_bottom;
+
+            if (pad_type == kPaddingSame) {
+                /**
+                 * SAME padding.
+                 * Padding on both ends are the "same":
+                 *     padding_to_beginning =  total_padding / 2
+                 *     padding_to_end       = (total_padding + 1)/2.
+                 * i.e., for even number of padding, padding to both ends are exactly
+                 * the same; for odd number of padding, padding to the ending is bigger
+                 * than the padding to the beginning by 1.
+                 *
+                 * total_padding is a function of input, stride and filter size.
+                 * It could be computed as follows:
+                 *    out_size = (input + stride - 1) / stride;
+                 *    needed_input = (out_size - 1) * stride + filter_size
+                 *    total_padding = max(0, needed_input - output_size)
+                 *  The computation is the same for the horizontal and vertical directions.
+                 */
+
+                calculateExplicitPadding(input_width, stride_width,
+                                         filter_width, pad_type /*padding_implicit*/,
+                                         &padding_left, &padding_right);
+                calculateExplicitPadding(input_height, stride_height,
+                                         filter_height, pad_type /*padding_implicit*/,
+                                         &padding_top, &padding_bottom);
+
+                pad_start = {padding_left, padding_top};
+                pad_end = {padding_right, padding_bottom};
+
+            } else if (pad_type == kPaddingValid) {
+                /**
+                 * VALID padding.
+                 * No padding. When the input size is not evenly divisible by
+                 * the filter size, the input at the end that could not fill
+                 * the whole filter tile will simply be ignored.
+                 */
+                pad_start = {0, 0};
+                pad_end = {0, 0};
+            }
+
+          }
+
+      auto out = Pooling(input, kernel, stride, pad_start, pad_end, InferenceEngine::PoolingLayer::PoolType::MAX);
+      mPorts[operation.outputs[0]] = handleFusion(out, PARAM_I32(fusion_index));
+
+      return true;
 }
 
 bool PreparedModel::operationConCat(const Operation& operation)
@@ -1687,80 +2080,176 @@ bool PreparedModel::operationConCat(const Operation& operation)
 bool PreparedModel::operationConv2D(const Operation& operation)
 {
   VLOG(L1, "OperationType::CONV_2D");
-  /*
-   * Inputs:
-   * 0: A 4-D tensor, of shape [batches, height, width, depth_in], specifying the input.
-   * 1: A 4-D tensor, of shape [depth_out, filter_height, filter_width, depth_in],
-   *    specifying the filter.
-   * 2: A 1-D tensor, of shape [depth_out], specifying the bias.
-   *    For input tensor of {@link OperandType::TENSOR_FLOAT32} type, the bias should
-   *    also be of {@link OperandType::TENSOR_FLOAT32}.
-   *    For input tensor of {@link OperandType::TENSOR_QUANT8_ASYMM} type, the bias
-   *    should be of {@link OperandType::TENSOR_INT32}.
-   * 3: An INT32 value, specifying the padding on the left, in the ‘width’ dimension.
-   * 4: An INT32 value, specifying the padding on the right,in the ‘width’ dimension.
-   * 5: An INT32 value, specifying the padding on the top, in the ‘height’ dimension.
-   * 6: An INT32 value, specifying the padding on the bottom, in the ‘height’ dimension.
-   * 7: An INT32 value, specifying the output stride in the ‘width’ dimension.
-   * 8: An INT32 value, specifying the output stride in the ‘height’ dimension.
-   * 9: An INT32 value, and has to be one of the {@link FusedActivationFunc} values.
-   *    Specifies the activation to invoke on the result of each addition.                 *
-   */
 
+      /**
+       * Performs an 2-D convolution operation.
+       *
+       * The CONV_2D op sweeps a 2-D filter that can mix channels together over a
+       * batch of images, applying the filter to each window of each image of the
+       * appropriate size.
+       *
+       * The output dimensions are functions of the filter dimensions, stride, and
+       * padding.
+       *
+       * The values in the output tensor are computed as:
+       *
+       *     output[batch, row, col, channel] =
+       *         sum_{i, j} (
+       *             input[batch, row + i, col + j, k] *
+       *             filter[channel, row + i, col + j, k] +
+       *             bias[channel]
+       *         )
+       *
+       * Supported tensor {@link OperandType}:
+       * * {@link OperandType::TENSOR_FLOAT32}
+       * * {@link OperandType::TENSOR_QUANT8_ASYMM}
+       *
+       * Supported tensor rank: 4, with "NHWC" data layout.
+       *
+       * Both explicit padding and implicit padding are supported.
+       *
+       * Inputs (explicit padding):
+       * * 0: A 4-D tensor, of shape [batches, height, width, depth_in],
+       *      specifying the input.
+       * * 1: A 4-D tensor, of shape
+       *      [depth_out, filter_height, filter_width, depth_in], specifying the
+       *      filter.
+       * * 2: A 1-D tensor, of shape [depth_out], specifying the bias.
+       *      For input tensor of {@link OperandType::TENSOR_FLOAT32}, the bias
+       *      should also be of {@link OperandType::TENSOR_FLOAT32}. For input
+       *      tensor of {@link OperandType::TENSOR_QUANT8_ASYMM}, the bias
+       *      should be of {@link OperandType::TENSOR_INT32}, with zeroPoint of
+       *      0 and bias_scale == input_scale * filter_scale.
+       * * 3: An {@link OperandType::INT32} scalar, specifying the padding on
+       *      the left, in the ‘width’ dimension.
+       * * 4: An {@link OperandType::INT32} scalar, specifying the padding on
+       *      the right, in the ‘width’ dimension.
+       * * 5: An {@link OperandType::INT32} scalar, specifying the padding on
+       *      the top, in the ‘height’ dimension.
+       * * 6: An {@link OperandType::INT32} scalar, specifying the padding on
+       *      the bottom, in the ‘height’ dimension.
+       * * 7: An {@link OperandType::INT32} scalar, specifying the stride when
+       *      walking through input in the ‘width’ dimension.
+       * * 8: An {@link OperandType::INT32} scalar, specifying the stride when
+       *      walking through input in the ‘height’ dimension.
+       * * 9: An {@link OperandType::INT32} scalar, and has to be one of the
+       *      {@link FusedActivationFunc} values. Specifies the activation to
+       *      invoke on the result.
+       *
+       * Inputs (implicit padding):
+       * * 0: A 4-D tensor, of shape [batches, height, width, depth_in],
+       *      specifying the input.
+       * * 1: A 4-D tensor, of shape
+       *      [depth_out, filter_height, filter_width, depth_in], specifying the
+       *      filter.
+       * * 2: A 1-D tensor, of shape [depth_out], specifying the bias. For input
+       *      tensor of {@link OperandType::TENSOR_FLOAT32}, the bias should
+       *      also be of {@link OperandType::TENSOR_FLOAT32}. For input tensor
+       *      of {@link OperandType::TENSOR_QUANT8_ASYMM}, the bias should be
+       *      of {@link OperandType::TENSOR_INT32}, with zeroPoint of 0 and
+       *      bias_scale == input_scale * filter_scale.
+       * * 3: An {@link OperandType::INT32} scalar, specifying the implicit
+       *      padding scheme, has to be one of the
+       *      following values: {0 (NONE), 1 (SAME), 2 (VALID)}.
+       * * 4: An {@link OperandType::INT32} scalar, specifying the stride when
+       *      walking through input in the ‘width’ dimension.
+       * * 5: An {@link OperandType::INT32} scalar, specifying the stride when
+      *       walking through input in the ‘height’ dimension.
+       * * 6: An {@link OperandType::INT32} scalar, and has to be one of the
+       *      {@link FusedActivationFunc} values. Specifies the activation to
+       *      invoke on the result.
+       *
+       * Outputs:
+       * * 0: The output 4-D tensor, of shape
+       *      [batches, out_height, out_width, depth_out]. For output tensor of
+       *      {@link OperandType::TENSOR_QUANT8_ASYMM}, the following condition
+       *      must be satisfied: output_scale > input_scale * filter_scale.
+       *
+      CONV_2D = 3,
+
+      ***/
+
+  auto input = getPort(operation.inputs[0]);
   auto filter = GetConstOperandAsTensor(operation.inputs[1]);
   auto bias = GetConstOperandAsTensor(operation.inputs[2]);
 
+  const auto inputDims = input->getTensorDesc().getDims();
+  const auto filterDims = filter->getTensorDesc().getDims();
 
   ConvolutionParams prms;
-  prms.weights = static_cast<IRBlob::Ptr>(filter); // permute OHWI to OIHW (0->0, 3->1, 1->2, 2->3)
-  const auto dims = prms.weights->getTensorDesc().getDims();
-  auto input = getPort(operation.inputs[0]);
-  const auto indims = input->getTensorDesc().getDims();
-  int  fusion_index = -1;
-  if (operation.inputs.size() == 7) {//PAD SAME
-      const auto pad_type = PARAM_I32(3);
-      int stride_width = PARAM_I32(4);
-      int stride_height = PARAM_I32(5);
+  //prms.weights = static_cast<IRBlob::Ptr>(filter); // permute OHWI to OIHW (0->0, 3->1, 1->2, 2->3)
+  //const auto dims = prms.weights->getTensorDesc().getDims();
+  //const auto indims = input->getTensorDesc().getDims();
+  //int  fusion_index = -1;
 
-      int input_height = indims[2];
-      int input_width = indims[3];
+  int batches = (int)inputDims[0];
+  int in_channels = (int)inputDims[1];
+  int input_height = (int)inputDims[2];
+  int input_width = (int)inputDims[3];
 
-      int filter_height = dims[2];
-      int filter_width = dims[3];
-      if (pad_type == kPaddingSame) {
-          /**
-           * SAME padding.
-           * Padding on both ends are the "same":
-           *     padding_to_beginning =  total_padding / 2
-           *     padding_to_end       = (total_padding + 1)/2.
-           * i.e., for even number of padding, padding to both ends are exactly
-           * the same; for odd number of padding, padding to the ending is bigger
-           * than the padding to the beginning by 1.
-           *
-           * total_padding is a function of input, stride and filter size.
-           * It could be computed as follows:
-           *    out_size = (input + stride - 1) / stride;
-           *    needed_input = (out_size - 1) * stride + filter_size
-           *    total_padding = max(0, needed_input - output_size)
-           *  The computation is the same for the horizontal and vertical directions.
-           */
-          int width_output_size = (input_width + stride_width - 1) / stride_width;
-          int width_needed_input = (width_output_size - 1) * stride_width + filter_width;
-          int width_total_padding = std::max(0, width_needed_input - width_output_size);
-
-          int height_output_size = (input_height + stride_height - 1) / stride_height;
-          int height_needed_input = (height_output_size - 1) * stride_height + filter_height;
-          int height_total_padding = std::max(0, height_needed_input - height_output_size);
+  int filter_in = (int)filterDims[1];
+  int filter_out = (int)filterDims[0];
+  int filter_height = (int)filterDims[2];
+  int filter_width = (int)filterDims[3];
 
 
-          int width_padding_to_beginning =  width_total_padding / 2;
-          int width_padding_to_end = (width_total_padding + 1)/ 2;
-          int height_padding_to_beginning =  height_total_padding / 2;
-          int height_padding_to_end = (height_total_padding + 1)/ 2;
+  //int32_t padding_left, padding_right;
+  //int32_t padding_top, padding_bottom;
+  //int32_t stride_width, stride_height;
 
-          prms.pad_start = {width_padding_to_beginning, height_padding_to_beginning};
-          prms.pad_end = {width_padding_to_end, height_padding_to_end};
-      } else if (pad_type == kPaddingValid) {
+  uint32_t fusion_index = -1;
+
+  if (operation.inputs.size() == 10) {
+      prms.pad_start = {PARAM_I32(3), PARAM_I32(5)};
+      prms.pad_end = {PARAM_I32(4), PARAM_I32(6)};
+      prms.stride = {PARAM_I32(7), PARAM_I32(8)};
+      prms.kernel = {filter_width, filter_height};
+      prms.num_output_planes = filter_out; //depth out
+      fusion_index = 9;
+  } else if (operation.inputs.size() == 7) {//PAD SAME
+    const auto pad_type = PARAM_I32(3); //padding_implicit
+    int stride_width = PARAM_I32(4);
+    int stride_height = PARAM_I32(5);
+    int padding_left, padding_right;
+    int padding_top, padding_bottom;
+/*
+    int input_height = indims[2];
+    int input_width = indims[3];
+
+    int filter_height = dims[2];
+    int filter_width = dims[3];
+*/
+    if (pad_type == kPaddingSame) {
+
+        /**
+         * SAME padding.
+         * Padding on both ends are the "same":
+         *     padding_to_beginning =  total_padding / 2
+         *     padding_to_end       = (total_padding + 1)/2.
+         * i.e., for even number of padding, padding to both ends are exactly
+         * the same; for odd number of padding, padding to the ending is bigger
+         * than the padding to the beginning by 1.
+         *
+         * total_padding is a function of input, stride and filter size.
+         * It could be computed as follows:
+         *    out_size = (input + stride - 1) / stride;
+         *    needed_input = (out_size - 1) * stride + filter_size
+         *    total_padding = max(0, needed_input - output_size)
+         *  The computation is the same for the horizontal and vertical directions.
+         */
+
+        calculateExplicitPadding(input_width, stride_width,
+                                 filter_width, pad_type /*padding_implicit*/,
+                                 &padding_left, &padding_right);
+        calculateExplicitPadding(input_height, stride_height,
+                                 filter_height, pad_type /*padding_implicit*/,
+                                 &padding_top, &padding_bottom);
+
+        prms.pad_start = {padding_left, padding_top};
+        prms.pad_end = {padding_right, padding_bottom};
+        prms.pad_type = 1;
+
+    } else if (pad_type == kPaddingValid) {
           /**
            * VALID padding.
            * No padding. When the input size is not evenly divisible by
@@ -1769,31 +2258,311 @@ bool PreparedModel::operationConv2D(const Operation& operation)
            */
           prms.pad_start = {0, 0};
           prms.pad_end = {0, 0};
+          prms.pad_type = 2;
       }
       prms.stride = {stride_width, stride_height};
-      prms.kernel = {(int)dims[3], (int)dims[2]};
-      prms.num_output_planes = dims[0]; //depth out
+      prms.kernel = {filter_width, filter_height};
+      prms.num_output_planes = filter_out; //depth out
       fusion_index = 6;
-  } else if (operation.inputs.size() == 10) {
-      prms.pad_start = {PARAM_I32(3), PARAM_I32(5)};
-      prms.pad_end = {PARAM_I32(4), PARAM_I32(6)};
-      prms.stride = {PARAM_I32(7), PARAM_I32(8)};
-      prms.kernel = {(int)dims[3], (int)dims[2]};
-      prms.num_output_planes = dims[0]; //depth out
-      fusion_index = 9;
+   }
+
+    if (bias->size() != prms.num_output_planes){
+        VLOG(L1, "biases size mismatch filer's depth");
+        nnAssert(false);
+      }
+
+    // input_size (validate)
+    if (filter_in != in_channels){
+        VLOG(L1, "filter depth_in size mismatch input depth");
+        nnAssert(false);
+      }
+
+/*
+    //Reshape CONV_2D
+    TensorDims newDims = {(uint32_t)filter_in, (uint32_t)filter_out, (uint32_t)filter_height, (uint32_t)filter_width};
+
+    TensorDesc td(InferenceEngine::Precision::FP16, newDims, {{newDims[2], newDims[3], newDims[0], newDims[1]}, {2, 3, 0, 1}}); //working for CTS
+
+    //check diff combination btw TF lite and IE
+    //2310
+    //TensorDesc td(InferenceEngine::Precision::FP16, newDims, {{newDims[2], newDims[3], newDims[1], newDims[0]}, {2, 3, 1, 0}});
+
+
+    InferenceEngine::TBlob<short>::Ptr dst_blob = std::make_shared<InferenceEngine::TBlob<short>>(td);
+    dst_blob->allocate();
+
+    for (size_t i = 0 ; i < dst_blob->size(); i++) {
+  	dst_blob->buffer().as<short*>()[dst_blob->getTensorDesc().offset(i)] = filter->cbuffer().as<const short*>()[filter->getTensorDesc().offset(i)];
+    }
+    prms.weights = static_cast<IRBlob::Ptr>(dst_blob);
+*/
+    prms.weights = static_cast<IRBlob::Ptr>(filter); //org
+    const auto weightsDims = prms.weights->getTensorDesc().getDims();
+
+  	//auto out = Convolution(input, prms) + bias;
+    prms.biases = static_cast<IRBlob::Ptr>(bias);
+    auto out = Convolution(input, prms);
+
+    if (fusion_index < 0) {
+        VLOG(L1, "invalid fusion index");
+        nnAssert(false);
+    }
+    mPorts[operation.outputs[0]] = handleFusion(out, PARAM_I32(fusion_index));
+
+    VLOG(L1, "----------------------------------------------");
+    VLOGDIMS(L1, inputDims, "inputs dims");
+    VLOGDIMS(L1, filterDims, "filter dims");
+    VLOGDIMS(L1, weightsDims, "weights dims");
+    VLOG(L1, "----------------------------------------------");
+
+    return true;
+}
+
+bool PreparedModel::operationDepthwiseConv2D(const Operation& operation)
+{
+  VLOG(L1, "OperationType::DEPTHWISE_CONV_2D");
+  /**
+   * Performs a depthwise 2-D convolution operation.
+   *
+   * Given an input tensor of shape [batches, height, width, depth_in] and a
+   * filter tensor of shape [1, filter_height, filter_width, depth_out]
+   * containing depth_out convolutional filters of depth 1, DEPTHWISE_CONV
+   * applies a different filter to each input channel (expanding from 1
+   * channel to channel_multiplier channels for each), then concatenates the
+   * results together.
+   *
+   * The output has depth_out = depth_in * depth_multiplier channels.
+   * The output dimensions are functions of the filter dimensions, stride, and
+   * padding.
+   *
+   * The values in the output tensor are computed as:
+   *
+   *     output[b, i, j, k * channel_multiplier + q] =
+   *         sum_{di, dj} (
+   *             input[b, strides[1] * i + di, strides[2] * j + dj, k] *
+   *             filter[1, di, dj, k * channel_multiplier + q]
+   *         )
+   *
+   * Supported tensor {@link OperandType}:
+   * * {@link OperandType::TENSOR_FLOAT32}
+   * * {@link OperandType::TENSOR_QUANT8_ASYMM}
+   *
+   * Supported tensor rank: 4, with "NHWC" data layout.
+   *
+   * Both explicit padding and implicit padding are supported.
+   *
+   * Inputs (explicit padding):
+   * * 0: A 4-D tensor, of shape [batches, height, width, depth_in],
+   *      specifying the input.
+   * * 1: A 4-D tensor, of shape [1, filter_height, filter_width, depth_out],
+   *      specifying the filter.
+   * * 2: A 1-D tensor, of shape [depth_out], specifying the bias. For input
+   *      tensor of {@link OperandType::TENSOR_FLOAT32}, the bias should
+   *      also be of {@link OperandType::TENSOR_FLOAT32}. For input tensor
+   *      of {@link OperandType::TENSOR_QUANT8_ASYMM}, the bias should be
+   *      of {@link OperandType::TENSOR_INT32}, with zeroPoint of 0 and
+   *      bias_scale == input_scale * filter_scale.
+   * * 3: An {@link OperandType::INT32} scalar, specifying the padding on
+   *      the left, in the ‘width’ dimension.
+   * * 4: An {@link OperandType::INT32} scalar, specifying the padding on
+   *      the right, in the ‘width’ dimension.
+   * * 5: An {@link OperandType::INT32} scalar, specifying the padding on
+   *      the top, in the ‘height’ dimension.
+   * * 6: An {@link OperandType::INT32} scalar, specifying the padding on
+   *      the bottom, in the ‘height’ dimension.
+   * * 7: An {@link OperandType::INT32} scalar, specifying the stride when
+   *      walking through input in the ‘width’ dimension.
+   * * 8: An {@link OperandType::INT32} scalar, specifying the stride when
+   *      walking through input in the ‘height’ dimension.
+   * * 9: An {@link OperandType::INT32} scalar, specifying the depthwise
+   *      multiplier.
+   * * 10: An {@link OperandType::INT32} scalar, and has to be one of the
+   *       {@link FusedActivationFunc} values. Specifies the activation to
+   *       invoke on the result.
+   *
+   * Inputs (implicit padding):
+   * * 0: A 4-D tensor, of shape [batches, height, width, depth_in],
+   *      specifying the input.
+   * * 1: A 4-D tensor, of shape [1, filter_height, filter_width, depth_out],
+   *      specifying the filter.
+   * * 2: A 1-D tensor, of shape [depth_out], specifying the bias. For input
+   *      tensor of {@link OperandType::TENSOR_FLOAT32}, the bias should
+   *      also be of {@link OperandType::TENSOR_FLOAT32}. For input tensor
+   *      of {@link OperandType::TENSOR_QUANT8_ASYMM}, the bias should be
+   *      of {@link OperandType::TENSOR_INT32}, with zeroPoint of 0 and
+   *      bias_scale == input_scale * filter_scale.
+   * * 3: An {@link OperandType::INT32} scalar, specifying the implicit
+   *      padding scheme, has to be one of the
+   *      following values: {0 (NONE), 1 (SAME), 2 (VALID)}.
+   * * 4: An {@link OperandType::INT32} scalar, specifying the stride when
+   *      walking through input in the ‘width’ dimension.
+   * * 5: An {@link OperandType::INT32} scalar, specifying the stride when
+   *      walking through input in the ‘height’ dimension.
+   * * 6: An {@link OperandType::INT32} scalar, specifying the depthwise
+   *      multiplier.
+   * * 7: An {@link OperandType::INT32} scalar, and has to be one of the
+   *      {@link FusedActivationFunc} values. Specifies the activation to
+   *      invoke on the result.
+   *
+   * Outputs:
+   * * 0: The output 4-D tensor, of shape
+   *      [batches, out_height, out_width, depth_out]. For output tensor of
+   *      {@link OperandType::TENSOR_QUANT8_ASYMM}, the following condition
+   *      must be satisfied: output_scale > input_scale * filter_scale.
+   */
+
+
+  auto input = getPort(operation.inputs[0]);
+  auto filter = GetConstOperandAsTensor(operation.inputs[1]); //NCHW [1, depth_out, filter_height, filter_width]
+  auto bias = GetConstOperandAsTensor(operation.inputs[2]);
+
+
+  const auto inputDims = input->getTensorDesc().getDims();
+  const auto filterDims = filter->getTensorDesc().getDims();
+
+  ConvolutionParams prms;
+  //prms.weights = static_cast<IRBlob::Ptr>(filter); //NCHW [1, depth_out, filter_height, filter_width] // permute OHWI to OIHW (0->0, 3->1, 1->2, 2->3)
+
+  //according to TF
+  //filter: 4-D with shape [filter_height, filter_width, in_channels, channel_multiplier].
+  //reshape to org layout of TF [filter_height, filter_width, in_channels, channel_multiplier]
+  //then permute 2, 3, 0, 1
+  //prms.weights = static_cast<IRBlob::Ptr>(Permute(filter, {2, 3, 0, 1}));
+
+  int batches = (int)inputDims[0];
+  int in_channels = (int)inputDims[1];
+  int input_height = (int)inputDims[2];
+  int input_width = (int)inputDims[3];
+
+  int filter_in = (int)filterDims[0];
+  int filter_out = (int)filterDims[1];
+  int filter_height = (int)filterDims[2];
+  int filter_width = (int)filterDims[3];
+
+  //int32_t padding_left, padding_right;
+  //int32_t padding_top, padding_bottom;
+  //int32_t stride_width, stride_height;
+
+  int fusion_index = -1;
+  int depth_multiplier = 0;
+
+
+      if (operation.inputs.size() == 11) {
+          prms.pad_start = {PARAM_I32(3), PARAM_I32(5)};
+          prms.pad_end = {PARAM_I32(4), PARAM_I32(6)};
+          prms.stride = {PARAM_I32(7), PARAM_I32(8)};
+          prms.kernel = {(int)filter_width, (int)filter_height};
+          fusion_index = 10;
+          prms.groups = in_channels; //working
+          depth_multiplier = PARAM_I32(9);
+          prms.num_output_planes = in_channels*depth_multiplier;//same as filter_out; //dims[0]; //depth out
+      } else if (operation.inputs.size() == 8) {//PAD SAME
+          const auto pad_type = PARAM_I32(3);
+          int stride_width = PARAM_I32(4);
+          int stride_height = PARAM_I32(5);
+
+          int padding_left, padding_right;
+          int padding_top, padding_bottom;
+
+          if (pad_type == kPaddingSame) {
+              /**
+               * SAME padding.
+               * Padding on both ends are the "same":
+               *     padding_to_beginning =  total_padding / 2
+               *     padding_to_end       = (total_padding + 1)/2.
+               * i.e., for even number of padding, padding to both ends are exactly
+               * the same; for odd number of padding, padding to the ending is bigger
+               * than the padding to the beginning by 1.
+               *
+               * total_padding is a function of input, stride and filter size.
+               * It could be computed as follows:
+               *    out_size = (input + stride - 1) / stride;
+               *    needed_input = (out_size - 1) * stride + filter_size
+               *    total_padding = max(0, needed_input - output_size)
+               *  The computation is the same for the horizontal and vertical directions.
+               */
+               calculateExplicitPadding(input_width, stride_width,
+                                        filter_width, pad_type /*padding_implicit*/,
+                                        &padding_left, &padding_right);
+               calculateExplicitPadding(input_height, stride_height,
+                                        filter_height, pad_type /*padding_implicit*/,
+                                        &padding_top, &padding_bottom);
+
+               prms.pad_start = {padding_left, padding_top};
+               prms.pad_end = {padding_right, padding_bottom};
+               prms.pad_type = 1;
+
+          } else if (pad_type == kPaddingValid) {
+              /**
+               * VALID padding.
+               * No padding. When the input size is not evenly divisible by
+               * the filter size, the input at the end that could not fill
+               * the whole filter tile will simply be ignored.
+               */
+              prms.pad_start = {0, 0};
+              prms.pad_end = {0, 0};
+              prms.pad_type = 2;
+          }
+          prms.stride = {stride_width, stride_height};
+          prms.kernel = {(int)filter_width, (int)filter_height};
+          fusion_index = 7;
+          prms.groups = in_channels; //working
+          depth_multiplier = PARAM_I32(6);
+          prms.num_output_planes = in_channels*depth_multiplier;//same as filter_out; //dims[0]; //depth out
+      }
+
+
+  /*
+  TF filter: 4-D with shape [filter_height, filter_width, in_channels, channel_multiplier].
+  reshape to org layout of TF [filter_height, filter_width, in_channels, channel_multiplier]
+  then permute 2, 3, 0, 1
+  prms.weights = static_cast<IRBlob::Ptr>(Permute(filter, {2, 3, 0, 1}));
+
+  group is same as in_channels and the number of output features map as in_channels*depth_multiplier and
+  permute weights to (in_chennels, channel_multiplier, filter_height, filter_width) where assuming TF original input filter
+  shape as [filter_height, filter_width,  in_channels, channel_multiplier] to preapare in the layout expected by IE
+  */
+
+  //Reshape DEPTHWISE_CONV_2D
+  TensorDims newDims = {(uint32_t)in_channels, (uint32_t)depth_multiplier, (uint32_t)filter_height, (uint32_t)filter_width}; //channel_multiplier == depth_multiplier
+  //TensorDims newDims = {(uint32_t)depth_multiplier, (uint32_t)in_channels, (uint32_t)filter_height, (uint32_t)filter_width};
+  //TensorDims newDims = {(uint32_t)depth_multiplier, (uint32_t)in_channels, (uint32_t)filter_height, (uint32_t)filter_width}; //channel_multiplier == depth_multiplier
+  //TensorDims newDims = {1, in_channels*depth_multiplier, filter_height, filter_width}; //original filter shape //channel_multiplier == depth_multiplier
+
+  TensorDesc td(InferenceEngine::Precision::FP16, newDims, {{newDims[2], newDims[3], newDims[0], newDims[1]}, {2, 3, 0, 1}}); //working for CTS
+
+  //check diff combination btw TF lite and IE
+  //2310
+  //TensorDesc td(InferenceEngine::Precision::FP16, newDims, {{newDims[2], newDims[3], newDims[1], newDims[0]}, {2, 3, 1, 0}});
+  //0123
+  //TensorDesc td(InferenceEngine::Precision::FP16, newDims, {{newDims[1], newDims[0], newDims[2], newDims[3]}, {1, 0, 2, 3}});
+
+  InferenceEngine::TBlob<short>::Ptr dst_blob = std::make_shared<InferenceEngine::TBlob<short>>(td);
+  dst_blob->allocate();
+
+  for (size_t i = 0 ; i < filter->size(); i++) {
+    dst_blob->buffer().as<short*>()[dst_blob->getTensorDesc().offset(i)] = filter->cbuffer().as<const short*>()[filter->getTensorDesc().offset(i)]; //set Layout::NCHW in td for src and dst
   }
+  prms.weights = static_cast<IRBlob::Ptr>(dst_blob);
 
-  if (bias->size() != prms.num_output_planes){
-      VLOG(L1, "biases size mismatch filer's depth");
-      nnAssert(false);
-    }
+  //prms.weights = static_cast<IRBlob::Ptr>(filter);
 
-  // input_size (validate)
-  if (dims[1] != input->getDims()[1]){
-      VLOG(L1, "filter depth_in size mismatch input depth");
-      nnAssert(false);
-    }
-  auto out = Convolution(input, prms) + bias;
+  //reshape (1, depth_out, filter_height, filter_width) => GOHW (group, output, filter_height, filter_width)
+  //prms.weights->getTensorDesc().reshape(newDims, Layout::ANY);
+  //prms.weights = static_cast<IRBlob::Ptr>(Permute(prms.weights, {2, 3, 0, 1}));
+  const auto weightDims = prms.weights->getTensorDesc().getDims();
+
+  nnAssert(filter_out == in_channels * depth_multiplier);
+  VLOG(L1, "batches %d, channels %d, input_height: %d, input_width %d",
+           batches, in_channels, input_height, input_width);
+  VLOG(L1, "filter_in %d, filter_out %d, filter_height: %d, filter_width %d",
+           filter_in, filter_out, filter_height, filter_width);
+  VLOG(L1, "depth multiplier %d", depth_multiplier);
+
+  //auto out = Convolution(input, prms) + bias;
+  prms.biases = static_cast<IRBlob::Ptr>(bias);
+  auto out = Convolution(input, prms);
+
   if (fusion_index < 0) {
       VLOG(L1, "invalid fusion index");
       nnAssert(false);
@@ -1801,144 +2570,13 @@ bool PreparedModel::operationConv2D(const Operation& operation)
   mPorts[operation.outputs[0]] = handleFusion(out, PARAM_I32(fusion_index));
 
   VLOG(L1, "----------------------------------------------");
-  VLOGDIMS(L1, indims, "inputs dims");
-  VLOGDIMS(L1, dims, "weights dims");
+  VLOGDIMS(L1, inputDims, "inputs dims");
+  VLOGDIMS(L1, filterDims, "filter dims");
+  VLOGDIMS(L1, weightDims, "weight dims");
   VLOG(L1, "----------------------------------------------");
 
   return true;
-}
 
-bool PreparedModel::operationDepthwiseConv2D(const Operation& operation)
-{
-  VLOG(L1, "OperationType::DEPTHWISE_CONV_2D");
-  /*
-   * Inputs:
-   * 0: A 4-D tensor, of shape [batches, height (3), width (3), depth_in (2)], specifying the input.
-   * 1: A 4-D tensor, of shape [1, filter_height (2), filter_width (2), depth_out (4)], 1,H,W,(G,I) = H,W,G,I -> G,O,I,H,W (I=1) = G,O,H,W
-   *    specifying the filter.
-   * 2: A 1-D tensor, of shape [depth_out], specifying the bias.
-   *    For input tensor of {@link OperandType::TENSOR_FLOAT32} type, the bias should
-   *    also be of {@link OperandType::TENSOR_FLOAT32}.
-   *    For input tensor of {@link OperandType::TENSOR_QUANT8_ASYMM} type, the bias
-   *    should be of {@link OperandType::TENSOR_INT32}.
-   * 3: An INT32 value, specifying the padding on the left, in the ‘width’ dimension.
-   * 4: An INT32 value, specifying the padding on the right,in the ‘width’ dimension.
-   * 5: An INT32 value, specifying the padding on the top, in the ‘height’ dimension.
-   * 6: An INT32 value, specifying the padding on the bottom, in the ‘height’ dimension.
-   * 7: An INT32 value, specifying the output stride in the ‘width’ dimension.
-   * 8: An INT32 value, specifying the output stride in the ‘height’ dimension.
-   * 9: An INT32 value, specifying the depthwise multiplier.
-   * 10: An INT32 value, and has to be one of the {@link FusedActivationFunc} values.
-   */
-  auto input = getPort(operation.inputs[0]);
-  auto filter = GetConstOperandAsTensor(operation.inputs[1]);
-  auto bias = GetConstOperandAsTensor(operation.inputs[2]);
-
-  const auto indims = input->getTensorDesc().getDims();
-
-
-/*
-  ConvolutionParams prms;
-  // here real weights are not 1,H,W,O since out has groups in it (I=1),H,W,G,O/G, and we use G,(O/G),(I=1),H,W
-  const auto fdims = filter->getTensorDesc().getDims();
-
-  for (auto i = 0; i < fdims.size(); i++)
-  VLOG(L1, "filter fdims[%d] = %d ", i, fdims[i]);
-
-  auto H = fdims[1];
-  auto W = fdims[2];
-  auto D = fdims[3];
-  auto G = prms.groups = PARAM_I32(9);
-  auto I = input->getTensorDesc().getDims()[1]; // IE laypout NCHW
-  VLOG(L1, "H = %lu W = %lu  G = %d D = %lu I= %lu D/I = %lu ", H, W, G, D, I, D/I);
-  filter->getTensorDesc().reshape({H,W,static_cast<unsigned long>(G),D/I},Layout::ANY);
-
-  prms.weights = static_cast<IRBlob::Ptr>(Permute(filter, {3, 0, 1, 2})); // permute IHWO to OIHW
-  const auto dims = prms.weights->getTensorDesc().getDims();
-  //call reshape with single vector with size of weights
-  prms.weights->getTensorDesc().reshape({filter->size()},Layout::ANY);
-*/
-
-  //depthwise: vpu use oihw as shape, format is ihwo. (ihwo->iohw->oihw)
-  ConvolutionParams prms;
-  prms.weights = static_cast<IRBlob::Ptr>(Permute(filter, {1, 0, 2, 3})); // permute HWOG to GOHW   //3012
-  const auto wdims = prms.weights->getTensorDesc().getDims();
-
-  prms.groups = PARAM_I32(9);
-  prms.pad_start = {PARAM_I32(3), PARAM_I32(5)};
-  prms.pad_end = {PARAM_I32(4), PARAM_I32(6)};
-  prms.stride = {PARAM_I32(7), PARAM_I32(8)};
-  //prms.kernel = {(int)dims[2], (int)dims[1]};
-  prms.kernel = {(int)wdims[3], (int)wdims[2]};
-  //prms.num_output_planes = dims[3]; // depth out
-  prms.num_output_planes = wdims[0]; // depth out
-
-  uint32_t batches = indims[0];
-  uint32_t channels = indims[1];
-  uint32_t input_height = indims[2];
-  uint32_t input_width = indims[3];
-
-  uint32_t filter_out = wdims[0];
-  uint32_t filter_in = wdims[1];
-  uint32_t filter_height = wdims[2];
-  uint32_t filter_width = wdims[3];
-
-  int32_t padding_left, padding_right;
-  int32_t padding_top, padding_bottom;
-  int32_t stride_width, stride_height;
-  uint32_t depth_multiplier = 0;
-  int32_t activation = PARAM_I32(10);
-
-  depth_multiplier = PARAM_I32(9);
-
-
-  nnAssert(filter_out == channels * depth_multiplier);
-  VLOG(L1, "batches %d, channels %d, input_height: %d, input_width %d",
-           batches, channels, input_height, input_width);
-  VLOG(L1, "channels_in %d, channels_out %d, filter_height: %d, filter_width %d",
-           filter_in, filter_out, filter_height, filter_width);
-  VLOG(L1, "depth multiplier %d", depth_multiplier);
-
-  //if (bias->size() != prms.num_output_planes*prms.groups){
-  if (bias->size() != wdims[0]){
-      VLOG(L1, "biases size mismatch filer's depth");
-      nnAssert(false);
-  }
-  //auto input = getPort(operation.inputs[0]);
-  // input_size (validate)
-
-  if (prms.groups != input->getDims()[1]){
-      VLOG(L1, "input features are not equal depth multiplier");
-      nnAssert(false);
-    }
-
-  for (auto i = 0; i < wdims.size(); i++)
-  VLOG(L1, "weights wdims[%d] = %d ", i, wdims[i]);
-
-/*
-  //auto pmem = insertReorderIfNeed(&filter, memory::format::oihw, type_conv_filter);
-
-  filter.shape = {channels, depth_multiplier, 1, filter_height, filter_width};
-  //add to stub pmem, then can be pick up later
-  addStubPmem(&filter, new memory({{filter.shape, type_conv_filter, format_filter_group},
-                                  *cpu_engine}, pmem->get_data_handle()));
-*/
-  TensorDims newDims = {channels, depth_multiplier, 1, filter_height, filter_width};
-  prms.weights->getTensorDesc().setDims(newDims);
-
-  auto out = Convolution(input, prms) + bias;
-
-/*
-  int32_t output_height = computeOutSize(input_height, filter_height, stride_height,
-                                      padding_top, padding_bottom);
-  int32_t output_width = computeOutSize(input_width, filter_width, stride_width,
-                                     padding_left, padding_right);
-  //get output shape, mkldnn define shape as nchw
-  output.shape = {batches, filter_out, output_height, output_width};
-*/
-  mPorts[operation.outputs[0]] = handleFusion(out, PARAM_I32(10));
-
-  return true;
 }
 
 bool PreparedModel::operationFullyConnected(const Operation& operation)
@@ -1985,9 +2623,9 @@ bool PreparedModel::operationFullyConnected(const Operation& operation)
    output->dimensions = {batch_size, num_units};
 
 */
+    auto input = getPort(operation.inputs[0]);
     auto weights = GetConstOperandAsTensor(operation.inputs[1]);
     auto bias = GetConstOperandAsTensor(operation.inputs[2]);
-    auto input = getPort(operation.inputs[0]);
 
     auto indims = input->getTensorDesc().getDims();
     for (auto i = 0; i < indims.size(); i++)
@@ -2000,7 +2638,7 @@ bool PreparedModel::operationFullyConnected(const Operation& operation)
     //input is [batch_size, input_size], weights is [num_unit, input_size]
     nnAssert(indims[1] == wdims[1]);
 
-    if (input->getDims().size()>2)
+    if (input->getTensorDesc().getDims().size()>2)
     {
         // todo: could be we need to rotate the input weights to reflect the different layout of input tensor
         // when it is not 2D: NHWC vs NCHW in IE
@@ -2063,34 +2701,6 @@ bool PreparedModel::operationLRN(const Operation& operation)
   mPorts[operation.outputs[0]] = LRN(getPort(operation.inputs[0]), alpha, beta, size, false, k);
 
   return true;
-}
-
-bool PreparedModel::operationMaxPool2D(const Operation& operation)
-{
-  VLOG(L1, "OperationType::MAX_POOL_2D");
-    /*
-     *  * Inputs:
-     * 0: A 4-D tensor, of shape [batches, height, width, depth], specifying the input.
-     * 1: An INT32 value, specifying the padding on the left, in the ‘width’ dimension.
-     * 2: An INT32 value, specifying the padding on the right,in the ‘width’ dimension.
-     * 3: An INT32 value, specifying the padding on the top, in the ‘height’ dimension.
-     * 4: An INT32 value, specifying the padding on the bottom, in the ‘height’ dimension.
-     * 5: An INT32 value, specifying the output stride in the ‘width’ dimension.
-     * 6: An INT32 value, specifying the output stride in the ‘height’ dimension.
-     * 7: An INT32 value, specifying the filter width.
-     * 8: An INT32 value, specifying the filter height.
-     * 9: An INT32 value, and has to be one of the {@link FusedActivationFunc} values.
-     *    Specifies the activation to invoke on the result of each addition.
-     */
-    Point2D pad_start = {PARAM_I32(1),PARAM_I32(3)};
-    Point2D pad_end = {PARAM_I32(2), PARAM_I32(4)};
-    Point2D stride = {PARAM_I32(5),PARAM_I32(6)};
-    Point2D kernel = {PARAM_I32(7), PARAM_I32(8)};
-    auto out = Pooling(getPort(operation.inputs[0]), kernel, stride, pad_start, pad_end,
-                       InferenceEngine::PoolingLayer::PoolType::MAX);
-    mPorts[operation.outputs[0]] = handleFusion(out, PARAM_I32(9));
-
-    return true;
 }
 
 bool PreparedModel::operationLogisticSigmoid(const Operation& operation)
@@ -2180,16 +2790,7 @@ static inline size_t sizeOf(const TensorDims &dims)
 bool PreparedModel::operationReshape(const Operation& operation)
 {
     VLOG(L1, "OperationType::RESHAPE");
-    /*
-     * * Inputs:
-     * 0: A tensor, specifying the tensor to be reshaped.
-     * 1: A 1-D tensor of type {@link OperandType::TENSOR_INT32}, defining the shape
-     *    of the output tensor. The number of elements implied by shape must be the same
-     *    as the number of elements in the input tensor.
-     */
-    /* todo: We need to be careful here, inter-tensors are in different order,
-     *       could be we need to reflect this also in reshape..
-     * */
+
      /**
       * Reshapes a tensor.
       *
@@ -2213,27 +2814,46 @@ bool PreparedModel::operationReshape(const Operation& operation)
       *       could be we need to reflect this also in reshape..
       */
 
-    auto dims = toDims(GetConstVecOperand<uint32_t>(mModel, operation.inputs[1]));
-    int index = -1;
-    auto shape = 1;
-    for (auto i = 0; i < dims.size(); i++) {
-        VLOG(L1, "operand1: shape of output tensor dims[%d] = %d ", i, dims[i]);
-        if ((int)dims[i] < 0) {
-            index = i;
-            VLOG(L1, "index = %d", i);
+    auto input = getPort(operation.inputs[0]);
+    auto inDims = input->getTensorDesc().getDims();
+
+    auto outDims = toDims(GetConstVecOperand<uint32_t>(mModel, operation.inputs[1]));
+
+    // Reshape allows one of the targetDims components to have the
+    // special -1 value, meaning it will be calculated automatically based on the
+    // input. Here we calculate what that dimension should be so that the number
+    // of output elements in the same as the number of input elements.
+
+    //auto numInputElements = getNumberOfElements(static_cast<const vec<uint32_t>> (inDims));
+    auto numInputElements = sizeOf(inDims);  //getNumberOfElements
+
+    int strechDim = -1;
+    auto numOutputElements = 1; //shape
+    for (auto i = 0; i < outDims.size(); i++) {
+        VLOG(L1, "operand1: shape of output tensor outDims[%d] = %d ", i, outDims[i]);
+        if ((int)outDims[i] < 0) {
+            strechDim = i; //strechdim
+            VLOG(L1, "strechDim = %d", i);
             continue;
         }
-        shape *= dims[i];
+        numOutputElements *= outDims[i]; //shape
     }
-    if (index >= 0) {
-        dims[index] = (uint32_t)(sizeOf((getPort(operation.inputs[0]))->getDims()) / shape);   
-        VLOG(L1, "size: %d, index = %d, %d", sizeOf((getPort(operation.inputs[0]))->getDims()),index, dims[index]);
+    if (strechDim >= 0) {
+        auto strechValue = numInputElements / numOutputElements;
+        outDims[strechDim] = (uint32_t) strechValue;
+        numOutputElements *= strechValue;
+
+        VLOG(L1, "numInputElements or size = %d, index = %d, outDims[index] = %d", numInputElements, strechDim, outDims[strechDim]);
     }
 
-    for (auto i = 0; i < dims.size(); i++)
-        VLOG(L1, "operand1: shape of output tensor dims[%d] = %d ", i, dims[i]);
-       
-    mPorts[operation.outputs[0]] = Reshape(dims, getPort(operation.inputs[0]));
+    for (auto i = 0; i < outDims.size(); i++)
+        VLOG(L1, "operand1: shape of output tensor outDims[%d] = %d ", i, outDims[i]);
+    if (numInputElements != numOutputElements){
+      VLOG(L1, "numInputElements is not equal to numOutputElements", numInputElements, numOutputElements);
+      nnAssert(false);
+    }
+//Note: " error [VPU] Unsupported 1 D dimensions" for reshape output and fix me
+    mPorts[operation.outputs[0]] = Reshape(outDims, input);
 
     return true;
 
@@ -2243,10 +2863,74 @@ bool PreparedModel::operationSoftmax(const Operation& operation)
 {
     VLOG(L1, "OperationType::SOFTMAX");
 
-    mPorts[operation.outputs[0]] = Softmax(getPort(operation.inputs[0]));
-    float scale = PARAM_FP(1);
+    /**
+     * Computes the softmax activation on the input tensor element-wise, per
+     * batch, by normalizing the input vector so the maximum coefficient is
+     * zero.
+     *
+     * The output is calculated using this formula:
+     *
+     *     output[batch, i] =
+     *         exp((input[batch, i] - max(input[batch, :])) * beta) /
+     *         sum_{k}{exp((input[batch, k] - max(input[batch, :])) * beta)}
+     *
+     * Supported tensor {@link OperandType}:
+     * * {@link OperandType::TENSOR_FLOAT32}
+     * * {@link OperandType::TENSOR_QUANT8_ASYMM}
+     *
+     * Supported tensor rank: 2 or 4.
+     *
+     * Inputs:
+     * * 0: A 2-D or 4-D tensor, specifying the tensor to be reshaped.
+     * * 1: An {@link OperandType::FLOAT32} scalar, specifying the positive
+     *      scaling factor for the exponent, beta.
+     *
+     * Outputs:
+     * * 0: The output tensor of same shape as input0.
+     *      For {@link OperandType::TENSOR_QUANT8_ASYMM},
+     *      the scale must be 1.f / 256 and the zeroPoint must be 0.
+     */
+
+    auto input = getPort(operation.inputs[0]);
+
+/*
+    //handle 2D and 4D tensors
+    auto inputDims = input->getTensorDesc().getDims();
+
+    if (inputDims.size() == 2) {
+        uint32_t batch_size = inputDims[0];//getSizeOfDimension(inputShape, 0);
+        uint32_t input_size = sizeOf(inputDims) / batch_size; //getNumberOfElements(inputShape) / batch_size;
+
+        //Shape shapeIn4D;
+        //shapeIn4D.dimensions = {batch_size, 1, 1, input_size};
+        TensorDims newDims = {batch_size, 1, 1, input_size};
+        //inputDims = newDims;
+        input->getTensorDesc().setDims(newDims);
+        //dim = convertShapeToDims(shapeIn4D);
+
+    } else if (inputDims.size() == 4) {
+        //dim = convertShapeToDims(inputShape);
+        //newDims = inputDims;
+    } else {
+        #ifdef NNLOG
+        ALOGI("Softmax only 2D and 4D tensors supported");
+        #endif
+        //return false;
+    }
+*/
+
+    mPorts[operation.outputs[0]] = Softmax(input);
+    float beta /*scale*/ = PARAM_FP(1);
+/*
     if (scale != 1.0f) {
         ALOGE("scale of softmax not suported");
+        nnAssert(false);
+    }
+*/
+    VLOG(L1, "Softmax beta = %f ", beta);
+
+    if (beta <= 0.0f) {
+        ALOGE("beta must be positive for softmax");
         nnAssert(false);
     }
 
@@ -2603,17 +3287,14 @@ void PreparedModel::convertModel(IRDocument &mNet)
 	}
 }
 
-void PreparedModel::initializeInput(RunTimeOperandInfo* input)
+void PreparedModel::initializeInput()
 {
-}
-//from {pmem, shape} to {new pmem, type, buffer, format, length}
-void PreparedModel::finalizeOutput(/*RunTimeOperandInfo* output */)
-{
-  VLOG(L1, "finalize Output");
-  for (auto i : mModel.outputIndexes)
+  VLOG(L1, "initialize Input");
+  for (auto i : mModel.inputIndexes)
   {
     int dims_size = mOperands[i].dimensions.size();
 
+/*
     switch(dims_size) {
         case 2:
             mPorts[i]->setLayout(NC);
@@ -2628,19 +3309,85 @@ void PreparedModel::finalizeOutput(/*RunTimeOperandInfo* output */)
             VLOG(L1, "unsupported dims size %d", dims_size);
             nnAssert(true);
     }
+*/
+    //mPorts[i]->setPrecision(InferenceEngine::Precision::FP16);
+
+
+
+    VLOG(L1, "mPorts[%d] %s dims size %d", i, mPorts[i]->name.c_str(), dims_size);
+    VLOGDIMS(L1, mOperands[i].dimensions, "current operand inpu dims:");
+    VLOGDIMS(L1, mPorts[i]->getTensorDesc().getDims(), "Real input dims:");
+
+    auto inputDims = mPorts[i]->getTensorDesc().getDims();
+
+    /*
+    for (auto j = 0; j < outputDims.size(); j++)
+    VLOG(L1, "output dims[%d] = %d & set output dims[%d] = %d ", j, mOperands[i].dimensions[j], j, outputDims[j]);
+    VLOG(L1, "intialization for output data mPorts[%d]->name = %s\n", i, mPorts[i]->name.c_str());
+    */
+
+    uint32_t nelem = getNumberOfElements(mOperands[i].dimensions);
+    auto inputElem = sizeOf(inputDims);
+    if (nelem != inputElem) {
+      VLOG(L1, "set operand input dims to real input dims\n");
+      for (auto j = 0; j < inputDims.size(); j++)
+      mOperands[i].dimensions[j] = static_cast<uint32_t>(inputDims[j]);
+      mOperands[i].length = sizeOfData(mOperands[i].type, mOperands[i].dimensions);
+    }
+
+  }
+}
+
+void PreparedModel::finalizeOutput(/*RunTimeOperandInfo* output */)
+{
+  VLOG(L1, "finalize Output");
+  for (auto i : mModel.outputIndexes)
+  {
+    int dims_size = mOperands[i].dimensions.size();
+
+
+    switch(dims_size) {
+        case 2:
+            mPorts[i]->setLayout(NC);
+            break;
+        case 4:
+            mPorts[i]->setLayout(NHWC);
+            break;
+        case 1:
+            mPorts[i]->setLayout(C);
+            break;
+        default:
+            VLOG(L1, "unsupported dims size %d", dims_size);
+            nnAssert(true);
+    }
 
     //mPorts[i]->setPrecision(InferenceEngine::Precision::FP16);
     mPorts[i]->setPrecision(InferenceEngine::Precision::FP32);
     mNet.addOutput(mPorts[i]);
 
     VLOG(L1, "mPorts[%d] %s dims size %d", i, mPorts[i]->name.c_str(), dims_size);
-    VLOGDIMS(L1, mOperands[i].dimensions, "Output dims:");
-    VLOGDIMS(L1, mPorts[i]->getDims(), "Real Output dims:");
+    VLOGDIMS(L1, mOperands[i].dimensions, "current operand Output dims:");
+    VLOGDIMS(L1, mPorts[i]->getTensorDesc().getDims(), "Real Output dims:");
 
-    auto dims = mPorts[i]->getDims();
-    for (auto j = 0; j < dims.size(); j++)
-    VLOG(L1, "output dims[%d] = %d & set output dims[%d] = %d ", j, mOperands[i].dimensions[j], j, dims[j]);
+    auto outputDims = mPorts[i]->getTensorDesc().getDims();
+
+    /*
+    for (auto j = 0; j < outputDims.size(); j++)
+    VLOG(L1, "output dims[%d] = %d & set output dims[%d] = %d ", j, mOperands[i].dimensions[j], j, outputDims[j]);
     VLOG(L1, "intialization for output data mPorts[%d]->name = %s\n", i, mPorts[i]->name.c_str());
+    */
+
+    uint32_t nelem = getNumberOfElements(mOperands[i].dimensions);
+    auto outputElem = sizeOf(outputDims);
+    if (nelem != outputElem) {
+      VLOG(L1, "set correct dims as operand output dims different than real output dims\n");
+      /*
+      for (auto j = 0; j < outputDims.size(); j++)
+      mOperands[i].dimensions[j] = static_cast<uint32_t>(outputDims[j]);
+      mOperands[i].length = sizeOfData(mOperands[i].type, mOperands[i].dimensions);
+      */
+    }
+
   }
 }
 
@@ -2654,42 +3401,89 @@ IRBlob::Ptr VpuPreparedModel::GetConstOperandAsTensor(uint32_t index)
     if (op.type == OperandType::TENSOR_FLOAT32 || op.type == OperandType::FLOAT32) {
 #ifndef MYRIAD_FP32  //Myriad only supprts FP16
             vec<unsigned int> order;
-            if (op.dimensions.size() == 4) order = {0,3,1,2};  //nhwc -> nchw
-            else if (op.dimensions.size() == 2) order = {0, 1};
-            else order = {0}; //(op.dimensions.size() < 2)
-            TensorDesc td(InferenceEngine::Precision::FP16, permuteDims(toDims(op.dimensions), order), Layout::ANY);
+            Layout layout;
+            if (op.dimensions.size() == 4) {
+              order = {0,3,1,2};  //nhwc -> nchw
+              layout = Layout::NCHW;
+              //layout = Layout::NHWC;
+            }
+            else if (op.dimensions.size() == 2) {
+              order = {0, 1};
+              layout = Layout::NC;
+            }
+            else {
+              order = {0}; //(op.dimensions.size() < 2)
+              layout = Layout::C;
+            }
+
+            TensorDesc td(InferenceEngine::Precision::FP16, permuteDims(toDims(op.dimensions), order), layout);
+
             // todo: create a readOnly blob that accepts const pointers
             InferenceEngine::TBlob<short>::Ptr blob = std::make_shared<InferenceEngine::TBlob<short>>(td);
             blob->allocate();
             auto mem = blob->data();
             short *fp16Array = mem.as<short*>();
+
+            /*
+            TensorDesc td(InferenceEngine::Precision::FP16, toDims(op.dimensions), layout);
+
+            InferenceEngine::TBlob<short>::Ptr blob = std::make_shared<InferenceEngine::TBlob<short>>(td);
+            blob->allocate();
+            */
+
+            //float* src = static_cast<float *>(buf);
+
             // convert from [(float *)buf, len] to fp16Array,
             uint32_t nelem = getNumberOfElements(op.dimensions);
-            VLOG(L1, "Model buffer oplength = %d bytes nelem= %d fp16Array= %d bytes sizeof model buf= %d bytes\n", len , nelem, sizeof(fp16Array), sizeof(buf));
+            //VLOG(L1, "Model buffer oplength = %d bytes nelem= %d fp16Array= %d bytes sizeof model buf= %d bytes\n", len , nelem, sizeof(fp16Array), sizeof(buf));
             if (blob->size() != nelem) {
-                VLOG(L1, "Model buffer len = %d bytes nelem= %d fp16Array= %d bytes\n",len , nelem, sizeof(fp16Array));
+                //VLOG(L1, "Model buffer len = %d bytes nelem= %d fp16Array= %d bytes\n",len , nelem, sizeof(fp16Array));
+                VLOG(L1, "Model buffer len = %d bytes nelem= %d blob->size()= %d\n",len , nelem, blob->size());
                 nnAssert(false);
             }
+
+            /*
+            for (size_t i = 0 ; i < blob->size(); i++) {
+            blob->buffer().as<short*>()[blob->getTensorDesc().offset(i)] = f32tof16(((float *)buf)[i]);
+
+            //blob->buffer().as<short*>()[blob->getTensorDesc().offset(i)] = float2half(((float *)buf)[i]);
+
+            }
+            */
+
             f32tof16Arrays(fp16Array, (float *)buf, nelem);
+            //floattofp16(fp16Array, (float *)buf, nelem);
             return blob;
 #else //FP32 support
             vec<unsigned int> order;
-            if (op.dimensions.size() == 4) order = {0,3,1,2};  //nhwc -> nchw
-            else if (op.dimensions.size() == 2) order = {0, 1};
-            else order = {0}; //(op.dimensions.size() < 2)
-            TensorDesc td(InferenceEngine::Precision::FP32, permuteDims(toDims(op.dimensions), order), Layout::ANY);
+            Layout layout;
+            if (op.dimensions.size() == 4) {
+              order = {0,3,1,2};  //nhwc -> nchw
+              layout = Layout::NCHW;
+            }
+            else if (op.dimensions.size() == 2) {
+              order = {0, 1};
+              layout = Layout::NC;
+            }
+            else {
+              order = {0}; //(op.dimensions.size() < 2)
+              layout = Layout::C;
+            }
+            TensorDesc td(InferenceEngine::Precision::FP32, permuteDims(toDims(op.dimensions), order), layout);
             // todo: create a readOnly blob that accepts const pointers
             //return std::make_shared<InferenceEngine::TBlob<float>>(td, (float *)buf, len);
 #endif
     } else if (op.type == OperandType::TENSOR_INT32) {
 
-        VLOG(L1, "check if const tensors of type IN32 supported");
-        //nnAssert(true);
-        TensorDesc td(InferenceEngine::Precision::I32, toDims(op.dimensions), Layout::ANY);
-//        return std::make_shared<InferenceEngine::TBlob<float>>(td, (float *)buf, len);
+            VLOG(L1, "check if const tensors of type IN32 supported");
+            TensorDesc td(InferenceEngine::Precision::I32, toDims(op.dimensions), Layout::ANY);
+            if (buf == nullptr)
+                VLOG(L1, "TENSOR_INT32 buf is NULL !!!!!!!!!!!!!!!");
+            InferenceEngine::TBlob<float>::Ptr blob = std::make_shared<InferenceEngine::TBlob<float>>(td, (float *)buf, len);
+            return blob;
     } else {
-        VLOG(L1, "not supporting const tensors of type ", op.type);
-        nnAssert(false);
+            VLOG(L1, "not supporting const tensors of type ", op.type);
+            nnAssert(false);
     }
     return nullptr;
 }
@@ -2714,6 +3508,7 @@ Blob::Ptr VpuPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const 
       else order = {0}; //(op.dimensions.size() < 2)
 
       TensorDesc td(InferenceEngine::Precision::FP32, permuteDims(toDims(op.dimensions), order), Layout::ANY);
+      //TensorDesc td(InferenceEngine::Precision::FP16, newDims, {{newDims[2], newDims[3], newDims[0], newDims[1]}, {2, 3, 0, 1}});
           // todo: create a readOnly blob that accepts const pointers
   		//InferenceEngine::TBlob<short>::Ptr blob = std::make_shared<InferenceEngine::TBlob<short>>(td);
       InferenceEngine::TBlob<float>::Ptr blob = InferenceEngine::make_shared_blob<float>(td, (float *)buf, len);
@@ -2725,7 +3520,23 @@ Blob::Ptr VpuPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const 
 //      TensorDesc td(InferenceEngine::Precision::FP16, toDims(op.dimensions), Layout::ANY);
       // todo: create a readOnly blob that accepts const pointers
 //      return std::make_shared<InferenceEngine::TBlob<float>>(td, (float *)buf, len);
-      TensorDesc td(InferenceEngine::Precision::FP32, toDims(op.dimensions), Layout::ANY); //nhwc
+      vec<unsigned int> order;
+      Layout layout;
+      if (op.dimensions.size() == 4) {
+        //order = {0,3,1,2};  //nhwc -> nchw
+        layout = Layout::NHWC;
+      }
+      else if (op.dimensions.size() == 2) {
+        //order = {0, 1};
+        layout = Layout::NC;
+      }
+      else {
+        //order = {0}; //(op.dimensions.size() < 2)
+        layout = Layout::C;
+      }
+
+      //TensorDesc td(InferenceEngine::Precision::FP32, toDims(op.dimensions), Layout::ANY); //nhwc working
+      TensorDesc td(InferenceEngine::Precision::FP32, toDims(op.dimensions), layout); //nhwc
       //TensorDesc td(InferenceEngine::Precision::FP32, permuteDims(toDims(op.dimensions), {0,3,1,2}), Layout::ANY);  //nhwc->nchw
           // todo: create a readOnly blob that accepts const pointers
       InferenceEngine::TBlob<float>::Ptr blob = InferenceEngine::make_shared_blob<float>(td, (float *)buf, len);

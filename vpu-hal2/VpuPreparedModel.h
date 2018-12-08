@@ -26,6 +26,7 @@
 #include <fstream>
 
 #include "IENetwork.h"
+#include "Executor.h"
 
 using ::android::hidl::memory::V1_0::IMemory;
 using namespace IRBuilder;
@@ -84,6 +85,7 @@ struct RunTimeOperandInfo {
     }
 };
 
+
 // Used to keep a pointer to each of the memory pools.
 struct RunTimePoolInfo {
     sp<IMemory> memory;
@@ -93,6 +95,7 @@ struct RunTimePoolInfo {
     bool set(const hidl_memory& hidlMemory);
     bool update();
 };
+
 
 bool setRunTimePoolInfosFromHidlMemories(std::vector<RunTimePoolInfo>* poolInfos,
                                          const hidl_vec<hidl_memory>& pools);
@@ -154,7 +157,7 @@ protected:
     bool operationSoftmax(const Operation& operation);
     bool operationTANH(const Operation& operation);
 
-    void initializeInput(RunTimeOperandInfo* input);
+    void initializeInput();
     void finalizeOutput(/*RunTimeOperandInfo* output*/);
 
     OutputPort handleFusion(const OutputPort &out, int32_t fusedOp);
@@ -183,6 +186,10 @@ protected:
     IRDocument mNet;
     std::vector<OutputPort> mPorts;  //typedef std::shared_ptr<Data> DataPtr;
     ExecuteNetwork* enginePtr;
+    #ifdef AT_RUNTIME
+    std::vector<executor::RunTimePoolInfo> mPoolInfosExe;
+    #endif
+
 };
 
 class VpuPreparedModel : public PreparedModel {

@@ -6,10 +6,14 @@ include $(CLEAR_VARS)
 LOCAL_MODULE := android.hardware.neuralnetworks@1.0-generic-impl
 LOCAL_PROPRIETARY_MODULE := true
 LOCAL_MODULE_OWNER := intel
+#LOCAL_MULTILIB := both
 LOCAL_MULTILIB := 64
+
 LOCAL_SRC_FILES := \
 	VpuDriver.cpp \
-	VpuPreparedModel.cpp
+	VpuPreparedModel.cpp \
+	Executor.cpp
+
 
 LOCAL_C_INCLUDES += \
 	$(LOCAL_PATH) \
@@ -51,7 +55,8 @@ LOCAL_CFLAGS += \
 LOCAL_CFLAGS += \
 	-DNNLOG \
 	-DAKS \
-	-DIMPLEMENT_INFERENCE_ENGINE_API \
+	-DIMPLEMENT_INFERENCE_ENGINE_API 
+#	-DAT_RUNTIME
 
 LOCAL_SHARED_LIBRARIES := \
 	libhidlbase \
@@ -106,4 +111,4 @@ include $(CLEAR_VARS)
 include $(ZPATH)/graphAPI/graphAPI.mk
 include $(ZPATH)/graphTests/graphTests.mk
 include $(ZPATH)/dl/Android.mk
-include $(ZPATH)/ncsdk2/api/src/Android.mk
+#include $(ZPATH)/ncsdk2/api/src/Android.mk
