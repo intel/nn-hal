@@ -163,7 +163,18 @@ void IRDocument::optimize()
 
             it = _layers.erase(it);
             network->remove(l->name);
-        }
+        } /*else if (l->type == "Convolution"){ //convolution layer fused with Activatio layer
+          auto convLayer = l;
+          ++it;
+          if (it == _layers.end()) return;
+          auto fusedLayer = *it;
+          if (fusedLayer->type == "ReLU" || fusedLayer->type == "ReLU6" || fusedLayer->type == "Clamp") {
+              convLayer->_fusedWith = fusedLayer;
+              #ifdef NNLOG
+              ALOGI("layer = %s fused with %s", convLayer->name.c_str(), fusedLayer->name.c_str());
+              #endif
+          }
+        }*/
         else
         {
             ++it;
@@ -275,7 +286,7 @@ void IRDocument::save(std::ostream &xml_os, std::ostream &bin_os)
     for(auto &cnn_layer : _layers)
     {
         #ifdef NNLOG
-        ALOGI("save cnn_layer name = %s", cnn_layer->name.c_str());
+        //ALOGI("save cnn_layer name = %s", cnn_layer->name.c_str());
         #endif
         cnn_layer->userValue.v_int = ++id_cnt;
         int pcnt = 0;
@@ -341,16 +352,25 @@ InferenceEngine::InputInfo::Ptr IRDocument::createInput(const std::string &name,
 {
     Layout layout;
     if (dims.size() == 4) layout = NCHW;
+    //if (dims.size() == 4) layout = NHWC;
     else if (dims.size() == 2) layout = InferenceEngine::Layout::NC;
     else layout = InferenceEngine::Layout::C;
 
     std::cout << "createInput input data dims[0] "<<dims[0]<< "dims[1]" <<dims[1]<< std::endl;
     TensorDesc td(IRBuilder::g_layer_precision, dims, layout);
+    //TensorDesc td(InferenceEngine::Precision::FP32, dims, layout);
 
     auto inputData = std::make_shared<InferenceEngine::Data>(name, td);
     InferenceEngine::InputInfo::Ptr info(new InferenceEngine::InputInfo());
 
+
     info->setInputData(inputData);
+
+    Precision inputPrecision = info->getInputPrecision();
+    if (inputPrecision == Precision::FP16) {
+        info->setInputPrecision(Precision::FP32);
+    }
+
     network->setInputInfo(info);
 
     #ifdef NNLOG
@@ -366,6 +386,7 @@ InferenceEngine::InputInfo::Ptr IRDocument::createInput(const std::string &name,
     #endif
 
     return info;
+
 }
 
 
@@ -462,10 +483,11 @@ void IRDocument::saveToIR(std::ostream &binFile, pugi::xml_node &parent, const I
 
     for(auto blob : irLayer->blobs)
     {
+/*
         #ifdef NNLOG
         ALOGI("blob name = %s", blob.first.c_str());
         #endif
-
+*/
         auto fb = blob.second;
         saveBlobToIR(binFile, fb, layer, blob.first);
     }

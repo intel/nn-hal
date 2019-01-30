@@ -19,7 +19,7 @@
 #include <hidl/HidlTransportSupport.h>
 #include <hidl/LegacySupport.h>
 
-#include "VpuDriver.h"
+#include "Driver.h"
 
 
 using android::hardware::configureRpcThreadpool;

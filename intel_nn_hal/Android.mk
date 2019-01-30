@@ -10,8 +10,8 @@ LOCAL_MODULE_OWNER := intel
 LOCAL_MULTILIB := 64
 
 LOCAL_SRC_FILES := \
-	VpuDriver.cpp \
-	VpuPreparedModel.cpp \
+	Driver.cpp \
+	PreparedModel.cpp \
 	Executor.cpp
 
 
@@ -53,10 +53,13 @@ LOCAL_CFLAGS += \
 	-fexceptions
 
 LOCAL_CFLAGS += \
-	-DNNLOG \
-	-DAKS \
-	-DIMPLEMENT_INFERENCE_ENGINE_API 
-#	-DAT_RUNTIME
+	-DIMPLEMENT_INFERENCE_ENGINE_API \
+	-D__ANDROID__
+
+LOCAL_CFLAGS +=  -DNN_DEBUG
+#LOCAL_CFLAGS +=  -DAT_RUNTIME
+#LOCAL_CFLAGS +=  -DNNLOG
+
 
 LOCAL_SHARED_LIBRARIES := \
 	libhidlbase \

@@ -26,7 +26,6 @@
 #include <fstream>
 
 #include "IENetwork.h"
-#include "Executor.h"
 
 using ::android::hidl::memory::V1_0::IMemory;
 using namespace IRBuilder;
@@ -118,6 +117,7 @@ public:
           :mTargetDevice(device), mModel(model), mNet("nnNet") {
         if (mTargetDevice == TargetDevice::eCPU)
            IRBuilder::g_layer_precision = InferenceEngine::Precision::FP32;
+           //using type = typename InferenceEngine::PrecisionTrait<IRBuilder::g_layer_precision>::value_type;
         else if (mTargetDevice == TargetDevice::eMYRIAD)
            IRBuilder::g_layer_precision = InferenceEngine::Precision::FP16;
         else
@@ -136,7 +136,6 @@ protected:
     void deinitialize();
     bool initializeRunTimeOperandInfo();
     void asyncExecute(const Request& request, const sp<IExecutionCallback>& callback);
-    void convertModel(IRDocument &mNet);
 
     bool operationAdd(const Operation& operation);
     bool operationAveragePool2D(const Operation& operation);
@@ -174,6 +173,7 @@ protected:
     std::vector<T> GetConstVecOperand(const Model &model, uint32_t index);
     virtual Blob::Ptr GetConstOperandAsTensor(uint32_t index);
     virtual Blob::Ptr GetInOutOperandAsBlob(RunTimeOperandInfo& op, const uint8_t *buf, uint32_t& len);
+    virtual Blob::Ptr GetConstWeightsOperandAsTensor(uint32_t index);
     void SetOperandMemory(const Model &model, uint32_t index, uint32_t &len_out, const uint8_t *buf);
     void SetOperandFromTensor(uint8_t* buf, uint32_t &length, Blob::Ptr infOutput);
     bool isConst(int index);
@@ -186,9 +186,6 @@ protected:
     IRDocument mNet;
     std::vector<OutputPort> mPorts;  //typedef std::shared_ptr<Data> DataPtr;
     ExecuteNetwork* enginePtr;
-    #ifdef AT_RUNTIME
-    std::vector<executor::RunTimePoolInfo> mPoolInfosExe;
-    #endif
 
 };
 
@@ -200,6 +197,7 @@ public:
 
     virtual Blob::Ptr GetConstOperandAsTensor(uint32_t index) override;
     virtual Blob::Ptr GetInOutOperandAsBlob(RunTimeOperandInfo& op, const uint8_t *buf, uint32_t& len) override;
+    virtual Blob::Ptr GetConstWeightsOperandAsTensor(uint32_t index) override;
 };
 
 class CpuPreparedModel : public PreparedModel {
@@ -210,6 +208,7 @@ public:
 
     virtual Blob::Ptr GetConstOperandAsTensor(uint32_t index) override;
     virtual Blob::Ptr GetInOutOperandAsBlob(RunTimeOperandInfo& op, const uint8_t *buf, uint32_t& len) override;
+    virtual Blob::Ptr GetConstWeightsOperandAsTensor(uint32_t index) override;
 };
 
 }  // namespace driver

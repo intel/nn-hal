@@ -21,6 +21,7 @@
 #include <android/hardware/neuralnetworks/1.0/IPreparedModel.h>
 #include <hardware/hardware.h>
 #include <string>
+
 namespace android {
 namespace hardware {
 namespace neuralnetworks {

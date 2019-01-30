@@ -1,7 +1,7 @@
 service neuralnetworks-hal-1-0-cpu /vendor/bin/hw/android.hardware.neuralnetworks@1.0-generic-service -D CPU
     class hal
-    user root
-    group root
+    user system
+    group system
 
 service neuralnetworks-hal-1-0-vpu /vendor/bin/hw/android.hardware.neuralnetworks@1.0-generic-service -D VPU
     class hal

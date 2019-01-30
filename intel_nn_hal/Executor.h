@@ -173,6 +173,7 @@ protected:
     template <typename T>
     std::vector<T> GetConstVecOperand(const Model *model, uint32_t index);
     virtual Blob::Ptr GetConstOperandAsTensor(uint32_t index);
+    virtual Blob::Ptr GetConstWeightsOperandAsTensor(uint32_t index);
     virtual Blob::Ptr GetInOutOperandAsBlob(RunTimeOperandInfo& op, const uint8_t *buf, uint32_t& len);
     void SetOperandMemory(const Model *model, uint32_t index, uint32_t &len_out, const uint8_t *buf);
     void SetOperandFromTensor(uint8_t* buf, uint32_t &length, Blob::Ptr infOutput);
@@ -181,7 +182,6 @@ protected:
 
     TargetDevice mTargetDevice;
     std::vector<RunTimeOperandInfo> mOperands;
-    std::vector<RunTimePoolInfo> mPoolInfos;
     IRDocument mNet;
     std::vector<OutputPort> mPorts;  //typedef std::shared_ptr<Data> DataPtr;
     ExecuteNetwork* enginePtr;
@@ -202,6 +202,7 @@ public:
 
     virtual Blob::Ptr GetConstOperandAsTensor(uint32_t index) override;
     virtual Blob::Ptr GetInOutOperandAsBlob(RunTimeOperandInfo& op, const uint8_t *buf, uint32_t& len) override;
+    virtual Blob::Ptr GetConstWeightsOperandAsTensor(uint32_t index) override;
 };
 
 class CpuExecutor : public Executor {
@@ -212,6 +213,56 @@ public:
 
     virtual Blob::Ptr GetConstOperandAsTensor(uint32_t index) override;
     virtual Blob::Ptr GetInOutOperandAsBlob(RunTimeOperandInfo& op, const uint8_t *buf, uint32_t& len) override;
+    virtual Blob::Ptr GetConstWeightsOperandAsTensor(uint32_t index) override;
+};
+
+
+
+class PreparedModel : public IPreparedModel {
+public:
+    PreparedModel(const Model& model) : mModel(model), mTargetDevice(TargetDevice::eMYRIAD) {
+        IRBuilder::g_layer_precision = InferenceEngine::Precision::FP16;
+    }
+    PreparedModel(const TargetDevice device, const Model& model)
+          :mTargetDevice(device), mModel(model) {
+        if (mTargetDevice == TargetDevice::eCPU)
+           IRBuilder::g_layer_precision = InferenceEngine::Precision::FP32;
+        else if (mTargetDevice == TargetDevice::eMYRIAD)
+           IRBuilder::g_layer_precision = InferenceEngine::Precision::FP16;
+        else
+           IRBuilder::g_layer_precision = InferenceEngine::Precision::UNSPECIFIED;
+    }
+    ~PreparedModel() override {}
+    bool initialize();
+    static bool isOperationSupported(const Operation& operation, const Model& model);
+    static bool validModel(const Model& model);
+    static bool validateRequest(const Request& request, const Model& model);
+    Return<ErrorStatus> execute(const Request& request,
+                                const sp<IExecutionCallback>& callback) override;
+
+private:
+    void asyncExecute(const Request& request, const sp<IExecutionCallback>& callback);
+
+    Model mModel;
+    std::vector<RunTimePoolInfo> mPoolInfos;
+    TargetDevice mTargetDevice;
+
+};
+
+class VpuPreparedModel : public PreparedModel {
+public:
+    VpuPreparedModel(const Model& model)
+          :PreparedModel(TargetDevice::eMYRIAD, model) {
+    }
+
+};
+
+class CpuPreparedModel : public PreparedModel {
+public:
+    CpuPreparedModel(const Model& model)
+          :PreparedModel(TargetDevice::eCPU, model) {
+    }
+
 };
 
 }

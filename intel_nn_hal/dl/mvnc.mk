@@ -77,5 +77,18 @@ LOCAL_MODULE_CLASS := ETC
 #LOCAL_MODULE_PATH := $(PRODUCT_OUT)/vendor/firmware/mvnc
 
 include $(BUILD_PREBUILT)
+#####################################################
+$(info LOCAL_PATH =$(LOCAL_PATH))
+include $(CLEAR_VARS)
 
+LOCAL_MODULE := MvNCAPI-ma2480.mvcmd
+LOCAL_SRC_FILES := inference-engine/temp/vpu/firmware/ma2480/mvnc/MvNCAPI-ma2480.mvcmd
+LOCAL_PROPRIETARY_MODULE := true
+LOCAL_MODULE_OWNER := intel
+LOCAL_MODULE_CLASS := ETC
+
+#LOCAL_MODULE_PATH := $(PRODUCT_OUT)/vendor/firmware/mvnc
+
+include $(BUILD_PREBUILT)
+####################################################
 #include $(PATH_TO_LIBUSB_SRC)/android/jni/libusb.mk

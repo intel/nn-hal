@@ -57,8 +57,8 @@ LOCAL_CFLAGS += \
 	-D__ANDROID__ -DNNLOG -DDEBUG \
 	-DIMPLEMENT_INFERENCE_ENGINE_API
 
-LOCAL_STATIC_LIBRARIES := libomp
-LOCAL_SHARED_LIBRARIES := liblog libinference_engine libmkldnn
+LOCAL_STATIC_LIBRARIES := libmkldnn libomp
+LOCAL_SHARED_LIBRARIES := liblog libinference_engine
 
 LOCAL_SRC_FILES += \
 	inference-engine/src/mkldnn_plugin/mkldnn/os/lin/lin_omp_manager.cpp

@@ -16,9 +16,12 @@
 
 #define LOG_TAG "Driver"
 
-#include "VpuDriver.h"
-#include "VpuPreparedModel.h"
+#include "Driver.h"
+#ifndef AT_RUNTIME
+#include "PreparedModel.h"
+#else
 #include "Executor.h"
+#endif
 #include <android-base/logging.h>
 #include <thread>
 
@@ -29,8 +32,10 @@ namespace neuralnetworks {
 namespace V1_0 {
 namespace driver {
 
+#ifndef AT_RUNTIME
 static sp<PreparedModel> ModelFactory(const char* name, const Model& model) {
     sp<PreparedModel> preparedModel = NULL;
+
     if (strcmp(name, "CPU") ==0)
         preparedModel = new CpuPreparedModel(model);
     else if (strcmp(name, "VPU") ==0)
@@ -38,6 +43,21 @@ static sp<PreparedModel> ModelFactory(const char* name, const Model& model) {
 
     return preparedModel;
 }
+
+#else
+static sp<executor::PreparedModel> ModelFactory(const char* name, const Model& model) {
+
+    sp<executor::PreparedModel> preparedModel = NULL;
+
+    if (strcmp(name, "CPU") ==0)
+        preparedModel = new executor::CpuPreparedModel(model);
+    else if (strcmp(name, "VPU") ==0)
+        preparedModel = new executor::VpuPreparedModel(model);
+
+    return preparedModel;
+}
+
+#endif
 
 Return<ErrorStatus> Driver::prepareModel(const Model& model,
                                              const sp<IPreparedModelCallback>& callback)
@@ -49,14 +69,26 @@ Return<ErrorStatus> Driver::prepareModel(const Model& model,
         return ErrorStatus::INVALID_ARGUMENT;
     }
 
+#ifndef AT_RUNTIME
     if (!PreparedModel::validModel(model)) {
         ALOGI("model is not valid");
         callback->notify(ErrorStatus::INVALID_ARGUMENT, nullptr);
         return ErrorStatus::INVALID_ARGUMENT;
     }
-
+#else
+    if (!executor::PreparedModel::validModel(model)) {
+        ALOGI("model is not valid");
+        callback->notify(ErrorStatus::INVALID_ARGUMENT, nullptr);
+        return ErrorStatus::INVALID_ARGUMENT;
+    }
+#endif
     // TODO: make asynchronous later
+#ifndef AT_RUNTIME
     sp<PreparedModel> preparedModel = ModelFactory(mName.c_str(), model);
+#else
+    sp<executor::PreparedModel> preparedModel = ModelFactory(mName.c_str(), model);
+#endif
+
     if (preparedModel == NULL) {
         ALOGI("failed to create preparedmodel");
         return ErrorStatus::INVALID_ARGUMENT;
@@ -80,7 +112,10 @@ Return<DeviceStatus> Driver::getStatus() {
 Return<void> Driver::getCapabilities(getCapabilities_cb cb) {
     if (mName.compare("CPU") == 0) {
         ALOGI("Cpu driver getCapabilities()");
-        Capabilities capabilities = {.float32Performance = {.execTime = 1.1f, .powerUsage = 1.1f}};
+        Capabilities capabilities = {.float32Performance = {.execTime = 1.1f, .powerUsage = 1.1f},
+                                .quantized8Performance = {.execTime = 1.1f, .powerUsage = 1.1f}};
+
+        ALOGI("CPU MKLDNN driver Capabilities .execTime = 0.9f, .powerUsage = 0.9f");
         cb(ErrorStatus::NONE, capabilities);
     } else { /* mName.compare("VPU") == 0 */
         ALOGI("Myriad driver getCapabilities()");
@@ -111,6 +146,7 @@ Return<void> Driver::getSupportedOperations(const Model& model,
     int count = model.operations.size();
     std::vector<bool> supported(count, false);
 
+#ifndef AT_RUNTIME
     if (!PreparedModel::validModel(model)) {
         ALOGI("model is not valid");
         cb(ErrorStatus::INVALID_ARGUMENT, supported);
@@ -121,6 +157,18 @@ Return<void> Driver::getSupportedOperations(const Model& model,
         const auto& operation = model.operations[i];
         supported[i] = PreparedModel::isOperationSupported(operation, model);
     }
+#else
+    if (!executor::PreparedModel::validModel(model)) {
+        ALOGI("model is not valid");
+        cb(ErrorStatus::INVALID_ARGUMENT, supported);
+        return Void();
+    }
+
+    for (int i = 0; i < count; i++) {
+        const auto& operation = model.operations[i];
+        supported[i] = executor::PreparedModel::isOperationSupported(operation, model);
+    }
+#endif
 
     cb(ErrorStatus::NONE, supported);
     return Void();

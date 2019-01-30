@@ -10,8 +10,8 @@ LOCAL_MULTILIB := both
 LOCAL_SRC_FILES := \
 	inference-engine/samples/common/format_reader/bmp.cpp \
 	inference-engine/samples/common/format_reader/format_reader.cpp \
-	inference-engine/samples/common/format_reader/MnistUbyte.cpp
-#	inference-engine/samples/common/format_reader/opencv_wraper.cpp \
+	inference-engine/samples/common/format_reader/MnistUbyte.cpp \
+	inference-engine/samples/common/format_reader/opencv_wraper.cpp
 
 
 LOCAL_C_INCLUDES += \

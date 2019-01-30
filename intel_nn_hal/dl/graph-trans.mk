@@ -97,8 +97,8 @@ LOCAL_C_INCLUDES += \
 
 LOCAL_CFLAGS += -std=c++11 -Wall -Wno-unknown-pragmas -Wno-strict-overflow -fPIC -Wformat -Wformat-security -fstack-protector-all
 LOCAL_CFLAGS += -Wno-unused-variable -Wno-unused-parameter -Wno-non-virtual-dtor -Wno-missing-field-initializers  -fexceptions -frtti -Wno-error
-LOCAL_CFLAGS += -DENABLE_VPU -DENABLE_MYRIAD -D__ANDROID__ -DNNLOG -DNDEBUG -DIMPLEMENT_INFERENCE_ENGINE_API -D_FORTIFY_SOURCE=2 -fPIE
-LOCAL_CFLAGS += -D__ANDROID__ -DNNLOG
+LOCAL_CFLAGS += -DENABLE_VPU -DENABLE_MYRIAD -D__ANDROID__ -DNDEBUG -DIMPLEMENT_INFERENCE_ENGINE_API -D_FORTIFY_SOURCE=2 -fPIE
+#LOCAL_CFLAGS += -DNNLOG
 
 
 LOCAL_STATIC_LIBRARIES := libvpu_common
@@ -127,8 +127,8 @@ LOCAL_C_INCLUDES += \
 
 LOCAL_CFLAGS += -std=c++11 -Wall -Wno-unknown-pragmas -Wno-strict-overflow -fPIC -Wformat -Wformat-security -fstack-protector-all
 LOCAL_CFLAGS += -Wno-unused-variable -Wno-unused-parameter -Wno-non-virtual-dtor -Wno-missing-field-initializers  -frtti -fexceptions -Wno-error
-LOCAL_CFLAGS += -DENABLE_VPU -DENABLE_MYRIAD -DIMPLEMENT_INFERENCE_ENGINE_API -std=gnu++11 -D_FORTIFY_SOURCE=2 -fPIE
-LOCAL_CFLAGS += -D__ANDROID__ -DNNLOG
+LOCAL_CFLAGS += -DENABLE_VPU -DENABLE_MYRIAD -D__ANDROID__ -DIMPLEMENT_INFERENCE_ENGINE_API -std=gnu++11 -D_FORTIFY_SOURCE=2 -fPIE
+#LOCAL_CFLAGS += -DNNLOG
 
 LOCAL_SHARED_LIBRARIES := libinference_engine
 

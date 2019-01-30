@@ -96,6 +96,7 @@ static void setConfig(std::map<std::string, std::string> &config) {
     //config[VPUConfigParams::VPU_LOG_LEVEL] = CONFIG_VALUE(LOG_DEBUG);
     //config[InferenceEngine::PluginConfigParams::KEY_LOG_LEVEL] = InferenceEngine::PluginConfigParams::LOG_DEBUG /*LOG_WARNING*/;
     //config[InferenceEngine::VPUConfigParams::IGNORE_UNKNOWN_LAYERS] = InferenceEngine::PluginConfigParams::NO;
+    //config[VPU_CONFIG_KEY(COMPUTE_LAYOUT)] = VPU_CONFIG_VALUE(NHWC);
 }
 
 class ExecuteNetwork
@@ -146,7 +147,7 @@ public:
         InferencePlugin plugin(enginePtr);
         executable_network = plugin.LoadNetwork(*network, networkConfig);
         //std::cout << "Network loaded" << std::endl;
-	ALOGI("Network loaded");
+	 ALOGI("Network loaded");
 
         inferRequest = executable_network.CreateInferRequest();
         //std::cout << "infer request created" << std::endl;
@@ -159,7 +160,19 @@ public:
 	  #endif
       Precision inputPrecision = Precision::FP32;
       inputInfo.begin()->second->setPrecision(inputPrecision);
+      //inputInfo.begin()->second->setPrecision(Precision::U8);
+
+      auto inputDims = inputInfo.begin()->second->getTensorDesc().getDims();
+      if (inputDims.size() == 4)
+      inputInfo.begin()->second->setLayout(Layout::NCHW);
+      else if (inputDims.size() == 2)
       inputInfo.begin()->second->setLayout(Layout::NC);
+      else
+      inputInfo.begin()->second->setLayout(Layout::C);
+
+
+      //inputInfo.begin()->second->setPrecision(Precision::U8);
+      //inputInfo.begin()->second->setLayout(Layout::NCHW);
 
     }
 
@@ -168,16 +181,21 @@ public:
 	  #ifdef NNLOG
       ALOGI("Prepare output blob");
 	  #endif
-      Precision inputPrecision = Precision::FP32;
-      outputInfo.begin()->second->setPrecision(inputPrecision);
-      //outputInfo.begin()->second->setLayout(Layout::NC);
+      Precision outputPrecision = Precision::FP32;
+      outputInfo.begin()->second->setPrecision(outputPrecision);
+
+      auto outputDims = outputInfo.begin()->second->getDims();
+      if (outputDims.size() == 4)
+      outputInfo.begin()->second->setLayout(Layout::NHWC);
+      else if (outputDims.size() == 2)
+      outputInfo.begin()->second->setLayout(Layout::NC);
+      else
+      outputInfo.begin()->second->setLayout(Layout::C);
 
       #ifdef NNLOG
-      auto dims = inputInfo.begin()->second->getDims();
-      ALOGI("inputInfo dims size = %d\n", dims.size());
-      //outputInfo.begin()->second->setDims(dims);
-      auto outputDims = outputInfo.begin()->second->getDims();
-      ALOGI("outputInfo dims size = %d\n", outputDims.size());
+      //auto dims = inputInfo.begin()->second->getDims();
+      //ALOGI("inputInfo dims size = %d\n", dims.size());
+      //ALOGI("outputInfo dims size = %d\n", outputDims.size());
       #endif
     }
 

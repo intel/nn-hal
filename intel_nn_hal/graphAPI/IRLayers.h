@@ -73,6 +73,7 @@ inline OutputPort addOutput(const IRLayer &layer, const InferenceEngine::SizeVec
         std::cout << "addOutput dims size "<< dims.size()<<std::endl;
         //InferenceEngine::TensorDesc td(g_layer_precision, dims, InferenceEngine::Layout::ANY);
         InferenceEngine::TensorDesc td(g_layer_precision, dims, InferenceEngine::Layout::NCHW);
+        //InferenceEngine::TensorDesc td(g_layer_precision, dims, InferenceEngine::Layout::NHWC);
         data = std::make_shared<InferenceEngine::Data>(d_name, td);
 
     }
@@ -168,6 +169,9 @@ namespace FCLayer
 {
 static IRLayer create(const IRBlob::Ptr &weights, const OutputPort &src)
 {
+    #ifdef NNLOG
+    ALOGI("Create FC layer");
+    #endif
     std::string name = "FC-"; // todo: make it unique
     name = name << layer_name_count++;
     InferenceEngine::LayerParams prm;
@@ -185,7 +189,7 @@ static IRLayer create(const IRBlob::Ptr &weights, const OutputPort &src)
     IR_ASSERT(inDims.size() == 2);
 
     unsigned int ofm = 0;
-    if (wDim.size()==2)
+    if (wDim.size() == 2)
     {
         //std::cout << "inDims[1]"<<inDims[1]<< "wDim[1]" <<wDim[1]<< std::endl;
 
@@ -347,12 +351,12 @@ struct ConvolutionParams
     int groups=1;
     Point2D kernel, stride = {1}, pad_start = {0}, pad_end = {0};
     int num_output_planes;
-    int pad_type;
     IRBlob::Ptr weights;
     IRBlob::Ptr biases;
+    std::string padType;
 };
 
-inline size_t n(const OutputPort &src)
+inline size_t in_ch(const OutputPort &src)
 {
     auto dims = src->getTensorDesc().getDims();
     return dims.size() == 4 ? dims[1] : dims[2];
@@ -363,7 +367,7 @@ inline OutputPort Convolution(const OutputPort &src, const ConvolutionParams &pr
     auto inDims = src->getTensorDesc().getDims();
     IR_ASSERT(inDims.size() == 4);
     //IR_ASSERT(prms.kernel.size() * n(src) * prms.num_output_planes == prms.weights->size());
-	  IR_ASSERT((prms.kernel.size() * n(src) * prms.num_output_planes)/prms.groups == prms.weights->size());
+	  IR_ASSERT((prms.kernel.size() * in_ch(src) * prms.num_output_planes)/prms.groups == prms.weights->size());
 
     ret->_weights = prms.weights;
     ret->blobs["weights"] = prms.weights;
@@ -384,16 +388,6 @@ inline OutputPort Convolution(const OutputPort &src, const ConvolutionParams &pr
     ret->_pads_end.insert(InferenceEngine::X_AXIS, prms.pad_end.x);
     ret->_pads_end.insert(InferenceEngine::Y_AXIS, prms.pad_end.y);
 
-/*
-// test with fix pad = 0
-    ret->_padding.clear();
-    ret->_padding.insert(InferenceEngine::X_AXIS, 0);
-    ret->_padding.insert(InferenceEngine::Y_AXIS, 0);
-    ret->_pads_end.clear();
-    ret->_pads_end.insert(InferenceEngine::X_AXIS, 0);
-    ret->_pads_end.insert(InferenceEngine::Y_AXIS, 0);
-//end
-*/
     ret->_dilation.clear();
     ret->_dilation.insert(InferenceEngine::X_AXIS, 1);
     ret->_dilation.insert(InferenceEngine::Y_AXIS, 1);
@@ -403,6 +397,7 @@ inline OutputPort Convolution(const OutputPort &src, const ConvolutionParams &pr
 
     //<data dilation-x="1" dilation-y="1" group="1" kernel-x="3" kernel-y="3" output="8" pad-x="0" pad-y="0" stride="1,1,2,2" stride-x="2" stride-y="2"/>
 
+    ret->params["auto_pad"] = prms.padType;
     ret->params["dilation-x"] = std::to_string(ret->_dilation.at(InferenceEngine::X_AXIS));
     ret->params["dilation-y"] = std::to_string(ret->_dilation.at(InferenceEngine::Y_AXIS));
     ret->params["group"] = std::to_string(ret->_group);
@@ -410,8 +405,10 @@ inline OutputPort Convolution(const OutputPort &src, const ConvolutionParams &pr
     ret->params["kernel-x"] = std::to_string(ret->_kernel.at(InferenceEngine::X_AXIS));
     ret->params["kernel-y"] = std::to_string(ret->_kernel.at(InferenceEngine::Y_AXIS));
     ret->params["output"] = std::to_string(ret->_out_depth);
-    ret->params["pad-x"] = std::to_string(ret->_padding.at(InferenceEngine::X_AXIS));
-    ret->params["pad-y"] = std::to_string(ret->_padding.at(InferenceEngine::Y_AXIS));
+    ret->params["pad-begin-x"] = std::to_string(ret->_padding.at(InferenceEngine::X_AXIS));
+    ret->params["pad-begin-y"] = std::to_string(ret->_padding.at(InferenceEngine::Y_AXIS));
+    ret->params["pad-end-x"] = std::to_string(ret->_pads_end.at(InferenceEngine::X_AXIS));
+    ret->params["pad-end-y"] = std::to_string(ret->_pads_end.at(InferenceEngine::Y_AXIS));
     ret->params["stride-x"] = std::to_string(ret->_stride.at(InferenceEngine::X_AXIS));
     ret->params["stride-y"] = std::to_string(ret->_stride.at(InferenceEngine::Y_AXIS));
 
@@ -425,30 +422,53 @@ inline OutputPort Convolution(const OutputPort &src, const ConvolutionParams &pr
         ret->_pads_end.at(InferenceEngine::X_AXIS), ret->_pads_end.at(InferenceEngine::Y_AXIS));
     #endif
 
-    Point2D in_size = {static_cast<int>(inDims[3]), static_cast<int>(inDims[2])};
-    // todo: handle uneven padding
-    //Point2D out_size = (in_size + prms.pad_start + prms.pad_end - prms.kernel + prms.stride) / prms.stride + 1;
-    Point2D out_size = (in_size - prms.kernel + prms.stride + prms.pad_start + prms.pad_end ) / prms.stride;
+    if (prms.padType == "explicit") {
+          Point2D in_size = {static_cast<int>(inDims[3]), static_cast<int>(inDims[2])};
+          //Point2D out_size = (in_size + prms.pad_start + prms.pad_end - prms.kernel + prms.stride) / prms.stride + 1;
+          Point2D out_size = (in_size - prms.kernel + prms.stride + prms.pad_start + prms.pad_end ) / prms.stride;
 
-    addOutput(ret, {inDims[0], (size_t) prms.num_output_planes, (size_t) out_size.y, (size_t) out_size.x});
-
-/*  // handle uneven padding
-    //Output DIMENSIONS calculation
-    size_t out_w, out_h;
-    if(prms.pad_type == 2){ //padding kPaddingValid
-      //Point2D out_size = (in_size - prms.kernel + 1) /prms.stride;
-      out_w = std::ceil((double)(in_size.x - prms.kernel.x + prms.stride.x + prms.pad_start.x + prms.pad_end.x + 1) /(double)prms.stride.x);
-      out_h = std::ceil((double)(in_size.y - prms.kernel.y + prms.stride.y + prms.pad_start.y + prms.pad_end.y + 1) /(double)prms.stride.y);
-      addOutput(ret, {inDims[0], (size_t) prms.num_output_planes, out_h, out_w});
+          addOutput(ret, {inDims[0], (size_t) prms.num_output_planes, (size_t) out_size.y, (size_t) out_size.x}); //nchw
+          //addOutput(ret, {inDims[0], (size_t) out_size.y, (size_t) out_size.x, (size_t) prms.num_output_planes}); //nhwc
     }
-    else if(prms.pad_type == 1){ //padding kPaddingSame
-      //Point2D out_size = (in_size / prms.stride);
-      out_w = std::ceil((double)(in_size.x - prms.kernel.x + prms.stride.x + prms.pad_start.x + prms.pad_end.x) /(double)prms.stride.x);
-      out_h = std::ceil((double)(in_size.y - prms.kernel.y + prms.stride.y + prms.pad_start.y + prms.pad_end.y) /(double)prms.stride.y);
-      addOutput(ret, {inDims[0], (size_t) prms.num_output_planes, out_h, out_w});
+    else {
 
-  }
-*/
+          //Calculate output height and width for uneven padding
+          size_t inputN = inDims[0];
+          size_t IH = inDims[2];
+          size_t IW = inDims[3];
+          size_t KH = 0, KW = 0;
+          float OH_temp, OW_temp;
+
+          if (ret->_dilation[InferenceEngine::Y_AXIS])
+              KH = (ret->_kernel[InferenceEngine::Y_AXIS] - 1) * ret->_dilation[InferenceEngine::Y_AXIS] + 1;
+          else
+              KH = ret->_kernel[InferenceEngine::Y_AXIS];
+          if (ret->_dilation[InferenceEngine::X_AXIS])
+              KW = (ret->_kernel[InferenceEngine::X_AXIS] - 1) * ret->_dilation[InferenceEngine::X_AXIS] + 1;
+          else
+              KW = ret->_kernel[InferenceEngine::X_AXIS];
+
+          size_t SH = ret->_stride[InferenceEngine::Y_AXIS];
+          size_t SW = ret->_stride[InferenceEngine::X_AXIS];
+          size_t PH = ret->_padding[InferenceEngine::Y_AXIS];
+          size_t PW = ret->_padding[InferenceEngine::X_AXIS];
+          size_t OC = ret->_out_depth;
+
+          if (prms.padType == "valid") {
+              OH_temp = std::ceil((IH - KH + 1.f) / SH);
+              OW_temp = std::ceil((IW - KW + 1.f) / SW);
+          } else if (prms.padType == "same_upper") {
+              OH_temp = std::ceil(1.f * IH / SH);
+              OW_temp = std::ceil(1.f * IW / SW);
+          } else if (prms.padType == "same_lower") {
+              OH_temp = std::floor(1.f * IH / SH);
+              OW_temp = std::floor(1.f * IW / SW);
+          }
+
+          size_t OH = static_cast<size_t>(OH_temp);
+          size_t OW = static_cast<size_t>(OW_temp);
+          addOutput(ret, {inputN, OC, OH, OW});
+    }
 
     return output(ret);
 }
@@ -560,7 +580,8 @@ inline OutputPort Pooling(const OutputPort &inp,
     // todo: handle uneven padding
     Point2D out_size = (in_size + pad + pad - kernel + stride) / stride;
     src >> ret;
-    return addOutput(ret, {inDims[0], inDims[1], (size_t) out_size.y, (size_t) out_size.x});
+    addOutput(ret, {inDims[0], inDims[1], (size_t) out_size.y, (size_t) out_size.x});
+    return output(ret);
 }
 
 inline OutputPort Pooling(const OutputPort &inp,
@@ -568,8 +589,9 @@ inline OutputPort Pooling(const OutputPort &inp,
                             const Point2D &stride,
                             const Point2D &pad_start,
                             const Point2D &pad_end,
+                            std::string padType,
                             InferenceEngine::PoolingLayer::PoolType type)
-  {
+{
       auto src = inp;
       std::string name = "Pooling-"; // todo: make it unique
       name = name << layer_name_count++;
@@ -591,7 +613,6 @@ inline OutputPort Pooling(const OutputPort &inp,
       ret->_pads_end.clear();
       ret->_pads_end.insert(InferenceEngine::X_AXIS, pad_end.x);
       ret->_pads_end.insert(InferenceEngine::Y_AXIS, pad_end.y);
-
       ret->_type = type;
       ret->_exclude_pad = true;
 
@@ -600,26 +621,61 @@ inline OutputPort Pooling(const OutputPort &inp,
 //        pad_end.x= %d pad_end.y= %d ", kernel.x, kernel.y, stride.x, stride.y, pad_start.x, pad_start.y, pad_end.x, pad_end.y);
       #endif
       //<data exclude-pad="true" kernel-x="4" kernel-y="4" pad-x="0" pad-y="0" pool-method="avg" stride="1,1,2,2" stride-x="2" stride-y="2"/>
+      ret->params["auto_pad"] = padType;
       ret->params["_exclude_pad"] = std::to_string(ret->_exclude_pad);
       ret->params["kernel-x"] = std::to_string(ret->_kernel.at(InferenceEngine::X_AXIS));
       ret->params["kernel-y"] = std::to_string(ret->_kernel.at(InferenceEngine::Y_AXIS));
-      ret->params["pad-x"] = std::to_string(ret->_padding.at(InferenceEngine::X_AXIS));
-      ret->params["pad-y"] = std::to_string(ret->_padding.at(InferenceEngine::Y_AXIS));
-
+      ret->params["pad-begin-x"] = std::to_string(ret->_padding.at(InferenceEngine::X_AXIS));
+      ret->params["pad-begin-y"] = std::to_string(ret->_padding.at(InferenceEngine::Y_AXIS));
+      ret->params["pad-end-x"] = std::to_string(ret->_pads_end.at(InferenceEngine::X_AXIS));
+      ret->params["pad-end-y"] = std::to_string(ret->_pads_end.at(InferenceEngine::Y_AXIS));
       std::string poolingType = ret->_type == InferenceEngine::PoolingLayer::PoolType::AVG ? "avg" : "max";
       ret->params["pool-method"] = poolingType; //std::to_string(poolingType);
       ret->params["stride-x"] = std::to_string(ret->_stride.at(InferenceEngine::X_AXIS));
       ret->params["stride-y"] = std::to_string(ret->_stride.at(InferenceEngine::Y_AXIS));
 
-      auto inDims = src->getTensorDesc().getDims();
-
-      Point2D in_size = {static_cast<int>(inDims[3]), static_cast<int>(inDims[2])};
-      // todo: handle uneven padding
-      Point2D out_size = (in_size - kernel + pad_start + pad_end + stride) / stride; // add stride-1 to round ceiling
       src >> ret;
 
-      return addOutput(ret, {inDims[0], inDims[1], (size_t) out_size.y, (size_t) out_size.x});
-  }
+      auto inDims = src->getTensorDesc().getDims();
+
+      if (padType == "explicit") {
+          Point2D in_size = {static_cast<int>(inDims[3]), static_cast<int>(inDims[2])};
+          // todo: handle uneven padding
+          Point2D out_size = (in_size - kernel + pad_start + pad_end + stride) / stride; // add stride-1 to round ceiling
+
+          addOutput(ret, {inDims[0], inDims[1], (size_t) out_size.y, (size_t) out_size.x});
+      } else {
+      //Calculate output height and width for uneven padding
+          float OHTemp = 1.f, OWTemp = 1.f;
+          size_t inputN = inDims[0];
+          size_t IC = inDims[1];
+          size_t IH = inDims[2];
+          size_t IW = inDims[3];
+          size_t KH = ret->_kernel[InferenceEngine::Y_AXIS];
+          size_t KW = ret->_kernel[InferenceEngine::X_AXIS];
+          size_t SH = ret->_stride[InferenceEngine::Y_AXIS];
+          size_t SW = ret->_stride[InferenceEngine::X_AXIS];
+          size_t PH = ret->_padding[InferenceEngine::Y_AXIS];
+          size_t PW = ret->_padding[InferenceEngine::X_AXIS];
+
+          if (padType == "valid") {
+              OHTemp = std::ceil((IH - KH + 1.f) / SH);
+              OWTemp = std::ceil((IW - KW + 1.f) / SW);
+          } else if (padType == "same_upper") {
+              OHTemp = std::ceil(1.f * IH / SH);
+              OWTemp = std::ceil(1.f * IW / SW);
+          } else if (padType == "same_lower") {
+              OHTemp = std::floor(1.f * IH / SH);
+              OWTemp = std::floor(1.f * IW / SW);
+          }
+
+          size_t OH = static_cast<size_t>(OHTemp);
+          size_t OW = static_cast<size_t>(OWTemp);
+          addOutput(ret, {inputN, IC, OH, OW});
+      }
+
+      return output(ret);
+}
 
 
 namespace SumLayer
@@ -928,8 +984,32 @@ inline OutputPort Reshape(const TensorDims &newDims, const OutputPort &src)
     layer->type = "Reshape";
     src >> layer;
     //addOutput(layer, src->getTensorDesc().getDims());
-    addOutput(layer, newDims);
-    auto op = output(layer);
+
+   /*
+   brief A vector of sizes of the shape
+   std::vector<int> shape;
+   */
+
+    layer->params["axis"] = std::to_string(layer->axis);
+    layer->params["num_axes"] = std::to_string(layer->num_axes);
+
+/*  //check if mandatory to provide shape
+    for (int i = 0; i < newDims.size(); i++)
+    layer->shape[i] = static_cast<int>(newDims[i]);
+    // VectorToStringI(layer->shape)
+    std::string result;
+    const char sep = ',';
+    for (auto it : layer->shape) {
+        result += std::to_string(it) + sep;
+    }
+    if (!result.empty()) {
+        result = result.substr(0, result.size() - 2);
+    }
+
+   layer->params["dim"] = result;
+*/
+   addOutput(layer, newDims);
+   auto op = output(layer);
     //op->setDims(newDims);
 
 /*
