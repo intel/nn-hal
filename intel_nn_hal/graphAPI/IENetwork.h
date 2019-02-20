@@ -27,7 +27,7 @@
 #include <ie_plugin_dispatcher.hpp>
 #include <ie_plugin_ptr.hpp>
 #include <inference_engine.hpp>
-#include "vpu_plugin_config.hpp"
+
 #include "ie_iinfer_request.hpp"
 #include "ie_infer_request.hpp"
 #include "ie_plugin_cpp.hpp"
@@ -38,6 +38,9 @@
 #include <android/log.h>
 #include <log/log.h>
 
+#ifdef ENABLE_MYRIAD
+#include "vpu_plugin_config.hpp"
+#endif
 using namespace InferenceEngine::details;
 using namespace IRBuilder;
 using namespace InferenceEngine;
