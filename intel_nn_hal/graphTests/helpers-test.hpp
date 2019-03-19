@@ -5,7 +5,9 @@
 #include "ie_plugin_dispatcher.hpp"
 #include "inference_engine.hpp"
 #include "debug.h"
+#ifdef ENABLE_MYRIAD
 #include "vpu_plugin_config.hpp"
+#endif
 
 #include <android/log.h>
 #include <log/log.h>

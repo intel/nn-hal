@@ -12,11 +12,9 @@ LOCAL_SRC_FILES := \
   IRLayer.cpp
 
 LOCAL_C_INCLUDES += \
-	$(LOCAL_PATH) \
-	$(LOCAL_PATH)/include \
-	$(LOCAL_PATH)/../dl/inference-engine/include \
-	$(LOCAL_PATH)/../dl/inference-engine/src/inference_engine \
-	$(LOCAL_PATH)/../dl/inference-engine/thirdparty/pugixml/src
+	$(LOCAL_PATH)/../../../dldt/inference-engine/include \
+	$(LOCAL_PATH)/../../../dldt/inference-engine/src/inference_engine \
+	$(LOCAL_PATH)/../../../dldt/inference-engine/thirdparty/pugixml/src
 
 LOCAL_CFLAGS += \
 	-std=c++11 \

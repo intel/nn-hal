@@ -1,3 +1,4 @@
+/*
 cc_library_headers {
     name: "libmkldnn_headers",
     host_supported: false,
@@ -59,4 +60,4 @@ cc_library {
         "libmkldnn_headers",
     ],
 }
-
+*/
