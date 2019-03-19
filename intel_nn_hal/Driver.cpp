@@ -112,8 +112,8 @@ Return<DeviceStatus> Driver::getStatus() {
 Return<void> Driver::getCapabilities(getCapabilities_cb cb) {
     if (mName.compare("CPU") == 0) {
         ALOGI("Cpu driver getCapabilities()");
-        Capabilities capabilities = {.float32Performance = {.execTime = 1.1f, .powerUsage = 1.1f},
-                                .quantized8Performance = {.execTime = 1.1f, .powerUsage = 1.1f}};
+        Capabilities capabilities = {.float32Performance = {.execTime = 0.9f, .powerUsage = 0.9f},
+                                .quantized8Performance = {.execTime = 0.9f, .powerUsage = 0.9f}};
 
         ALOGI("CPU MKLDNN driver Capabilities .execTime = 0.9f, .powerUsage = 0.9f");
         cb(ErrorStatus::NONE, capabilities);
@@ -121,8 +121,8 @@ Return<void> Driver::getCapabilities(getCapabilities_cb cb) {
         ALOGI("Myriad driver getCapabilities()");
         //OMR1 V1_0
 
-        Capabilities capabilities = {.float32Performance = {.execTime = 0.9f, .powerUsage = 0.9f},
-                                 .quantized8Performance = {.execTime = 0.9f, .powerUsage = 0.9f}};
+        Capabilities capabilities = {.float32Performance = {.execTime = 1.1f, .powerUsage = 1.1f},
+                                 .quantized8Performance = {.execTime = 1.1f, .powerUsage = 1.1f}};
 
         //Capabilities capabilities = {.float32Performance = {.execTime = 0.9f, .powerUsage = 0.9f}};
         ALOGI("Myriad driver Capabilities .execTime = 0.9f, .powerUsage = 0.9f");
