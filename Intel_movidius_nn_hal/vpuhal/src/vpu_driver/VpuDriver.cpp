@@ -90,6 +90,13 @@ Return<void> VpuDriver::getSupportedOperations(const Model& model,
 Return<ErrorStatus> VpuDriver::prepareModel(const Model& model,
                                                const sp<IPreparedModelCallback>& callback) {
 
+    int devStatus;
+    devStatus = ncs_init();
+    if (devStatus){
+        ALOGE("Error - VpuDriver returning since NN device is disconnected/offline.");
+        return ErrorStatus::DEVICE_UNAVAILABLE;
+    }
+
     if (VLOG_IS_ON(DRIVER)) {
       VLOG(DRIVER) << "VpuDriver::prepareModel begin";
       logModelToInfo(model);
