@@ -29,9 +29,9 @@ To integrate [Intel® MKL-DNN](https://github.com/intel/mkl-dnn) into Intel® MK
 
 
 * Download and extract the [Intel® MKL-DNN](https://github.com/intel/mkl-dnn) -v0.14 as mentioned on the [Intel® MKL-DNN](https://github.com/intel/mkl-dnn)
-* Copy the extracted ncsdk to the specified location as shown below
+* Copy the extracted mkl-dnn to the specified location as shown below
 ```
-cp <DIR>/mkl-dnn <DIR>/Intel_movidius_nn_hal/libmkldnn/mkl-dnn -rf
+cp <DIR>/mkl-dnn <DIR>/Intel_mkldnn_nn_hal/libmkldnn/mkl-dnn -rf
 ```
 * Make sure the **mkl-dnn** directory is located under **Intel_mkldnn_nn_hal/libmkldnn**
 
