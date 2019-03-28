@@ -9,7 +9,6 @@ LOCAL_MULTILIB := 64
 
 LOCAL_SRC_FILES := \
 inference-engine/src/inference_engine/precision_utils.cpp \
-inference-engine/src/inference_engine/ie_blob.cpp \
 inference-engine/src/inference_engine/ie_blob_common.cpp \
 inference-engine/src/inference_engine/ie_utils.cpp \
 inference-engine/src/inference_engine/ade_util.cpp \
