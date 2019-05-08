@@ -44,12 +44,14 @@
 #include <android/log.h>
 #include <log/log.h>
 #endif
-
-namespace IRBuilder
-{
+namespace android {
+namespace hardware {
+namespace neuralnetworks {
+namespace nnhal {
 
 extern int layer_name_count;
 extern InferenceEngine::Precision g_layer_precision;
+inline size_t sizeOf(const TensorDims &dims) ;
 
 inline OutputPort addOutput(const IRLayer &layer, const InferenceEngine::SizeVector &dims)
 {
@@ -1111,4 +1113,8 @@ inline OutputPort AddConst(IRDocument &doc, const OutputPort &src, const IRBlob:
     return src + constOut;
 }
 
-}  // namespace IRBuilder
+
+}  // namespace nnhal
+}  // namespace neuralnetworks
+}  // namespace hardware
+}  // namespace android

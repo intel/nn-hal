@@ -12,7 +12,7 @@
 #include <android/log.h>
 #include <log/log.h>
 
-using namespace IRBuilder;
+using namespace ::android::hardware::neuralnetworks::nnhal;
 using namespace InferenceEngine;
 
 template <class T> using  vec = std::vector<T>;

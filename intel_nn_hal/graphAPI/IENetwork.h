@@ -42,9 +42,12 @@
 #include "vpu_plugin_config.hpp"
 #endif
 using namespace InferenceEngine::details;
-using namespace IRBuilder;
+//using namespace IRBuilder;
 using namespace InferenceEngine;
-
+namespace android {
+namespace hardware {
+namespace neuralnetworks {
+namespace nnhal {
 template <typename T>
 inline std::ostream & operator << (std::ostream &out, const std::vector<T> &vec) {
     if (vec.empty()) return std::operator<<(out, "[]");
@@ -140,7 +143,10 @@ public:
 
     }
 
-    //~ExecuteNetwork(){ }
+    ~ExecuteNetwork(){
+		ALOGE("execute network destructor called");
+		return; 
+	};
     void loadNetwork()
     {
 
@@ -267,3 +273,7 @@ public:
         return;
     }
 };
+}  // namespace nnhal
+}  // namespace neuralnetworks
+}  // namespace hardware
+}  // namespace android

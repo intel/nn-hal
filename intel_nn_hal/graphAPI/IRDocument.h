@@ -36,15 +36,16 @@
 #include "ie_common.h"
 
 
+
+namespace android {
+namespace hardware {
+namespace neuralnetworks {
+namespace nnhal {
 class InternalNetworkImpl;
-
-namespace IRBuilder
-{
-
 class IRDocument
 {
 private:
-    struct Edge
+    struct Edge 
     {
         struct port
         {
@@ -104,4 +105,8 @@ public:
     InferenceEngine::ICNNNetwork *getNetwork();
 };
 
-}  // namespace IRBuilder
+
+}  // namespace nnhal
+}  // namespace neuralnetworks
+}  // namespace hardware
+}  // namespace android
