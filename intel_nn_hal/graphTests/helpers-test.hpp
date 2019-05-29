@@ -248,6 +248,7 @@ class ExecuteNetwork
 public:
     ExecuteNetwork(){}
     ExecuteNetwork(IRDocument &doc, TargetDevice target = TargetDevice::eCPU)
+        : network(nullptr)
     {
         InferenceEngine::PluginDispatcher dispatcher({"/vendor/lib64","/vendor/lib","/system/lib64","/system/lib","","./"});
         enginePtr = dispatcher.getSuitablePlugin(target);
