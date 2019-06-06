@@ -108,15 +108,15 @@ class ExecuteNetwork
     ICNNNetwork *network;
     //IExecutableNetwork::Ptr pExeNet;
     ExecutableNetwork executable_network;
-    InputsDataMap inputInfo;
-    OutputsDataMap outputInfo;
+    InputsDataMap inputInfo = {};
+    OutputsDataMap outputInfo = {};
     IInferRequest::Ptr req;
     InferRequest inferRequest;
     ResponseDesc resp;
 
 public:
-    ExecuteNetwork(){}
-    ExecuteNetwork(IRDocument &doc, TargetDevice target = TargetDevice::eCPU)
+    ExecuteNetwork() : network(nullptr){}
+    ExecuteNetwork(IRDocument &doc, TargetDevice target = TargetDevice::eCPU) : network(nullptr)
     {
         InferenceEngine::PluginDispatcher dispatcher({"/vendor/lib64","/vendor/lib","/system/lib64","/system/lib","","./"});
         enginePtr = dispatcher.getSuitablePlugin(target);

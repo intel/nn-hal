@@ -239,8 +239,8 @@ class ExecuteNetwork
     ICNNNetwork *network;
     //IExecutableNetwork::Ptr pExeNet;
     ExecutableNetwork executable_network;
-    InputsDataMap inputInfo;
-    OutputsDataMap outputInfo;
+    InputsDataMap inputInfo = {};
+    OutputsDataMap outputInfo = {};
     IInferRequest::Ptr req;
     InferRequest inferRequest;
     ResponseDesc resp;
