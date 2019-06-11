@@ -32,7 +32,6 @@
 
 #include "IRLayers.h"
 
-
 using namespace IRBuilder;
 
 int IRBuilder::layer_name_count = 0;
@@ -45,8 +44,8 @@ const std::string ActivationLayer::Tanh("tanh");
 
 const std::string ActivationLayer::ReLU("ReLU");
 
-void IRBuilder::operator>>(const InferenceEngine::DataPtr &lhs, const InferenceEngine::CNNLayerPtr &rhs)
-{
+void IRBuilder::operator>>(const InferenceEngine::DataPtr &lhs,
+                           const InferenceEngine::CNNLayerPtr &rhs) {
     lhs->inputTo[rhs->name] = rhs;
     rhs->insData.push_back(lhs);
 }

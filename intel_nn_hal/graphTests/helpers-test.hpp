@@ -2,9 +2,9 @@
 
 #include "IRDocument.h"
 #include "IRLayers.h"
+#include "debug.h"
 #include "ie_plugin_dispatcher.hpp"
 #include "inference_engine.hpp"
-#include "debug.h"
 #ifdef ENABLE_MYRIAD
 #include "vpu_plugin_config.hpp"
 #endif
@@ -15,13 +15,14 @@
 using namespace IRBuilder;
 using namespace InferenceEngine;
 
-template <class T> using  vec = std::vector<T>;
+template <class T>
+using vec = std::vector<T>;
 
 template <typename T>
-inline std::ostream & operator << (std::ostream &out, const std::vector<T> &vec) {
+inline std::ostream &operator<<(std::ostream &out, const std::vector<T> &vec) {
     if (vec.empty()) return std::operator<<(out, "[]");
     out << "[" << vec[0];
-    for (unsigned i=1; i < vec.size(); i++) {
+    for (unsigned i = 1; i < vec.size(); i++) {
         out << ", " << vec[i];
     }
     return out << "]";
@@ -35,23 +36,19 @@ uint32_t getNumberOfElements(const vec<uint32_t> &dims) {
     return count;
 }
 
-TensorDims toDims(const vec<uint32_t> &dims)
-{
+TensorDims toDims(const vec<uint32_t> &dims) {
     TensorDims td;
-    for (auto d: dims) td.push_back(d);
+    for (auto d : dims) td.push_back(d);
     return td;
 }
 // Function to convert F32 into F16
 // F32: exp_bias:127 SEEEEEEE EMMMMMMM MMMMMMMM MMMMMMMM.
 // F16: exp_bias:15  SEEEEEMM MMMMMMMM
-#define EXP_MASK_F32 	 0x7F800000U
-#define EXP_MASK_F16     0x7C00U
-
+#define EXP_MASK_F32 0x7F800000U
+#define EXP_MASK_F16 0x7C00U
 
 // small helper function to represent uint32_t value as float32
-float asfloat(uint32_t v) {
-    return *reinterpret_cast<float *>(&v);
-}
+float asfloat(uint32_t v) { return *reinterpret_cast<float *>(&v); }
 
 // Function to convert F32 into F16
 float f16tof32(short x) {
@@ -74,7 +71,8 @@ float f16tof32(short x) {
         u <<= (23 - 10);
         u |= EXP_MASK_F32;
         u |= s;
-    } else if ((x & EXP_MASK_F16) == 0) {  // check for zero and denormals. both are converted to zero
+    } else if ((x & EXP_MASK_F16) ==
+               0) {  // check for zero and denormals. both are converted to zero
         u = s;
     } else {
         // abs
@@ -160,7 +158,8 @@ short f32tof16(float x) {
     return v.u | s;
 }
 
-void f16tof32Arrays(float *dst, const short *src, uint32_t& nelem, float scale = 1, float bias = 0) {
+void f16tof32Arrays(float *dst, const short *src, uint32_t &nelem, float scale = 1,
+                    float bias = 0) {
     ALOGI("convert f16tof32Arrays...\n");
     const short *_src = reinterpret_cast<const short *>(src);
 
@@ -169,19 +168,22 @@ void f16tof32Arrays(float *dst, const short *src, uint32_t& nelem, float scale =
     }
 }
 
-void f32tof16Arrays(short *dst, const float *src, uint32_t& nelem, float scale = 1, float bias = 0) {
+void f32tof16Arrays(short *dst, const float *src, uint32_t &nelem, float scale = 1,
+                    float bias = 0) {
     ALOGI("convert f32tof16Arrays...");
     for (uint32_t i = 0; i < nelem; i++) {
         dst[i] = f32tof16(src[i] * scale + bias);
-        //VLOG(L1, "element no: %d", i);
+        // VLOG(L1, "element no: %d", i);
     }
 }
 
 static void setConfig(std::map<std::string, std::string> &config) {
 //    config[VPUConfigParams::FIRST_SHAVE] = "0";
 //    config[VPUConfigParams::LAST_SHAVE] = "11";
-//    config[VPUConfigParams::MEMORY_OPTIMIZATION] = CONFIG_VALUE(NO);//InferenceEngine::PluginConfigParams::YES;
-//    config[VPUConfigParams::COPY_OPTIMIZATION] = CONFIG_VALUE(NO);//InferenceEngine::PluginConfigParams::YES;
+//    config[VPUConfigParams::MEMORY_OPTIMIZATION] =
+//    CONFIG_VALUE(NO);//InferenceEngine::PluginConfigParams::YES;
+//    config[VPUConfigParams::COPY_OPTIMIZATION] =
+//    CONFIG_VALUE(NO);//InferenceEngine::PluginConfigParams::YES;
 #ifdef ENABLE_MYRIAD
     config[CONFIG_KEY(LOG_LEVEL)] = CONFIG_VALUE(LOG_INFO);
     config[VPUConfigParams::KEY_VPU_LOG_LEVEL] = CONFIG_VALUE(LOG_DEBUG);
@@ -191,53 +193,52 @@ static void setConfig(std::map<std::string, std::string> &config) {
     config[PluginConfigParams::KEY_EXCLUSIVE_ASYNC_REQUESTS] = PluginConfigParams::NO;
     config[PluginConfigParams::KEY_DYN_BATCH_LIMIT] = "1";
 #endif
-    //config[VPU_CONFIG_KEY(LOG_LEVEL)] = CONFIG_VALUE(LOG_DEBUG);
-    //config[InferenceEngine::PluginConfigParams::CONFIG_KEY(LOG_LEVEL)] = InferenceEngine::PluginConfigParams::LOG_DEBUG;
-    //config[VPUConfigParams::VPU_LOG_LEVEL] = CONFIG_VALUE(LOG_DEBUG);
-    //config[InferenceEngine::PluginConfigParams::KEY_LOG_LEVEL] = InferenceEngine::PluginConfigParams::LOG_DEBUG /*LOG_WARNING*/;
-    //config[InferenceEngine::VPUConfigParams::IGNORE_UNKNOWN_LAYERS] = InferenceEngine::PluginConfigParams::NO;
+    // config[VPU_CONFIG_KEY(LOG_LEVEL)] = CONFIG_VALUE(LOG_DEBUG);
+    // config[InferenceEngine::PluginConfigParams::CONFIG_KEY(LOG_LEVEL)] =
+    // InferenceEngine::PluginConfigParams::LOG_DEBUG; config[VPUConfigParams::VPU_LOG_LEVEL] =
+    // CONFIG_VALUE(LOG_DEBUG); config[InferenceEngine::PluginConfigParams::KEY_LOG_LEVEL] =
+    // InferenceEngine::PluginConfigParams::LOG_DEBUG /*LOG_WARNING*/;
+    // config[InferenceEngine::VPUConfigParams::IGNORE_UNKNOWN_LAYERS] =
+    // InferenceEngine::PluginConfigParams::NO;
 
-/*    std::ifstream in("config");
-    if (in.is_open()) {
-        std::string key, value;
-        while (in >> key >> value) {
-            config[key] = value;
+    /*    std::ifstream in("config");
+        if (in.is_open()) {
+            std::string key, value;
+            while (in >> key >> value) {
+                config[key] = value;
+            }
+            in.close();
         }
-        in.close();
-    }
-*/
+    */
 }
 
+void dumpBlob(const /*std::string*/ char *prefix, size_t len, Blob::Ptr blob) {
+    /*
+        auto dims = blob->getTensorDesc().getDims();
+        std::cout << prefix << dims;
 
-void dumpBlob(const /*std::string*/ char* prefix, size_t len, Blob::Ptr blob)
-{
-/*
-    auto dims = blob->getTensorDesc().getDims();
-    std::cout << prefix << dims;
+        auto mem = blob->readOnly();
 
-    auto mem = blob->readOnly();
+        const short *pf = mem.as<const short*>();
 
-    const short *pf = mem.as<const short*>();
+        if (len > blob->size()) len = blob->size();
 
-    if (len > blob->size()) len = blob->size();
-
-    for (unsigned i=0; i<len; i++)
-    {
-        if (0==i % 16)
+        for (unsigned i=0; i<len; i++)
         {
-            std::cout << std::endl<< i<< ": ";
+            if (0==i % 16)
+            {
+                std::cout << std::endl<< i<< ": ";
+            }
+            std::cout << pf[i] << ", ";
         }
-        std::cout << pf[i] << ", ";
-    }
-    std::cout << std::endl;
-*/
+        std::cout << std::endl;
+    */
 }
 
-class ExecuteNetwork
-{
+class ExecuteNetwork {
     InferenceEnginePluginPtr enginePtr;
     ICNNNetwork *network;
-    //IExecutableNetwork::Ptr pExeNet;
+    // IExecutableNetwork::Ptr pExeNet;
     ExecutableNetwork executable_network;
     InputsDataMap inputInfo = {};
     OutputsDataMap outputInfo = {};
@@ -245,12 +246,11 @@ class ExecuteNetwork
     InferRequest inferRequest;
     ResponseDesc resp;
 
-public:
-    ExecuteNetwork(){}
-    ExecuteNetwork(IRDocument &doc, TargetDevice target = TargetDevice::eCPU)
-        : network(nullptr)
-    {
-        InferenceEngine::PluginDispatcher dispatcher({"/vendor/lib64","/vendor/lib","/system/lib64","/system/lib","","./"});
+   public:
+    ExecuteNetwork() {}
+    ExecuteNetwork(IRDocument &doc, TargetDevice target = TargetDevice::eCPU) : network(nullptr) {
+        InferenceEngine::PluginDispatcher dispatcher(
+            {"/vendor/lib64", "/vendor/lib", "/system/lib64", "/system/lib", "", "./"});
         enginePtr = dispatcher.getSuitablePlugin(target);
 
         network = doc.getNetwork();
@@ -260,16 +260,14 @@ public:
         printf("aks Execute Network intialized\n");
     }
 
-    ExecuteNetwork(ExecutableNetwork& exeNet) : ExecuteNetwork(){
-    executable_network = exeNet;
-    inferRequest = executable_network.CreateInferRequest();
-    ALOGI("aks infer request created");
-    printf("aks infer request created\n");
-  }
+    ExecuteNetwork(ExecutableNetwork &exeNet) : ExecuteNetwork() {
+        executable_network = exeNet;
+        inferRequest = executable_network.CreateInferRequest();
+        ALOGI("aks infer request created");
+        printf("aks infer request created\n");
+    }
 
-    void loadNetwork()
-    {
-
+    void loadNetwork() {
         std::map<std::string, std::string> networkConfig;
         setConfig(networkConfig);
 
@@ -282,58 +280,53 @@ public:
 
         inferRequest = executable_network.CreateInferRequest();
         std::cout << "infer request created" << std::endl;
-      }
-
-    void prepareInput()
-    {
-      printf("aks prepare Input\n");
-      Precision inputPrecision = Precision::FP32;
-      inputInfo.begin()->second->setPrecision(inputPrecision);
-      inputInfo.begin()->second->setLayout(Layout::NC);
-
     }
 
-    void prepareOutput()
-    {
-      printf("aks prepare output\n");
-      Precision inputPrecision = Precision::FP32;
-      outputInfo.begin()->second->setPrecision(inputPrecision);
-      //outputInfo.begin()->second->setLayout(Layout::NC);
-
-      auto dims = inputInfo.begin()->second->getDims();
-      printf("input dims size = %d\n", dims.size());
-      //outputInfo.begin()->second->setDims(dims);
-      auto outputDims = outputInfo.begin()->second->getDims();
-      printf("output dims size = %d\n", outputDims.size());
+    void prepareInput() {
+        printf("aks prepare Input\n");
+        Precision inputPrecision = Precision::FP32;
+        inputInfo.begin()->second->setPrecision(inputPrecision);
+        inputInfo.begin()->second->setLayout(Layout::NC);
     }
 
-    //for aync infer request
-      void setBlob(const std::string& inName, const Blob::Ptr& inputBlob)
-      {
-          ALOGI("aks setBlob for infer request, input or output name: %s", inName.c_str());
-          ALOGI("aks Blob size %d and byte size %d bytes/element %d", inputBlob->size(), inputBlob->byteSize(), inputBlob->element_size());
+    void prepareOutput() {
+        printf("aks prepare output\n");
+        Precision inputPrecision = Precision::FP32;
+        outputInfo.begin()->second->setPrecision(inputPrecision);
+        // outputInfo.begin()->second->setLayout(Layout::NC);
 
-          //inferRequest.SetBlob(inName.c_str(), inputBlob);
-          inferRequest.SetBlob(inName, inputBlob);
-          ALOGI("aks infer request set blob done for name %s", inName.c_str());
+        auto dims = inputInfo.begin()->second->getDims();
+        printf("input dims size = %d\n", dims.size());
+        // outputInfo.begin()->second->setDims(dims);
+        auto outputDims = outputInfo.begin()->second->getDims();
+        printf("output dims size = %d\n", outputDims.size());
+    }
 
-          //std::cout << "setBlob input or output name : " << inName << std::endl;
+    // for aync infer request
+    void setBlob(const std::string &inName, const Blob::Ptr &inputBlob) {
+        ALOGI("aks setBlob for infer request, input or output name: %s", inName.c_str());
+        ALOGI("aks Blob size %d and byte size %d bytes/element %d", inputBlob->size(),
+              inputBlob->byteSize(), inputBlob->element_size());
 
-      }
+        // inferRequest.SetBlob(inName.c_str(), inputBlob);
+        inferRequest.SetBlob(inName, inputBlob);
+        ALOGI("aks infer request set blob done for name %s", inName.c_str());
 
-     //for non aync infer request
-     Blob::Ptr getBlob(const std::string& outName) {
-         Blob::Ptr outputBlob;
-         outputBlob = inferRequest.GetBlob(outName);
-         //std::cout << "GetBlob input or output name : " << outName << std::endl;
-         ALOGI("aks GetBlob input or output name : ", outName.c_str());
-         return As<TBlob<short>>(outputBlob);
-     }
+        // std::cout << "setBlob input or output name : " << inName << std::endl;
+    }
 
-    TBlob<float>::Ptr Infer(const Blob::Ptr &in)
-    {
-//        printf("infer network\n");
-//        inferRequest = executable_network.CreateInferRequest();
+    // for non aync infer request
+    Blob::Ptr getBlob(const std::string &outName) {
+        Blob::Ptr outputBlob;
+        outputBlob = inferRequest.GetBlob(outName);
+        // std::cout << "GetBlob input or output name : " << outName << std::endl;
+        ALOGI("aks GetBlob input or output name : ", outName.c_str());
+        return As<TBlob<short>>(outputBlob);
+    }
+
+    TBlob<float>::Ptr Infer(const Blob::Ptr &in) {
+        //        printf("infer network\n");
+        //        inferRequest = executable_network.CreateInferRequest();
 
         auto inName = inputInfo.begin()->first;
         printf("set input blob\n");
@@ -343,22 +336,23 @@ public:
         const std::string firstOutName = outputInfo.begin()->first;
         InferenceEngine::TBlob<PrecisionTrait<Precision::FP32>::value_type>::Ptr outputBlob;
         outputBlob = InferenceEngine::make_shared_blob<PrecisionTrait<Precision::FP32>::value_type,
-                InferenceEngine::SizeVector>(Precision::FP32, outputInfo.begin()->second->getDims());
+                                                       InferenceEngine::SizeVector>(
+            Precision::FP32, outputInfo.begin()->second->getDims());
         outputBlob->allocate();
 
         printf("set output blob\n");
         inferRequest.SetBlob(firstOutName, outputBlob);
 
-        //inferRequest = executable_network.CreateInferRequest();
+        // inferRequest = executable_network.CreateInferRequest();
         printf("aks StartAsync triggered\n");
-        inferRequest.StartAsync();  //for async infer
+        inferRequest.StartAsync();  // for async infer
         printf("aks wait triggered");
         inferRequest.Wait(1000);
 
         std::cout << "output name : " << firstOutName << std::endl;
-        ALOGI("aks output name : %s",firstOutName.c_str());
-        //Blob::Ptr outBlob;
-        //req->GetBlob(firstOutName.c_str(), outBlob, &resp);
+        ALOGI("aks output name : %s", firstOutName.c_str());
+        // Blob::Ptr outBlob;
+        // req->GetBlob(firstOutName.c_str(), outBlob, &resp);
         return As<TBlob<float>>(outputBlob);
     }
 };
@@ -373,8 +367,9 @@ public:
     InfEng(TargetDevice target = TargetDevice::eCPU)
     {
         ResponseDesc resp;
-        InferenceEngine::PluginDispatcher dispatcher({"/vendor/lib64","/vendor/lib","/system/lib64","/system/lib","","./"});
-        enginePtr = dispatcher.getSuitablePlugin(target);
+        InferenceEngine::PluginDispatcher
+dispatcher({"/vendor/lib64","/vendor/lib","/system/lib64","/system/lib","","./"}); enginePtr =
+dispatcher.getSuitablePlugin(target);
     }
 
 
