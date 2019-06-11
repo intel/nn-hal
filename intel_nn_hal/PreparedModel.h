@@ -109,12 +109,12 @@ bool setRunTimePoolInfosFromHidlMemories(std::vector<RunTimePoolInfo>* poolInfos
 class PreparedModel : public IPreparedModel {
 public:
     PreparedModel(const Model& model)
-          :mTargetDevice(TargetDevice::eMYRIAD), mModel(model), mNet("nnNet") {
+          :mTargetDevice(TargetDevice::eMYRIAD), mModel(model), mNet("nnNet"), enginePtr(nullptr) {
         IRBuilder::g_layer_precision = InferenceEngine::Precision::FP16;
     }
 
     PreparedModel(const TargetDevice device, const Model& model)
-          :mTargetDevice(device), mModel(model), mNet("nnNet") {
+          :mTargetDevice(device), mModel(model), mNet("nnNet"), enginePtr(nullptr) {
         if (mTargetDevice == TargetDevice::eCPU)
            IRBuilder::g_layer_precision = InferenceEngine::Precision::FP32;
            //using type = typename InferenceEngine::PrecisionTrait<IRBuilder::g_layer_precision>::value_type;
