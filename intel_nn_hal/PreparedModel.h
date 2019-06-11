@@ -129,8 +129,6 @@ public:
     Return<ErrorStatus> execute(const Request& request,
                                 const sp<IExecutionCallback>& callback) override;
     static bool isOperationSupported(const Operation& operation, const Model& model);
-    static bool validModel(const Model& model);
-    static bool validateRequest(const Request& request, const Model& model);
 
 protected:
     void deinitialize();

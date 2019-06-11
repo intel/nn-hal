@@ -1,0 +1,2 @@
+# Before commiting any changes, run the following command to make sure proper coding style is followed
+find . -regex '.*\.\(cpp\|hpp\|cc\|cxx\)' -exec clang-format -style=file -i {} \;

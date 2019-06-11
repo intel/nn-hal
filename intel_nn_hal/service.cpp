@@ -21,22 +21,20 @@
 
 #include "Driver.h"
 
-
 using android::hardware::configureRpcThreadpool;
 using android::hardware::joinRpcThreadpool;
 using android::hardware::neuralnetworks::V1_0::driver::Driver;
 
 int main(int argc, char* argv[]) {
     if (argc > 2 && strlen(argv[2]) > 0) {
-	if(strcmp(argv[1], "-D") != 0) return 0;
+        if (strcmp(argv[1], "-D") != 0) return 0;
         const char* deviceType = argv[2];
         android::sp<Driver> device = new Driver(deviceType);
         ALOGD("NN-HAL(%s) is ready.", deviceType);
         configureRpcThreadpool(4, true);
         android::status_t status = device->registerAsService(deviceType);
-        LOG_ALWAYS_FATAL_IF(
-            status != android::OK,
-            "Error while registering as service for %s: %d", deviceType, status);
+        LOG_ALWAYS_FATAL_IF(status != android::OK, "Error while registering as service for %s: %d",
+                            deviceType, status);
         joinRpcThreadpool();
     }
 
