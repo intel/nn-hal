@@ -32,76 +32,76 @@
 
 #pragma once
 #include "IRLayer.h"
-#include "ie_common.h"
 #include "ie_icnn_network.hpp"
+#include "ie_common.h"
+
 
 class InternalNetworkImpl;
 
-namespace IRBuilder {
+namespace IRBuilder
+{
 
-class IRDocument {
+class IRDocument
+{
 private:
-  struct Edge {
-    struct port {
-      int lid, pid;
-    } from, to;
-  };
+    struct Edge
+    {
+        struct port
+        {
+            int lid, pid;
+        } from, to;
+    };
 
-  InternalNetworkImpl *network;
-  std::vector<IRLayer> _layers; // ordered by input propagation
-  std::vector<Edge> _edges;
-  std::string _name;
-  size_t _layer_id_cnt = 1;
-  bool _processed = false;
+    InternalNetworkImpl *network;
+    std::vector<IRLayer> _layers; // ordered by input propagation
+    std::vector<Edge> _edges;
+    std::string _name;
+    size_t _layer_id_cnt = 1;
+    bool _processed = false;
 
-  std::map<const float *, size_t> _segmentsMap = {}; // org
+    std::map<const float *, size_t> _segmentsMap={}; //org
 
-  // std::map<const short*, size_t> _segmentsMap;
+    //std::map<const short*, size_t> _segmentsMap;
 
-  static bool shouldRemove(const IRLayer &l);
-  void process(const IRLayer &value);
-  void optimize();
-  void build();
+    static bool shouldRemove(const IRLayer &l);
+    void process(const IRLayer &value);
+    void optimize();
+    void build();
 
-  // saving functions
-  static void saveOutputToIR(pugi::xml_node &parent,
-                             const InferenceEngine::DataPtr &port);
-  static void saveInputToIR(pugi::xml_node &parent, int index,
-                            const InferenceEngine::DataPtr &port);
+    // saving functions
+    static void saveOutputToIR(pugi::xml_node &parent, const InferenceEngine::DataPtr &port);
+    static void saveInputToIR(pugi::xml_node &parent, int index, const InferenceEngine::DataPtr &port);
 
-  // save a layer
-  void saveToIR(std::ostream &binFile, pugi::xml_node &parent,
-                const IRLayer &irLayer);
-  // svae a blob
-  void saveBlobToIR(std::ostream &binFile,
-                    const InferenceEngine::Blob::Ptr &blob,
-                    pugi::xml_node &layer, const std::string &name);
+    // save a layer
+    void saveToIR(std::ostream &binFile, pugi::xml_node &parent, const IRLayer &irLayer);
+    // svae a blob
+    void saveBlobToIR(std::ostream &binFile, const InferenceEngine::Blob::Ptr &blob, pugi::xml_node &layer, const std::string &name);
 
-  void saveLayerToDot(std::ostream &dot, const IRLayer &irLayer) const;
-  IRDocument(IRDocument &) = delete;
-  IRDocument operator=(IRDocument &) = delete;
+    void saveLayerToDot(std::ostream &dot, const IRLayer &irLayer) const;
+    IRDocument(IRDocument &) = delete;
+    IRDocument operator=(IRDocument &) = delete;
 
 public:
-  explicit IRDocument(const std::string &cs);
-  ~IRDocument();
 
-  void add(const IRLayer &ir_layer);
+    explicit IRDocument(const std::string &cs);
+    ~IRDocument();
 
-  // Products
-  void save(std::ostream &xml_os, std::ostream &bin_os);
-  void save(const std::string &filebase);
-  void crateDotFile(std::ostream &dot) const;
+    void add(const IRLayer &ir_layer);
 
-  DelayObj createDelay(const std::string &id, const TensorDims &dims);
+    // Products
+    void save(std::ostream &xml_os, std::ostream &bin_os);
+    void save(const std::string &filebase);
+    void crateDotFile(std::ostream &dot) const;
 
-  InferenceEngine::InputInfo::Ptr createInput(const std::string &name,
-                                              const TensorDims &dims) const;
-  InferenceEngine::ICNNNetwork *buildNetwork();
+    DelayObj createDelay(const std::string &id, const TensorDims &dims);
 
-  void addOutput(const IRLayer &src, int outIndx = 0);
-  void addOutput(const InferenceEngine::DataPtr &src);
-  void setName(const char *name);
-  InferenceEngine::ICNNNetwork *getNetwork();
+    InferenceEngine::InputInfo::Ptr createInput(const std::string &name, const TensorDims &dims) const;
+    InferenceEngine::ICNNNetwork *buildNetwork();
+
+    void addOutput(const IRLayer &src, int outIndx = 0);
+    void addOutput(const InferenceEngine::DataPtr &src);
+    void setName(const char *name);
+    InferenceEngine::ICNNNetwork *getNetwork();
 };
 
-} // namespace IRBuilder
+}  // namespace IRBuilder
