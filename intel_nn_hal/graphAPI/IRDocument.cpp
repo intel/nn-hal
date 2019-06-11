@@ -58,11 +58,7 @@ class InternalNetworkImpl : public InferenceEngine::details::CNNNetworkImpl {
     void remove(const string &layer_name) { _layers.erase(layer_name); }
 
     bool hasLayer(const string &lname) const { return _layers.find(lname) != _layers.end(); }
-    /*
-        void setName(const std::string name){
-            setName(name);
-        }
-    */
+
     void addData(const DataPtr &data) { _data[data->name] = data; }
 
     void addOutput(const DataPtr &data) {
@@ -134,16 +130,7 @@ void IRDocument::optimize() {
 
             it = _layers.erase(it);
             network->remove(l->name);
-        } /*else if (l->type == "Convolution"){ //convolution layer fused with Activatio layer
-          auto convLayer = l;
-          ++it;
-          if (it == _layers.end()) return;
-          auto fusedLayer = *it;
-          if (fusedLayer->type == "ReLU" || fusedLayer->type == "ReLU6" || fusedLayer->type ==
-        "Clamp") { convLayer->_fusedWith = fusedLayer; #ifdef NNLOG ALOGI("layer = %s fused with
-        %s", convLayer->name.c_str(), fusedLayer->name.c_str()); #endif
-          }
-        }*/
+        }
         else {
             ++it;
         }
@@ -182,14 +169,6 @@ InferenceEngine::ICNNNetwork *IRDocument::getNetwork() { return network; }
 void IRDocument::saveBlobToIR(std::ostream &binFile,
                               const /*IRBlob::Ptr*/ InferenceEngine::Blob::Ptr &blob,
                               pugi::xml_node &layer, const std::string &name) {
-    /*
-        const void* fp = static_cast<const void *>(blob->cbuffer()); //org
-        auto fit = _segmentsMap.find((float*)fp);
-    */
-
-    // if(IRBuilder::g_layer_precision == Precision::FP16)  //fix me: handle float case
-    // const short* fp = blob->cbuffer().as<const short*>();
-    // else
     const float *fp = blob->cbuffer().as<const float *>();
 
     auto fit = _segmentsMap.find(fp);
@@ -209,7 +188,7 @@ void IRDocument::saveBlobToIR(std::ostream &binFile,
     if (newBlob) {
         binFile.write(reinterpret_cast<const char *>(fp), blob->byteSize());
     }
-    // node.append_attribute("precision").set_value("FP16");
+
     node.append_attribute("precision").set_value(blob->precision().name());
 }
 
@@ -238,9 +217,6 @@ void IRDocument::save(std::ostream &xml_os, std::ostream &bin_os) {
     }
 
     for (auto &cnn_layer : _layers) {
-#ifdef NNLOG
-// ALOGI("save cnn_layer name = %s", cnn_layer->name.c_str());
-#endif
         cnn_layer->userValue.v_int = ++id_cnt;
         int pcnt = 0;
         for (auto output : cnn_layer->outData) output->userObject.v_int = pcnt++;
@@ -298,7 +274,6 @@ InferenceEngine::InputInfo::Ptr IRDocument::createInput(const std::string &name,
                                                         const TensorDims &dims) const {
     Layout layout;
     if (dims.size() == 4) layout = NCHW;
-    // if (dims.size() == 4) layout = NHWC;
     else if (dims.size() == 2)
         layout = InferenceEngine::Layout::NC;
     else
@@ -306,7 +281,6 @@ InferenceEngine::InputInfo::Ptr IRDocument::createInput(const std::string &name,
 
     std::cout << "createInput input data dims[0] " << dims[0] << "dims[1]" << dims[1] << std::endl;
     TensorDesc td(IRBuilder::g_layer_precision, dims, layout);
-    // TensorDesc td(InferenceEngine::Precision::FP32, dims, layout);
 
     auto inputData = std::make_shared<InferenceEngine::Data>(name, td);
     InferenceEngine::InputInfo::Ptr info(new InferenceEngine::InputInfo());
@@ -413,11 +387,6 @@ void IRDocument::saveToIR(std::ostream &binFile, pugi::xml_node &parent, const I
     }
 
     for (auto blob : irLayer->blobs) {
-        /*
-                #ifdef NNLOG
-                ALOGI("blob name = %s", blob.first.c_str());
-                #endif
-        */
         auto fb = blob.second;
         saveBlobToIR(binFile, fb, layer, blob.first);
     }

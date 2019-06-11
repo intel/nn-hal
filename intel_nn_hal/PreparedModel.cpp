@@ -22,6 +22,7 @@
 #include <log/log.h>
 #include <fstream>
 #include <thread>
+#include "ValidateHal.h"
 
 #define DISABLE_ALL_QUANT
 //#define NN_DEBUG
@@ -98,6 +99,8 @@ namespace hardware {
 namespace neuralnetworks {
 namespace V1_0 {
 namespace driver {
+
+using namespace android::nn;
 
 enum PaddingScheme {
     kPaddingUnknown = 0,
@@ -923,161 +926,6 @@ OutputPort PreparedModel::getPort(int index) {
 
 void PreparedModel::SetOperandMemory(const Model& model, uint32_t index, uint32_t& len_out,
                                      const uint8_t* buf) {}
-
-/*
-void PreparedModel::SetOperandFromTensor(uint8_t* buf, uint32_t &length, IRBlob::Ptr infOutput)
-{
-
-    auto& td = infOutput->getTensorDesc();
-    auto dims = infOutput->getTensorDesc().getDims();
-    if (td.getPrecision() == InferenceEngine::Precision::FP16)
-        td.setPrecision(InferenceEngine::Precision::FP16);
-    if (td.getLayout() == Layout::NCHW)
-        td.setLayout(NHWC);
-    auto mem = infOutput->readOnly();
-
-    const float *pf = mem.as<const float*>();
-
-    length = infOutput->size();
-    buf = (uint8_t*) pf;
-
-
-    return;
-}
-*/
-// TODO doublecheck
-bool PreparedModel::validateRequest(const Request& request, const Model& model) {
-    auto validRequestArguments =
-        [&](const hidl_vec<RequestArgument>& arguments, const hidl_vec<uint32_t>& operandIndexes,
-            const hidl_vec<Operand>& operands, size_t poolCount, const char* type) -> bool {
-        const size_t argumentCount = arguments.size();
-        if (argumentCount != operandIndexes.size()) {
-            ALOGE("Request specifies %zu, but %s has the model as %zu", argumentCount, type,
-                  operandIndexes.size());
-            return false;
-        }
-        for (size_t argumentIndex = 0; argumentIndex < argumentCount; argumentIndex++) {
-            const RequestArgument& argument = arguments[argumentIndex];
-            const uint32_t operandIndex = operandIndexes[argumentIndex];
-            const Operand& operand = operands[operandIndex];
-            if (argument.hasNoValue) {
-                if (argument.location.poolIndex != 0 || argument.location.offset != 0 ||
-                    argument.location.length != 0 || argument.dimensions.size() != 0) {
-                    ALOGE("Request %s: %zu has no value yet has details.", type, argumentIndex);
-                    return false;
-                }
-            }
-            if (argument.location.poolIndex >= poolCount) {
-                ALOGE("Request %s: %zu has an invalid poolIndex %d", type, argumentIndex,
-                      argument.location.poolIndex);
-                return false;
-            }
-            // TODO: Validate that we are within the pool.
-            uint32_t rank = argument.dimensions.size();
-            if (rank > 0) {
-                if (rank != operand.dimensions.size()) {
-                    ALOGE(
-                        "Request %s: %zu  has number of dimensions (%d) different than the model's "
-                        "(%zu)",
-                        type, argumentIndex, rank, operand.dimensions.size());
-                    return false;
-                }
-                for (size_t i = 0; i < rank; i++) {
-                    if (argument.dimensions[i] != operand.dimensions[i] &&
-                        operand.dimensions[i] != 0) {
-                        ALOGE(
-                            "Request %s: %zu has dimension %zu of %d different than the model's %d",
-                            type, argumentIndex, i, operand.dimensions[i], operand.dimensions[i]);
-                        return false;
-                    }
-                    if (argument.dimensions[i] == 0) {
-                        ALOGE("Request %s: %zu has dimension %zu of zero", type, argumentIndex, i);
-                        return false;
-                    }
-                }
-            }
-        }
-        return true;
-    };
-
-    const size_t pool_counts = request.pools.size();
-    return (validRequestArguments(request.inputs, model.inputIndexes, model.operands, pool_counts,
-                                  "input") &&
-            validRequestArguments(request.outputs, model.outputIndexes, model.operands, pool_counts,
-                                  "output"));
-}
-
-bool PreparedModel::validModel(const Model& model) {
-    auto validOperandIndexes = [&](const hidl_vec<uint32_t> indexes, size_t operandCount) -> bool {
-        for (uint32_t i : indexes) {
-            if (i >= operandCount) {
-                ALOGE("Index out of range %d/%zu", i, operandCount);
-                return false;
-            }
-        }
-        return true;
-    };
-
-    const size_t operand_counts = model.operands.size();
-
-    if (!validOperandIndexes(model.inputIndexes, operand_counts) ||
-        !validOperandIndexes(model.outputIndexes, operand_counts)) {
-        ALOGE("model inputs/outputs index invalid");
-        return false;
-    }
-
-    for (size_t i = 0; i < operand_counts; i++) {
-        const Operand& operand = model.operands[i];
-        if (operand.type != OperandType::TENSOR_FLOAT32 && operand.type != OperandType::FLOAT32 &&
-            operand.type != OperandType::INT32 && operand.type != OperandType::UINT32 &&
-            operand.type != OperandType::TENSOR_INT32 &&
-            operand.type != OperandType::TENSOR_QUANT8_ASYMM) {
-            ALOGE("wrong operand type %d", operand.type);
-            return false;
-        }
-
-        switch (operand.lifetime) {
-            case OperandLifeTime::MODEL_INPUT:
-            case OperandLifeTime::MODEL_OUTPUT:
-            case OperandLifeTime::NO_VALUE:
-            case OperandLifeTime::TEMPORARY_VARIABLE:
-                if (operand.location.offset != 0 || operand.location.length != 0) {
-                    ALOGE("Unexpected offset %d, or length %d", operand.location.offset,
-                          operand.location.length);
-                    return false;
-                }
-                break;
-            case OperandLifeTime::CONSTANT_COPY:
-                if (operand.location.offset + operand.location.length >
-                    model.operandValues.size()) {
-                    ALOGE("OperandValue location out of range.  Starts at %d length %d. max %zu",
-                          operand.location.offset, operand.location.length,
-                          model.operandValues.size());
-                    return false;
-                }
-                break;
-            case OperandLifeTime::CONSTANT_REFERENCE: {
-                auto pool_counts = model.pools.size();
-                if (operand.location.poolIndex >= pool_counts) {
-                    ALOGE("Invalid poolIndex %d/%lu", operand.location.poolIndex, pool_counts);
-                    return false;
-                }
-                break;
-            }
-            default:
-                return false;
-        }
-    }
-
-    for (const auto& operation : model.operations) {
-        // TANH is last one
-        if (static_cast<uint32_t>(operation.type) > static_cast<uint32_t>(OperationType::TANH)) {
-            return false;
-        }
-    }
-
-    return true;
-}
 
 bool PreparedModel::initializeRunTimeOperandInfo() {
     // initialize runtime operand info from model.
@@ -1950,7 +1798,7 @@ bool PreparedModel::operationConCat(const Operation& operation) {
      * n+1: An INT32 value, and has to be one of the {@link FusedActivationFunc} values.
      *    Specifies the activation to invoke on the result of each addition.
      */
-    auto n = operation.inputs.size() - 2;
+    auto n = operation.inputs.size() - 1;
     std::vector<OutputPort> inputs;
     for (int i = 0; i < n; i++) inputs.push_back(getPort(operation.inputs[i]));
     auto out = Concat(inputs, PARAM_I32(n));
