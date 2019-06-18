@@ -1795,14 +1795,20 @@ bool PreparedModel::operationConCat(const Operation& operation) {
      * Inputs:
      * 0 ~ n-1: The list on n input tensors, of shape [D0, D1, ..., Daxis(i), ..., Dm]
      * n: An INT32 value, specifying the concatenation axis.
-     * n+1: An INT32 value, and has to be one of the {@link FusedActivationFunc} values.
-     *    Specifies the activation to invoke on the result of each addition.
      */
+    uint32_t axis;
     auto n = operation.inputs.size() - 1;
     std::vector<OutputPort> inputs;
+    if (getPort(operation.inputs[0])->getLayout() == InferenceEngine::NCHW) {
+	std::vector<uint32_t> axisMap = {0, 2, 3, 1};
+	axis = axisMap[PARAM_I32(n)];
+    }
+    else
+	axis = PARAM_I32(n);
+
     for (int i = 0; i < n; i++) inputs.push_back(getPort(operation.inputs[i]));
-    auto out = Concat(inputs, PARAM_I32(n));
-    mPorts[operation.outputs[0]] = handleFusion(out, PARAM_I32(n + 1));
+    auto out = Concat(inputs, axis);
+    mPorts[operation.outputs[0]] = out;
 
     return true;
 }
