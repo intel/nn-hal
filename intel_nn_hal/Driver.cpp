@@ -23,6 +23,7 @@
 #include "Executor.h"
 #endif
 #include <android-base/logging.h>
+#include <cutils/properties.h>
 #include <thread>
 #include "ValidateHal.h"
 
@@ -128,6 +129,7 @@ Return<void> Driver::getSupportedOperations(const Model& model, getSupportedOper
     ALOGI("Driver getSupportedOperations()");
     int count = model.operations.size();
     std::vector<bool> supported(count, false);
+    char value[PROPERTY_VALUE_MAX];
 
     if (!validateModel(model)) {
         ALOGI("NNERR: %s failed at line no: %d\n", __func__, __LINE__);
@@ -135,6 +137,15 @@ Return<void> Driver::getSupportedOperations(const Model& model, getSupportedOper
         return Void();
     }
 
+    property_get("persist.vendor.nn_hal.disable", value, "0");
+    if (atoi(value)) {
+        ALOGI("NNHAL Disabled - CPU fallback\n");
+        for (int i = 0; i < count; i++) {
+            supported[i] = false;
+        }
+        cb(ErrorStatus::NONE, supported);
+        return Void();
+    }
 #ifndef AT_RUNTIME
     for (int i = 0; i < count; i++) {
         const auto& operation = model.operations[i];
