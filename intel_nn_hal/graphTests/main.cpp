@@ -4,7 +4,7 @@
 #include <android/log.h>
 #include <log/log.h>
 
-using namespace IRBuilder;
+using namespace ::android::hardware::neuralnetworks::nnhal;
 
 template <typename T>
 void createAlexNet(IRDocument &doc) {
@@ -443,11 +443,11 @@ int main(int argc, const char *argv[]) {
     std::string inp;
 
 #ifdef ENABLE_MYRIAD
-    IRBuilder::g_layer_precision = InferenceEngine::Precision::FP16;
+    g_layer_precision = InferenceEngine::Precision::FP16;
     // testAlexNet();
     // testMKLBug<short>();
 #elif ENABLE_MKLDNN
-    IRBuilder::g_layer_precision = InferenceEngine::Precision::FP32;
+    g_layer_precision = InferenceEngine::Precision::FP32;
     // testAlexNet();
     // testMKLBug<float>();
 #endif
