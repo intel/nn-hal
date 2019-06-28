@@ -17,88 +17,12 @@
 #define LOG_TAG "PreparedModel"
 
 #include "PreparedModel.h"
-#include <android-base/logging.h>
-#include <android/log.h>
-#include <log/log.h>
-#include <fstream>
-#include <thread>
 #include "ValidateHal.h"
-
-#define DISABLE_ALL_QUANT
-//#define NN_DEBUG
-
-enum DebugLevel {
-    L0,
-    L1,
-    L2,
-    L3,
-    L4,
-};
-
-unsigned int debugMask = ((1 << (L1 + 1)) - 1);
-
-#ifdef NN_DEBUG
-#define VLOG(l, x, ...)                                                          \
-    do {                                                                         \
-        if (debugMask & (1 << l)) ALOGI("[%s] " x, __FUNCTION__, ##__VA_ARGS__); \
-    } while (0)
-
-#define VLOGDIMS(l, d, header)                                                         \
-    do {                                                                               \
-        auto size = (d).size();                                                        \
-        VLOG(l, "%s: vectors {%d, %d, %d, %d}", header, (d)[0], size > 1 ? (d)[1] : 0, \
-             size > 2 ? (d)[2] : 0, size > 3 ? (d)[3] : 0);                            \
-    } while (0)
-
-#define dumpOperand(index)                                      \
-    do {                                                        \
-        const auto op = mModel.operands[index];                 \
-        ALOGI("---------------------------------------------"); \
-        ALOGI("Operand index: %d", index);                      \
-        ALOGI("%s", toString(op).c_str());                      \
-        ALOGI("---------------------------------------------"); \
-    } while (0)
-
-#define dumpOperation(operation)                                \
-    do {                                                        \
-        ALOGI("---------------------------------------------"); \
-        ALOGI("Operation:");                                    \
-        ALOGI("%s", toString(operation).c_str());               \
-        ALOGI("---------------------------------------------"); \
-    } while (0)
-
-#define dumpOperationSupport(operation, support)                    \
-    do {                                                            \
-        ALOGI("---------------------------------------------");     \
-        ALOGI("Operation support: %s", support ? "True" : "False"); \
-        ALOGI("%s", toString(operation).c_str());                   \
-        ALOGI("---------------------------------------------");     \
-    } while (0)
-
-#else
-#define VLOG(...)
-#define VLOGDIMS(l, d, header)
-#define dumpOperand(...)
-#define dumpOperation(operation)
-#define dumpOperationSupport(operation, support)
-#endif
-
-#define WRONG_DIM (-1)
-
-#define nnAssert(v)                                                                            \
-    do {                                                                                       \
-        if (!(v)) {                                                                            \
-            LOG(ERROR) << "nnAssert failed at " << __FILE__ << ":" << __LINE__ << " - '" << #v \
-                       << "'\n";                                                               \
-            abort();                                                                           \
-        }                                                                                      \
-    } while (0)
 
 namespace android {
 namespace hardware {
 namespace neuralnetworks {
-namespace V1_0 {
-namespace driver {
+namespace nnhal {
 
 using namespace android::nn;
 
@@ -151,7 +75,7 @@ int32_t computeOutSize(int32_t imageSize, int32_t filterSize, int32_t stride, in
     return (imageSize - filterSize + stride + paddingHead + paddingTail) / stride;
 }
 
-static inline size_t sizeOf(const TensorDims& dims) {
+inline size_t sizeOf(const TensorDims& dims) {
     size_t ret = dims[0];
     for (int i = 1; i < dims.size(); ++i) ret *= dims[i];
     return ret;
@@ -672,6 +596,7 @@ size_t product(const vec<T>& dims) {
 }
 
 TensorDims permuteDims(const TensorDims& src, const vec<unsigned int>& order) {
+    ALOGE("Entering %s",__func__);
     TensorDims ret;
     for (int i = 0; i < src.size(); i++) {
         ret.push_back(src[order[i]]);
@@ -680,6 +605,7 @@ TensorDims permuteDims(const TensorDims& src, const vec<unsigned int>& order) {
 }
 
 // IRBlob::Ptr Permute(IRBlob::Ptr ptr, const vec<unsigned int> &order)
+#if 0 //no usage as of now
 IRBlob::Ptr Permute(IRBlob::Ptr ptr, const vec<unsigned int>& order) {
     VLOG(L1, "Permute");
     auto orig_dims = ptr->getTensorDesc().getDims();
@@ -688,9 +614,7 @@ IRBlob::Ptr Permute(IRBlob::Ptr ptr, const vec<unsigned int>& order) {
 
     return ptr;
 }
-
-#define PARAM_I32(i) ParseOperationInput<int32_t>(mModel, operation, i)
-#define PARAM_FP(i) ParseOperationInput<float>(mModel, operation, i)
+#endif
 
 template <typename T>
 struct printHelper {
@@ -805,14 +729,14 @@ const uint8_t* PreparedModel::GetOperandMemory(const Model& model, uint32_t inde
     } else if (op.lifetime == OperandLifeTime::TEMPORARY_VARIABLE) {
         // return const_cast<uint8_t*>(op.buffer);
         VLOG(L1, "operand lifetime OperandLifeTime::TEMPORARY_VARIABLE");
-        VLOG(L1, "operand is expected to be const, but lifetime is %d", op.lifetime);
+        //VLOG(L1, "operand is expected to be const, but lifetime is %d", op.lifetime);
         len_out = sizeOfData(op.type, op.dimensions);
         // nnAssert(false);
         return nullptr;
     }
 
     ALOGE("operand is expected to be const, but lifetime is %d", op.lifetime);
-    nnAssert(false);  // temp fix since some time const operand set as TEMPORARY_VARIABLE
+    //nnAssert(false);  // temp fix since some time const operand set as TEMPORARY_VARIABLE
     return nullptr;
 }
 
@@ -821,7 +745,8 @@ T PreparedModel::GetConstOperand(const Model& model, uint32_t index) {
     dumpOperand(index);
     uint32_t len;
     const uint8_t* buf = GetOperandMemory(model, index, len);
-    return GetConstFromBuffer<T>(buf, len);
+    T retvalue = (buf != nullptr)?GetConstFromBuffer<T>(buf, len) : -1;
+    return retvalue;
 }
 
 template <typename T>
@@ -836,22 +761,21 @@ std::vector<T> PreparedModel::GetConstVecOperand(const Model& model, uint32_t in
 
 IRBlob::Ptr PreparedModel::GetConstWeightsOperandAsTensor(uint32_t index) { return nullptr; }
 
-IRBlob::Ptr PreparedModel::GetConstOperandAsTensor(uint32_t index) { return nullptr; }
+IRBlob::Ptr PreparedModel::GetConstOperandAsTensor(int operand_idx,int operation_idx) { return nullptr; }
 
-Blob::Ptr PreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const uint8_t* buf,
-                                               uint32_t& len) {
+Blob::Ptr PreparedModel::GetInOutOperandAsBlob(bool param_type,RunTimeOperandInfo& op, const uint8_t *buf, uint32_t& len) {
     return nullptr;
 }
 
 OutputPort PreparedModel::getPort(int index) {
-    VLOG(L1, "getPort\n");
+    VLOG(L1, "getPort, taking care of input param:Model_Input/Temp Variable\n");
     if (isConst(index)) {
         VLOG(L1, "index is a const!");
         nnAssert(false);
     }
     const auto op = mModel.operands[index];
     if (op.lifetime == OperandLifeTime::MODEL_INPUT) {
-        VLOG(L1, "Model input operand\n");
+        VLOG(L1, "Getting Operand for Model Input \n");
         std::ostringstream operandName;
         operandName << "input" << index;
 
@@ -912,24 +836,22 @@ OutputPort PreparedModel::getPort(int index) {
         if (!mPorts[index]) nnAssert(false);
         VLOG(L1, "mPorts[%d] already allocated\n", index);
         return mPorts[index];
-        // to.buffer = nullptr;
-        // to.length = sizeOfData(to.type, to.dimensions);
-        // nnAssert(true);
     }
 
     return nullptr;
 }
-
-// uint8_t* buffer;
-// The length of the buffer.
-// uint32_t length;
 
 void PreparedModel::SetOperandMemory(const Model& model, uint32_t index, uint32_t& len_out,
                                      const uint8_t* buf) {}
 
 bool PreparedModel::initializeRunTimeOperandInfo() {
     // initialize runtime operand info from model.
+    ALOGE("Entering %s",__func__);
     const size_t count = mModel.operands.size();
+    if(!count) {
+        VLOG(L1, "NNERR:Operand Count is 0");
+        return false;
+	}	
     mOperands.resize(count);
     mPorts.resize(count);
     // TensorDims dims;
@@ -946,33 +868,23 @@ bool PreparedModel::initializeRunTimeOperandInfo() {
         }
 
         to.scale = from.scale;
-        nnAssert(from.zeroPoint == 0);
         switch (from.type) {
             case OperandType::TENSOR_FLOAT32:
             case OperandType::FLOAT32:
-                // nnAssert(to.scale == 0);
                 to.type = OperandType::TENSOR_FLOAT32;
                 VLOG(L1, "OperandType = %d\n", from.type);
-                // port->setPrecision(InferenceEngine::Precision::FP32);
-                // to.type = VpuDataType::FP32;
-                // to.type = InferenceEngine::VPU::VpuDataType::FP32;
                 break;
             case OperandType::INT32:
             case OperandType::UINT32:
                 nnAssert(to.scale == 0);
             case OperandType::TENSOR_INT32:
-                to.type = OperandType::TENSOR_INT32;
-                // port->setPrecision(InferenceEngine::Precision::I32);
-                VLOG(L1, "OperandType::TENSOR_INT32 and operand scale value = %.1f", to.scale);
+                to.type = from.type;
                 break;
             case OperandType::TENSOR_QUANT8_ASYMM:
                 ALOGE("OperandType::TENSOR_QUANT8_ASYMM is not supported");
-                nnAssert(to.scale != 0);
-                // to.type = VpuDataType::U8;
                 break;
             default:
                 ALOGE("wrong operand type %d", from.type);
-                ;
                 return false;
         }
 
@@ -1018,7 +930,6 @@ bool PreparedModel::initialize() {
     // Check operation supoorted or not, user may not call getOpertionSupported()
     for (const auto& operation : mModel.operations) {
         success = isOperationSupported(operation, mModel);
-        dumpOperationSupport(operation, success);
         if (!success) {
             VLOG(L1, "get unsupported operation in initialize()");
             return false;
@@ -1102,7 +1013,9 @@ bool PreparedModel::initialize() {
     }
 
     initializeInput();
-    finalizeOutput();
+    success=finalizeOutput();
+    if (success == false)
+	    return success;
 
     // initialize IE operation input/output ports
     //    convertModel(mNet);
@@ -1111,13 +1024,20 @@ bool PreparedModel::initialize() {
     mNet.buildNetwork();
     std::fstream dot;
     std::string graphfile("/data/local/graphfile");
+    if(mModel.operations.size() > 1) {
+		mNet.save(graphfile);
+		VLOG(L1,"saving to IR if oepration count > 1");
+	}
+	else 
+		VLOG(L1,"NOT Saving to IR as operation count is 1,appending TBD!!");
+	
     dot.open("/data/local/graph.dot", std::ios::out);
-    mNet.save(graphfile);
+    
     mNet.crateDotFile(dot);
     dot.close();
 
     VLOG(L1, "initialize ExecuteNetwork for device %s",
-         InferenceEngine::TargetDeviceInfo::name(mTargetDevice));
+    InferenceEngine::TargetDeviceInfo::name(mTargetDevice));
     enginePtr = new ExecuteNetwork(mNet, mTargetDevice);
     enginePtr->prepareInput();
     enginePtr->loadNetwork();
@@ -1127,7 +1047,6 @@ bool PreparedModel::initialize() {
 
 void PreparedModel::deinitialize() {
     VLOG(L1, "deinitialize");
-    delete enginePtr;
     enginePtr = nullptr;
 
     for (const auto& operand : mOperands) {
@@ -1184,6 +1103,7 @@ void printOperandbuf(int level, const uint8_t* buffer, const std::vector<uint32_
 #endif
 
 void PreparedModel::asyncExecute(const Request& request, const sp<IExecutionCallback>& callback) {
+    ALOGE("Entering %s",__func__);
     std::vector<RunTimePoolInfo> requestPoolInfos;
     if (!setRunTimePoolInfosFromHidlMemories(&requestPoolInfos, request.pools)) {
         callback->notify(ErrorStatus::GENERAL_FAILURE);
@@ -1220,32 +1140,14 @@ void PreparedModel::asyncExecute(const Request& request, const sp<IExecutionCall
                 // model/request oputput pointer pass to inference engine input
                 // memcpy(operand.buffer, r.buffer + arg.location.offset, operand.length)
 
-                auto inputBlob = GetInOutOperandAsBlob(
-                    operand, const_cast<uint8_t*>(r.buffer + arg.location.offset),
-                    operand.length);  // if not doing memcpy
+                auto inputBlob = GetInOutOperandAsBlob(IN_PARAM,operand, const_cast<uint8_t*>(r.buffer + arg.location.offset), operand.length); //if not doing memcpy
                 VLOG(L1, "setBlob for mPorts[%d]->name %s", indexes[i],
                      mPorts[indexes[i]]->name.c_str());
                 enginePtr->setBlob(mPorts[indexes[i]]->name,
                                    inputBlob);  // setInputBlob(const std::string &,IRBlob::Ptr);
 
             } else {
-                // inference engine output pointer pass to model/request oputput
-                // copy model oputput to request output
-                // memcpy(r.buffer + arg.location.offset, operand.buffer, operand.length);
-                /*
-                                auto outputDims = mPorts[indexes[i]]->getTensorDesc().getDims();
-                                auto nelem = sizeOf(outputDims);
-                                auto lenght = 4*nelem;
-                                uint8_t* tmpbuffer = new uint8_t[lenght];
-                                TensorDesc td(InferenceEngine::Precision::FP32, outputDims,
-                   Layout::ANY); //nhwc
-
-                                InferenceEngine::TBlob<float>::Ptr outputBlob =
-                   InferenceEngine::make_shared_blob<float>(td, (float *)tmpbuffer, lenght);
-                */
-                auto outputBlob = GetInOutOperandAsBlob(
-                    operand, const_cast<uint8_t*>(r.buffer + arg.location.offset),
-                    operand.length);  // if not doing memcpy
+                auto outputBlob = GetInOutOperandAsBlob(OUT_PARAM,operand, const_cast<uint8_t*>(r.buffer + arg.location.offset), operand.length); //if not doing memcpy
                 enginePtr->setBlob(mPorts[indexes[i]]->name, outputBlob);
 
                 // memcpy(r.buffer + arg.location.offset, tmpbuffer, operand.length);
@@ -1287,13 +1189,6 @@ void PreparedModel::asyncExecute(const Request& request, const sp<IExecutionCall
         for (int i = 0; i < nelem; i++) {
             VLOG(L1, "outBlob elements %d = %f", i, outBlob->readOnly()[i]);
         }
-        /*
-        auto outbuf = outBlob->cbuffer();
-        const uint8_t* buf1 = outbuf.as<uint8_t*>();
-        memcpy(output.buffer, buf1, output.length);
-        //uint8_t* buffer
-        printOperandbuf(L2, const_cast<uint8_t*>(output.buffer), output.dimensions);
-        */
         VLOG(L1, "Model input0 are:");
         const RunTimeOperandInfo& input = mOperands[mModel.inputIndexes[0]];
         InferenceEngine::TBlob<float>::Ptr inBlob =
@@ -1303,25 +1198,6 @@ void PreparedModel::asyncExecute(const Request& request, const sp<IExecutionCall
             VLOG(L1, "inBlob elements %d = %f", i, inBlob->readOnly()[i]);
         }
 
-        /*
-        auto inbuf = inBlob->cbuffer();
-        uint8_t* buf2 = inbuf.as<uint8_t*>();
-        memcpy(input.buffer, inbuf, input.length);
-        printOperandbuf(L4, input.buffer, input.dimensions, 20);
-        */
-
-        /* //commented to run for MobileNet model and this only applicable for single cts opeation
-        test for(const auto& op : mModel.operations) { const auto& o = mOperands[op.outputs[0]];
-            InferenceEngine::TBlob<float>::Ptr opBlob =
-        enginePtr->getBlob(mPorts[op.outputs[0]]->name); VLOG(L1, "Operation %d has output
-        0(lifetime %d) are:", op.type, o.lifetime);
-
-            nelem = (opBlob->size() > 10 ? 10 : opBlob->size());
-            for (int i = 0; i <  nelem; i++) {
-            VLOG(L1, "operation output Blob elements %d = %f", i, opBlob->readOnly()[i]);
-            }
-            //printOperandbuf(L4, o.buffer, o.dimensions, 20);
-        } */
     }
 #endif
 
@@ -1369,87 +1245,222 @@ T getOperandConstVal(const Model& model, const Operand& operand) {
 bool PreparedModel::isOperationSupported(const Operation& operation, const Model& model) {
     VLOG(L1, "Check operation %d", operation.type);
 
-#define VLOG_CHECKFAIL(fail) VLOG(L1, "Check failed: %s", fail)
-
-#ifdef DISABLE_ALL_QUANT
-    for (auto i : operation.inputs) {
-        const auto input = model.operands[i];
-        if (input.type == OperandType::TENSOR_QUANT8_ASYMM) {
-            VLOG_CHECKFAIL("input quant");
-            return false;
-        }
-    }
-    for (auto i : operation.outputs) {
-        const auto output = model.operands[i];
-        if (output.type == OperandType::TENSOR_QUANT8_ASYMM) {
-            VLOG_CHECKFAIL("output quant");
-            return false;
-        }
-    }
-#else
-    for (auto i : operation.inputs) {
-        const auto input = model.operands[i];
-        if (input.type == OperandType::TENSOR_QUANT8_ASYMM && input.zeroPoint != 0) {
-            VLOG_CHECKFAIL("input quant");
-            return false;
-        }
-    }
-    for (auto i : operation.outputs) {
-        const auto output = model.operands[i];
-        if (output.type == OperandType::TENSOR_QUANT8_ASYMM && output.zeroPoint != 0) {
-            VLOG_CHECKFAIL("output quant");
-            return false;
-        }
-    }
-#endif
-
-    const auto input0 = model.operands[operation.inputs[0]];
-    auto activationPass = [&model](const Operand& input) -> bool {
-        const FusedActivationFunc activation =
-            getOperandConstVal<FusedActivationFunc>(model, input);
-        /*
-        if (activation == FusedActivationFunc::RELU1) {
-            VLOG_CHECKFAIL("relu1 used");
-            return false;
-        }
-        */
-        return true;
-    };
-
-    const auto& inputn = model.operands[operation.inputs[operation.inputs.size() - 1]];
+    #define VLOG_CHECKFAIL(fail) VLOG(L1, "Check failed: %s", fail)
 
     switch (operation.type) {
         case OperationType::CONV_2D: {
-            const auto& input1 = model.operands[operation.inputs[1]];
-            // filter in == channel
-            if (input0.dimensions[3] != input1.dimensions[3]) {
-                VLOG_CHECKFAIL("filter in not equals channel");
-                return false;
+            int oper_size = operation.inputs.size();
+		    const auto&  input0 = model.operands[operation.inputs[OP_INPUT_IDX_CONV]];
+			const auto& input1 = model.operands[operation.inputs[OP_FILTER_IDX_CONV]];
+			const auto& input2 = model.operands[operation.inputs[OP_BIAS_IDX_CONV]];
+			
+			
+			VLOG(L1,"Validating CONV2D params");
+			//filter in == channel
+			//Check Input/Filter  Operand type
+			
+			if (oper_size != IMPL_PAD_PARAMS_CONV &&  oper_size != EXPL_PAD_PARAMS_CONV) {
+				VLOG(L1,"NNERR: Operation Input Size invalid ,aborting!!");
+				return false;
+			}
+			
+			if(input0.type != OperandType::TENSOR_FLOAT32 ||  input1.type != OperandType::TENSOR_FLOAT32 || 
+				input2.type != OperandType::TENSOR_FLOAT32){
+				VLOG(L1,"NNERR: input0/input1/input2 invalid operand types");
+				return false;
+			}	
+			
+			if(input0.lifetime == input1.lifetime ){
+				VLOG(L1,"NNERR: Filter (index %d) as model_input (index %d) not supported,aborting!!",operation.inputs[OP_FILTER_IDX_CONV],operation.inputs[OP_INPUT_IDX_CONV]);
+				return false;
+			}
+			
+			//Check Input Dimension size
+			if(input0.dimensions.size() != NHWC_DIM_NUM ||
+			 input1.dimensions.size() != NHWC_DIM_NUM) {
+					VLOG(L1,"NNERR: input-0 dim-size %d  or input1 dim-size %d invalid,aborting!!",input0.dimensions.size(),input1.dimensions.size());
+					return false;
+			}
+			
+			//Check Channel parameter for Input and filter/kernel 	
+            if (input0.dimensions[NHWC_CH_IDX] != 
+				input1.dimensions[NHWC_CH_IDX]) {
+                VLOG(L1,"NNERR: input-0 ch-size %d  and input-1 ch-size %d not equal,aborting!!",input0.dimensions.size(),input1.dimensions.size());
+				return false;
             }
+			
+			if (input1.dimensions[NHWC_HT_IDX] != 
+				input1.dimensions[NHWC_WD_IDX]) {
+                VLOG(L1,"NNERR: non-square Filter size(H:%d,W:%d) not supported,warning!!",input1.dimensions[NHWC_HT_IDX],input1.dimensions[NHWC_WD_IDX]);
+			    //return false;
+            }
+			
+			//Check all other Input operand types for implicit/explicit Padding
+			
+			if(oper_size == IMPL_PAD_PARAMS_CONV){
+			const auto& input3 = model.operands[operation.inputs[OP_PADSCHEME_IDX_CONV]];
+			const auto& input4 = model.operands[operation.inputs[OP_STRD_WD_IDX_IMPL_CONV]];
+			const auto& input5 = model.operands[operation.inputs[OP_STRD_HT_IDX_IMPL_CONV]];
+			const auto& input6 = model.operands[operation.inputs[OP_ACTV_FUNC_IDX_IMPL_CONV]];	
+			
+				if(input3.type != OperandType::INT32 || input4.type != OperandType::INT32 || input5.type != OperandType::INT32 ||
+				input6.type != OperandType::INT32){
+				VLOG(L1,"NNERR: inputs 3-6 invalid operand types");
+				return false;	
+				}
+			}
+			else if (oper_size == EXPL_PAD_PARAMS_CONV){
+			const auto& input3 = model.operands[operation.inputs[OP_PADL_IDX_CONV]];
+			const auto& input4 = model.operands[operation.inputs[OP_PADR_IDX_CONV]];
+			const auto& input5 = model.operands[operation.inputs[OP_PADH_IDX_CONV]];
+			const auto& input6 = model.operands[operation.inputs[OP_PADW_IDX_CONV]];
+			const auto& input7 = model.operands[operation.inputs[OP_STRD_WD_IDX_EXPL_CONV]];	
+			const auto& input8 = model.operands[operation.inputs[OP_STRD_HT_IDX_EXPL_CONV]];		
+			const auto& input9 = model.operands[operation.inputs[OP_ACTV_FUNC_IDX_EXPL_CONV]];
+			
+				if(input3.type != OperandType::INT32 || input4.type != OperandType::INT32 || input5.type != OperandType::INT32 ||
+				input6.type != OperandType::INT32 || input7.type != OperandType::INT32 || input8.type != OperandType::INT32 ||
+				input9.type != OperandType::INT32){
+				VLOG(L1,"NNERR:inputs 3-9 invalid operand types");
+				return false;	
+				}
+			}
+		
+			//Check for Output Operand types
+			if(operation.outputs.size() > 1) {
+				VLOG(L1,"NNERR:output operand size invalid for depthwise conv2d,aborting!!");
+				return false;
+				
+			}	
+			const auto& output = model.operands[operation.outputs[0]];
+			
+			if(output.type != OperandType::TENSOR_FLOAT32){
+				VLOG(L1,"NNERR:output operand types invalid,aborting!!");
+				return false;		
+			}
             break;
-            // continue to check actication.
+            //continue to check activation.
         }
 
         case OperationType::DEPTHWISE_CONV_2D: {
-            const auto& input1 = model.operands[operation.inputs[1]];
-            // channels_out must be channels * depth_mul
-            if ((input1.dimensions[3] % input0.dimensions[3]) != 0) {
-                VLOG_CHECKFAIL("dims not in group");
+            VLOG(L1,"Validating DEPTHWISE_CONV_2D params");
+			const auto&  input0 = model.operands[operation.inputs[OP_INPUT_IDX_CONV]];
+			const auto& input1 = model.operands[operation.inputs[OP_FILTER_IDX_CONV]];
+            //depth_out = depth_in * depth_multiplier,input1 is depth_out and input0 is depth_in
+          			
+			const auto& input2 = model.operands[operation.inputs[OP_BIAS_IDX_CONV]];
+			//ALOGI("channelsize: input-0 operand-type %d input-1 operand-type %d input2 operand-type %d",input0.type,input1.type,input2.type);
+			
+			int oper_size = operation.inputs.size();
+			
+			if (oper_size != IMPL_PAD_PARAMS_DW_CONV &&  oper_size != EXPL_PAD_PARAMS_DW_CONV) {
+				VLOG(L1,"NNERR: Operation Input Size invalid ,aborting!!");
+				return false;
+			}
+			//Check Input/Filter  Operand type
+			if(input0.type != OperandType::TENSOR_FLOAT32 ||  input1.type != OperandType::TENSOR_FLOAT32 || 
+				input2.type != OperandType::TENSOR_FLOAT32){
+				VLOG(L1,"NNERR: input 0-2 invalid operand types");
+				return false;
+			}	
+			
+			//Check Input Dimension size
+			if(input0.dimensions.size() != NHWC_DIM_NUM ||
+			 input1.dimensions.size() != NHWC_DIM_NUM) {
+					VLOG(L1,"NNERR: input-0 dim-size %d  or input1 dim-size %d invalid,aborting!!",input0.dimensions.size(),input1.dimensions.size());
+					return false;
+			}
+			
+			if(input0.lifetime == input1.lifetime ){
+				VLOG(L1,"NNERR: Filter (index %d) as model_input (index %d) not supported,aborting!!",operation.inputs[OP_FILTER_IDX_CONV],operation.inputs[OP_INPUT_IDX_CONV]);
+				return false;
+			}
+			
+			if ((input1.dimensions[NHWC_CH_IDX] % input0.dimensions[NHWC_CH_IDX]) != 0) {
+                VLOG_CHECKFAIL("NNERR:input/filter invalid depth leads to non-integer Depth Multiper");
                 return false;
             }
-            if (activationPass(inputn) == false) {
-                return false;
-            }
+			
+			//Check all other Input operand types for implicit/explicit Padding
+			
+			if(oper_size == IMPL_PAD_PARAMS_DW_CONV){
+			const auto& input3 = model.operands[operation.inputs[OP_PADSCHEME_IDX_CONV]];
+			const auto& input4 = model.operands[operation.inputs[OP_STRD_WD_IDX_IMPL_CONV]];
+			const auto& input5 = model.operands[operation.inputs[OP_STRD_HT_IDX_IMPL_CONV]];
+			const auto& input6 = model.operands[operation.inputs[OP_DW_CONV_DPM_IMPL]];
+			const auto& input7 = model.operands[operation.inputs[OP_ACTV_FUNC_IDX_IMPL_DW_CONV]];				
+			
+				if(input3.type != OperandType::INT32 || input4.type != OperandType::INT32 || input5.type != OperandType::INT32 ||
+				input6.type != OperandType::INT32 || input7.type != OperandType::INT32 ){
+				VLOG(L1,"NNERR: inputs 3-7 invalid operand types");
+				return false;	
+				}
+			}
+			else if (oper_size == EXPL_PAD_PARAMS_DW_CONV){
+			const auto& input3 = model.operands[operation.inputs[OP_PADL_IDX_CONV]];
+			const auto& input4 = model.operands[operation.inputs[OP_PADR_IDX_CONV]];
+			const auto& input5 = model.operands[operation.inputs[OP_PADH_IDX_CONV]];
+			const auto& input6 = model.operands[operation.inputs[OP_PADW_IDX_CONV]];
+			const auto& input7 = model.operands[operation.inputs[OP_STRD_WD_IDX_EXPL_CONV]];	
+			const auto& input8 = model.operands[operation.inputs[OP_STRD_HT_IDX_EXPL_CONV]];		
+			const auto& input9 = model.operands[operation.inputs[OP_DW_CONV_DPM_EXPL]];
+			const auto& input10 = model.operands[operation.inputs[OP_ACTV_FUNC_IDX_EXPL_DW_CONV]];
+			
+				if(input3.type != OperandType::INT32 || input4.type != OperandType::INT32 || input5.type != OperandType::INT32 ||
+				input6.type != OperandType::INT32 || input7.type != OperandType::INT32 || input8.type != OperandType::INT32 ||
+				input9.type != OperandType::INT32 || input10.type != OperandType::INT32){
+				VLOG(L1,"NNERR:inputs 3-10 invalid operand types");
+				return false;	
+				}
+			}
+			
+			//Check for Output Operand types
+			if(operation.outputs.size() > 1) {
+				VLOG(L1,"NNERR:output operand size invalid for conv2d,aborting!!");
+				return false;
+				
+			}	
+			const auto& output = model.operands[operation.outputs[0]];
+			
+			if(output.type != OperandType::TENSOR_FLOAT32){
+				VLOG(L1,"NNERR:output operand types invalid,aborting!!");
+				return false;		
+			}
             break;
         }
 
         case OperationType::SOFTMAX: {
-            const auto& input1 = model.operands[operation.inputs[1]];
+            VLOG(L1,"Validating SOFTMAX operation params");
+			const auto&  input0 = model.operands[operation.inputs[OP_INPUT_IDX_CONV]];
+			const auto& input1 = model.operands[operation.inputs[1]];
             float beta = getOperandConstVal<float>(model, input1);
-            // beta need = 1.0f
-            // if (beta != 1.0f) {
-            if (beta <= 0.0f) {
-                VLOG_CHECKFAIL("beta must be positive for softmax");
+			
+			const auto& output = model.operands[operation.outputs[0]];
+			
+			if (operation.inputs.size() != SOFTMAX_INPUT_PARAMS) {
+				VLOG(L1,"NNERR: Operation Input Size invalid ,aborting!!");
+				return false;
+			}
+			
+			//Check Input/Filter  Operand type
+			if(input0.type != OperandType::TENSOR_FLOAT32  || input1.type != OperandType::FLOAT32 ){
+				VLOG(L1,"NNERR: input0/input1 invalid operand types");
+				return false;
+			}	
+			
+			if(operation.outputs.size() > 1) {
+				VLOG(L1,"NNERR:output operand size invalid for conv2d,aborting!!");
+				return false;
+			}
+			
+			if(output.type != OperandType::TENSOR_FLOAT32){
+				VLOG(L1,"NNERR:output operand types invalid,aborting!!");
+				return false;		
+			}			
+            //beta need = 1.0f
+            //if (beta != 1.0f) {
+            if (beta != 1) {
+                VLOG_CHECKFAIL("NNERR:beta equal to 1 only supported");
                 return false;
             }
 
@@ -1457,42 +1468,206 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
         }
 
         case OperationType::AVERAGE_POOL_2D:
-        case OperationType::MAX_POOL_2D:
+        case OperationType::MAX_POOL_2D: {
+            int oper_size = operation.inputs.size();
+		    const auto&  input0 = model.operands[operation.inputs[OP_INPUT_IDX_POOL]];
+			VLOG(L1,"Validating AVG_POOL_2D params");
+			//filter in == channel
+			//Check Input/Filter  Operand type
+			
+			if (oper_size != IMPL_PAD_PARAMS_POOL &&  oper_size != EXPL_PAD_PARAMS_POOL) {
+				VLOG(L1,"NNERR: Operation Input Size invalid ,aborting!!");
+				return false;
+			}
+			
+			if(input0.type != OperandType::TENSOR_FLOAT32){
+				VLOG(L1,"NNERR: input0 invalid operand types");
+				return false;
+			}	
+			
+			//Check Input Dimension size
+			if(input0.dimensions.size() != NHWC_DIM_NUM ) {
+					VLOG(L1,"NNERR: input-0 dim-size %d invalid,aborting!!",input0.dimensions.size());
+					return false;
+			}
+			           
+			//Check all other Input operand types for implicit/explicit Padding
+			
+			if(oper_size == IMPL_PAD_PARAMS_POOL){
+			const auto& input1 = model.operands[operation.inputs[OP_PADSCHEME_IDX_POOL]];
+			const auto& input2 = model.operands[operation.inputs[OP_STRD_WD_IDX_IMPL_POOL]];
+			const auto& input3 = model.operands[operation.inputs[OP_STRD_HT_IDX_IMPL_POOL]];
+			const auto& input4 = model.operands[operation.inputs[OP_FLT_WD_IDX_IMPL_POOL]];
+			const auto& input5 = model.operands[operation.inputs[OP_FLT_HT_IDX_IMPL_POOL]];
+			const auto& input6 = model.operands[operation.inputs[OP_ACTV_FUNC_IDX_IMPL_POOL]];	
+			
+				if(input1.type != OperandType::INT32 || input2.type != OperandType::INT32 || input3.type != OperandType::INT32 || input4.type != OperandType::INT32 ||
+				input5.type != OperandType::INT32 || input6.type != OperandType::INT32
+				){
+				VLOG(L1,"NNERR: inputs 1-6 invalid operand types");
+				return false;	
+				}
+			}
+			else if (oper_size == EXPL_PAD_PARAMS_POOL){
+			const auto& input1 = model.operands[operation.inputs[OP_PADL_IDX_POOL]];
+			const auto& input2 = model.operands[operation.inputs[OP_PADR_IDX_POOL]];
+			const auto& input3 = model.operands[operation.inputs[OP_PADH_IDX_POOL]];
+			const auto& input4 = model.operands[operation.inputs[OP_PADW_IDX_POOL]];
+			const auto& input5 = model.operands[operation.inputs[OP_STRD_WD_IDX_EXPL_POOL]];	
+			const auto& input6 = model.operands[operation.inputs[OP_STRD_HT_IDX_EXPL_POOL]];const auto& input7 = model.operands[operation.inputs[OP_FLT_WD_IDX_EXPL_POOL]];	
+			const auto& input8 = model.operands[operation.inputs[OP_FLT_HT_IDX_EXPL_POOL]];		
+			const auto& input9 = model.operands[operation.inputs[OP_ACTV_FUNC_IDX_EXPL_POOL]];
+			
+				if(input1.type != OperandType::INT32 || input2.type != OperandType::INT32 || input3.type != OperandType::INT32 || input4.type != OperandType::INT32 || input5.type != OperandType::INT32 || input6.type != OperandType::INT32 ||
+				input7.type != OperandType::INT32 || input8.type != OperandType::INT32 || 
+				input9.type != OperandType::INT32){
+				VLOG(L1,"NNERR:inputs 1-9 as invalid operand types");
+				return false;	
+				}
+			}
+		
+			//Check for Output Operand types
+			if(operation.outputs.size() > 1) {
+				VLOG(L1,"NNERR:output operand size invalid for pooling,aborting!!");
+				return false;
+				
+			}	
+			const auto& output = model.operands[operation.outputs[0]];
+			
+			if(output.type != OperandType::TENSOR_FLOAT32){
+				VLOG(L1,"NNERR:output operand types invalid,aborting!!");
+				return false;		
+			}
+        }
         case OperationType::FULLY_CONNECTED: {
-            if (activationPass(inputn) == false) {
-                return false;
-            }
-            break;
+            const auto&  input0 = model.operands[operation.inputs[OP_INPUT_IDX_FC]];
+			
+			if (operation.inputs.size() != FC_INPUT_PARAMS) {
+				VLOG(L1,"NNERR: Operation Input Size invalid ,aborting!!");
+				return false;
+			}
+			const auto&  input1 = model.operands[operation.inputs[OP_WGHT_IDX_FC]];
+			const auto&  input2 = model.operands[operation.inputs[OP_BIAS_IDX_FC]];
+			
+			if(input0.type != OperandType::TENSOR_FLOAT32 ||  input1.type != OperandType::TENSOR_FLOAT32 || input2.type != OperandType::TENSOR_FLOAT32){
+				VLOG(L1,"NNERR: input0/input1/input2 invalid operand types");
+				return false;
+			}
+			
+			if(input0.dimensions.size() < 2 || input1.dimensions.size() < 2 ||
+			 input2.dimensions.size() < 1){
+				VLOG(L1,"NNERR: input 0-2 dimensions size invalid, aborting!!");
+				return false;
+			}
+			if (input0.dimensions[1] != input1.dimensions[1]) {
+				VLOG(L1, "NNERR: input0 and input1(weight) with unequal input-size value, aborting!!");
+				return false;
+			}
+			
+			const auto&  input3 = model.operands[operation.inputs[OP_ACTV_IDX_FC]];
+			
+			if (input3.type != OperandType::INT32){
+				VLOG(L1, "NNERR: input3  invalid operand types");
+				return false;
+			}
+			
+			if (operation.outputs.size() > 1) {
+				VLOG(L1, "NNERR:output operand size invalid for FC,aborting!!");
+				return false;
+
+			}
+			const auto& output = model.operands[operation.outputs[0]];
+
+			if (output.type != OperandType::TENSOR_FLOAT32) {
+				VLOG(L1, "NNERR:invalid output operand types for FC ,aborting!!");
+				return false;
+			}
         }
 
         case OperationType::RELU:
         case OperationType::RELU1:
         case OperationType::RELU6:
             break;
-        case OperationType::LOGISTIC:
+        case OperationType::LOGISTIC: {
+            const auto&  input0 = model.operands[operation.inputs[0]];
+			const auto& output = model.operands[operation.outputs[0]];
+			
+			if(input0.dimensions.size() > 4 || input0.type != OperandType::TENSOR_FLOAT32 ||
+			   operation.outputs.size() > 1 || operation.inputs.size() > 1 || output.type != OperandType::TENSOR_FLOAT32  ) {
+				VLOG(L1,"NNERR: input/output  params invalid for Relu/Logit, aborting!!");
+				return false;	
+			}
+			
+			if(input0.dimensions[0]  > 1){
+				VLOG(L1,"NNERR:batch size more than 1 not supported for relu/logit");
+				return false;
+			}				
+		
+        }
         case OperationType::TANH:
         case OperationType::LOCAL_RESPONSE_NORMALIZATION:
-        case OperationType::CONCATENATION:
         case OperationType::L2_NORMALIZATION:
         case OperationType::RESHAPE:
-            break;
+		case OperationType::CONCATENATION:
+		    VLOG(L1,"Supporting Reshape/Concat now,VTS is TBD!!");
+		break;
 
         case OperationType::ADD: {
-            const auto& input1 = model.operands[operation.inputs[1]];
-            if (input0.dimensions != input1.dimensions) {
-                VLOG_CHECKFAIL("dims not match");
-                return false;
-            }
+           if (operation.inputs.size() != ADD_INPUT_PARAMS) {
+				VLOG(L1,"NNERR: Operation Input Size invalid ,aborting!!");
+				return false;
+			}
+		   const auto&  input0 = model.operands[operation.inputs[OP_INPUT0_IDX_ADD]];	
+           const auto& input1 = model.operands[operation.inputs[OP_INPUT1_IDX_ADD]];
+		   const auto& input2 = model.operands[operation.inputs[OP_ACTV_IDX_ADD]];
+           if (input0.dimensions != input1.dimensions) {
+               VLOG(L1,"NNERR:dims not match");
+			   return false;
+           }
+		   
+		   if (input0.type != input1.type) {
+				VLOG(L1, "NNERR:input0 and input1 type not equal,aborting!!");
+				return false;
+			}
+			
+			if (input2.type != OperandType::INT32) {
+				VLOG(L1, "NNERR:input2 type invalid,aborting!!");
+				return false;
+			}
+			
+		   if (operation.outputs.size() > 1) {
+				VLOG(L1, "NNERR:output operand size invalid for ADD,aborting!!");
+				return false;
 
-            if (activationPass(inputn) == false) {
-                return false;
-            }
-            break;
-        }
+			}
+			const auto& output = model.operands[operation.outputs[0]];
+			
+			if (output.type != input0.type) {
+				VLOG(L1, "NNERR: output type not equalt to input0 type ,aborting!!");
+				return false;
+			}
+        } break;
         default:
             VLOG(L1, "unsupport opration %d", operation.type);
             return false;
     }
+    #ifdef DISABLE_ALL_QUANT
+    for (auto i : operation.inputs) {
+        const auto input = model.operands[i];
+        if (input.type == OperandType::TENSOR_QUANT8_ASYMM) {
+            VLOG_CHECKFAIL("input quant");
+			return false;
+        }
+    }
+    for (auto i : operation.outputs) {
+        const auto output = model.operands[i];
+        if (output.type == OperandType::TENSOR_QUANT8_ASYMM) {
+            VLOG_CHECKFAIL("output quant");
+			return false;
+        }
+    }
+
+    #endif
     VLOG(L1, "Operation %d supported by driver", operation.type);
 
     return true;
@@ -1513,33 +1688,31 @@ bool PreparedModel::isConst(int index) {
 bool PreparedModel::operationAdd(const Operation& operation) {
     VLOG(L1, "OperationType::ADD");
     OutputPort out;
-    bool isIn0Const = isConst(operation.inputs[0]);
-    bool isIn1Const = isConst(operation.inputs[1]);
+    bool isIn0Const = isConst(operation.inputs[OP_INPUT_IDX_CONV]);
+    bool isIn1Const = isConst(operation.inputs[OP_FILTER_IDX_CONV]);
     VLOG(L1, "isIn0Const = %d isIn1Const = %d \n", isIn0Const, isIn1Const);
     if (isIn0Const || isIn1Const) {
-        if (isIn0Const && isIn1Const) {
-            VLOG(L1, "adding 2 constants, we can do it now and put const as output");
-            nnAssert(true);
-        }
-        // this will use ScaleShift
-        if (isIn0Const)  // if op.inputs[1] is a Model input
-            out = AddConst(mNet, getPort(operation.inputs[1]),
-                           GetConstOperandAsTensor(operation.inputs[0]));
-        else  // isIn1Const is const //op.inputs[0] is a Model input
-            out = AddConst(mNet, getPort(operation.inputs[0]),
-                           GetConstOperandAsTensor(operation.inputs[1]));
-    } else {  // both inputs[0] & inputs[1] are model inputs
-        out = getPort(operation.inputs[0]) + getPort(operation.inputs[1]);
-    }
+				if (isIn0Const && isIn1Const) {
+					VLOG(L1, "adding 2 constants, we can do it now and put const as output");
+					nnAssert(true);
+				}
+				// this will use ScaleShift
+				if (isIn0Const) //if op.inputs[OP_FILTER_IDX] is a Model input
+					out = AddConst(mNet, getPort(operation.inputs[OP_FILTER_IDX_CONV]),GetConstOperandAsTensor(operation.inputs[OP_INPUT_IDX_CONV],OP_INPUT_IDX_CONV));
+				else // isIn1Const is const //op.inputs[OP_INPUT_IDX_CONV] is a Model input
+					out = AddConst(mNet, getPort(operation.inputs[OP_INPUT_IDX_CONV]),GetConstOperandAsTensor(operation.inputs[OP_FILTER_IDX_CONV],OP_FILTER_IDX_CONV));
+			} else { // both inputs[OP_INPUT_IDX_CONV] & inputs[OP_FILTER_IDX_CONV] are model inputs
+				out = getPort(operation.inputs[OP_INPUT_IDX_CONV]) + getPort(operation.inputs[OP_FILTER_IDX_CONV]);
+			}
     // check fusion
     VLOG(L1, "check fusion parameter = %d\n", PARAM_I32(2));
 
     mPorts[operation.outputs[0]] = handleFusion(out, PARAM_I32(2));
 
-    VLOG(L1, "add mPorts[%d]->name %s + mPorts[%d]->name %s  = mPorts[%d]->name %s \n",
-         operation.inputs[0], isIn0Const ? "isIn0Const" : mPorts[operation.inputs[0]]->name.c_str(),
-         operation.inputs[1], isIn1Const ? "isIn1Const" : mPorts[operation.inputs[1]]->name.c_str(),
-         operation.outputs[0], mPorts[operation.outputs[0]]->name.c_str());
+    VLOG(L1, "add mPorts[%d]->name %s + mPorts[%d]->name %s  = mPorts[%d]->name %s \n", operation.inputs[0],
+             isIn0Const ? "isIn0Const" : mPorts[operation.inputs[0]]->name.c_str(), operation.inputs[1],
+                   isIn1Const ? "isIn1Const":  mPorts[operation.inputs[1]]->name.c_str(),
+                      operation.outputs[0], mPorts[operation.outputs[0]]->name.c_str());
 
     return true;
 }
@@ -1815,7 +1988,7 @@ bool PreparedModel::operationConCat(const Operation& operation) {
 
 bool PreparedModel::operationConv2D(const Operation& operation) {
     VLOG(L1, "OperationType::CONV_2D");
-
+    dumpOperationParam(operation);
     /**
      * Performs an 2-D convolution operation.
      *
@@ -1904,160 +2077,129 @@ bool PreparedModel::operationConv2D(const Operation& operation) {
 
     ***/
 
-    auto input = getPort(operation.inputs[0]);
-    auto filter = GetConstOperandAsTensor(operation.inputs[1]);  // OIHW
-    // auto filter = GetConstWeightsOperandAsTensor(operation.inputs[1]);
-    auto bias = GetConstOperandAsTensor(operation.inputs[2]);
+    auto input = getPort(operation.inputs[OP_INPUT_IDX_CONV]);
+  auto filter = GetConstOperandAsTensor(operation.inputs[OP_FILTER_IDX_CONV],OP_FILTER_IDX_CONV); //OIHW
+  //auto filter = GetConstWeightsOperandAsTensor(operation.inputs[1]);
+  auto bias = GetConstOperandAsTensor(operation.inputs[OP_BIAS_IDX_CONV],OP_BIAS_IDX_CONV);
+  if(bias == nullptr) {
+	VLOG(L1,"NNERR:bias blob is NULL");
+    return false;
+  }	  
+  
+  if (operation.outputs.size() > 1) {
+	VLOG(L1,"NNERR:More than one output for Conv2d,Aborting!!");
+    return false;
+  }	  
+	  
+ 
+  const auto inputDims = input->getTensorDesc().getDims();
+  const auto filterDims = filter->getTensorDesc().getDims();
 
-    const auto inputDims = input->getTensorDesc().getDims();
-    const auto filterDims = filter->getTensorDesc().getDims();
+  ConvolutionParams prms;
 
-    ConvolutionParams prms;
-    // prms.weights = static_cast<IRBlob::Ptr>(filter); // permute OHWI to OIHW (0->0, 3->1, 1->2,
-    // 2->3) const auto dims = prms.weights->getTensorDesc().getDims(); const auto indims =
-    // input->getTensorDesc().getDims(); int  fusion_index = -1;
+  int batches = (int)inputDims[0];
+  int in_channels = (int)inputDims[1];
+  int input_height = (int)inputDims[2];
+  int input_width = (int)inputDims[3];
+	
+  int filter_in = (int)filterDims[1];
+  int filter_out = (int)filterDims[0];
+  int filter_height = (int)filterDims[2];
+  int filter_width = (int)filterDims[3];
 
-    int batches = (int)inputDims[0];
-    int in_channels = (int)inputDims[1];
-    int input_height = (int)inputDims[2];
-    int input_width = (int)inputDims[3];
+  int32_t fusion_index = -1;
+  
+	  
+  if (operation.inputs.size() == EXPL_PAD_PARAMS_CONV) {
+	  VLOG(L1,"Explicit padding requested");
+	  mPadreq = EXPL_PAD;
+      prms.padType = "explicit";
+      prms.pad_start.x = PARAM_I32(OP_PADL_IDX_CONV);
+	  prms.pad_start.y = PARAM_I32(OP_PADH_IDX_CONV);
+	  CHECK_OPERAND_2D(prms.pad_start,OP_PADL_IDX_CONV,OP_PADH_IDX_CONV);
+	  prms.pad_end.x = PARAM_I32(OP_PADR_IDX_CONV);
+	  prms.pad_end.y = PARAM_I32(OP_PADW_IDX_CONV);
+	  CHECK_OPERAND_2D(prms.pad_end,OP_PADR_IDX_CONV,OP_PADW_IDX_CONV);
+      prms.stride.x = PARAM_I32(OP_STRD_WD_IDX_EXPL_CONV);
+	  prms.stride.y = PARAM_I32(OP_STRD_HT_IDX_EXPL_CONV);
+      CHECK_OPERAND_2D(prms.stride,OP_STRD_WD_IDX_EXPL_CONV,OP_STRD_HT_IDX_EXPL_CONV);
+	  prms.kernel = {filter_width, filter_height};
+      prms.num_output_planes = filter_out; //depth out
+      fusion_index = OP_ACTV_FUNC_IDX_EXPL_CONV;
+  } else if (operation.inputs.size() == IMPL_PAD_PARAMS_CONV) {//PAD SAME
+    VLOG(L1,"Implicit padding requested");
+	mPadreq = IMPL_PAD;
+    const auto pad_type = PARAM_I32(3); //padding_implicit
+    int stride_width = PARAM_I32(4);
+    int stride_height = PARAM_I32(5);
+    int padding_left, padding_right;
+    int padding_top, padding_bottom;
 
-    int filter_in = (int)filterDims[1];
-    int filter_out = (int)filterDims[0];
-    int filter_height = (int)filterDims[2];
-    int filter_width = (int)filterDims[3];
+    if (pad_type == kPaddingSame) {
 
-    // int32_t padding_left, padding_right;
-    // int32_t padding_top, padding_bottom;
-    // int32_t stride_width, stride_height;
+        /**
+         * SAME padding.
+         * Padding on both ends are the "same":
+         *     padding_to_beginning =  total_padding / 2
+         *     padding_to_end       = (total_padding + 1)/2.
+         * i.e., for even number of padding, padding to both ends are exactly
+         * the same; for odd number of padding, padding to the ending is bigger
+         * than the padding to the beginning by 1.
+         *
+         * total_padding is a function of input, stride and filter size.
+         * It could be computed as follows:
+         *    out_size = (input + stride - 1) / stride;
+         *    needed_input = (out_size - 1) * stride + filter_size
+         *    total_padding = max(0, needed_input - output_size)
+         *  The computation is the same for the horizontal and vertical directions.
+         */
 
-    uint32_t fusion_index = -1;
+        calculateExplicitPadding(input_width, stride_width,
+                                 filter_width, pad_type /*padding_implicit*/,
+                                 &padding_left, &padding_right);
+        calculateExplicitPadding(input_height, stride_height,
+                                 filter_height, pad_type /*padding_implicit*/,
+                                 &padding_top, &padding_bottom);
 
-    if (operation.inputs.size() == 10) {
-        prms.padType = "explicit";
-        prms.pad_start = {PARAM_I32(3), PARAM_I32(5)};
-        prms.pad_end = {PARAM_I32(4), PARAM_I32(6)};
-        prms.stride = {PARAM_I32(7), PARAM_I32(8)};
-        prms.kernel = {filter_width, filter_height};
-        prms.num_output_planes = filter_out;  // depth out
-        fusion_index = 9;
-    } else if (operation.inputs.size() == 7) {  // PAD SAME
-        const auto pad_type = PARAM_I32(3);     // padding_implicit
-        int stride_width = PARAM_I32(4);
-        int stride_height = PARAM_I32(5);
-        int padding_left, padding_right;
-        int padding_top, padding_bottom;
-        /*
-            int input_height = indims[2];
-            int input_width = indims[3];
+        prms.pad_start = {padding_left, padding_top};
+        prms.pad_end = {padding_right, padding_bottom};
+        prms.padType = "same_upper";
 
-            int filter_height = dims[2];
-            int filter_width = dims[3];
-        */
-        if (pad_type == kPaddingSame) {
-            /**
-             * SAME padding.
-             * Padding on both ends are the "same":
-             *     padding_to_beginning =  total_padding / 2
-             *     padding_to_end       = (total_padding + 1)/2.
-             * i.e., for even number of padding, padding to both ends are exactly
-             * the same; for odd number of padding, padding to the ending is bigger
-             * than the padding to the beginning by 1.
-             *
-             * total_padding is a function of input, stride and filter size.
-             * It could be computed as follows:
-             *    out_size = (input + stride - 1) / stride;
-             *    needed_input = (out_size - 1) * stride + filter_size
-             *    total_padding = max(0, needed_input - output_size)
-             *  The computation is the same for the horizontal and vertical directions.
-             */
+    } else if (pad_type == kPaddingValid) {
+          /**
+           * VALID padding.
 
-            calculateExplicitPadding(input_width, stride_width, filter_width,
-                                     pad_type /*padding_implicit*/, &padding_left, &padding_right);
-            calculateExplicitPadding(input_height, stride_height, filter_height,
-                                     pad_type /*padding_implicit*/, &padding_top, &padding_bottom);
+           * No padding. When the input size is not evenly divisible by
+           * the filter size, the input at the end that could not fill
+           * the whole filter tile will simply be ignored.
+           */
+          prms.pad_start = {0, 0};
+          prms.pad_end = {0, 0};
+          prms.padType = "valid";
+      }
+      prms.stride = {stride_width, stride_height};
+      prms.kernel = {filter_width, filter_height};
+      prms.num_output_planes = filter_out; //depth out
+      fusion_index = OP_ACTV_FUNC_IDX_IMPL_CONV;
+   }
 
-            prms.pad_start = {padding_left, padding_top};
-            prms.pad_end = {padding_right, padding_bottom};
-            prms.padType = "same_upper";
-
-        } else if (pad_type == kPaddingValid) {
-            /**
-             * VALID padding.
-             * No padding. When the input size is not evenly divisible by
-             * the filter size, the input at the end that could not fill
-             * the whole filter tile will simply be ignored.
-             */
-            prms.pad_start = {0, 0};
-            prms.pad_end = {0, 0};
-            prms.padType = "valid";
-        }
-        prms.stride = {stride_width, stride_height};
-        prms.kernel = {filter_width, filter_height};
-        prms.num_output_planes = filter_out;  // depth out
-        fusion_index = 6;
-    }
-
-    if (bias->size() != prms.num_output_planes) {
-        VLOG(L1, "biases size mismatch filer's depth");
-        nnAssert(false);
-    }
-
+    if (bias && bias->size() != prms.num_output_planes){
+        VLOG(L1, "NNERR:biases size (%d)mismatch output planes (%d),warning",bias->size(),prms.num_output_planes);
+	    //return false;
+        //nnAssert(false);
+      }
+	
     // input_size (validate)
-    if (filter_in != in_channels) {
-        VLOG(L1, "filter depth_in size mismatch input depth");
-        nnAssert(false);
-    }
+    if (filter_in != in_channels){
+        VLOG(L1, "NNERR:filter depth_in size (%d) mismatch input depth (%d),warning!!",filter_in,in_channels);
+	    // return false;
+        //nnAssert(false);
+      }
 
-    // Reshape CONV_2D or use GetConstWeightsOperandAsTensor()
-    /*
-        //filter_in same as in_channels
-        TensorDims newDims = {(uint32_t)filter_in, (uint32_t)filter_out, (uint32_t)filter_height,
-       (uint32_t)filter_width};
-
-        TensorDesc td(IRBuilder::g_layer_precision, newDims, {{newDims[2], newDims[3], newDims[0],
-       newDims[1]}, {2, 3, 0, 1}}); //working for CTS
-
-        //check diff combination btw TF lite and IE
-        //2310
-        //TensorDesc td(IRBuilder::g_layer_precision, newDims, {{newDims[2], newDims[3], newDims[1],
-       newDims[0]}, {2, 3, 1, 0}});
-
-        //using data_type = typename
-       InferenceEngine::PrecisionTrait<IRBuilder::g_layer_precision>::value_type; //fix this to use
-       calculate data type at runtime
-
-        if (IRBuilder::g_layer_precision == InferenceEngine::Precision::FP32) {
-          InferenceEngine::TBlob<float>::Ptr dst_blob =
-       std::make_shared<InferenceEngine::TBlob<float>>(td); dst_blob->allocate();
-
-          for (size_t i = 0 ; i < filter->size(); i++) {
-            dst_blob->buffer().as<float*>()[dst_blob->getTensorDesc().offset(i)] =
-       filter->cbuffer().as<const float*>()[filter->getTensorDesc().offset(i)]; //set Layout::NCHW
-       in td for src and dst
-          }
-
-          prms.weights = static_cast<IRBlob::Ptr>(dst_blob);
-        }else {
-          InferenceEngine::TBlob<short>::Ptr dst_blob =
-       std::make_shared<InferenceEngine::TBlob<short>>(td); //short or uint16_t
-          dst_blob->allocate();
-
-          for (size_t i = 0 ; i < filter->size(); i++) {
-            dst_blob->buffer().as<short*>()[dst_blob->getTensorDesc().offset(i)] =
-       filter->cbuffer().as<const short*>()[filter->getTensorDesc().offset(i)]; //set Layout::NCHW
-       in td for src and dst
-          }
-
-          prms.weights = static_cast<IRBlob::Ptr>(dst_blob);
-        }
-
-    */
-    prms.weights = static_cast<IRBlob::Ptr>(
-        filter);  // layout [filter_in, filter_out, filter_height, filter_width]
+    prms.weights = static_cast<IRBlob::Ptr>(filter); //layout [filter_in, filter_out, filter_height, filter_width]
     const auto weightsDims = prms.weights->getTensorDesc().getDims();
 
-    // auto out = Convolution(input, prms) + bias;
+  	//auto out = Convolution(input, prms) + bias;
     prms.biases = static_cast<IRBlob::Ptr>(bias);
     auto out = Convolution(input, prms);
 
@@ -2065,8 +2207,14 @@ bool PreparedModel::operationConv2D(const Operation& operation) {
         VLOG(L1, "invalid fusion index");
         nnAssert(false);
     }
-    mPorts[operation.outputs[0]] = handleFusion(out, PARAM_I32(fusion_index));
-
+    auto acv_func = PARAM_I32(fusion_index);
+	if (acv_func < 0 ) {
+	VLOG(L1,"Invalid Activation function passed,aborting!!");
+	return false;
+	}	
+	//now here the out is next layer's input , and next layer is an activation layer..relu/sigmoid etc...
+	mPorts[operation.outputs[0]] = handleFusion(out, acv_func);
+	
     VLOG(L1, "----------------------------------------------");
     VLOGDIMS(L1, inputDims, "inputs dims");
     VLOGDIMS(L1, filterDims, "filter dims");
@@ -2078,6 +2226,7 @@ bool PreparedModel::operationConv2D(const Operation& operation) {
 
 bool PreparedModel::operationDepthwiseConv2D(const Operation& operation) {
     VLOG(L1, "OperationType::DEPTHWISE_CONV_2D");
+    dumpOperationParam(operation);
     /**
      * Performs a depthwise 2-D convolution operation.
      *
@@ -2168,189 +2317,130 @@ bool PreparedModel::operationDepthwiseConv2D(const Operation& operation) {
      *      must be satisfied: output_scale > input_scale * filter_scale.
      */
 
-    auto input = getPort(operation.inputs[0]);
-    // auto filter = GetConstOperandAsTensor(operation.inputs[1]); //NCHW [1, depth_out,
-    // filter_height, filter_width]
-    auto filter = GetConstWeightsOperandAsTensor(
-        operation.inputs[1]);  //[depth_out, 1, filter_height, filter_width] OIHW
-    auto bias = GetConstOperandAsTensor(operation.inputs[2]);
+    auto input = getPort(operation.inputs[OP_INPUT_IDX_CONV]);
+  //auto filter = GetConstOperandAsTensor(operation.inputs[1]); //NCHW [1, depth_out, filter_height, filter_width]
+  auto filter = GetConstWeightsOperandAsTensor(operation.inputs[OP_FILTER_IDX_CONV]); //[depth_out, 1, filter_height, filter_width] OIHW
+  auto bias = GetConstOperandAsTensor(operation.inputs[OP_BIAS_IDX_CONV],OP_BIAS_IDX_CONV);
 
-    const auto inputDims = input->getTensorDesc().getDims();
-    const auto filterDims = filter->getTensorDesc().getDims();
+  const auto inputDims = input->getTensorDesc().getDims();
+  const auto filterDims = filter->getTensorDesc().getDims();
 
-    ConvolutionParams prms;
+  ConvolutionParams prms;
 
-    int batches = (int)inputDims[0];
-    int in_channels = (int)inputDims[1];
-    int input_height = (int)inputDims[2];
-    int input_width = (int)inputDims[3];
+  int batches = (int)inputDims[0];
+  int in_channels = (int)inputDims[1];
+  int input_height = (int)inputDims[2];
+  int input_width = (int)inputDims[3];
 
-    int filter_in = (int)filterDims[1];
-    int filter_out = (int)filterDims[0];
-    int filter_height = (int)filterDims[2];
-    int filter_width = (int)filterDims[3];
+  int filter_in = (int)filterDims[1];
+  int filter_out = (int)filterDims[0];
+  int filter_height = (int)filterDims[2];
+  int filter_width = (int)filterDims[3];
+  int fusion_index = -1;
+  int depth_multiplier = 0;
 
-    // int32_t padding_left, padding_right;
-    // int32_t padding_top, padding_bottom;
-    // int32_t stride_width, stride_height;
 
-    int fusion_index = -1;
-    int depth_multiplier = 0;
+      if (operation.inputs.size() == 11) {
+		  mPadreq = EXPL_PAD;
+          prms.padType = "explicit";
+          prms.pad_start = {PARAM_I32(3), PARAM_I32(5)};
+          prms.pad_end = {PARAM_I32(4), PARAM_I32(6)};
+          prms.stride = {PARAM_I32(7), PARAM_I32(8)};
+          prms.kernel = {(int)filter_width, (int)filter_height};
+          fusion_index = 10;
+          prms.groups = in_channels; //working
+          depth_multiplier = PARAM_I32(9);
+          prms.num_output_planes = in_channels*depth_multiplier;//same as filter_out; //dims[0]; //depth out
+      } else if (operation.inputs.size() == 8) {//implicit padding
+	      mPadreq = IMPL_PAD;
+          const auto pad_type = PARAM_I32(3);
+          int stride_width = PARAM_I32(4);
+          int stride_height = PARAM_I32(5);
 
-    if (operation.inputs.size() == 11) {
-        prms.padType = "explicit";
-        prms.pad_start = {PARAM_I32(3), PARAM_I32(5)};
-        prms.pad_end = {PARAM_I32(4), PARAM_I32(6)};
-        prms.stride = {PARAM_I32(7), PARAM_I32(8)};
-        prms.kernel = {(int)filter_width, (int)filter_height};
-        fusion_index = 10;
-        prms.groups = in_channels;  // working
-        depth_multiplier = PARAM_I32(9);
-        prms.num_output_planes =
-            in_channels * depth_multiplier;     // same as filter_out; //dims[0]; //depth out
-    } else if (operation.inputs.size() == 8) {  // implicit padding
-        const auto pad_type = PARAM_I32(3);
-        int stride_width = PARAM_I32(4);
-        int stride_height = PARAM_I32(5);
+          int padding_left, padding_right;
+          int padding_top, padding_bottom;
 
-        int padding_left, padding_right;
-        int padding_top, padding_bottom;
+          if (pad_type == kPaddingSame) {
+              /**
+               * SAME padding.
+               * Padding on both ends are the "same":
+               *     padding_to_beginning =  total_padding / 2
+               *     padding_to_end       = (total_padding + 1)/2.
+               * i.e., for even number of padding, padding to both ends are exactly
+               * the same; for odd number of padding, padding to the ending is bigger
+               * than the padding to the beginning by 1.
+               *
+               * total_padding is a function of input, stride and filter size.
+               * It could be computed as follows:
+               *    out_size = (input + stride - 1) / stride;
+               *    needed_input = (out_size - 1) * stride + filter_size
+               *    total_padding = max(0, needed_input - output_size)
+               *  The computation is the same for the horizontal and vertical directions.
+               */
+               calculateExplicitPadding(input_width, stride_width,
+                                        filter_width, pad_type /*padding_implicit*/,
+                                        &padding_left, &padding_right);
+               calculateExplicitPadding(input_height, stride_height,
+                                        filter_height, pad_type /*padding_implicit*/,
+                                        &padding_top, &padding_bottom);
 
-        if (pad_type == kPaddingSame) {
-            /**
-             * SAME padding.
-             * Padding on both ends are the "same":
-             *     padding_to_beginning =  total_padding / 2
-             *     padding_to_end       = (total_padding + 1)/2.
-             * i.e., for even number of padding, padding to both ends are exactly
-             * the same; for odd number of padding, padding to the ending is bigger
-             * than the padding to the beginning by 1.
-             *
-             * total_padding is a function of input, stride and filter size.
-             * It could be computed as follows:
-             *    out_size = (input + stride - 1) / stride;
-             *    needed_input = (out_size - 1) * stride + filter_size
-             *    total_padding = max(0, needed_input - output_size)
-             *  The computation is the same for the horizontal and vertical directions.
-             */
-            calculateExplicitPadding(input_width, stride_width, filter_width,
-                                     pad_type /*padding_implicit*/, &padding_left, &padding_right);
-            calculateExplicitPadding(input_height, stride_height, filter_height,
-                                     pad_type /*padding_implicit*/, &padding_top, &padding_bottom);
+               prms.pad_start = {padding_left, padding_top};
+               prms.pad_end = {padding_right, padding_bottom};
+               prms.padType = "same_upper";
 
-            prms.pad_start = {padding_left, padding_top};
-            prms.pad_end = {padding_right, padding_bottom};
-            prms.padType = "same_upper";
-
-        } else if (pad_type == kPaddingValid) {
-            /**
-             * VALID padding.
-             * No padding. When the input size is not evenly divisible by
-             * the filter size, the input at the end that could not fill
-             * the whole filter tile will simply be ignored.
-             */
-            prms.pad_start = {0, 0};
-            prms.pad_end = {0, 0};
-            prms.padType = "valid";
-        }
-        prms.stride = {stride_width, stride_height};
-        prms.kernel = {(int)filter_width, (int)filter_height};
-        fusion_index = 7;
-        prms.groups = in_channels;  // working
-        depth_multiplier = PARAM_I32(6);
-        prms.num_output_planes = in_channels * depth_multiplier;  // same as filter_out;//depth out
-    }
-
-    /*
-    TF filter: 4-D with shape [filter_height, filter_width, in_channels, channel_multiplier].
-    reshape to org layout of TF [filter_height, filter_width, in_channels, channel_multiplier]
-    then permute 2, 3, 0, 1
-    prms.weights = static_cast<IRBlob::Ptr>(Permute(filter, {2, 3, 0, 1}));
-
-    group is same as in_channels and the number of output features map as
-    in_channels*depth_multiplier and permute weights to (in_chennels, channel_multiplier,
-    filter_height, filter_width) where assuming TF original input filter shape as [filter_height,
-    filter_width,  in_channels, channel_multiplier] to preapare in the layout expected by IE
-    */
-
-    /*
-      //Reshape DEPTHWISE_CONV_2D
-      //filter_out same as in_channels if depth_multiplier = 1
-      TensorDims newDims = {(uint32_t)in_channels, (uint32_t)depth_multiplier,
-      (uint32_t)filter_height, (uint32_t)filter_width}; //channel_multiplier == depth_multiplier
-      working for CTS
-      //TensorDims newDims = {(uint32_t)depth_multiplier, (uint32_t)in_channels,
-      (uint32_t)filter_height, (uint32_t)filter_width};
-      //TensorDims newDims = {1, in_channels*depth_multiplier, filter_height, filter_width};
-      //original filter shape //channel_multiplier == depth_multiplier
-
-      //TensorDesc td(IRBuilder::g_layer_precision, newDims, {{newDims[2], newDims[3], newDims[0],
-      newDims[1]}, {2, 3, 0, 1}}); //working for CTS TensorDesc td(IRBuilder::g_layer_precision,
-      newDims, {{newDims[1], newDims[0], newDims[2], newDims[3]}, {1, 0, 2, 3}});
-      //TensorDesc td(InferenceEngine::Precision::FP16, newDims, {{newDims[3], newDims[2],
-      newDims[1], newDims[0]}, {3, 2, 1, 0}});
-
-      //using data_type = typename
-      InferenceEngine::PrecisionTrait<IRBuilder::g_layer_precision>::value_type;
-
-      if (IRBuilder::g_layer_precision == InferenceEngine::Precision::FP32) {
-        InferenceEngine::TBlob<float>::Ptr dst_blob =
-      std::make_shared<InferenceEngine::TBlob<float>>(td); dst_blob->allocate();
-
-        for (size_t i = 0 ; i < filter->size(); i++) {
-          dst_blob->buffer().as<float*>()[dst_blob->getTensorDesc().offset(i)] =
-      filter->cbuffer().as<const float*>()[filter->getTensorDesc().offset(i)]; //set Layout::NCHW in
-      td for src and dst
-        }
-
-        prms.weights = static_cast<IRBlob::Ptr>(dst_blob);
-      }else {
-        InferenceEngine::TBlob<short>::Ptr dst_blob =
-      std::make_shared<InferenceEngine::TBlob<short>>(td); //short or uint16_t dst_blob->allocate();
-
-        for (size_t i = 0 ; i < filter->size(); i++) {
-          dst_blob->buffer().as<short*>()[dst_blob->getTensorDesc().offset(i)] =
-      filter->cbuffer().as<const short*>()[filter->getTensorDesc().offset(i)]; //set Layout::NCHW in
-      td for src and dst
-        }
-
-        prms.weights = static_cast<IRBlob::Ptr>(dst_blob);
+          } else if (pad_type == kPaddingValid) {
+              /**
+               * VALID padding.
+               * No padding. When the input size is not evenly divisible by
+               * the filter size, the input at the end that could not fill
+               * the whole filter tile will simply be ignored.
+               */
+              prms.pad_start = {0, 0};
+              prms.pad_end = {0, 0};
+              prms.padType = "valid";
+          }
+          prms.stride = {stride_width, stride_height};
+          prms.kernel = {(int)filter_width, (int)filter_height};
+          fusion_index = 7;
+          prms.groups = in_channels; //working
+          depth_multiplier = PARAM_I32(6);
+          prms.num_output_planes = in_channels*depth_multiplier;//same as filter_out;//depth out
       }
-    */
 
-    prms.weights = static_cast<IRBlob::Ptr>(filter);
+  prms.weights = static_cast<IRBlob::Ptr>(filter);
 
-    const auto weightDims = prms.weights->getTensorDesc().getDims();
+  const auto weightDims = prms.weights->getTensorDesc().getDims();
 
-    nnAssert(filter_out == in_channels * depth_multiplier);
-    VLOG(L1, "batches %d, channels %d, input_height: %d, input_width %d", batches, in_channels,
-         input_height, input_width);
-    VLOG(L1, "filter_in %d, filter_out %d, filter_height: %d, filter_width %d", filter_in,
-         filter_out, filter_height, filter_width);
-    VLOG(L1, "depth multiplier %d", depth_multiplier);
+  nnAssert(filter_out == in_channels * depth_multiplier);
+  VLOG(L1, "batches %d, channels %d, input_height: %d, input_width %d",
+           batches, in_channels, input_height, input_width);
+  VLOG(L1, "filter_in %d, filter_out %d, filter_height: %d, filter_width %d",
+           filter_in, filter_out, filter_height, filter_width);
+  VLOG(L1, "depth multiplier %d", depth_multiplier);
 
-    // auto out = Convolution(input, prms) + bias;
-    prms.biases = static_cast<IRBlob::Ptr>(bias);
-    auto out = Convolution(input, prms);
+  //auto out = Convolution(input, prms) + bias;
+  prms.biases = static_cast<IRBlob::Ptr>(bias);
+  auto out = Convolution(input, prms);
 
-    if (fusion_index < 0) {
-        VLOG(L1, "invalid fusion index");
-        nnAssert(false);
-    }
+  if (fusion_index < 0) {
+      VLOG(L1, "invalid fusion index");
+      nnAssert(false);
+  }
 
-    mPorts[operation.outputs[0]] = handleFusion(out, PARAM_I32(fusion_index));
+  mPorts[operation.outputs[0]] = handleFusion(out, PARAM_I32(fusion_index));
 
-    VLOG(L1, "----------------------------------------------");
-    VLOGDIMS(L1, inputDims, "inputs dims");
-    VLOGDIMS(L1, filterDims, "filter dims");
-    VLOGDIMS(L1, weightDims, "weight dims");
-    VLOG(L1, "----------------------------------------------");
+  VLOG(L1, "----------------------------------------------");
+  VLOGDIMS(L1, inputDims, "inputs dims");
+  VLOGDIMS(L1, filterDims, "filter dims");
+  VLOGDIMS(L1, weightDims, "weight dims");
+  VLOG(L1, "----------------------------------------------");
 
-    return true;
+  return true;
 }
 
 bool PreparedModel::operationFullyConnected(const Operation& operation) {
     VLOG(L1, "OperationType::FULLY_CONNECTED");
+    dumpOperationParam(operation);
     /**
      * Denotes a fully (densely) connected layer, which connects all elements
      * in the input tensor with each element in the output tensor.
@@ -2395,114 +2485,75 @@ bool PreparedModel::operationFullyConnected(const Operation& operation) {
     FULLY_CONNECTED = 9,
      */
 
-    auto input = getPort(operation.inputs[0]);
-    auto weights = GetConstOperandAsTensor(operation.inputs[1]);
-    auto bias = GetConstOperandAsTensor(operation.inputs[2]);
+   auto input = getPort(operation.inputs[OP_INPUT_IDX_CONV]);
+    auto weights = GetConstOperandAsTensor(operation.inputs[OP_FILTER_IDX_CONV],OP_FILTER_IDX_CONV);
+    auto bias = GetConstOperandAsTensor(operation.inputs[OP_BIAS_IDX_CONV],OP_BIAS_IDX_CONV);
 
     auto inputDims = input->getTensorDesc().getDims();
-    for (auto i = 0; i < inputDims.size(); i++) VLOG(L1, "input dims[%d] = %d ", i, inputDims[i]);
+    for (auto i = 0; i < inputDims.size(); i++)
+    VLOG(L1, "input dims[%d] = %d ", i, inputDims[i]);
 
     auto weightsDims = weights->getTensorDesc().getDims();
     for (auto i = 0; i < weightsDims.size(); i++)
-        VLOG(L1, "weights dims[%d] = %d ", i, weightsDims[i]);
+    VLOG(L1, "weights dims[%d] = %d ", i, weightsDims[i]);
 
     auto biasDims = bias->getTensorDesc().getDims();
 
-    // input is [batch_size, input_size], weights is [num_unit, input_size]
-    // nnAssert(inputDims[1] == weightsDims[1]);
+    //input is [batch_size, input_size], weights is [num_unit, input_size]
+    //nnAssert(inputDims[1] == weightsDims[1]);
 
     nnAssert(inputDims.size() >= 2);
     nnAssert(weightsDims.size() == 2);
     uint32_t numInputElements = sizeOf(inputDims);
-    uint32_t num_units = weightsDims[0];
+    uint32_t num_units  = weightsDims[0];
     uint32_t input_size = weightsDims[1];
     uint32_t batch_size = numInputElements / input_size;
     nnAssert(biasDims[0] == num_units);
     nnAssert(input_size * batch_size == numInputElements);
 
-    if (inputDims.size() > 2) {
-        // todo: could be we need to rotate the input weights to reflect the different layout of
-        // input tensor when it is not 2D: NHWC vs NCHW in IE
-        // Reshape
-        // input = Reshape({inputDims[0], product(inputDims)/inputDims[0]}, input);
+    if (inputDims.size()>2)
+    {
+        // todo: could be we need to rotate the input weights to reflect the different layout of input tensor
+        // when it is not 2D: NHWC vs NCHW in IE
+        //Reshape
+        //input = Reshape({inputDims[0], product(inputDims)/inputDims[0]}, input);
 
-        TensorDims outDims = {
-            (uint32_t)-1,
-            numInputElements / batch_size};  // fix me: find correct outDims and if -1 is fine
+        TensorDims outDims = {(uint32_t)-1, numInputElements/batch_size};  //fix me: find correct outDims and if -1 is fine
 
         int strechDim = -1;
-        auto numOutputElements = 1;  // shape
+        auto numOutputElements = 1; //shape
         for (auto i = 0; i < outDims.size(); i++) {
             VLOG(L1, "shape of output tensor outDims[%d] = %d ", i, outDims[i]);
             if ((int)outDims[i] < 0) {
-                strechDim = i;  // strechdim
+                strechDim = i; //strechdim
                 VLOG(L1, "strechDim = %d", i);
                 continue;
             }
-            numOutputElements *= outDims[i];  // shape
+            numOutputElements *= outDims[i]; //shape
         }
         if (strechDim >= 0) {
             auto strechValue = numInputElements / numOutputElements;
-            outDims[strechDim] = (uint32_t)strechValue;
+            outDims[strechDim] = (uint32_t) strechValue;
             numOutputElements *= strechValue;
 
-            VLOG(L1, "numInputElements = %d, index = %d, outDims[index] = %d", numInputElements,
-                 strechDim, outDims[strechDim]);
+            VLOG(L1, "numInputElements = %d, index = %d, outDims[index] = %d", numInputElements, strechDim, outDims[strechDim]);
         }
 
         input = Reshape(outDims, input);
 
-        /*
-                //Reshape
-                TensorDims newDims = {batch_size, input_n_elements/batch_size};
-
-                auto precision = input->getPrecision();
-                if (precision == InferenceEngine::Precision::FP16) {
-                  TensorDesc td(InferenceEngine::Precision::FP16, newDims, {{newDims[0],
-           newDims[1]}, {0, 1}});
-
-                  InferenceEngine::TBlob<short>::Ptr dst_input_blob =
-           std::make_shared<InferenceEngine::TBlob<short>>(td); dst_input_blob->allocate();
-
-                  if (input->cbuffer() != nullptr) {
-                      for (size_t i = 0 ; i < input->size(); i++) {
-                        dst_input_blob->buffer().as<short*>()[dst_blob->getTensorDesc().offset(i)] =
-           input->cbuffer().as<const short*>()[filter->getTensorDesc().offset(i)]; //set
-           Layout::NCHW in td for src and dst
-                      }
-                  }
-                }
-                else if (precision == InferenceEngine::Precision::FP32) {
-                  TensorDesc td(InferenceEngine::Precision::FP32, newDims, {{newDims[0],
-           newDims[1]}, {0, 1}});
-
-                  InferenceEngine::TBlob<float>::Ptr dst_input_blob =
-           std::make_shared<InferenceEngine::TBlob<float>>(td);
-
-                  if (input->cbuffer() != nullptr){
-                      dst_input_blob->allocate();
-                      for (size_t i = 0 ; i < input->size(); i++) {
-                        dst_input_blob->buffer().as<float*>()[dst_blob->getTensorDesc().offset(i)] =
-           input->cbuffer().as<const float*>()[filter->getTensorDesc().offset(i)]; //set
-           Layout::NCHW in td for src and dst
-                      }
-                  }
-                }
-
-                input = static_cast<IRBlob::Ptr>(dst_input_blob);
-        */
     }
 
     const auto newInputDims = input->getTensorDesc().getDims();
 
-    /*
-        //FIX ME : Work around since input size indims[0] != output nodes (wdims[0])
-        auto dims = permuteDims(weights->getTensorDesc().getDims(), {0, 1});
-        dims[0] = indims[0];
-        weights->getTensorDesc().setDims(dims);
-        //WA end
-    */
-    auto out = weights * input + bias;
+/*
+    //FIX ME : Work around since input size indims[0] != output nodes (wdims[0])
+    auto dims = permuteDims(weights->getTensorDesc().getDims(), {0, 1});
+    dims[0] = indims[0];
+    weights->getTensorDesc().setDims(dims);
+    //WA end
+*/
+    auto out = weights*input + bias;
+
 
     mPorts[operation.outputs[0]] = handleFusion(out, PARAM_I32(3));
 
@@ -2517,6 +2568,8 @@ bool PreparedModel::operationFullyConnected(const Operation& operation) {
 
 bool PreparedModel::operationL2Normalization(const Operation& operation) {
     VLOG(L1, "OperationType::L2_NORMALIZATION");
+    VLOG(L1, "Adding Op:L2_NORMALIZATION");
+    dumpOperationParam(operation);
     /*
      * Inputs:
      * 0: A 4-D tensor, of shape [batches, height, width, depth], specifying the input.
@@ -2730,41 +2783,8 @@ bool PreparedModel::operationSoftmax(const Operation& operation) {
 
     auto input = getPort(operation.inputs[0]);
 
-    /*
-        //handle 2D and 4D tensors
-        auto inputDims = input->getTensorDesc().getDims();
-
-        if (inputDims.size() == 2) {
-            uint32_t batch_size = inputDims[0];//getSizeOfDimension(inputShape, 0);
-            uint32_t input_size = sizeOf(inputDims) / batch_size; //getNumberOfElements(inputShape)
-       / batch_size;
-
-            //Shape shapeIn4D;
-            //shapeIn4D.dimensions = {batch_size, 1, 1, input_size};
-            TensorDims newDims = {batch_size, 1, 1, input_size};
-            //inputDims = newDims;
-            input->getTensorDesc().setDims(newDims);
-            //dim = convertShapeToDims(shapeIn4D);
-
-        } else if (inputDims.size() == 4) {
-            //dim = convertShapeToDims(inputShape);
-            //newDims = inputDims;
-        } else {
-            #ifdef NNLOG
-            ALOGI("Softmax only 2D and 4D tensors supported");
-            #endif
-            //return false;
-        }
-    */
-
     mPorts[operation.outputs[0]] = Softmax(input);
     float beta /*scale*/ = PARAM_FP(1);
-    /*
-        if (scale != 1.0f) {
-            ALOGE("scale of softmax not suported");
-            nnAssert(false);
-        }
-    */
     VLOG(L1, "Softmax beta = %f ", beta);
 
     if (beta <= 0.0f) {
@@ -2787,36 +2807,11 @@ void PreparedModel::initializeInput() {
     for (auto i : mModel.inputIndexes) {
         int dims_size = mOperands[i].dimensions.size();
 
-        /*
-            switch(dims_size) {
-                case 2:
-                    mPorts[i]->setLayout(NC);
-                    break;
-                case 4:
-                    mPorts[i]->setLayout(NCHW);
-                    break;
-                case 1:
-                    mPorts[i]->setLayout(C);
-                    break;
-                default:
-                    VLOG(L1, "unsupported dims size %d", dims_size);
-                    nnAssert(true);
-            }
-        */
-        // mPorts[i]->setPrecision(InferenceEngine::Precision::FP16);
-
         VLOG(L1, "mPorts[%d] %s dims size %d", i, mPorts[i]->name.c_str(), dims_size);
         VLOGDIMS(L1, mOperands[i].dimensions, "current operand inpu dims:");
         VLOGDIMS(L1, mPorts[i]->getTensorDesc().getDims(), "Real input dims:");
 
         auto inputDims = mPorts[i]->getTensorDesc().getDims();
-
-        /*
-        for (auto j = 0; j < outputDims.size(); j++)
-        VLOG(L1, "output dims[%d] = %d & set output dims[%d] = %d ", j, mOperands[i].dimensions[j],
-        j, outputDims[j]); VLOG(L1, "intialization for output data mPorts[%d]->name = %s\n", i,
-        mPorts[i]->name.c_str());
-        */
 
         uint32_t nelem = getNumberOfElements(mOperands[i].dimensions);
         auto inputElem = sizeOf(inputDims);
@@ -2829,55 +2824,29 @@ void PreparedModel::initializeInput() {
     }
 }
 
-void PreparedModel::finalizeOutput(/*RunTimeOperandInfo* output */) {
-    VLOG(L1, "finalize Output");
-    for (auto i : mModel.outputIndexes) {
-        int dims_size = mOperands[i].dimensions.size();
+bool PreparedModel::finalizeOutput(/*RunTimeOperandInfo* output */) {
+    VLOG(L1, "Entering %s",__func__);
+    const size_t count = mModel.operands.size();
+    
+    for (auto i : mModel.outputIndexes)
+    {
 
-        /*
-            switch(dims_size) {
-                case 2:
-                    mPorts[i]->setLayout(NC);
-                    break;
-                case 4:
-                    mPorts[i]->setLayout(NHWC);
-                    break;
-                case 1:
-                    mPorts[i]->setLayout(C);
-                    break;
-                default:
-                    VLOG(L1, "unsupported dims size %d", dims_size);
-                    nnAssert(true);
-            }
-        */
-        // mPorts[i]->setPrecision(InferenceEngine::Precision::FP16);
+        int dims_size = mOperands[i].dimensions.size();
+        
         mPorts[i]->setPrecision(InferenceEngine::Precision::FP32);
         mNet.addOutput(mPorts[i]);
 
-        VLOG(L1, "mPorts[%d] %s dims size %d", i, mPorts[i]->name.c_str(), dims_size);
         VLOGDIMS(L1, mOperands[i].dimensions, "current operand Output dims:");
         VLOGDIMS(L1, mPorts[i]->getTensorDesc().getDims(), "Real Output dims:");
 
         auto outputDims = mPorts[i]->getTensorDesc().getDims();
 
-        /*
-        for (auto j = 0; j < outputDims.size(); j++)
-        VLOG(L1, "output dims[%d] = %d & set output dims[%d] = %d ", j, mOperands[i].dimensions[j],
-        j, outputDims[j]); VLOG(L1, "intialization for output data mPorts[%d]->name = %s\n", i,
-        mPorts[i]->name.c_str());
-        */
-
         uint32_t nelem = getNumberOfElements(mOperands[i].dimensions);
         auto outputElem = sizeOf(outputDims);
-        if (nelem != outputElem) {
-            VLOG(L1, "set correct dims as operand output dims different than real output dims\n");
-            /*
-            for (auto j = 0; j < outputDims.size(); j++)
-            mOperands[i].dimensions[j] = static_cast<uint32_t>(outputDims[j]);
-            mOperands[i].length = sizeOfData(mOperands[i].type, mOperands[i].dimensions);
-            */
+        if (nelem != outputElem)
+        VLOG(L1, "NNWARN:set correct dims as operand output dims different than real output dims\n");
         }
-    }
+    return true;	
 }
 
 IRBlob::Ptr VpuPreparedModel::GetConstWeightsOperandAsTensor(uint32_t index) {
@@ -2915,8 +2884,6 @@ IRBlob::Ptr VpuPreparedModel::GetConstWeightsOperandAsTensor(uint32_t index) {
         short* fp16Array = mem.as<short*>();
         // convert from [(float *)buf, len] to fp16Array,
         uint32_t nelem = getNumberOfElements(op.dimensions);
-        // short *inputFilter_fp16 = new short[nelem];
-
         size_t fp16Array_length = nelem * sizeof(short);
 
         VLOGDIMS(L1, permuteDims(toDims(op.dimensions), order), "weights/bias dims");
@@ -2926,12 +2893,8 @@ IRBlob::Ptr VpuPreparedModel::GetConstWeightsOperandAsTensor(uint32_t index) {
              len, nelem, fp16Array_length, sizeof(buf));
 
         f32tof16Arrays(fp16Array, (float*)buf, nelem);  // OHWI memory layout
-        // floattofp16(fp16Array, (float *)buf, nelem);
 
         if (inputDims.size() != 4) {
-            // InferenceEngine::TBlob<short>::Ptr blob =
-            // std::make_shared<InferenceEngine::TBlob<short>>(td,(short *)inputFilter_fp16,
-            // fp16Array_length);
             return blob;
         } else {
             TensorDesc td(InferenceEngine::Precision::FP16, permuteDims(inputDims, order), layout);
@@ -2954,15 +2917,8 @@ IRBlob::Ptr VpuPreparedModel::GetConstWeightsOperandAsTensor(uint32_t index) {
                             size_t offset_ohwi = o * height * width * in_depth +
                                                  h * width * in_depth + w * in_depth +
                                                  i;  // similar to NHWC memory layout
-                            // blob->buffer().as<float*>()[blob->getTensorDesc().offset(offset++)] =
-                            // inputFilter[offset_ohwi];
                             blob_oihw->buffer().as<short*>()[offset++] =
                                 blob->buffer().as<short*>()[offset_ohwi];
-                            // size_t offset_oihw = o*in_depth*height*width + i*height*width +
-                            // h*width + w; //similar to NCHW memory layout
-                            // blob->buffer().as<float*>()[offset_oihw] = inputFilter[offset_ohwi];
-                            // VLOG(L1, "offset_ohwi= %d offset_oihw= %d", offset_ohwi,
-                            // offset_oihw);
                         }
                     }
                 }
@@ -3009,335 +2965,297 @@ IRBlob::Ptr VpuPreparedModel::GetConstWeightsOperandAsTensor(uint32_t index) {
     return nullptr;
 }
 
-IRBlob::Ptr VpuPreparedModel::GetConstOperandAsTensor(uint32_t index) {
-    // const auto op = model.operands.at(index);
+IRBlob::Ptr VpuPreparedModel::GetConstOperandAsTensor(int index,int operation_idx) {
+    //const auto op = model.operands.at(index);
     const auto op = mModel.operands[index];
     uint32_t len;
-    const uint8_t* buf = GetOperandMemory(mModel, index, len);
+    const uint8_t *buf = GetOperandMemory(mModel, index, len);
 
     VLOG(L1, "VpuPreparedModel:: Operand: index: %d, len: %d, buf: %p", index, len, buf);
     if (op.type == OperandType::TENSOR_FLOAT32 || op.type == OperandType::FLOAT32) {
-#ifndef MYRIAD_FP32  // Myriad only supprts FP16
+#ifndef MYRIAD_FP32  //Myriad only supprts FP16
 
-        vec<unsigned int> order;
-        Layout layout;
-        Layout input_layout;
-        if (op.dimensions.size() == 4) {
-            order = {0, 3, 1, 2};         // nhwc -> nchw
-            layout = Layout::OIHW;        // weights layout
-            input_layout = Layout::NHWC;  // same memory layout as OHWI
-        } else if (op.dimensions.size() == 2) {
+          vec<unsigned int> order;
+          Layout layout;
+          Layout input_layout;
+          if (op.dimensions.size() == 4) {
+            order = {0,3,1,2};  //nhwc -> nchw
+            layout = Layout::OIHW; //weights layout
+            input_layout = Layout::NHWC; //same memory layout as OHWI
+          }
+          else if (op.dimensions.size() == 2) {
             order = {0, 1};
             layout = Layout::NC;
             input_layout = Layout::NC;
-        } else {
-            order = {0};  //(op.dimensions.size() < 2)
+          }
+          else {
+            order = {0}; //(op.dimensions.size() < 2)
             layout = Layout::C;
             input_layout = Layout::C;
-        }
+          }
 
-        auto inputDims = toDims(op.dimensions);
-        TensorDesc td(InferenceEngine::Precision::FP16, inputDims, input_layout);
-        // todo: create a readOnly blob that accepts const pointers
-        InferenceEngine::TBlob<short>::Ptr blob =
-            std::make_shared<InferenceEngine::TBlob<short>>(td);
-        blob->allocate();
-        auto mem = blob->data();
-        short* fp16Array = mem.as<short*>();
-        // convert from [(float *)buf, len] to fp16Array,
-        uint32_t nelem = getNumberOfElements(op.dimensions);
-        // short *inputFilter_fp16 = new short[nelem];
+          auto inputDims = toDims(op.dimensions);
+          TensorDesc td(InferenceEngine::Precision::FP16, inputDims, input_layout);
+          // todo: create a readOnly blob that accepts const pointers
+          InferenceEngine::TBlob<short>::Ptr blob = std::make_shared<InferenceEngine::TBlob<short>>(td);
+          blob->allocate();
+          auto mem = blob->data();
+          short *fp16Array = mem.as<short*>();
+          // convert from [(float *)buf, len] to fp16Array,
+          uint32_t nelem = getNumberOfElements(op.dimensions);
+          //short *inputFilter_fp16 = new short[nelem];
 
-        size_t fp16Array_length = nelem * sizeof(short);
+          size_t fp16Array_length = nelem*sizeof(short);
 
-        VLOGDIMS(L1, permuteDims(toDims(op.dimensions), order), "weights/bias dims");
-        VLOG(L1,
-             "Model buffer oplength = %d bytes nelem= %d fp16Array_length= %d bytes sizeof model "
-             "buf= %d bytes\n",
-             len, nelem, fp16Array_length, sizeof(buf));
+          VLOGDIMS(L1, permuteDims(toDims(op.dimensions), order), "weights/bias dims");
+          VLOG(L1, "Model buffer oplength = %d bytes nelem= %d fp16Array_length= %d bytes sizeof model buf= %d bytes\n", len , nelem, fp16Array_length, sizeof(buf));
 
-        f32tof16Arrays(fp16Array, (float*)buf, nelem);  // OHWI memory layout
-        // floattofp16(fp16Array, (float *)buf, nelem);
+          f32tof16Arrays(fp16Array, (float *)buf, nelem); //OHWI memory layout
+          //floattofp16(fp16Array, (float *)buf, nelem);
 
-        if (inputDims.size() != 4) {
-            // InferenceEngine::TBlob<short>::Ptr blob =
-            // std::make_shared<InferenceEngine::TBlob<short>>(td,(short *)inputFilter_fp16,
-            // fp16Array_length);
-            return blob;
-        } else {
-            TensorDesc td(InferenceEngine::Precision::FP16, permuteDims(inputDims, order), layout);
-            InferenceEngine::TBlob<short>::Ptr blob_oihw =
-                std::make_shared<InferenceEngine::TBlob<short>>(td);
-            blob_oihw->allocate();
+          if (inputDims.size() != 4) {
+                //InferenceEngine::TBlob<short>::Ptr blob = std::make_shared<InferenceEngine::TBlob<short>>(td,(short *)inputFilter_fp16, fp16Array_length);
+                return blob;
+          } else {
+                TensorDesc td(InferenceEngine::Precision::FP16, permuteDims(inputDims, order), layout);
+                InferenceEngine::TBlob<short>::Ptr blob_oihw = std::make_shared<InferenceEngine::TBlob<short>>(td);
+                blob_oihw->allocate();
 
-            auto dims_ohwi = inputDims;  // toDims(op.dimensions);
-            size_t out_depth = dims_ohwi[0];
-            size_t in_depth = dims_ohwi[3];
-            size_t height = dims_ohwi[1];
-            size_t width = dims_ohwi[2];
-            size_t offset = 0;  // blob->size() == o*i*h*w and simlar to nchw memory layout
-            // const short* inputFilter = reinterpret_cast<const short *>(buf); //OHWI memory layout
+                auto dims_ohwi = inputDims; //toDims(op.dimensions);
+                size_t out_depth = dims_ohwi[0];
+                size_t in_depth = dims_ohwi[3];
+                size_t height = dims_ohwi[1];
+                size_t width = dims_ohwi[2];
+                size_t offset = 0; //blob->size() == o*i*h*w and simlar to nchw memory layout
+                //const short* inputFilter = reinterpret_cast<const short *>(buf); //OHWI memory layout
 
-            for (size_t o = 0; o < out_depth; o++) {
-                for (size_t i = 0; i < in_depth; i++) {
-                    for (size_t h = 0; h < height; h++) {
-                        for (size_t w = 0; w < width; w++) {
-                            size_t offset_ohwi = o * height * width * in_depth +
-                                                 h * width * in_depth + w * in_depth +
-                                                 i;  // similar to NHWC memory layout
-                            // blob->buffer().as<float*>()[blob->getTensorDesc().offset(offset++)] =
-                            // inputFilter[offset_ohwi];
-                            blob_oihw->buffer().as<short*>()[offset++] =
-                                blob->buffer().as<short*>()[offset_ohwi];
-                            // size_t offset_oihw = o*in_depth*height*width + i*height*width +
-                            // h*width + w; //similar to NCHW memory layout
-                            // blob->buffer().as<float*>()[offset_oihw] = inputFilter[offset_ohwi];
-                            // VLOG(L1, "offset_ohwi= %d offset_oihw= %d", offset_ohwi,
-                            // offset_oihw);
-                        }
+                for (size_t o = 0; o < out_depth; o++){
+                  for (size_t i = 0; i < in_depth; i++){
+                    for (size_t h = 0; h < height; h++){
+                      for (size_t w = 0; w < width; w++){
+                        size_t offset_ohwi = o*height*width*in_depth + h*width*in_depth + w*in_depth + i; //similar to NHWC memory layout
+                        //blob->buffer().as<float*>()[blob->getTensorDesc().offset(offset++)] = inputFilter[offset_ohwi];
+                        blob_oihw->buffer().as<short*>()[offset++] = blob->buffer().as<short*>()[offset_ohwi];
+                      }
                     }
+                  }
                 }
-            }
 
-            return blob_oihw;
-        }
-#else  // FP32 support
-        vec<unsigned int> order;
-        Layout layout;
-        if (op.dimensions.size() == 4) {
-            order = {0, 3, 1, 2};  // nhwc -> nchw
-            layout = Layout::NCHW;
-        } else if (op.dimensions.size() == 2) {
-            order = {0, 1};
-            layout = Layout::NC;
-        } else {
-            order = {0};  //(op.dimensions.size() < 2)
-            layout = Layout::C;
-        }
-        TensorDesc td(InferenceEngine::Precision::FP32, permuteDims(toDims(op.dimensions), order),
-                      layout);
-        // todo: create a readOnly blob that accepts const pointers
-        // return std::make_shared<InferenceEngine::TBlob<float>>(td, (float *)buf, len);
+                return blob_oihw;
+          }
+#else //FP32 support
+            vec<unsigned int> order;
+            Layout layout;
+            if (op.dimensions.size() == 4) {
+              order = {0,3,1,2};  //nhwc -> nchw
+              layout = Layout::NCHW;
+            }
+            else if (op.dimensions.size() == 2) {
+              order = {0, 1};
+              layout = Layout::NC;
+            }
+            else {
+              order = {0}; //(op.dimensions.size() < 2)
+              layout = Layout::C;
+            }
+            TensorDesc td(InferenceEngine::Precision::FP32, permuteDims(toDims(op.dimensions), order), layout);
+            // todo: create a readOnly blob that accepts const pointers
+            //return std::make_shared<InferenceEngine::TBlob<float>>(td, (float *)buf, len);
 #endif
     } else if (op.type == OperandType::TENSOR_INT32) {
-        VLOG(L1, "check if const tensors of type IN32 supported");
-        TensorDesc td(InferenceEngine::Precision::I32, toDims(op.dimensions), Layout::ANY);
-        if (buf == nullptr) {
-            VLOG(L1, "TENSOR_INT32 buf is NULL !!!!!!!!!!!!!!!");
-            InferenceEngine::TBlob<float>::Ptr blob =
-                std::make_shared<InferenceEngine::TBlob<float>>(td);
-            blob->allocate();
+
+            VLOG(L1, "check if const tensors of type IN32 supported");
+            TensorDesc td(InferenceEngine::Precision::I32, toDims(op.dimensions), Layout::ANY);
+            if (buf == nullptr)
+                VLOG(L1, "TENSOR_INT32 buf is NULL !!!!!!!!!!!!!!!");
+            InferenceEngine::TBlob<float>::Ptr blob = std::make_shared<InferenceEngine::TBlob<float>>(td, (float *)buf, len);
             return blob;
-        } else {
-            InferenceEngine::TBlob<float>::Ptr blob =
-                std::make_shared<InferenceEngine::TBlob<float>>(td, (float*)buf, len);
-            return blob;
-        }
     } else {
-        VLOG(L1, "not supporting const tensors of type ", op.type);
-        nnAssert(false);
+            VLOG(L1, "not supporting const tensors of type ", op.type);
+            nnAssert(false);
     }
     return nullptr;
 }
 
-Blob::Ptr VpuPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const uint8_t* buf,
-                                                  uint32_t& len) {
-    // const auto op = model.operands[index];
-    // uint32_t len;
-    // const uint8_t *buf = GetOperandMemory(model, index, len);
+Blob::Ptr VpuPreparedModel::GetInOutOperandAsBlob(bool param_type,RunTimeOperandInfo& op, const uint8_t *buf, uint32_t& len) {
 
-    if (op.type == OperandType::TENSOR_FLOAT32 || op.type == OperandType::FLOAT32) {
-#ifndef MYRIAD_FP16  // Myriad supports FP32 only for network input/output
-        if (op.lifetime == OperandLifeTime::MODEL_INPUT) {
-            VLOG(L1, "Create input blob !!!!");
-            vec<unsigned int> order;
-            Layout layout;
-            if (op.dimensions.size() == 4) {
-                order = {0, 3, 1, 2};  // nhwc -> nchw
-                layout = Layout::NCHW;
-                // layout = Layout::NHWC;
-            } else if (op.dimensions.size() == 2) {
-                order = {0, 1};
-                layout = Layout::NC;
-            } else {
-                order = {0};  //(op.dimensions.size() < 2)
-                layout = Layout::C;
-            }
+   if (op.type == OperandType::TENSOR_FLOAT32 || op.type == OperandType::FLOAT32) {
 
-            auto inputDims = toDims(op.dimensions);
-            TensorDesc td(InferenceEngine::Precision::FP32, permuteDims(inputDims, order), layout);
-            // TensorDesc td(InferenceEngine::Precision::FP32, inputDims, layout);
+#ifndef MYRIAD_FP16  //Myriad supports FP32 only for network input/output
+    if (op.lifetime == OperandLifeTime::MODEL_INPUT) {
+      VLOG(L1, "Create input blob !!!!");
+      vec<unsigned int> order;
+      Layout layout;
+      if (op.dimensions.size() == 4) {
+        order = {0,3,1,2};  //nhwc -> nchw
+        layout = Layout::NCHW;
+        //layout = Layout::NHWC;
+      }
+      else if (op.dimensions.size() == 2) {
+        order = {0, 1};
+        layout = Layout::NC;
+      }
+      else {
+        order = {0}; //(op.dimensions.size() < 2)
+        layout = Layout::C;
+      }
 
-            if (buf == nullptr) {
-                VLOG(L1, "MODEL_INPUT buf is NULL !!!!!!!!!!!!!!!");
-                InferenceEngine::TBlob<float>::Ptr blob =
-                    std::make_shared<InferenceEngine::TBlob<float>>(td);
-                blob->allocate();
-                return blob;
-            } else {
-                if (inputDims.size() != 4) {
-                    InferenceEngine::TBlob<float>::Ptr blob =
-                        std::make_shared<InferenceEngine::TBlob<float>>(td, (float*)buf, len);
-                    return blob;
-                } else {
-                    InferenceEngine::TBlob<float>::Ptr blob =
-                        std::make_shared<InferenceEngine::TBlob<float>>(td);
-                    blob->allocate();
+      auto inputDims = toDims(op.dimensions);
+      TensorDesc td(InferenceEngine::Precision::FP32, permuteDims(inputDims, order), layout);
+      //TensorDesc td(InferenceEngine::Precision::FP32, inputDims, layout);
 
-                    auto dims_nhwc = inputDims;  // toDims(op.dimensions);
-                    size_t batch = dims_nhwc[0];
-                    size_t in_depth = dims_nhwc[3];  // channels
-                    size_t height = dims_nhwc[1];
-                    size_t width = dims_nhwc[2];
-                    size_t offset = 0;  // blob->size() == o*i*h*w and simlar to nchw memory layout
-                    const float* input = reinterpret_cast<const float*>(buf);  // OHWI memory layout
+      if (buf == nullptr){
+          VLOG(L1, "NNERR:In %s MODEL_INPUT buf is NULL,aborting !!",__func__);
+		  return nullptr;
+	    }
+      if (inputDims.size() != 4) {
+            InferenceEngine::TBlob<float>::Ptr blob = std::make_shared<InferenceEngine::TBlob<float>>(td, (float *)buf, len);
+            return blob;
+      } else {
+            InferenceEngine::TBlob<float>::Ptr blob = std::make_shared<InferenceEngine::TBlob<float>>(td);
+            blob->allocate();
 
-                    // convert NHWC -> NCHW
+            auto dims_nhwc = inputDims; //toDims(op.dimensions);
+            size_t batch = dims_nhwc[0];
+            size_t in_depth = dims_nhwc[3]; //channels
+            size_t height = dims_nhwc[1];
+            size_t width = dims_nhwc[2];
+            size_t offset = 0; //blob->size() == o*i*h*w and simlar to nchw memory layout
+            const float* input = reinterpret_cast<const float *>(buf); //OHWI memory layout
 
-                    for (size_t b = 0; b < batch; b++) {
-                        for (size_t i = 0; i < in_depth; i++) {
-                            for (size_t h = 0; h < height; h++) {
-                                for (size_t w = 0; w < width; w++) {
-                                    size_t offset_nhwc = b * height * width * in_depth +
-                                                         h * width * in_depth + w * in_depth +
-                                                         i;  // similar to NHWC memory layout
-                                    blob->buffer().as<float*>()[offset++] = input[offset_nhwc];
-                                    // blob->buffer().as<float*>()[blob->getTensorDesc().offset(offset++)]
-                                    // = input[offset_nhwc]; size_t offset_nchw =
-                                    // b*in_depth*height*width + i*height*width + h*width + w;
-                                    // //similar to NCHW memory layout
-                                    // blob->buffer().as<float*>()[offset_oihw] =
-                                    // inputFilter[offset_ohwi]; VLOG(L1, "offset_nhwc= %d
-                                    // offset_nchw= %d", offset_nhwc, offset_nchw);
-                                }
-                            }
-                        }
-                    }
+            //convert NHWC -> NCHW
 
-                    return blob;
+            for (size_t b = 0; b < batch; b++){
+              for (size_t i = 0; i < in_depth; i++){
+                for (size_t h = 0; h < height; h++){
+                  for (size_t w = 0; w < width; w++){
+                    size_t offset_nhwc = b*height*width*in_depth + h*width*in_depth + w*in_depth + i; //similar to NHWC memory layout
+                    blob->buffer().as<float*>()[offset++] = input[offset_nhwc];
+
+                  }
                 }
-            }
-        } else if (op.lifetime == OperandLifeTime::MODEL_OUTPUT) {
-            VLOG(L1, "Create output blob");
-            vec<unsigned int> order;
-            Layout layout;
-            if (op.dimensions.size() == 4) {
-                // order = {0,3,1,2};  //nhwc -> nchw
-                layout = Layout::NHWC;
-            } else if (op.dimensions.size() == 2) {
-                // order = {0, 1};
-                layout = Layout::NC;
-            } else {
-                // order = {0}; //(op.dimensions.size() < 2)
-                layout = Layout::C;
-            }
-
-            // TensorDesc td(InferenceEngine::Precision::FP32, toDims(op.dimensions), Layout::ANY);
-            // //nhwc working
-            TensorDesc td(InferenceEngine::Precision::FP32, toDims(op.dimensions), layout);  // nhwc
-            // TensorDesc td(InferenceEngine::Precision::FP32, permuteDims(toDims(op.dimensions),
-            // {0,3,1,2}), Layout::ANY);  //nhwc->nchw
-            // todo: create a readOnly blob that accepts const pointers
-            InferenceEngine::TBlob<float>::Ptr blob =
-                InferenceEngine::make_shared_blob<float>(td, (float*)buf, len);
-            return blob;
-        }
-
-#else  // FP16 support if Myriad does not support FP32 for network input/output
-
-        if (op.lifetime == OperandLifeTime::MODEL_INPUT) {
-            // todo: create a readOnly blob that accepts const pointers
-            // InferenceEngine::TBlob<short>::Ptr blob =
-            // std::make_shared<InferenceEngine::TBlob<short>>(td);
-            vec<unsigned int> order;
-            Layout layout;
-            if (op.dimensions.size() == 4) {
-                order = {0, 3, 1, 2};  // nhwc -> nchw
-                layout = Layout::NCHW;
-            } else if (op.dimensions.size() == 2) {
-                order = {0, 1};
-                layout = Layout::NC;
-            } else {
-                order = {0};  //(op.dimensions.size() < 2)
-                layout = Layout::C;
-            }
-            TensorDesc td(InferenceEngine::Precision::FP16,
-                          permuteDims(toDims(op.dimensions), order), layout);
-            InferenceEngine::TBlob<short>::Ptr blob =
-                std::make_shared<InferenceEngine::TBlob<short>>(td);
-
-            // InferenceEngine::TBlob<short>::Ptr blob = InferenceEngine::make_shared_blob<short,
-            // InferenceEngine::SizeVector>(InferenceEngine::Precision::FP16,
-            // permuteDims(toDims(op.dimensions), order));
-
-            blob->allocate();
-            auto mem = blob->data();
-            short* fp16Array = mem.as<short*>();
-            // convert from [(float *)buf, len] to fp16Array, blob->size()
-            uint32_t nelem = getNumberOfElements(op.dimensions);
-            VLOG(L1,
-                 "Model buffer oplength = %d bytes nelem= %d fp16Array= %d bytes sizeof model buf= "
-                 "%d bytes\n",
-                 len, nelem, sizeof(fp16Array), sizeof(buf));
-            if (blob->size() != nelem) {
-                VLOG(L1, "Model buffer len = %d bytes nelem= %d fp16Array= %d bytes\n", len, nelem,
-                     sizeof(fp16Array));
-                nnAssert(false);
-            }
-
-            if (buf == nullptr) {
-                VLOG(L1, "Request model input buffer is null pointer");
-            } else {
-                f32tof16Arrays(fp16Array, (float*)buf, nelem);
+              }
             }
 
             return blob;
-        } else if (op.lifetime == OperandLifeTime::MODEL_OUTPUT) {
-            vec<unsigned int> order;
-            Layout layout;
-            if (op.dimensions.size() == 4) {
-                // order = {0,3,1,2};  //nhwc -> nchw
-                layout = Layout::NHWC;
-            } else if (op.dimensions.size() == 2) {
-                // order = {0, 1};
-                layout = Layout::NC;
-            } else {
-                // order = {0}; //(op.dimensions.size() < 2)
-                layout = Layout::C;
-            }
+      }
+		}
+    else if (op.lifetime == OperandLifeTime::MODEL_OUTPUT) {
+      VLOG(L1, "Create output blob");
+      vec<unsigned int> order;
+      Layout layout;
+      if (op.dimensions.size() == 4) {
+        //order = {0,3,1,2};  //nhwc -> nchw
+        layout = Layout::NHWC;
+      }
+      else if (op.dimensions.size() == 2) {
+        //order = {0, 1};
+        layout = Layout::NC;
+      }
+      else {
+        //order = {0}; //(op.dimensions.size() < 2)
+        layout = Layout::C;
+      }
 
-            TensorDesc td(InferenceEngine::Precision::FP16, toDims(op.dimensions), layout);
-            // todo: create a readOnly blob that accepts const pointers
-            InferenceEngine::TBlob<short>::Ptr blob =
-                std::make_shared<InferenceEngine::TBlob<short>>(td);
-            blob->allocate();
-            auto mem = blob->data();
-            short* fp16Array = mem.as<short*>();
-            // convert from [(float *)buf, len] to fp16Array, blob->size()
-            uint32_t length = len / sizeof(short);
-            VLOG(L1, "Model buffer len = %d bytes length= %d bytes fp16Array= %d bytes\n", len,
-                 length, sizeof(fp16Array));
-            if (length >= sizeof(fp16Array)) {
-                VLOG(L1, "Model buffer len = %d bytes length= %d bytes fp16Array= %d bytes\n", len,
-                     length, sizeof(fp16Array));
-                nnAssert(false);
-            }
-            // need memcpy after infer output ??
-            f16tof32Arrays((float*)buf, fp16Array, length);
+      //TensorDesc td(InferenceEngine::Precision::FP32, toDims(op.dimensions), Layout::ANY); //nhwc working
+      TensorDesc td(InferenceEngine::Precision::FP32, toDims(op.dimensions), layout); //nhwc
+      //TensorDesc td(InferenceEngine::Precision::FP32, permuteDims(toDims(op.dimensions), {0,3,1,2}), Layout::ANY);  //nhwc->nchw
+          // todo: create a readOnly blob that accepts const pointers
+      InferenceEngine::TBlob<float>::Ptr blob = InferenceEngine::make_shared_blob<float>(td, (float *)buf, len);
+      return blob;
+    }
 
-            return blob;
-        }
+#else //FP16 support if Myriad does not support FP32 for network input/output
 
-        // TensorDesc td(InferenceEngine::Precision::FP32, toDims(op.dimensions), Layout::ANY);
+    if (op.lifetime == OperandLifeTime::MODEL_INPUT) {
+          // todo: create a readOnly blob that accepts const pointers
+      //InferenceEngine::TBlob<short>::Ptr blob = std::make_shared<InferenceEngine::TBlob<short>>(td);
+      vec<unsigned int> order;
+      Layout layout;
+      if (op.dimensions.size() == 4) {
+      order = {0,3,1,2};  //nhwc -> nchw
+      layout = Layout::NCHW;
+      }
+      else if (op.dimensions.size() == 2) {
+      order = {0, 1};
+      layout = Layout::NC;
+      }
+      else {
+      order = {0}; //(op.dimensions.size() < 2)
+      layout = Layout::C;
+      }
+      TensorDesc td(InferenceEngine::Precision::FP16, permuteDims(toDims(op.dimensions), order), layout);
+      InferenceEngine::TBlob<short>::Ptr blob = std::make_shared<InferenceEngine::TBlob<short>>(td);
+
+      //InferenceEngine::TBlob<short>::Ptr blob = InferenceEngine::make_shared_blob<short, InferenceEngine::SizeVector>(InferenceEngine::Precision::FP16, permuteDims(toDims(op.dimensions), order));
+
+      blob->allocate();
+      auto mem = blob->data();
+      short *fp16Array = mem.as<short*>();
+      // convert from [(float *)buf, len] to fp16Array, blob->size()
+    uint32_t nelem = getNumberOfElements(op.dimensions);
+    VLOG(L1, "Model buffer oplength = %d bytes nelem= %d fp16Array= %d bytes sizeof model buf= %d bytes\n", len , nelem, sizeof(fp16Array), sizeof(buf));
+    if (blob->size() != nelem) {
+    VLOG(L1, "Model buffer len = %d bytes nelem= %d fp16Array= %d bytes\n",len , nelem, sizeof(fp16Array));
+    nnAssert(false);
+    }
+
+    if (buf == nullptr) {
+    VLOG(L1, "Request model input buffer is null pointer");
+    }
+
+    f32tof16Arrays(fp16Array, (float *)buf, nelem);
+
+    return blob;
+    }
+    else if (op.lifetime == OperandLifeTime::MODEL_OUTPUT) {
+
+      vec<unsigned int> order;
+      Layout layout;
+      if (op.dimensions.size() == 4) {
+        //order = {0,3,1,2};  //nhwc -> nchw
+        layout = Layout::NHWC;
+      }
+      else if (op.dimensions.size() == 2) {
+        //order = {0, 1};
+        layout = Layout::NC;
+      }
+      else {
+        //order = {0}; //(op.dimensions.size() < 2)
+        layout = Layout::C;
+      }
+
+      TensorDesc td(InferenceEngine::Precision::FP16, toDims(op.dimensions), layout);
+          // todo: create a readOnly blob that accepts const pointers
+      InferenceEngine::TBlob<short>::Ptr blob = std::make_shared<InferenceEngine::TBlob<short>>(td);
+      blob->allocate();
+      auto mem = blob->data();
+      short *fp16Array = mem.as<short*>();
+      // convert from [(float *)buf, len] to fp16Array, blob->size()
+      uint32_t length = len/sizeof(short);
+      VLOG(L1, "Model buffer len = %d bytes length= %d bytes fp16Array= %d bytes\n",len , length, sizeof(fp16Array));
+      if (length >= sizeof(fp16Array)) {
+      VLOG(L1, "Model buffer len = %d bytes length= %d bytes fp16Array= %d bytes\n",len , length, sizeof(fp16Array));
+      nnAssert(false);
+      }
+      //need memcpy after infer output ??
+      f16tof32Arrays((float *)buf, fp16Array,length);
+
+      return blob;
+    }
+
+        //TensorDesc td(InferenceEngine::Precision::FP32, toDims(op.dimensions), Layout::ANY);
         // todo: create a readOnly blob that accepts const pointers
-        // return std::make_shared<InferenceEngine::TBlob<float>>(td, (float *)buf, len);
+        //return std::make_shared<InferenceEngine::TBlob<float>>(td, (float *)buf, len);
 #endif
-    } else if (op.type == OperandType::TENSOR_INT32) {
+    }
+    else if (op.type == OperandType::TENSOR_INT32) {
         VLOG(L1, "check if const tensors of type IN32 supported");
-        // nnAssert(true);
-        // TensorDesc td(InferenceEngine::Precision::I32, toDims(op.dimensions), Layout::ANY);
-        // return std::make_shared<InferenceEngine::TBlob<int32_t>>(td, (int32_t *)buf, len);
+        //nnAssert(true);
+        //TensorDesc td(InferenceEngine::Precision::I32, toDims(op.dimensions), Layout::ANY);
+        //return std::make_shared<InferenceEngine::TBlob<int32_t>>(td, (int32_t *)buf, len);
     } else {
+
         VLOG(L1, "not supporting const tensors of type ", op.type);
         nnAssert(false);
     }
@@ -3406,12 +3324,6 @@ IRBlob::Ptr CpuPreparedModel::GetConstWeightsOperandAsTensor(uint32_t index) {
                                                      h * width * in_depth + w * in_depth +
                                                      i;  // similar to NHWC memory layout
                                 blob->buffer().as<float*>()[offset++] = inputFilter[offset_ohwi];
-                                // blob->buffer().as<float*>()[blob->getTensorDesc().offset(offset++)]
-                                // = inputFilter[offset_ohwi]; size_t offset_oihw =
-                                // o*in_depth*height*width + i*height*width + h*width + w; //similar
-                                // to NCHW memory layout blob->buffer().as<float*>()[offset_oihw] =
-                                // inputFilter[offset_ohwi]; VLOG(L1, "offset_ohwi= %d offset_oihw=
-                                // %d", offset_ohwi, offset_oihw);
                             }
                         }
                     }
@@ -3441,204 +3353,175 @@ IRBlob::Ptr CpuPreparedModel::GetConstWeightsOperandAsTensor(uint32_t index) {
     return nullptr;
 }
 
-IRBlob::Ptr CpuPreparedModel::GetConstOperandAsTensor(uint32_t index) {
-    dumpOperand(index);
-    const auto op = mModel.operands[index];
+IRBlob::Ptr CpuPreparedModel::GetConstOperandAsTensor(int operand_idx,int operation_idx)
+{
+    ALOGE("Entering %s,",__func__);
+	dumpOperand(operand_idx);
+    const auto op = mModel.operands[operand_idx];
     uint32_t len;
-    const uint8_t* buf = GetOperandMemory(mModel, index, len);
-    VLOG(L1, "CpuPreparedModel:: Operand: index: %d, len: %d, buf: %p", index, len, buf);
-    if (op.type == OperandType::TENSOR_FLOAT32 || op.type == OperandType::FLOAT32) {
+	
+    const uint8_t *buf = GetOperandMemory(mModel, operand_idx, len);
+    VLOG(L1, "CpuPreparedModel:: operand_index: %d, operation_index :%d,len: %d, buf: %p", operand_idx,operation_idx, len, buf);
+    
+	if (op.type == OperandType::TENSOR_FLOAT32 || op.type == OperandType::FLOAT32) {
         vec<unsigned int> order;
         Layout layout;
         if (op.dimensions.size() == 4) {
-            order = {0, 3, 1, 2};  // nhwc -> nchw
-            // layout = Layout::NCHW;
-            // layout = Layout::NHWC;
-            layout = Layout::OIHW;  // weights layout
-        } else if (op.dimensions.size() == 2) {
-            order = {0, 1};
-            layout = Layout::NC;
-        } else {
-            order = {0};  //(op.dimensions.size() < 2)
-            layout = Layout::C;
+          order = {0,3,1,2};  //nhwc -> nchw
+          //layout = Layout::NCHW;
+          //layout = Layout::NHWC;
+          layout = Layout::OIHW; //weights layout
+        }
+        else if (op.dimensions.size() == 2) {
+          order = {0, 1};
+          layout = Layout::NC;
+        }
+        else {
+          order = {0}; //(op.dimensions.size() < 2)
+          layout = Layout::C;
         }
         auto inputDims = toDims(op.dimensions);
         TensorDesc td(InferenceEngine::Precision::FP32, permuteDims(inputDims, order), layout);
-        // TensorDesc td(InferenceEngine::Precision::FP32, toDims(op.dimensions), layout);
-        if (buf == nullptr) {
-            VLOG(L1, "TENSOR_FLOAT32 buf is NULL !!!!!!!!!!!!!!!");
-            InferenceEngine::TBlob<float>::Ptr blob =
-                std::make_shared<InferenceEngine::TBlob<float>>(td);
-            blob->allocate();
-            return blob;
-        } else {
-            if (inputDims.size() != 4) {
-                InferenceEngine::TBlob<float>::Ptr blob =
-                    std::make_shared<InferenceEngine::TBlob<float>>(td, (float*)buf, len);
-                return blob;
-            } else {
-                InferenceEngine::TBlob<float>::Ptr blob =
-                    std::make_shared<InferenceEngine::TBlob<float>>(td);
-                blob->allocate();
+        //TensorDesc td(InferenceEngine::Precision::FP32, toDims(op.dimensions), layout);
+        if (buf == nullptr && operation_idx != OP_INPUT_IDX_CONV) {
+            VLOG(L1, "NNERR:TENSOR_FLOAT32 buf is NULL,aborting!!");
+			return nullptr;
+		}	
+        if (inputDims.size() != NHWC_DIM_NUM && buf != nullptr) { //nor input nor filter nor output params,only bias,padding and stride params
+              VLOG(L1,"Creating blob for bias params");
+			  InferenceEngine::TBlob<float>::Ptr blob = std::make_shared<InferenceEngine::TBlob<float>>(td, (float *)buf, len);
+              return blob;
+        } else { //only filter params
+		      VLOG(L1,"Creating blob for filter params");
+              InferenceEngine::TBlob<float>::Ptr blob = std::make_shared<InferenceEngine::TBlob<float>>(td);
+              blob->allocate();
 
-                auto dims_ohwi = inputDims;  // toDims(op.dimensions);
-                size_t out_depth = dims_ohwi[0];
-                size_t in_depth = dims_ohwi[3];
-                size_t height = dims_ohwi[1];
-                size_t width = dims_ohwi[2];
-                size_t offset = 0;  // blob->size() == o*i*h*w and simlar to nchw memory layout
-                const float* inputFilter =
-                    reinterpret_cast<const float*>(buf);  // OHWI memory layout
+              auto dims_ohwi = inputDims; //toDims(op.dimensions);
+              size_t out_depth = dims_ohwi[0];
+              size_t in_depth = dims_ohwi[3];
+              size_t height = dims_ohwi[1];
+              size_t width = dims_ohwi[2];
+              size_t offset = 0; //blob->size() == o*i*h*w and simlar to nchw memory layout
+              const float* inputFilter = reinterpret_cast<const float *>(buf); //OHWI memory layout
 
-                for (size_t o = 0; o < out_depth; o++) {
-                    for (size_t i = 0; i < in_depth; i++) {
-                        for (size_t h = 0; h < height; h++) {
-                            for (size_t w = 0; w < width; w++) {
-                                size_t offset_ohwi = o * height * width * in_depth +
-                                                     h * width * in_depth + w * in_depth +
-                                                     i;  // similar to NHWC memory layout
-                                // blob->buffer().as<float*>()[blob->getTensorDesc().offset(offset++)]
-                                // = inputFilter[offset_ohwi];
-                                blob->buffer().as<float*>()[offset++] = inputFilter[offset_ohwi];
-                                // size_t offset_oihw = o*in_depth*height*width + i*height*width +
-                                // h*width + w; //similar to NCHW memory layout
-                                // blob->buffer().as<float*>()[offset_oihw] =
-                                // inputFilter[offset_ohwi]; VLOG(L1, "offset_ohwi= %d offset_oihw=
-                                // %d", offset_ohwi, offset_oihw);
-                            }
-                        }
+              for (size_t o = 0; o < out_depth; o++){
+                for (size_t i = 0; i < in_depth; i++){
+                  for (size_t h = 0; h < height; h++){
+                    for (size_t w = 0; w < width; w++){
+                      size_t offset_ohwi = o*height*width*in_depth + h*width*in_depth + w*in_depth + i; //similar to NHWC memory layout
+                      //blob->buffer().as<float*>()[blob->getTensorDesc().offset(offset++)] = inputFilter[offset_ohwi];
+                      blob->buffer().as<float*>()[offset++] = inputFilter[offset_ohwi];
                     }
+                  }
                 }
+              }
 
-                return blob;
-            }
+              return blob;
         }
-    } else if (op.type == OperandType::TENSOR_INT32) {
-        VLOG(L1, "check if const tensors of type IN32 supported");
+    } else if (op.type == OperandType::TENSOR_INT32 && buf != nullptr) {
+
+        VLOG(L1, "creating blob for tensor_int32/quant  params");
         TensorDesc td(InferenceEngine::Precision::I32, toDims(op.dimensions), Layout::ANY);
-        if (buf == nullptr) {
-            VLOG(L1, "TENSOR_INT32 buf is NULL !!!!!!!!!!!!!!!");
-            InferenceEngine::TBlob<float>::Ptr blob =
-                std::make_shared<InferenceEngine::TBlob<float>>(td);
-            blob->allocate();
-            return blob;
-        } else {
-            InferenceEngine::TBlob<float>::Ptr blob =
-                std::make_shared<InferenceEngine::TBlob<float>>(td, (float*)buf, len);
-            return blob;
-        }
+        
+        InferenceEngine::TBlob<float>::Ptr blob = std::make_shared<InferenceEngine::TBlob<float>>(td, (float *)buf, len);
+        return blob;
     } else {
-        VLOG(L1, "not supporting const tensors of type ", op.type);
-        nnAssert(false);
+        VLOG(L1, "NNERR:not supporting const tensors of type=%d,hence failed in creating blob", op.type);
+		 //nnAssert(false);
+		 return nullptr;
     }
     return nullptr;
 }
 
-Blob::Ptr CpuPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const uint8_t* buf,
-                                                  uint32_t& len) {
+Blob::Ptr CpuPreparedModel::GetInOutOperandAsBlob(bool param_type,RunTimeOperandInfo& op, const uint8_t *buf, uint32_t& len)
+{
     if (op.type == OperandType::TENSOR_FLOAT32 || op.type == OperandType::FLOAT32) {
         if (op.lifetime == OperandLifeTime::MODEL_INPUT) {
-            VLOG(L1, "Create input blob !!!!");
-            vec<unsigned int> order;
-            Layout layout;
-            if (op.dimensions.size() == 4) {
-                order = {0, 3, 1, 2};  // nhwc -> nchw
-                layout = Layout::NCHW;
-                // layout = Layout::NHWC;
-            } else if (op.dimensions.size() == 2) {
-                order = {0, 1};
-                layout = Layout::NC;
-            } else {
-                order = {0};  //(op.dimensions.size() < 2)
-                layout = Layout::C;
-            }
+          VLOG(L1, "Creating  input-blob !!!!");
+          vec<unsigned int> order;
+          Layout layout;
+          if (op.dimensions.size() == 4) {
+          order = {0,3,1,2};  //nhwc -> nchw
+          layout = Layout::NCHW;
+          //layout = Layout::NHWC;
+          }
+          else if (op.dimensions.size() == 2) {
+          order = {0, 1};
+          layout = Layout::NC;
+          }
+          else {
+          order = {0}; //(op.dimensions.size() < 2)
+          layout = Layout::C;
+          }
 
-            auto inputDims = toDims(op.dimensions);
-            TensorDesc td(InferenceEngine::Precision::FP32, permuteDims(inputDims, order), layout);
-            // TensorDesc td(InferenceEngine::Precision::FP32, inputDims, layout);
+          auto inputDims = toDims(op.dimensions);
+          TensorDesc td(InferenceEngine::Precision::FP32, permuteDims(inputDims, order), layout);
+          //TensorDesc td(InferenceEngine::Precision::FP32, inputDims, layout);
 
-            if (buf == nullptr) {
-                VLOG(L1, "MODEL_INPUT buf is NULL !!!!!!!!!!!!!!!");
-                InferenceEngine::TBlob<float>::Ptr blob =
-                    std::make_shared<InferenceEngine::TBlob<float>>(td);
-                blob->allocate();
+          if (buf == nullptr) {
+              VLOG(L1, "NNERR:In %s MODEL_INPUT buf is NULL,aborting!!",__func__);
+			  return nullptr;
+		  }
+          if (inputDims.size() != 4) {
+                InferenceEngine::TBlob<float>::Ptr blob = std::make_shared<InferenceEngine::TBlob<float>>(td, (float *)buf, len);
                 return blob;
-            } else {
-                if (inputDims.size() != 4) {
-                    InferenceEngine::TBlob<float>::Ptr blob =
-                        std::make_shared<InferenceEngine::TBlob<float>>(td, (float*)buf, len);
-                    return blob;
-                } else {
-                    InferenceEngine::TBlob<float>::Ptr blob =
-                        std::make_shared<InferenceEngine::TBlob<float>>(td);
-                    blob->allocate();
+          } else {
+                InferenceEngine::TBlob<float>::Ptr blob = std::make_shared<InferenceEngine::TBlob<float>>(td);
+                blob->allocate();
 
-                    auto dims_nhwc = inputDims;  // toDims(op.dimensions);
-                    size_t batch = dims_nhwc[0];
-                    size_t in_depth = dims_nhwc[3];  // channels
-                    size_t height = dims_nhwc[1];
-                    size_t width = dims_nhwc[2];
-                    size_t offset = 0;  // blob->size() == o*i*h*w and simlar to nchw memory layout
-                    const float* input = reinterpret_cast<const float*>(buf);  // OHWI memory layout
+                auto dims_nhwc = inputDims; //toDims(op.dimensions);
+                size_t batch = dims_nhwc[0];
+                size_t in_depth = dims_nhwc[3]; //channels
+                size_t height = dims_nhwc[1];
+                size_t width = dims_nhwc[2];
+                size_t offset = 0; //blob->size() == o*i*h*w and simlar to nchw memory layout
+                const float* input = reinterpret_cast<const float *>(buf); //OHWI memory layout
 
-                    // convert NHWC -> NCHW
+                //convert NHWC -> NCHW
 
-                    for (size_t b = 0; b < batch; b++) {
-                        for (size_t i = 0; i < in_depth; i++) {
-                            for (size_t h = 0; h < height; h++) {
-                                for (size_t w = 0; w < width; w++) {
-                                    size_t offset_nhwc = b * height * width * in_depth +
-                                                         h * width * in_depth + w * in_depth +
-                                                         i;  // similar to NHWC memory layout
-                                    blob->buffer().as<float*>()[offset++] = input[offset_nhwc];
-                                    // blob->buffer().as<float*>()[blob->getTensorDesc().offset(offset++)]
-                                    // = input[offset_nhwc]; size_t offset_nchw =
-                                    // b*in_depth*height*width + i*height*width + h*width + w;
-                                    // //similar to NCHW memory layout
-                                    // blob->buffer().as<float*>()[offset_oihw] =
-                                    // inputFilter[offset_ohwi]; VLOG(L1, "offset_nhwc= %d
-                                    // offset_nchw= %d", offset_nhwc, offset_nchw);
-                                }
-                            }
-                        }
+                for (size_t b = 0; b < batch; b++){
+                  for (size_t i = 0; i < in_depth; i++){
+                    for (size_t h = 0; h < height; h++){
+                      for (size_t w = 0; w < width; w++){
+                        size_t offset_nhwc = b*height*width*in_depth + h*width*in_depth + w*in_depth + i; //similar to NHWC memory layout
+                        blob->buffer().as<float*>()[offset++] = input[offset_nhwc];
+                      }
                     }
-
-                    return blob;
+                  }
                 }
-            }
+
+                return blob;
+          }
         } else if (op.lifetime == OperandLifeTime::MODEL_OUTPUT) {
-            VLOG(L1, "Create output blob !!!!");
+            VLOG(L1, "Creating output-blob !!!!");
             vec<unsigned int> order;
             Layout layout;
             if (op.dimensions.size() == 4) {
-                // order = {0,3,1,2};  //nhwc -> nchw
-                layout = Layout::NHWC;
-            } else if (op.dimensions.size() == 2) {
-                // order = {0, 1};
-                layout = Layout::NC;
-            } else {
-                // order = {0}; //(op.dimensions.size() < 2)
-                layout = Layout::C;
+              //order = {0,3,1,2};  //nhwc -> nchw
+              layout = Layout::NHWC;
+            }
+            else if (op.dimensions.size() == 2) {
+              //order = {0, 1};
+              layout = Layout::NC;
+            }
+            else {
+              //order = {0}; //(op.dimensions.size() < 2)
+              layout = Layout::C;
             }
 
-            TensorDesc td(InferenceEngine::Precision::FP32, toDims(op.dimensions), layout);  // nhwc
-            if (buf == nullptr) {
-                VLOG(L1, "MODEL_OUTPUT buf is NULL !!!!!!!!!!!!!!!");
-                InferenceEngine::TBlob<float>::Ptr blob =
-                    std::make_shared<InferenceEngine::TBlob<float>>(td);
-                blob->allocate();
-                return blob;
-            } else {
-                InferenceEngine::TBlob<float>::Ptr blob =
-                    InferenceEngine::make_shared_blob<float>(td, (float*)buf, len);
-                return blob;
-            }
+            TensorDesc td(InferenceEngine::Precision::FP32, toDims(op.dimensions), layout); //nhwc
+            if (buf == nullptr){
+                VLOG(L1, "NNERR:In %s MODEL_OUTPUT buf is NULL,aborting!!",__func__);
+				return nullptr;
+			}
+            InferenceEngine::TBlob<float>::Ptr blob = InferenceEngine::make_shared_blob<float>(td, (float *)buf, len);
+            return blob;
         }
     } else if (op.type == OperandType::TENSOR_INT32) {
         VLOG(L1, "check if const tensors of type IN32 supported");
-        // nnAssert(true);
+        //nnAssert(true);
         TensorDesc td(InferenceEngine::Precision::I32, toDims(op.dimensions), Layout::ANY);
-        return std::make_shared<InferenceEngine::TBlob<int32_t>>(td, (int32_t*)buf, len);
+        return std::make_shared<InferenceEngine::TBlob<int32_t>>(td, (int32_t *)buf, len);
     } else {
         VLOG(L1, "not supporting const tensors of type ", op.type);
         nnAssert(false);
@@ -3646,8 +3529,7 @@ Blob::Ptr CpuPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const 
     return nullptr;
 }
 
-}  // namespace driver
-}  // namespace V1_0
+}  // namespace nnhal
 }  // namespace neuralnetworks
 }  // namespace hardware
 }  // namespace android

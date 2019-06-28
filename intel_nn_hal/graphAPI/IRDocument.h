@@ -35,12 +35,11 @@
 #include "ie_icnn_network.hpp"
 #include "ie_common.h"
 
-
-class InternalNetworkImpl;
-
-namespace IRBuilder
-{
-
+namespace android {
+namespace hardware {
+namespace neuralnetworks {
+namespace nnhal {
+    class InternalNetworkImpl;
 class IRDocument
 {
 private:
@@ -104,4 +103,7 @@ public:
     InferenceEngine::ICNNNetwork *getNetwork();
 };
 
-}  // namespace IRBuilder
+}  // namespace nnhal
+}  // namespace neuralnetworks
+}  // namespace hardware
+}  // namespace android 
