@@ -1292,7 +1292,7 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
 			if (input1.dimensions[NHWC_HT_IDX] != 
 				input1.dimensions[NHWC_WD_IDX]) {
                 VLOG(L1,"NNERR: non-square Filter size(H:%d,W:%d) not supported,warning!!",input1.dimensions[NHWC_HT_IDX],input1.dimensions[NHWC_WD_IDX]);
-			    //return false;
+			    return false;
             }
 			
 			//Check all other Input operand types for implicit/explicit Padding
@@ -1587,7 +1587,6 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
         case OperationType::RELU:
         case OperationType::RELU1:
         case OperationType::RELU6:
-            break;
         case OperationType::LOGISTIC: {
             const auto&  input0 = model.operands[operation.inputs[0]];
 			const auto& output = model.operands[operation.outputs[0]];
