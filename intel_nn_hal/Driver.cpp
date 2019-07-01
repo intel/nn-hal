@@ -77,8 +77,8 @@ Return<ErrorStatus> Driver::prepareModel_1_1(const Model& model,
     }
     if (!preparedModel->initialize()) {
        ALOGI("failed to initialize preparedmodel");
-       callback->notify(ErrorStatus::INVALID_ARGUMENT, nullptr);
-       return ErrorStatus::INVALID_ARGUMENT;
+       callback->notify(ErrorStatus::GENERAL_FAILURE, nullptr);
+       return ErrorStatus::NONE;
     }
     callback->notify(ErrorStatus::NONE, preparedModel);
     return ErrorStatus::NONE;
