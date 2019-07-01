@@ -60,8 +60,10 @@ inline std::string GetCWD()
 };
 
 
-namespace IRBuilder
-{
+namespace android {
+namespace hardware {
+namespace neuralnetworks {
+namespace nnhal {
 
 template<typename T>
 std::string &operator<<(std::string &&src, T i)
@@ -101,13 +103,6 @@ struct DelayObj
 
 typedef InferenceEngine::SizeVector TensorDims;
 
-inline size_t sizeOf(const TensorDims &dims)
-{
-    size_t ret = dims[0];
-    for(int i = 1; i < dims.size(); ++i) ret *= dims[i];
-    return ret;
-}
-
 void operator>>(const InferenceEngine::DataPtr &lhs, const InferenceEngine::CNNLayerPtr &rhs);
 
 inline void operator>>(const InferenceEngine::CNNLayerPtr &lhs, const InferenceEngine::CNNLayerPtr &rhs)
@@ -138,4 +133,7 @@ IRBlob::Ptr readBlobFromFile(const std::string &file, const TensorDims &dims, In
     return data;
 }
 
-}  // namespace IRBuilder
+}  // namespace nnhal
+}  // namespace neuralnetworks
+}  // namespace hardware
+}  // namespace android 
