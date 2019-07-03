@@ -7,10 +7,10 @@
 using namespace ::android::hardware::neuralnetworks::nnhal;
 
 template <typename T>
-void createAlexNet(IRDocument &doc) {
+void createAlexNet(IRDocument& doc) {
     auto input = doc.createInput("in1", {1, 3, 227, 227});
 
-    auto &pp = input->getPreProcess();
+    auto& pp = input->getPreProcess();
 
     pp.init(3);
     pp.setVariant(MEAN_VALUE);  // reverse of 123.68, 116.779, 103.939
@@ -20,7 +20,7 @@ void createAlexNet(IRDocument &doc) {
 
     ConvolutionParams prms;
     //<convolution_data stride-x="4" stride-y="4" pad-x="0" pad-y="0" kernel-x="11" kernel-y="11"
-    //output="96" group="1"/>
+    // output="96" group="1"/>
     prms.weights = readBlobFromFile<T>("AlexNet-bins/conv1_weights.bin");
     prms.kernel = {11, 11};
     prms.stride = {4, 4};
@@ -32,13 +32,13 @@ void createAlexNet(IRDocument &doc) {
     //<norm_data alpha = "9.9999997e-05" beta = "0.75" local-size = "5" region = "across" / >
     auto n1 = LRN(r1, 0.0001f, 0.75f, 5, true);
     //<pooling_data kernel-x="3" kernel-y="3" pad-x="0" pad-y="0" stride-x="2" stride-y="2"
-    //rounding-type="ceil" pool-method="max"/>
+    // rounding-type="ceil" pool-method="max"/>
     auto p1 = Pooling(n1, {3, 3}, {2, 2}, {0, 0}, PoolingLayer::MAX);
 
     /// 2nd part
     auto s1 = Split(p1, 2);
     //<convolution_data stride-x="1" stride-y="1" pad-x="2" pad-y="2" kernel-x="5" kernel-y="5"
-    //output="128" group="1"/>
+    // output="128" group="1"/>
     prms.kernel = {5, 5};
     prms.stride = {1, 1};
     prms.pad_start = {2, 2};
@@ -53,12 +53,12 @@ void createAlexNet(IRDocument &doc) {
     auto relu2 = ReLU(c2);
     auto n2 = LRN(relu2, 0.0001f, 0.75f, 5, true);
     //<pooling_data kernel-x="3" kernel-y="3" pad-x="0" pad-y="0" stride-x="2" stride-y="2"
-    //rounding-type="ceil" pool-method="max"/>
+    // rounding-type="ceil" pool-method="max"/>
     auto p2 = Pooling(n2, {3, 3}, {2, 2}, {0, 0}, PoolingLayer::MAX);
 
     // 3rd part
     //<convolution_data stride-x="1" stride-y="1" pad-x="1" pad-y="1" kernel-x="3" kernel-y="3"
-    //output="384" group="1"/>
+    // output="384" group="1"/>
     prms.kernel = {3, 3};
     prms.stride = {1, 1};
     prms.pad_start = {1, 1};
@@ -70,7 +70,7 @@ void createAlexNet(IRDocument &doc) {
     // 4th part
     auto s4 = Split(c3, 2);
     //<convolution_data stride-x="1" stride-y="1" pad-x="1" pad-y="1" kernel-x="3" kernel-y="3"
-    //output="192" group="1"/>
+    // output="192" group="1"/>
     prms.num_output_planes = 192;
     prms.weights = readBlobFromFile<T>("AlexNet-bins/conv4_0_weights.bin");
     auto c4_0 =
@@ -81,7 +81,7 @@ void createAlexNet(IRDocument &doc) {
 
     // 5th part
     //<convolution_data stride-x="1" stride-y="1" pad-x="1" pad-y="1" kernel-x="3" kernel-y="3"
-    //output="128" group="1"/>
+    // output="128" group="1"/>
     prms.num_output_planes = 128;
     prms.weights = readBlobFromFile<T>("AlexNet-bins/conv5_0_weights.bin");
     auto c5_0 =
@@ -92,7 +92,7 @@ void createAlexNet(IRDocument &doc) {
     auto c5 = Concat({c5_0, c5_1});
 
     //<pooling_data kernel-x="3" kernel-y="3" pad-x="0" pad-y="0" stride-x="2" stride-y="2"
-    //rounding-type="ceil" pool-method="max"/>
+    // rounding-type="ceil" pool-method="max"/>
     auto p5 = Pooling(c5, {3, 3}, {2, 2}, {0, 0}, PoolingLayer::MAX);
 
     // fc6
@@ -106,12 +106,12 @@ void createAlexNet(IRDocument &doc) {
     m = readBlobFromFile<T>("AlexNet-bins/fc8_weights.bin");
     auto fc8 = m * fc7 + readBlobFromFile<T>("AlexNet-bins/fc8_bias.bin");
 
-    const OutputPort &output = Softmax(fc8);
+    const OutputPort& output = Softmax(fc8);
     doc.addOutput(output);
     return;
 }
 
-inline void prompt(const char *msg = "press [ENTER] to contine") {
+inline void prompt(const char* msg = "press [ENTER] to contine") {
 #ifdef WIN32
     std::cout << msg << std::endl;
     std::cin.get();
@@ -130,11 +130,11 @@ bool testAlexNet() {
 #elif ENABLE_MKLDNN
         createAlexNet<float>(doc);
 #endif
-    } catch (const InferenceEngine::details::InferenceEngineException &ex) {
+    } catch (const InferenceEngine::details::InferenceEngineException& ex) {
         std::cerr << "IE Expection: " << ex.what();
         prompt();
         return false;
-    } catch (const std::exception &ex) {
+    } catch (const std::exception& ex) {
         std::cerr << ex.what();
         prompt();
         return false;
@@ -153,13 +153,6 @@ bool testAlexNet() {
         auto in = readBlobFromFile<float>("AlexNet-bins/input.bin", {1, 3, 227, 227},
                                           InferenceEngine::NCHW);
 #endif
-        /*
-                        InfEng eng(TargetDevice::eMYRIAD);
-
-                        auto exe = eng.Load(doc);
-
-                        auto ob = exe.Infer(in);
-        */
         printf("aks initialize ExecuteNetwork\n");
 #ifdef ENABLE_MYRIAD
         ExecuteNetwork executeNet(doc, TargetDevice::eMYRIAD);
@@ -183,14 +176,14 @@ bool testAlexNet() {
         const auto mem = ob->readOnly();
 
         // const float *pf = mem.as<const float*>();
-        const float *pf = mem.as<const float *>();
+        const float* pf = mem.as<const float*>();
 
         for (int i = 0; i < top10.size(); i++) {
             std::cout << "TOP " << i + 1 << ": " << pf[top10[i]] * 100 << "% at index " << top10[i]
                       << std::endl;
         }
 #endif
-    } catch (const std::exception &ex) {
+    } catch (const std::exception& ex) {
         std::cerr << ex.what();
         return false;
     }
@@ -212,10 +205,10 @@ bool testAffineLayer() {
         // auto input = doc.createInput("input", { 5 }); // 5 elements, batch of 1
 
         std::vector<float> wdata = {2.0f, 4.0f, 0.5f, 0.25f, 1.0f};
-        float *buf = wdata.data();
+        float* buf = wdata.data();
 
         vec<uint32_t> wdims = {1, 5};
-        // vec<uint32_t> wdims = { 5, 1 };
+// vec<uint32_t> wdims = { 5, 1 };
 #ifdef ENABLE_MYRIAD
         TensorDesc td(InferenceEngine::Precision::FP16, toDims(wdims), Layout::NC);
 
@@ -223,14 +216,14 @@ bool testAffineLayer() {
             std::make_shared<InferenceEngine::TBlob<short>>(td);
         weightsBlob->allocate();
         auto mem = weightsBlob->data();
-        short *fp16Array = mem.as<short *>();
+        short* fp16Array = mem.as<short*>();
 
         // convert from [(float *)buf, len] to fp16Array,
 
         uint32_t nelem = getNumberOfElements(wdims);
         printf("weights nelement %u\n", nelem);
 
-        f32tof16Arrays(fp16Array, (float *)buf,
+        f32tof16Arrays(fp16Array, (float*)buf,
                        nelem);  // void f32tof16Arrays(short *dst, const float *src, uint32_t&
                                 // nelem, float scale = 1, float bias = 0)
 #elif ENABLE_MKLDNN
@@ -248,7 +241,7 @@ bool testAffineLayer() {
         // Create Bias blob
         std::vector<float> bData = {1.0f};
 
-        float *buf1 = bData.data();
+        float* buf1 = bData.data();
 
         vec<uint32_t> bdims = {1};
 #ifdef ENABLE_MYRIAD
@@ -258,26 +251,23 @@ bool testAffineLayer() {
             std::make_shared<InferenceEngine::TBlob<short>>(td1);
         biasBlob->allocate();
         auto mem1 = biasBlob->data();
-        short *fp16Array1 = mem1.as<short *>();
+        short* fp16Array1 = mem1.as<short*>();
 
         // convert from [(float *)buf, len] to fp16Array,
         uint32_t nelem1 = getNumberOfElements(bdims);
         // printf("bias nelement %u\n", nelem);
 
-        f32tof16Arrays(fp16Array1, (float *)buf1,
+        f32tof16Arrays(fp16Array1, (float*)buf1,
                        nelem1);  // void f32tof16Arrays(short *dst, const float *src, uint32_t&
                                  // nelem, float scale = 1, float bias = 0)
 #elif ENABLE_MKLDNN
-        TensorDesc td1(InferenceEngine::Precision::FP32, toDims(bdims), /*Layout::ANY*/ Layout::C);
+        TensorDesc td1(InferenceEngine::Precision::FP32, toDims(bdims),
+                       /*Layout::ANY*/ Layout::C);
 
         InferenceEngine::TBlob<float>::Ptr biasBlob =
             std::make_shared<InferenceEngine::TBlob<float>>(td1);
         biasBlob->set(bData);
 #endif
-
-        // auto bias = make_shared_blob<short>(Precision::FP32, Layout::C, std::vector<float>({
-        // -1.0f })); auto bias = make_shared_blob<short>(Precision::FP16, Layout::C,
-        // std::vector<short>({ 1 }));
 
         printf("addOutput\n");
         auto indim = input->getDims();
@@ -317,9 +307,6 @@ bool testAffineLayer() {
             inData->data()[i] = invalue.at(i);
         }
 
-        // auto inData = make_shared_blob<float>(Precision::FP32, Layout::NC, std::vector<float>({
-        // 0.1f,0.2f,0.3f,0.4f,0.5f }));
-
         auto network = doc.getNetwork();
         network->setBatchSize(batch);
         char networkName1[1024] = {};
@@ -344,7 +331,6 @@ bool testAffineLayer() {
 
         for (int i = 0; i < weightsBlob->size(); i++) {
             expectedResult += wdata.data()[i] * inData->readOnly()[i];
-            // expectedResult += weightsBlob->readOnly().as<short*>()[i] * inData_mem16[i];
         }
         if (expectedResult < 0) expectedResult = 0;
 
@@ -363,7 +349,7 @@ bool testAffineLayer() {
             printf("TEST FAILED! expected: %f got result %f ", expectedResult, result);
         }
         return true;
-    } catch (const std::exception &ex) {
+    } catch (const std::exception& ex) {
         printf("exception\n");
         std::cerr << ex.what();
 
@@ -382,7 +368,7 @@ bool testMKLBug() {
 
         ConvolutionParams prms;
         //<convolution_data stride-x="4" stride-y="4" pad-x="0" pad-y="0" kernel-x="11"
-        //kernel-y="11" output="96" group="1"/>
+        // kernel-y="11" output="96" group="1"/>
         prms.weights = readBlobFromFile<T>("AlexNet-bins/conv1_weights.bin");
         prms.kernel = {11, 11};
         prms.stride = {4, 4};
@@ -390,16 +376,17 @@ bool testMKLBug() {
 
         auto b1 = readBlobFromFile<T>("AlexNet-bins/conv1_bias.bin");
         auto r1 = ReLU(Convolution(input->getInputData(), prms) + b1);
-        //<norm_data alpha = "9.9999997e-05" beta = "0.75" local-size = "5" region = "across" / >
+        //<norm_data alpha = "9.9999997e-05" beta = "0.75" local-size = "5" region =
+        //"across" / >
         auto n1 = LRN(r1, 0.0001f, 0.75f, 5, true);
         //<pooling_data kernel-x="3" kernel-y="3" pad-x="0" pad-y="0" stride-x="2" stride-y="2"
-        //rounding-type="ceil" pool-method="max"/>
+        // rounding-type="ceil" pool-method="max"/>
         auto p1 = Pooling(n1, {3, 3}, {2, 2}, {0, 0}, PoolingLayer::MAX);
 
         /// 2nd part
         auto s1 = Split(p1, 2);
         //<convolution_data stride-x="1" stride-y="1" pad-x="2" pad-y="2" kernel-x="5" kernel-y="5"
-        //output="128" group="1"/>
+        // output="128" group="1"/>
         prms.kernel = {5, 5};
         prms.stride = {1, 1};
         prms.pad_end = prms.pad_start = {2, 2};
@@ -413,7 +400,7 @@ bool testMKLBug() {
         auto c2 = ReLU(conv2);
         auto n2 = LRN(c2, 0.0001f, 0.75f, 5, true);
         //<pooling_data kernel-x="3" kernel-y="3" pad-x="0" pad-y="0" stride-x="2" stride-y="2"
-        //rounding-type="ceil" pool-method="max"/>
+        // rounding-type="ceil" pool-method="max"/>
         auto p2 = Pooling(n2, {3, 3}, {2, 2}, {0, 0}, PoolingLayer::MAX);
 
         doc.addOutput(c2);
@@ -432,24 +419,20 @@ bool testMKLBug() {
         executeNet.loadNetwork();
         printf("infer network\n");
         auto ob = executeNet.Infer(in);
-    } catch (const std::exception &ex) {
+    } catch (const std::exception& ex) {
         std::cerr << ex.what();
         return false;
     }
     return true;
 }
 
-int main(int argc, const char *argv[]) {
+int main(int argc, const char* argv[]) {
     std::string inp;
 
 #ifdef ENABLE_MYRIAD
     g_layer_precision = InferenceEngine::Precision::FP16;
-    // testAlexNet();
-    // testMKLBug<short>();
 #elif ENABLE_MKLDNN
     g_layer_precision = InferenceEngine::Precision::FP32;
-    // testAlexNet();
-    // testMKLBug<float>();
 #endif
 
     testAffineLayer();
