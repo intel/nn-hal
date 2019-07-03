@@ -58,13 +58,13 @@ class InternalNetworkImpl : public InferenceEngine::details::CNNNetworkImpl {
         setName(netName);
     }
 
-    void remove(const string &layer_name) { _layers.erase(layer_name); }
+    void remove(const string& layer_name) { _layers.erase(layer_name); }
 
-    bool hasLayer(const string &lname) const { return _layers.find(lname) != _layers.end(); }
+    bool hasLayer(const string& lname) const { return _layers.find(lname) != _layers.end(); }
 
-    void addData(const DataPtr &data) { _data[data->name] = data; }
+    void addData(const DataPtr& data) { _data[data->name] = data; }
 
-    void addOutput(const DataPtr &data) {
+    void addOutput(const DataPtr& data) {
         addData(data);
 
         auto docdatadims = data->getTensorDesc().getDims();
@@ -73,21 +73,19 @@ class InternalNetworkImpl : public InferenceEngine::details::CNNNetworkImpl {
             ALOGI("doc addOutput data dims[%d] = %d", i, docdatadims[i]);
 #endif
         std::cout << "doc addOutput datadims size " << docdatadims.size() << std::endl;
-        // std::cout << "docdatadims[0] "<<docdatadims[0]<< "docdatadims[1]" <<docdatadims[1]<<
-        // std::endl;
 
         _outputData[data->name] = data;
     }
 };
 
-IRDocument::IRDocument(const std::string &cs) : _name(cs) { network = new InternalNetworkImpl(cs); }
+IRDocument::IRDocument(const std::string& cs) : _name(cs) { network = new InternalNetworkImpl(cs); }
 
 IRDocument::~IRDocument() {
     delete network;
     network = nullptr;
 }
 
-void IRDocument::add(const IRLayer &ir_layer) {
+void IRDocument::add(const IRLayer& ir_layer) {
 #ifdef NNLOG
     ALOGI("add ir_layer = %s", ir_layer->name.c_str());
 #endif
@@ -95,12 +93,12 @@ void IRDocument::add(const IRLayer &ir_layer) {
     _layers.push_back(ir_layer);
 }
 
-bool IRDocument::shouldRemove(const IRLayer &l) {
+bool IRDocument::shouldRemove(const IRLayer& l) {
     if (l->type != "Reshape") return false;
     return l->insData[0].lock()->getDims() == output(l)->getDims();
 }
 
-void IRDocument::process(const IRLayer &layer) {
+void IRDocument::process(const IRLayer& layer) {
     if (network->hasLayer(layer->name)) return;
     add(layer);
     for (auto o : layer->outData) {
@@ -113,7 +111,6 @@ void IRDocument::optimize() {
     for (auto it = _layers.begin(); it != _layers.end();) {
         auto l = *it;
         if (shouldRemove(l)) {
-            // l-in -> (l,l-out) -> (b-in list) ===> a-out -> (b-in list)
             auto lin = l->input();
             auto lout = output(l);
 
@@ -122,8 +119,7 @@ void IRDocument::optimize() {
             auto lout_targets = lout->inputTo;
             for (auto i : lout_targets) {
                 lin->inputTo[i.first] = i.second;
-                // reaplce target input data from lout to lin
-                for (auto &tar_inp : i.second->insData) {
+                for (auto& tar_inp : i.second->insData) {
                     if (tar_inp.lock() == lout) {
                         tar_inp = lin;
                         break;
@@ -133,8 +129,7 @@ void IRDocument::optimize() {
 
             it = _layers.erase(it);
             network->remove(l->name);
-        }
-        else {
+        } else {
             ++it;
         }
     }
@@ -156,11 +151,11 @@ void IRDocument::build() {
     _processed = true;
 }
 
-InferenceEngine::ICNNNetwork *IRDocument::buildNetwork() {
+InferenceEngine::ICNNNetwork* IRDocument::buildNetwork() {
     build();
     return network;
 }
-InferenceEngine::ICNNNetwork *IRDocument::getNetwork() { return network; }
+InferenceEngine::ICNNNetwork* IRDocument::getNetwork() { return network; }
 /**
  * \brief save a blob to IR
  * \param binFile
@@ -169,17 +164,16 @@ InferenceEngine::ICNNNetwork *IRDocument::getNetwork() { return network; }
  * \param name
  */
 
-void IRDocument::saveBlobToIR(std::ostream &binFile,
-                              const /*IRBlob::Ptr*/ InferenceEngine::Blob::Ptr &blob,
-                              pugi::xml_node &layer, const std::string &name) {
-    const float *fp = blob->cbuffer().as<const float *>();
+void IRDocument::saveBlobToIR(std::ostream& binFile,
+                              const /*IRBlob::Ptr*/ InferenceEngine::Blob::Ptr& blob,
+                              pugi::xml_node& layer, const std::string& name) {
+    const float* fp = blob->cbuffer().as<const float*>();
 
     auto fit = _segmentsMap.find(fp);
     bool newBlob = fit == _segmentsMap.end();
     size_t offset;
     if (newBlob) {
         offset = binFile.tellp();
-        //_segmentsMap[(float*)fp] = offset;
         _segmentsMap[fp] = offset;
     } else {
         offset = fit->second;
@@ -189,13 +183,13 @@ void IRDocument::saveBlobToIR(std::ostream &binFile,
     node.append_attribute("offset").set_value(offset);
     node.append_attribute("size").set_value(blob->byteSize());
     if (newBlob) {
-        binFile.write(reinterpret_cast<const char *>(fp), blob->byteSize());
+        binFile.write(reinterpret_cast<const char*>(fp), blob->byteSize());
     }
 
     node.append_attribute("precision").set_value(blob->precision().name());
 }
 
-void IRDocument::save(std::ostream &xml_os, std::ostream &bin_os) {
+void IRDocument::save(std::ostream& xml_os, std::ostream& bin_os) {
     pugi::xml_document doc;
 
     build();
@@ -208,7 +202,7 @@ void IRDocument::save(std::ostream &xml_os, std::ostream &bin_os) {
     InputsDataMap netInputs;
     network->getInputsInfo(netInputs);
     int icnt = 0;
-    for (auto &kvp : netInputs) {  // todo: consider adding input layer to actual network...
+    for (auto& kvp : netInputs) {  // todo: consider adding input layer to actual network...
         InferenceEngine::LayerParams prms;
         prms.name = kvp.first;
         CNNLayer::Ptr inputLayer(new CNNLayer(prms));
@@ -219,14 +213,14 @@ void IRDocument::save(std::ostream &xml_os, std::ostream &bin_os) {
         saveToIR(bin_os, layers, inputLayer);
     }
 
-    for (auto &cnn_layer : _layers) {
+    for (auto& cnn_layer : _layers) {
         cnn_layer->userValue.v_int = ++id_cnt;
         int pcnt = 0;
         for (auto output : cnn_layer->outData) output->userObject.v_int = pcnt++;
         saveToIR(bin_os, layers, cnn_layer);
     }
     pugi::xml_node edgesNode = root.append_child("edges");
-    for (auto &kvp : _layers) {
+    for (auto& kvp : _layers) {
         int pcnt = 0;
         for (auto inputData : kvp->insData) {
             Edge edge;
@@ -249,7 +243,7 @@ void IRDocument::save(std::ostream &xml_os, std::ostream &bin_os) {
     doc.save(xml_os);
 }
 
-void IRDocument::save(const std::string &filebase) {
+void IRDocument::save(const std::string& filebase) {
     std::fstream xml, bin;
 
     xml.open(filebase + ".xml", std::ios_base::out);
@@ -259,24 +253,25 @@ void IRDocument::save(const std::string &filebase) {
     bin.close();
 }
 
-void IRDocument::crateDotFile(std::ostream &dot) const {
+void IRDocument::crateDotFile(std::ostream& dot) const {
     dot << "digraph g {\n\tgraph[rankdir = \"LR\"];" << std::endl;
 
-    for (auto &kvp : network->allLayers()) {
+    for (auto& kvp : network->allLayers()) {
         saveLayerToDot(dot, kvp.second);
     }
     dot << std::endl << std::endl;
-    for (auto &kvp : _edges) {
+    for (auto& kvp : _edges) {
         dot << "\t\"layer_" << kvp.from.lid << "\":p" << kvp.from.pid << " -> \"layer_"
             << kvp.to.lid << "\":p" << kvp.to.pid << " [];" << std::endl;
     }
     dot << "}" << std::endl;
 }
 
-InferenceEngine::InputInfo::Ptr IRDocument::createInput(const std::string &name,
-                                                        const TensorDims &dims) const {
+InferenceEngine::InputInfo::Ptr IRDocument::createInput(const std::string& name,
+                                                        const TensorDims& dims) const {
     Layout layout;
-    if (dims.size() == 4) layout = NCHW;
+    if (dims.size() == 4)
+        layout = NCHW;
     else if (dims.size() == 2)
         layout = InferenceEngine::Layout::NC;
     else
@@ -314,17 +309,16 @@ InferenceEngine::InputInfo::Ptr IRDocument::createInput(const std::string &name,
     return info;
 }
 
-void IRDocument::addOutput(const DataPtr &src) { network->addOutput(src); }
+void IRDocument::addOutput(const DataPtr& src) { network->addOutput(src); }
 
 /**
  * \brief save output port to IR
  * \param parent
  * \param port
  */
-void IRDocument::saveOutputToIR(pugi::xml_node &parent, const DataPtr &port) {
+void IRDocument::saveOutputToIR(pugi::xml_node& parent, const DataPtr& port) {
     auto node = parent.append_child("port");
     node.append_attribute("id").set_value(port->userObject.v_int);
-    // node.append_attribute("buffer").set_value(reinterpret_cast<size_t>(buffer) & 0x00FFFFFF);
     if (!port->inputTo.empty()) {
         std::string comment = "connected to ";
         for (auto peer : port->inputTo) comment += ", " + peer.first;
@@ -342,7 +336,7 @@ void IRDocument::saveOutputToIR(pugi::xml_node &parent, const DataPtr &port) {
  * \param index
  * \param port
  */
-void IRDocument::saveInputToIR(pugi::xml_node &parent, int index, const DataPtr &port) {
+void IRDocument::saveInputToIR(pugi::xml_node& parent, int index, const DataPtr& port) {
     auto node = parent.append_child("port");
     node.append_attribute("id").set_value(index);
     auto peer = port->creatorLayer.lock();
@@ -362,7 +356,7 @@ void IRDocument::saveInputToIR(pugi::xml_node &parent, int index, const DataPtr 
  * \param parent
  * \param irLayer
  */
-void IRDocument::saveToIR(std::ostream &binFile, pugi::xml_node &parent, const IRLayer &irLayer) {
+void IRDocument::saveToIR(std::ostream& binFile, pugi::xml_node& parent, const IRLayer& irLayer) {
     auto layer = parent.append_child("layer");
     layer.append_attribute("name").set_value(irLayer->name.c_str());
     layer.append_attribute("type").set_value(irLayer->type.c_str());
@@ -372,7 +366,7 @@ void IRDocument::saveToIR(std::ostream &binFile, pugi::xml_node &parent, const I
 
     if (!irLayer->params.empty()) {
         auto attr = layer.append_child("data");  // todo: need to check for type and overide it
-        for (auto &kvp : irLayer->params) {
+        for (auto& kvp : irLayer->params) {
             attr.append_attribute(kvp.first.c_str()).set_value(kvp.second.c_str());
         }
     }
@@ -384,7 +378,7 @@ void IRDocument::saveToIR(std::ostream &binFile, pugi::xml_node &parent, const I
     }
     if (!irLayer->outData.empty()) {
         auto outputs = layer.append_child("output");
-        for (auto &inp : irLayer->outData) {
+        for (auto& inp : irLayer->outData) {
             saveOutputToIR(outputs, inp);
         }
     }
@@ -395,7 +389,7 @@ void IRDocument::saveToIR(std::ostream &binFile, pugi::xml_node &parent, const I
     }
 }
 
-void IRDocument::saveLayerToDot(std::ostream &dot, const IRLayer &irLayer) const {
+void IRDocument::saveLayerToDot(std::ostream& dot, const IRLayer& irLayer) const {
     /*
     "layer_4" [
     label = "name| type | <f2> |-1"
@@ -405,13 +399,13 @@ void IRDocument::saveLayerToDot(std::ostream &dot, const IRLayer &irLayer) const
     dot << "\t\"layer_" << irLayer->userValue.v_int << "\" [ label = \"" << _name
         << "| type: " << irLayer->type;
     int pid = 0;
-    for (auto &in : irLayer->insData) {
+    for (auto& in : irLayer->insData) {
         dot << "| ";
         auto dims = in.lock()->getDims();
         dot << "<p" << (pid++) << "> " << dims[0];
         for (int i = 1; i < dims.size(); ++i) dot << ", " << dims[i];
     }
-    for (auto &p : irLayer->outData) {
+    for (auto& p : irLayer->outData) {
         dot << "| ";
         auto dims = p->getDims();
         dot << "<p" << p->userObject.v_int << "> " << dims[0];
@@ -420,7 +414,7 @@ void IRDocument::saveLayerToDot(std::ostream &dot, const IRLayer &irLayer) const
     dot << "\"";
     dot << "\t\tshape = \"record\" ];" << std::endl;
 }
-void IRDocument::setName(const char *name) {
+void IRDocument::setName(const char* name) {
     _name = name;
     network->setName(_name);
 }

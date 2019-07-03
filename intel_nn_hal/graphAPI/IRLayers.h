@@ -74,15 +74,12 @@ inline OutputPort addOutput(const IRLayer &layer, const InferenceEngine::SizeVec
     else if(dims.size() == 4)
     {
         std::cout << "addOutput dims size "<< dims.size()<<std::endl;
-        //InferenceEngine::TensorDesc td(g_layer_precision, dims, InferenceEngine::Layout::ANY);
         InferenceEngine::TensorDesc td(g_layer_precision, dims, InferenceEngine::Layout::NCHW);
-        //InferenceEngine::TensorDesc td(g_layer_precision, dims, InferenceEngine::Layout::NHWC);
         data = std::make_shared<InferenceEngine::Data>(d_name, td);
 
     }
     else {
         std::cout << "addOutput dims size "<< dims.size()<<std::endl;
-        //InferenceEngine::TensorDesc td(g_layer_precision, dims, InferenceEngine::Layout::ANY);
         InferenceEngine::TensorDesc td(g_layer_precision, dims, InferenceEngine::Layout::C);
         data = std::make_shared<InferenceEngine::Data>(d_name, td);
     }
@@ -181,20 +178,16 @@ static IRLayer create(const IRBlob::Ptr &weights, const OutputPort &src)
     prm.precision = g_layer_precision;
     prm.name = name;
 
-    //auto inDims = src->getDims(); // (batch, IFM)
     auto inDims = src->getTensorDesc().getDims(); // (batch, IFM)
-    //std::cout << "inDims size "<<inDims.size()<< "inDims[0] "<<inDims[0]<< "inDims[1] "<<inDims[1]<< std::endl;
 
 
     auto wDim = weights->getTensorDesc().getDims();
-    //std::cout << "wDim size "<<wDim.size()<<"wDim[0] "<<wDim[0]<< "wDim[1] "<<wDim[1]<< std::endl;
 
     IR_ASSERT(inDims.size() == 2);
 
     unsigned int ofm = 0;
     if (wDim.size() == 2)
     {
-        //std::cout << "inDims[1]"<<inDims[1]<< "wDim[1]" <<wDim[1]<< std::endl;
 
         #ifdef NNLOG
         ALOGI("inDims[0] = %d inDims[1] = %d", inDims[0], inDims[1]);
@@ -256,24 +249,6 @@ static OutputPort ScaleShiftNode(const OutputPort &src, const IRBlob::Ptr &scale
     return addOutput(l, src->getTensorDesc().getDims());
 }
 
-
-/*
-inline IRLayer AddConst(const IRLayer &lhs, const IRBlob::Ptr &biases)
-{
-    auto fc = As<InferenceEngine::WeightableLayer>(lhs);
-    if (fc) {
-      // todo: check if biases was not already being set
-      fc->_biases = biases;
-      fc->blobs["biases"] = biases;
-      return lhs; // it was fused with prev layer
-    } else {
-	// need to create an add with Const here using ScaleShift with no weights...
-	    THROW_IE_EXCEPTION << "not implemented yet" ;
-    }
-
-}
-*/
-
 inline OutputPort AddTryConst(const OutputPort &src, const IRBlob::Ptr &biases) {
     auto fc = As<InferenceEngine::WeightableLayer>(LayerOf(src));
     if (fc) {
@@ -297,13 +272,6 @@ inline OutputPort AddTryConst(const OutputPort &src, const IRBlob::Ptr &biases) 
 inline OutputPort operator+(const OutputPort &src, const IRBlob::Ptr &biases) {
     return AddTryConst(src, biases);
 }
-/*
-inline OutputPort operator+(const OutputPort &src, const IRBlob::Ptr &biases)
-{
-    auto l = LayerOf(src);
-    return output(AddConst(l, biases));
-}
-*/
 
 namespace ConvLayer
 {
@@ -369,8 +337,7 @@ inline OutputPort Convolution(const OutputPort &src, const ConvolutionParams &pr
     auto ret = As<InferenceEngine::ConvolutionLayer>(ConvLayer::create(src));
     auto inDims = src->getTensorDesc().getDims();
     IR_ASSERT(inDims.size() == 4);
-    //IR_ASSERT(prms.kernel.size() * n(src) * prms.num_output_planes == prms.weights->size());
-	  IR_ASSERT((prms.kernel.size() * in_ch(src) * prms.num_output_planes)/prms.groups == prms.weights->size());
+	IR_ASSERT((prms.kernel.size() * in_ch(src) * prms.num_output_planes)/prms.groups == prms.weights->size());
 
     ret->_weights = prms.weights;
     ret->blobs["weights"] = prms.weights;
@@ -397,8 +364,6 @@ inline OutputPort Convolution(const OutputPort &src, const ConvolutionParams &pr
 
     ret->_group = prms.groups;
     ret->_out_depth = prms.num_output_planes;
-
-    //<data dilation-x="1" dilation-y="1" group="1" kernel-x="3" kernel-y="3" output="8" pad-x="0" pad-y="0" stride="1,1,2,2" stride-x="2" stride-y="2"/>
 
     ret->params["auto_pad"] = prms.padType;
     ret->params["dilation-x"] = std::to_string(ret->_dilation.at(InferenceEngine::X_AXIS));
@@ -427,11 +392,9 @@ inline OutputPort Convolution(const OutputPort &src, const ConvolutionParams &pr
 
     if (prms.padType == "explicit") {
           Point2D in_size = {static_cast<int>(inDims[3]), static_cast<int>(inDims[2])};
-          //Point2D out_size = (in_size + prms.pad_start + prms.pad_end - prms.kernel + prms.stride) / prms.stride + 1;
           Point2D out_size = (in_size - prms.kernel + prms.stride + prms.pad_start + prms.pad_end ) / prms.stride;
 
           addOutput(ret, {inDims[0], (size_t) prms.num_output_planes, (size_t) out_size.y, (size_t) out_size.x}); //nchw
-          //addOutput(ret, {inDims[0], (size_t) out_size.y, (size_t) out_size.x, (size_t) prms.num_output_planes}); //nhwc
     }
     else {
 
@@ -556,14 +519,6 @@ inline OutputPort Pooling(const OutputPort &inp,
     auto ret = std::make_shared<InferenceEngine::PoolingLayer>(prm);
     ret->type = "Pooling";
 
-/*
-    ret->_kernel_x = kernel.x;
-    ret->_kernel_y = kernel.y;
-    ret->_stride_x = stride.x;
-    ret->_stride_y = stride.y;
-    ret->_padding_x = pad.x;
-    ret->_padding_y = pad.y;
-*/
     ret->_kernel.clear();
     ret->_kernel.insert(InferenceEngine::X_AXIS, kernel.x);
     ret->_kernel.insert(InferenceEngine::Y_AXIS, kernel.y);
@@ -623,7 +578,6 @@ inline OutputPort Pooling(const OutputPort &inp,
 //        ALOGI("Pooling  kernel.x= %d kernel.y= %d stride.x= %d stride.y= %d pad_start.x= %d pad_start.y= %d \
 //        pad_end.x= %d pad_end.y= %d ", kernel.x, kernel.y, stride.x, stride.y, pad_start.x, pad_start.y, pad_end.x, pad_end.y);
       #endif
-      //<data exclude-pad="true" kernel-x="4" kernel-y="4" pad-x="0" pad-y="0" pool-method="avg" stride="1,1,2,2" stride-x="2" stride-y="2"/>
       ret->params["auto_pad"] = padType;
       ret->params["_exclude_pad"] = std::to_string(ret->_exclude_pad);
       ret->params["kernel-x"] = std::to_string(ret->_kernel.at(InferenceEngine::X_AXIS));
@@ -986,12 +940,6 @@ inline OutputPort Reshape(const TensorDims &newDims, const OutputPort &src)
     auto layer = std::make_shared<InferenceEngine::ReshapeLayer>(prms);
     layer->type = "Reshape";
     src >> layer;
-    //addOutput(layer, src->getTensorDesc().getDims());
-
-   /*
-   brief A vector of sizes of the shape
-   std::vector<int> shape;
-   */
 
     layer->params["axis"] = std::to_string(layer->axis);
     layer->params["num_axes"] = std::to_string(layer->num_axes);
@@ -1063,15 +1011,9 @@ static OutputPort Softmax(const OutputPort &src)
     auto l = std::make_shared<InferenceEngine::SoftMaxLayer>(prm);
     l->type = "SoftMax";
     src >> l;
-    //addOutput(l, src->getTensorDesc().getDims());
     addOutput(l, inputDims);
 
     return output(l);
-/*
-    auto op = output(l);
-    op->setDims(newDims);
-    return op;
-*/
 }
 
 inline OutputPort Gather(const std::vector<OutputPort> inputs, int axis = 1)

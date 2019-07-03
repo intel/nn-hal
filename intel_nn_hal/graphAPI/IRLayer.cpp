@@ -47,12 +47,11 @@ const std::string ActivationLayer::Tanh("tanh");
 
 const std::string ActivationLayer::ReLU("ReLU");
 
-void operator>>(const InferenceEngine::DataPtr &lhs,
-                           const InferenceEngine::CNNLayerPtr &rhs) {
+void operator>>(const InferenceEngine::DataPtr& lhs, const InferenceEngine::CNNLayerPtr& rhs) {
     lhs->inputTo[rhs->name] = rhs;
     rhs->insData.push_back(lhs);
 }
 }  // namespace nnhal
 }  // namespace neuralnetworks
 }  // namespace hardware
-}  // namespace android 
+}  // namespace android
