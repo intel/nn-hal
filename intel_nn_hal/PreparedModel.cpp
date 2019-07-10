@@ -1519,7 +1519,7 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
                 VLOG(L1, "NNERR:output operand types invalid,aborting!!");
                 return false;
             }
-        }
+        } break;
         case OperationType::FULLY_CONNECTED: {
             const auto& input0 = model.operands[operation.inputs[OP_INPUT_IDX_FC]];
 
@@ -1566,8 +1566,7 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
                 VLOG(L1, "NNERR:invalid output operand types for FC ,aborting!!");
                 return false;
             }
-        }
-
+        } break;
         case OperationType::RELU:
         case OperationType::RELU1:
         case OperationType::RELU6:
@@ -1586,7 +1585,7 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
                 VLOG(L1, "NNERR:batch size more than 1 not supported for relu/logit");
                 return false;
             }
-        }
+        } break;
         case OperationType::TANH:
         case OperationType::LOCAL_RESPONSE_NORMALIZATION:
         case OperationType::L2_NORMALIZATION:
