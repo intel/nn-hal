@@ -60,8 +60,8 @@ Return<DeviceStatus> MklDnnDriver::getStatus() {
 }
 
 Return<void> MklDnnDriver::getCapabilities(getCapabilities_cb cb) {
-    Capabilities capabilities = {.float32Performance = {.execTime = 0.9f, .powerUsage = 1.1f},
-                                 .quantized8Performance = {.execTime = 0.9f, .powerUsage = 1.1f}};
+    Capabilities capabilities = {.float32Performance = {.execTime = 0.9f, .powerUsage = 0.9f},
+                                 .quantized8Performance = {.execTime = 0.9f, .powerUsage = 0.9f}};
     cb(ErrorStatus::NONE, capabilities);
     return Void();
 }
