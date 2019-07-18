@@ -1227,6 +1227,11 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
                 return false;
             }
 
+            if (oper_size == EXPL_PAD_PARAMS_CONV) {
+                VLOG(L1, "NNERR: Explicit padding not supported!!");
+                return false;
+            }
+
             if (input0.type != OperandType::TENSOR_FLOAT32 ||
                 input1.type != OperandType::TENSOR_FLOAT32 ||
                 input2.type != OperandType::TENSOR_FLOAT32) {
@@ -1326,6 +1331,11 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
 
             if (oper_size != IMPL_PAD_PARAMS_DW_CONV && oper_size != EXPL_PAD_PARAMS_DW_CONV) {
                 VLOG(L1, "NNERR: Operation Input Size invalid ,aborting!!");
+                return false;
+            }
+
+            if (oper_size == EXPL_PAD_PARAMS_DW_CONV) {
+                VLOG(L1, "NNERR: Explicit padding not supported!!");
                 return false;
             }
             // Check Input/Filter  Operand type
@@ -1537,6 +1547,12 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
                 return false;
             }
 
+            if (input0.lifetime == input1.lifetime) {
+                VLOG(L1, "NNERR: Filter (index %d) as model_input not supported,aborting!!",
+                     operation.inputs[OP_FILTER_IDX_CONV]);
+                return false;
+            }
+
             if (input0.dimensions.size() < 2 || input1.dimensions.size() < 2 ||
                 input2.dimensions.size() < 1) {
                 VLOG(L1, "NNERR: input 0-2 dimensions size invalid, aborting!!");
@@ -1587,11 +1603,19 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
             }
         } break;
         case OperationType::TANH:
-        case OperationType::LOCAL_RESPONSE_NORMALIZATION:
-        case OperationType::L2_NORMALIZATION:
-        case OperationType::RESHAPE:
-        case OperationType::CONCATENATION:
-            VLOG(L1, "Supporting Reshape/Concat now,VTS is TBD!!");
+            // case OperationType::LOCAL_RESPONSE_NORMALIZATION:
+            // case OperationType::L2_NORMALIZATION:
+            // case OperationType::RESHAPE:{
+            //     const auto&  input0 = model.operands[operation.inputs[0]];
+            //     const auto&  input1 = model.operands[operation.inputs[1]];
+            //     if(input0.lifetime == input1.lifetime ){
+            //         VLOG(L1,"NNERR: Filter (index %d) as model_input (index %d) not
+            //         supported,aborting!!",operation.inputs[OP_FILTER_IDX_CONV],operation.inputs[OP_INPUT_IDX_CONV]);
+            //         return false;
+            //     }
+            // }
+            // case OperationType::CONCATENATION:
+            //     VLOG(L1, "Supporting Reshape/Concat now,VTS is TBD!!");
             break;
 
         case OperationType::ADD: {
@@ -2326,6 +2350,7 @@ bool PreparedModel::operationDepthwiseConv2D(const Operation& operation) {
     int depth_multiplier = 0;
 
     if (operation.inputs.size() == 11) {
+        VLOG(L1, "Explicit padding requested");
         mPadreq = EXPL_PAD;
         prms.padType = "explicit";
         prms.pad_start = {PARAM_I32(3), PARAM_I32(5)};
@@ -2338,6 +2363,7 @@ bool PreparedModel::operationDepthwiseConv2D(const Operation& operation) {
         prms.num_output_planes =
             in_channels * depth_multiplier;     // same as filter_out; //dims[0]; //depth out
     } else if (operation.inputs.size() == 8) {  // implicit padding
+        VLOG(L1, "Implicit padding requested");
         mPadreq = IMPL_PAD;
         const auto pad_type = PARAM_I32(3);
         int stride_width = PARAM_I32(4);
