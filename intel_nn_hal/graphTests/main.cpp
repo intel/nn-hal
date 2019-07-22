@@ -4,7 +4,7 @@
 #include <android/log.h>
 #include <log/log.h>
 
-using namespace IRBuilder;
+using namespace ::android::hardware::neuralnetworks::nnhal;
 
 template <typename T>
 void createAlexNet(IRDocument &doc) {
@@ -20,7 +20,7 @@ void createAlexNet(IRDocument &doc) {
 
     ConvolutionParams prms;
     //<convolution_data stride-x="4" stride-y="4" pad-x="0" pad-y="0" kernel-x="11" kernel-y="11"
-    //output="96" group="1"/>
+    // output="96" group="1"/>
     prms.weights = readBlobFromFile<T>("AlexNet-bins/conv1_weights.bin");
     prms.kernel = {11, 11};
     prms.stride = {4, 4};
@@ -32,13 +32,13 @@ void createAlexNet(IRDocument &doc) {
     //<norm_data alpha = "9.9999997e-05" beta = "0.75" local-size = "5" region = "across" / >
     auto n1 = LRN(r1, 0.0001f, 0.75f, 5, true);
     //<pooling_data kernel-x="3" kernel-y="3" pad-x="0" pad-y="0" stride-x="2" stride-y="2"
-    //rounding-type="ceil" pool-method="max"/>
+    // rounding-type="ceil" pool-method="max"/>
     auto p1 = Pooling(n1, {3, 3}, {2, 2}, {0, 0}, PoolingLayer::MAX);
 
     /// 2nd part
     auto s1 = Split(p1, 2);
     //<convolution_data stride-x="1" stride-y="1" pad-x="2" pad-y="2" kernel-x="5" kernel-y="5"
-    //output="128" group="1"/>
+    // output="128" group="1"/>
     prms.kernel = {5, 5};
     prms.stride = {1, 1};
     prms.pad_start = {2, 2};
@@ -53,12 +53,12 @@ void createAlexNet(IRDocument &doc) {
     auto relu2 = ReLU(c2);
     auto n2 = LRN(relu2, 0.0001f, 0.75f, 5, true);
     //<pooling_data kernel-x="3" kernel-y="3" pad-x="0" pad-y="0" stride-x="2" stride-y="2"
-    //rounding-type="ceil" pool-method="max"/>
+    // rounding-type="ceil" pool-method="max"/>
     auto p2 = Pooling(n2, {3, 3}, {2, 2}, {0, 0}, PoolingLayer::MAX);
 
     // 3rd part
     //<convolution_data stride-x="1" stride-y="1" pad-x="1" pad-y="1" kernel-x="3" kernel-y="3"
-    //output="384" group="1"/>
+    // output="384" group="1"/>
     prms.kernel = {3, 3};
     prms.stride = {1, 1};
     prms.pad_start = {1, 1};
@@ -70,7 +70,7 @@ void createAlexNet(IRDocument &doc) {
     // 4th part
     auto s4 = Split(c3, 2);
     //<convolution_data stride-x="1" stride-y="1" pad-x="1" pad-y="1" kernel-x="3" kernel-y="3"
-    //output="192" group="1"/>
+    // output="192" group="1"/>
     prms.num_output_planes = 192;
     prms.weights = readBlobFromFile<T>("AlexNet-bins/conv4_0_weights.bin");
     auto c4_0 =
@@ -81,7 +81,7 @@ void createAlexNet(IRDocument &doc) {
 
     // 5th part
     //<convolution_data stride-x="1" stride-y="1" pad-x="1" pad-y="1" kernel-x="3" kernel-y="3"
-    //output="128" group="1"/>
+    // output="128" group="1"/>
     prms.num_output_planes = 128;
     prms.weights = readBlobFromFile<T>("AlexNet-bins/conv5_0_weights.bin");
     auto c5_0 =
@@ -92,7 +92,7 @@ void createAlexNet(IRDocument &doc) {
     auto c5 = Concat({c5_0, c5_1});
 
     //<pooling_data kernel-x="3" kernel-y="3" pad-x="0" pad-y="0" stride-x="2" stride-y="2"
-    //rounding-type="ceil" pool-method="max"/>
+    // rounding-type="ceil" pool-method="max"/>
     auto p5 = Pooling(c5, {3, 3}, {2, 2}, {0, 0}, PoolingLayer::MAX);
 
     // fc6
@@ -382,7 +382,7 @@ bool testMKLBug() {
 
         ConvolutionParams prms;
         //<convolution_data stride-x="4" stride-y="4" pad-x="0" pad-y="0" kernel-x="11"
-        //kernel-y="11" output="96" group="1"/>
+        // kernel-y="11" output="96" group="1"/>
         prms.weights = readBlobFromFile<T>("AlexNet-bins/conv1_weights.bin");
         prms.kernel = {11, 11};
         prms.stride = {4, 4};
@@ -393,13 +393,13 @@ bool testMKLBug() {
         //<norm_data alpha = "9.9999997e-05" beta = "0.75" local-size = "5" region = "across" / >
         auto n1 = LRN(r1, 0.0001f, 0.75f, 5, true);
         //<pooling_data kernel-x="3" kernel-y="3" pad-x="0" pad-y="0" stride-x="2" stride-y="2"
-        //rounding-type="ceil" pool-method="max"/>
+        // rounding-type="ceil" pool-method="max"/>
         auto p1 = Pooling(n1, {3, 3}, {2, 2}, {0, 0}, PoolingLayer::MAX);
 
         /// 2nd part
         auto s1 = Split(p1, 2);
         //<convolution_data stride-x="1" stride-y="1" pad-x="2" pad-y="2" kernel-x="5" kernel-y="5"
-        //output="128" group="1"/>
+        // output="128" group="1"/>
         prms.kernel = {5, 5};
         prms.stride = {1, 1};
         prms.pad_end = prms.pad_start = {2, 2};
@@ -413,7 +413,7 @@ bool testMKLBug() {
         auto c2 = ReLU(conv2);
         auto n2 = LRN(c2, 0.0001f, 0.75f, 5, true);
         //<pooling_data kernel-x="3" kernel-y="3" pad-x="0" pad-y="0" stride-x="2" stride-y="2"
-        //rounding-type="ceil" pool-method="max"/>
+        // rounding-type="ceil" pool-method="max"/>
         auto p2 = Pooling(n2, {3, 3}, {2, 2}, {0, 0}, PoolingLayer::MAX);
 
         doc.addOutput(c2);
@@ -443,11 +443,11 @@ int main(int argc, const char *argv[]) {
     std::string inp;
 
 #ifdef ENABLE_MYRIAD
-    IRBuilder::g_layer_precision = InferenceEngine::Precision::FP16;
+    g_layer_precision = InferenceEngine::Precision::FP16;
     // testAlexNet();
     // testMKLBug<short>();
 #elif ENABLE_MKLDNN
-    IRBuilder::g_layer_precision = InferenceEngine::Precision::FP32;
+    g_layer_precision = InferenceEngine::Precision::FP32;
     // testAlexNet();
     // testMKLBug<float>();
 #endif

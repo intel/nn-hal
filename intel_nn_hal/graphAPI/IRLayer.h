@@ -31,20 +31,20 @@
  */
 
 #pragma once
+#include <memory>
+#include <sstream>
 #include <string>
 #include <vector>
-#include <sstream>
-#include <memory>
 #include "file_utils.h"
-#include "w_unistd.h"
-#include "ie_common.h"
 #include "ie_api.h"
-#include "ie_layouts.h"
-#include "ie_input_info.hpp"
 #include "ie_blob.h"
+#include "ie_common.h"
+#include "ie_input_info.hpp"
 #include "ie_layers.h"
-#include "pugixml.hpp"
 #include "ie_layers_property.hpp"
+#include "ie_layouts.h"
+#include "pugixml.hpp"
+#include "w_unistd.h"
 
 #ifdef _WIN32
 #define strncasecmp _strnicmp
@@ -52,28 +52,26 @@
 
 namespace FileUtils {
 // Hack: should be in file utils, this is to avoid chaning master
-inline std::string GetCWD()
-{
-	char cwd[4096];
-	return getcwd(cwd, 4095);
+inline std::string GetCWD() {
+    char cwd[4096];
+    return getcwd(cwd, 4095);
 }
-};
+};  // namespace FileUtils
 
+namespace android {
+namespace hardware {
+namespace neuralnetworks {
+namespace nnhal {
 
-namespace IRBuilder
-{
-
-template<typename T>
-std::string &operator<<(std::string &&src, T i)
-{
+template <typename T>
+std::string &operator<<(std::string &&src, T i) {
     std::stringstream oss;
     oss << i;
     return src.append(oss.str());
 }
 
-template<typename T>
-std::string operator<<(const std::string &src, T i)
-{
+template <typename T>
+std::string operator<<(const std::string &src, T i) {
     std::stringstream oss;
     oss << src;
     oss << i;
@@ -81,61 +79,55 @@ std::string operator<<(const std::string &src, T i)
 }
 
 #define THROW(x) THROW_IE_EXCEPTION << x
-#define IR_ASSERT(x) if (!(x)) THROW_IE_EXCEPTION << "Assert failed for " #x << ": "
+#define IR_ASSERT(x) \
+    if (!(x)) THROW_IE_EXCEPTION << "Assert failed for " #x << ": "
 
-typedef InferenceEngine::CNNLayer::Ptr 	IRLayer;
-typedef InferenceEngine::DataPtr 	OutputPort;
-typedef InferenceEngine::Blob 		IRBlob;
+typedef InferenceEngine::CNNLayer::Ptr IRLayer;
+typedef InferenceEngine::DataPtr OutputPort;
+typedef InferenceEngine::Blob IRBlob;
 
-struct Vector
-{
+struct Vector {
     uint32_t length;
     IRBlob::Ptr data;
 };
 
-struct DelayObj
-{
-    IRLayer in_t; // x(t)
-    IRLayer out_t_1; // x(t-1)
+struct DelayObj {
+    IRLayer in_t;     // x(t)
+    IRLayer out_t_1;  // x(t-1)
 };
 
 typedef InferenceEngine::SizeVector TensorDims;
 
-inline size_t sizeOf(const TensorDims &dims)
-{
-    size_t ret = dims[0];
-    for(int i = 1; i < dims.size(); ++i) ret *= dims[i];
-    return ret;
-}
-
 void operator>>(const InferenceEngine::DataPtr &lhs, const InferenceEngine::CNNLayerPtr &rhs);
 
-inline void operator>>(const InferenceEngine::CNNLayerPtr &lhs, const InferenceEngine::CNNLayerPtr &rhs)
-{
+inline void operator>>(const InferenceEngine::CNNLayerPtr &lhs,
+                       const InferenceEngine::CNNLayerPtr &rhs) {
     lhs->outData[0] >> rhs;
 }
 
 template <typename T>
-IRBlob::Ptr readBlobFromFile(const std::string &file)
-{
+IRBlob::Ptr readBlobFromFile(const std::string &file) {
     auto fs = FileUtils::fileSize(file);
     if (fs <= 0) THROW("blob file ") << file << " not found or empty";
     InferenceEngine::Precision precision = sizeof(T) == sizeof(short)
-        ? InferenceEngine::Precision::FP16 : InferenceEngine::Precision::FP32;
-    auto ret = typename InferenceEngine::TBlob<T>::Ptr(
-        new InferenceEngine::TBlob<T>(precision, InferenceEngine::C,
-        { static_cast<size_t>(fs / sizeof(T)) }));
+                                               ? InferenceEngine::Precision::FP16
+                                               : InferenceEngine::Precision::FP32;
+    auto ret = typename InferenceEngine::TBlob<T>::Ptr(new InferenceEngine::TBlob<T>(
+        precision, InferenceEngine::C, {static_cast<size_t>(fs / sizeof(T))}));
     ret->allocate();
     FileUtils::readAllFile(file, ret->data(), fs);
     return ret;
 }
 
 template <typename T>
-IRBlob::Ptr readBlobFromFile(const std::string &file, const TensorDims &dims, InferenceEngine::Layout l)
-{
+IRBlob::Ptr readBlobFromFile(const std::string &file, const TensorDims &dims,
+                             InferenceEngine::Layout l) {
     auto data = readBlobFromFile<T>(file);
     data->Reshape(dims, l);
     return data;
 }
 
-}  // namespace IRBuilder
+}  // namespace nnhal
+}  // namespace neuralnetworks
+}  // namespace hardware
+}  // namespace android

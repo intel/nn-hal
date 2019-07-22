@@ -92,7 +92,7 @@ class ExecuteNetwork {
     InferRequest inferRequest;
     ResponseDesc resp;
 
-   public:
+public:
     ExecuteNetwork() {}
     ExecuteNetwork(IRDocument &doc, TargetDevice target = TargetDevice::eCPU) {
         InferenceEngine::PluginDispatcher dispatcher(
