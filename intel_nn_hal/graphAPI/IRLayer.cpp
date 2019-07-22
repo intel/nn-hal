@@ -32,11 +32,14 @@
 
 #include "IRLayers.h"
 
-using namespace IRBuilder;
+namespace android {
+namespace hardware {
+namespace neuralnetworks {
+namespace nnhal {
 
-int IRBuilder::layer_name_count = 0;
+int layer_name_count = 0;
 
-InferenceEngine::Precision IRBuilder::g_layer_precision = InferenceEngine::Precision::UNSPECIFIED;
+InferenceEngine::Precision g_layer_precision = InferenceEngine::Precision::UNSPECIFIED;
 
 const std::string ActivationLayer::Sigmoid("sigmoid");
 
@@ -44,8 +47,11 @@ const std::string ActivationLayer::Tanh("tanh");
 
 const std::string ActivationLayer::ReLU("ReLU");
 
-void IRBuilder::operator>>(const InferenceEngine::DataPtr &lhs,
-                           const InferenceEngine::CNNLayerPtr &rhs) {
+void operator>>(const InferenceEngine::DataPtr &lhs, const InferenceEngine::CNNLayerPtr &rhs) {
     lhs->inputTo[rhs->name] = rhs;
     rhs->insData.push_back(lhs);
 }
+}  // namespace nnhal
+}  // namespace neuralnetworks
+}  // namespace hardware
+}  // namespace android

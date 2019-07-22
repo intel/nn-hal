@@ -12,7 +12,7 @@
 #include <android/log.h>
 #include <log/log.h>
 
-using namespace IRBuilder;
+using namespace ::android::hardware::neuralnetworks::nnhal;
 using namespace InferenceEngine;
 
 template <class T>
@@ -246,7 +246,7 @@ class ExecuteNetwork {
     InferRequest inferRequest;
     ResponseDesc resp;
 
-   public:
+public:
     ExecuteNetwork() : network(nullptr) {}
     ExecuteNetwork(IRDocument &doc, TargetDevice target = TargetDevice::eCPU) : network(nullptr) {
         InferenceEngine::PluginDispatcher dispatcher(

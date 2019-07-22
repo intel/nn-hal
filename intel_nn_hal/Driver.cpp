@@ -17,24 +17,18 @@
 #define LOG_TAG "Driver"
 
 #include "Driver.h"
-#ifndef AT_RUNTIME
-#include "PreparedModel.h"
-#else
-#include "Executor.h"
-#endif
 #include <android-base/logging.h>
 #include <thread>
+#include "PreparedModel.h"
 #include "ValidateHal.h"
 
 namespace android {
 namespace hardware {
 namespace neuralnetworks {
-namespace V1_0 {
-namespace driver {
+namespace nnhal {
 
 using namespace android::nn;
 
-#ifndef AT_RUNTIME
 static sp<PreparedModel> ModelFactory(const char* name, const Model& model) {
     sp<PreparedModel> preparedModel = NULL;
 
@@ -46,42 +40,28 @@ static sp<PreparedModel> ModelFactory(const char* name, const Model& model) {
     return preparedModel;
 }
 
-#else
-static sp<executor::PreparedModel> ModelFactory(const char* name, const Model& model) {
-    sp<executor::PreparedModel> preparedModel = NULL;
+Return<ErrorStatus> Driver::prepareModel(const V10_Model& model,
+                                         const sp<IPreparedModelCallback>& callback) {
+    ALOGI("Entering %s", __func__);
 
-    if (strcmp(name, "CPU") == 0)
-        preparedModel = new executor::CpuPreparedModel(model);
-    else if (strcmp(name, "VPU") == 0)
-        preparedModel = new executor::VpuPreparedModel(model);
-
-    return preparedModel;
+    return ErrorStatus::NONE;
 }
 
-#endif
-
-Return<ErrorStatus> Driver::prepareModel(const Model& model,
-                                         const sp<IPreparedModelCallback>& callback) {
-    ALOGI("Driver::prepareModel");
+Return<ErrorStatus> Driver::prepareModel_1_1(const Model& model, ExecutionPreference preference,
+                                             const sp<IPreparedModelCallback>& callback) {
+    ALOGI("Entering %s", __func__);
 
     if (callback.get() == nullptr) {
         ALOGI("invalid callback passed to prepareModel");
         return ErrorStatus::INVALID_ARGUMENT;
     }
-
-    if (!validateModel(model)) {
-        ALOGI("NNERR: %s failed at line no: %d\n", __func__, __LINE__);
+    if (!validateModel(model) || !validateExecutionPreference(preference)) {
         callback->notify(ErrorStatus::INVALID_ARGUMENT, nullptr);
         return ErrorStatus::INVALID_ARGUMENT;
     }
 
     // TODO: make asynchronous later
-#ifndef AT_RUNTIME
     sp<PreparedModel> preparedModel = ModelFactory(mName.c_str(), model);
-#else
-    sp<executor::PreparedModel> preparedModel = ModelFactory(mName.c_str(), model);
-#endif
-
     if (preparedModel == NULL) {
         ALOGI("failed to create preparedmodel");
         return ErrorStatus::INVALID_ARGUMENT;
@@ -103,13 +83,19 @@ Return<DeviceStatus> Driver::getStatus() {
 }
 
 Return<void> Driver::getCapabilities(getCapabilities_cb cb) {
+    ALOGI("Entering %s", __func__);
+
+    return Void();
+}
+
+Return<void> Driver::getCapabilities_1_1(getCapabilities_1_1_cb cb) {
+    ALOGI("Entering %s", __func__);
     if (mName.compare("CPU") == 0) {
         ALOGI("Cpu driver getCapabilities()");
         Capabilities capabilities = {
             .float32Performance = {.execTime = 0.9f, .powerUsage = 0.9f},
-            .quantized8Performance = {.execTime = 0.9f, .powerUsage = 0.9f}};
-
-        ALOGI("CPU MKLDNN driver Capabilities .execTime = 0.9f, .powerUsage = 0.9f");
+            .quantized8Performance = {.execTime = 0.9f, .powerUsage = 0.9f},
+            .relaxedFloat32toFloat16Performance = {.execTime = 0.9f, .powerUsage = 0.9f}};
         cb(ErrorStatus::NONE, capabilities);
     } else { /* mName.compare("VPU") == 0 */
         ALOGI("Myriad driver getCapabilities()");
@@ -124,10 +110,18 @@ Return<void> Driver::getCapabilities(getCapabilities_cb cb) {
     return Void();
 }
 
-Return<void> Driver::getSupportedOperations(const Model& model, getSupportedOperations_cb cb) {
-    ALOGI("Driver getSupportedOperations()");
+Return<void> Driver::getSupportedOperations(const V10_Model& model, getSupportedOperations_cb cb) {
+    ALOGI("Entering %s", __func__);
+
+    return Void();
+}
+
+Return<void> Driver::getSupportedOperations_1_1(const Model& model,
+                                                getSupportedOperations_1_1_cb cb) {
+    ALOGI("Entering %s", __func__);
+
     int count = model.operations.size();
-    std::vector<bool> supported(count, false);
+    std::vector<bool> supported(count, true);
 
     if (!validateModel(model)) {
         ALOGI("NNERR: %s failed at line no: %d\n", __func__, __LINE__);
@@ -135,24 +129,15 @@ Return<void> Driver::getSupportedOperations(const Model& model, getSupportedOper
         return Void();
     }
 
-#ifndef AT_RUNTIME
     for (int i = 0; i < count; i++) {
         const auto& operation = model.operations[i];
         supported[i] = PreparedModel::isOperationSupported(operation, model);
     }
-#else
-    for (int i = 0; i < count; i++) {
-        const auto& operation = model.operations[i];
-        supported[i] = executor::PreparedModel::isOperationSupported(operation, model);
-    }
-#endif
-
     cb(ErrorStatus::NONE, supported);
     return Void();
 }
 
-}  // namespace driver
-}  // namespace V1_0
+}  // namespace nnhal
 }  // namespace neuralnetworks
 }  // namespace hardware
 }  // namespace android

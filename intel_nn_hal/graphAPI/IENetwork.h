@@ -21,19 +21,19 @@
 
 #pragma once
 
-#include "IRDocument.h"
-#include "IRLayers.h"
 #include <ie_plugin_config.hpp>
 #include <ie_plugin_dispatcher.hpp>
 #include <ie_plugin_ptr.hpp>
 #include <inference_engine.hpp>
+#include "IRDocument.h"
+#include "IRLayers.h"
 
+#include <fstream>
+#include "debug.h"
+#include "ie_exception_conversion.hpp"
 #include "ie_iinfer_request.hpp"
 #include "ie_infer_request.hpp"
 #include "ie_plugin_cpp.hpp"
-#include "ie_exception_conversion.hpp"
-#include "debug.h"
-#include <fstream>
 
 #include <android/log.h>
 #include <log/log.h>
@@ -42,20 +42,23 @@
 #include "vpu_plugin_config.hpp"
 #endif
 using namespace InferenceEngine::details;
-using namespace IRBuilder;
 using namespace InferenceEngine;
 
+namespace android {
+namespace hardware {
+namespace neuralnetworks {
+namespace nnhal {
 template <typename T>
-inline std::ostream & operator << (std::ostream &out, const std::vector<T> &vec) {
+inline std::ostream &operator<<(std::ostream &out, const std::vector<T> &vec) {
     if (vec.empty()) return std::operator<<(out, "[]");
     out << "[" << vec[0];
-    for (unsigned i=1; i < vec.size(); i++) {
+    for (unsigned i = 1; i < vec.size(); i++) {
         out << ", " << vec[i];
     }
     return out << "]";
 }
 
-//aks
+// aks
 /*
 void dumpBlob(const std::string &prefix, size_t len, TBlob<short>::Ptr blob)
 {
@@ -85,28 +88,31 @@ void dumpBlob(const std::string &prefix, size_t len, TBlob<short>::Ptr blob)
 
 */
 static void setConfig(std::map<std::string, std::string> &config) {
-    //config[VPUConfigParams::FIRST_SHAVE] = "0";
-    //config[VPUConfigParams::LAST_SHAVE] = "11";
-    //config[VPUConfigParams::MEMORY_OPTIMIZATION] = CONFIG_VALUE(NO);//InferenceEngine::PluginConfigParams::YES;
-    //config[VPUConfigParams::COPY_OPTIMIZATION] = CONFIG_VALUE(NO);//InferenceEngine::PluginConfigParams::YES;
-/* //enable below for VPU logs
-    config[CONFIG_KEY(LOG_LEVEL)] = CONFIG_VALUE(LOG_INFO);
-    config[VPUConfigParams::KEY_VPU_LOG_LEVEL] = CONFIG_VALUE(LOG_DEBUG);
-    config[CONFIG_KEY(LOG_LEVEL)] = CONFIG_VALUE(LOG_DEBUG);
-*/
-    //config[VPU_CONFIG_KEY(LOG_LEVEL)] = CONFIG_VALUE(LOG_DEBUG);
-    //config[InferenceEngine::PluginConfigParams::CONFIG_KEY(LOG_LEVEL)] = InferenceEngine::PluginConfigParams::LOG_DEBUG;
-    //config[VPUConfigParams::VPU_LOG_LEVEL] = CONFIG_VALUE(LOG_DEBUG);
-    //config[InferenceEngine::PluginConfigParams::KEY_LOG_LEVEL] = InferenceEngine::PluginConfigParams::LOG_DEBUG /*LOG_WARNING*/;
-    //config[InferenceEngine::VPUConfigParams::IGNORE_UNKNOWN_LAYERS] = InferenceEngine::PluginConfigParams::NO;
-    //config[VPU_CONFIG_KEY(COMPUTE_LAYOUT)] = VPU_CONFIG_VALUE(NHWC);
+    // config[VPUConfigParams::FIRST_SHAVE] = "0";
+    // config[VPUConfigParams::LAST_SHAVE] = "11";
+    // config[VPUConfigParams::MEMORY_OPTIMIZATION] =
+    // CONFIG_VALUE(NO);//InferenceEngine::PluginConfigParams::YES;
+    // config[VPUConfigParams::COPY_OPTIMIZATION] =
+    // CONFIG_VALUE(NO);//InferenceEngine::PluginConfigParams::YES;
+    /* //enable below for VPU logs
+        config[CONFIG_KEY(LOG_LEVEL)] = CONFIG_VALUE(LOG_INFO);
+        config[VPUConfigParams::KEY_VPU_LOG_LEVEL] = CONFIG_VALUE(LOG_DEBUG);
+        config[CONFIG_KEY(LOG_LEVEL)] = CONFIG_VALUE(LOG_DEBUG);
+    */
+    // config[VPU_CONFIG_KEY(LOG_LEVEL)] = CONFIG_VALUE(LOG_DEBUG);
+    // config[InferenceEngine::PluginConfigParams::CONFIG_KEY(LOG_LEVEL)] =
+    // InferenceEngine::PluginConfigParams::LOG_DEBUG; config[VPUConfigParams::VPU_LOG_LEVEL] =
+    // CONFIG_VALUE(LOG_DEBUG); config[InferenceEngine::PluginConfigParams::KEY_LOG_LEVEL] =
+    // InferenceEngine::PluginConfigParams::LOG_DEBUG /*LOG_WARNING*/;
+    // config[InferenceEngine::VPUConfigParams::IGNORE_UNKNOWN_LAYERS] =
+    // InferenceEngine::PluginConfigParams::NO; config[VPU_CONFIG_KEY(COMPUTE_LAYOUT)] =
+    // VPU_CONFIG_VALUE(NHWC);
 }
 
-class ExecuteNetwork
-{
+class ExecuteNetwork {
     InferenceEnginePluginPtr enginePtr;
     ICNNNetwork *network;
-    //IExecutableNetwork::Ptr pExeNet;
+    // IExecutableNetwork::Ptr pExeNet;
     ExecutableNetwork executable_network;
     InputsDataMap inputInfo = {};
     OutputsDataMap outputInfo = {};
@@ -115,155 +121,152 @@ class ExecuteNetwork
     ResponseDesc resp;
 
 public:
-    ExecuteNetwork() : network(nullptr){}
-    ExecuteNetwork(IRDocument &doc, TargetDevice target = TargetDevice::eCPU) : network(nullptr)
-    {
-        InferenceEngine::PluginDispatcher dispatcher({"/vendor/lib64","/vendor/lib","/system/lib64","/system/lib","","./"});
+    ExecuteNetwork() : network(nullptr) {}
+    ExecuteNetwork(IRDocument &doc, TargetDevice target = TargetDevice::eCPU) : network(nullptr) {
+        InferenceEngine::PluginDispatcher dispatcher(
+            {"/vendor/lib64", "/vendor/lib", "/system/lib64", "/system/lib", "", "./"});
         enginePtr = dispatcher.getSuitablePlugin(target);
 
         network = doc.getNetwork();
         network->getInputsInfo(inputInfo);
         network->getOutputsInfo(outputInfo);
 
-        //size_t batch = 1;
-        //network->setBatchSize(batch);
+        // size_t batch = 1;
+        // network->setBatchSize(batch);
 
-        #ifdef NNLOG
-        ALOGI("%s Plugin loaded",InferenceEngine::TargetDeviceInfo::name(target));
-        #endif
+#ifdef NNLOG
+        ALOGI("%s Plugin loaded", InferenceEngine::TargetDeviceInfo::name(target));
+#endif
     }
 
-    ExecuteNetwork(ExecutableNetwork& exeNet) : ExecuteNetwork(){
-    executable_network = exeNet;
-    inferRequest = executable_network.CreateInferRequest();
-    ALOGI("infer request created");
-
+    ExecuteNetwork(ExecutableNetwork &exeNet) : ExecuteNetwork() {
+        executable_network = exeNet;
+        inferRequest = executable_network.CreateInferRequest();
+        ALOGI("infer request created");
     }
 
     //~ExecuteNetwork(){ }
-    void loadNetwork()
-    {
-
+    void loadNetwork() {
         std::map<std::string, std::string> networkConfig;
         setConfig(networkConfig);
 
         InferencePlugin plugin(enginePtr);
         executable_network = plugin.LoadNetwork(*network, networkConfig);
-        //std::cout << "Network loaded" << std::endl;
-	 ALOGI("Network loaded");
+        // std::cout << "Network loaded" << std::endl;
+        ALOGI("Network loaded");
 
         inferRequest = executable_network.CreateInferRequest();
-        //std::cout << "infer request created" << std::endl;
-      }
-
-    void prepareInput()
-    {
-	  #ifdef NNLOG
-      ALOGI("Prepare input blob");
-	  #endif
-      Precision inputPrecision = Precision::FP32;
-      inputInfo.begin()->second->setPrecision(inputPrecision);
-      //inputInfo.begin()->second->setPrecision(Precision::U8);
-
-      auto inputDims = inputInfo.begin()->second->getTensorDesc().getDims();
-      if (inputDims.size() == 4)
-      inputInfo.begin()->second->setLayout(Layout::NCHW);
-      else if (inputDims.size() == 2)
-      inputInfo.begin()->second->setLayout(Layout::NC);
-      else
-      inputInfo.begin()->second->setLayout(Layout::C);
-
-
-      //inputInfo.begin()->second->setPrecision(Precision::U8);
-      //inputInfo.begin()->second->setLayout(Layout::NCHW);
-
+        // std::cout << "infer request created" << std::endl;
     }
 
-    void prepareOutput()
-    {
-	  #ifdef NNLOG
-      ALOGI("Prepare output blob");
-	  #endif
-      Precision outputPrecision = Precision::FP32;
-      outputInfo.begin()->second->setPrecision(outputPrecision);
+    void prepareInput() {
+#ifdef NNLOG
+        ALOGI("Prepare input blob");
+#endif
+        Precision inputPrecision = Precision::FP32;
+        inputInfo.begin()->second->setPrecision(inputPrecision);
+        // inputInfo.begin()->second->setPrecision(Precision::U8);
 
-      auto outputDims = outputInfo.begin()->second->getDims();
-      if (outputDims.size() == 4)
-      outputInfo.begin()->second->setLayout(Layout::NHWC);
-      else if (outputDims.size() == 2)
-      outputInfo.begin()->second->setLayout(Layout::NC);
-      else
-      outputInfo.begin()->second->setLayout(Layout::C);
+        auto inputDims = inputInfo.begin()->second->getTensorDesc().getDims();
+        if (inputDims.size() == 4)
+            inputInfo.begin()->second->setLayout(Layout::NCHW);
+        else if (inputDims.size() == 2)
+            inputInfo.begin()->second->setLayout(Layout::NC);
+        else
+            inputInfo.begin()->second->setLayout(Layout::C);
 
-      #ifdef NNLOG
-      //auto dims = inputInfo.begin()->second->getDims();
-      //ALOGI("inputInfo dims size = %d\n", dims.size());
-      //ALOGI("outputInfo dims size = %d\n", outputDims.size());
-      #endif
+        // inputInfo.begin()->second->setPrecision(Precision::U8);
+        // inputInfo.begin()->second->setLayout(Layout::NCHW);
     }
 
-    //setBlob input/output blob for infer request
-    void setBlob(const std::string& inName, const Blob::Ptr& inputBlob)
-    {
-        #ifdef NNLOG
+    void prepareOutput() {
+#ifdef NNLOG
+        ALOGI("Prepare output blob");
+#endif
+        Precision outputPrecision = Precision::FP32;
+        outputInfo.begin()->second->setPrecision(outputPrecision);
+
+        auto outputDims = outputInfo.begin()->second->getDims();
+        if (outputDims.size() == 4)
+            outputInfo.begin()->second->setLayout(Layout::NHWC);
+        else if (outputDims.size() == 2)
+            outputInfo.begin()->second->setLayout(Layout::NC);
+        else
+            outputInfo.begin()->second->setLayout(Layout::C);
+
+#ifdef NNLOG
+// auto dims = inputInfo.begin()->second->getDims();
+// ALOGI("inputInfo dims size = %d\n", dims.size());
+// ALOGI("outputInfo dims size = %d\n", outputDims.size());
+#endif
+    }
+
+    // setBlob input/output blob for infer request
+    void setBlob(const std::string &inName, const Blob::Ptr &inputBlob) {
+#ifdef NNLOG
         ALOGI("setBlob input or output blob name : %s", inName.c_str());
-        ALOGI("Blob size %d and size in bytes %d bytes element size %d bytes", inputBlob->size(), inputBlob->byteSize(), inputBlob->element_size());
-        #endif
+        ALOGI("Blob size %d and size in bytes %d bytes element size %d bytes", inputBlob->size(),
+              inputBlob->byteSize(), inputBlob->element_size());
+#endif
 
-        //inferRequest.SetBlob(inName.c_str(), inputBlob);
+        // inferRequest.SetBlob(inName.c_str(), inputBlob);
         inferRequest.SetBlob(inName, inputBlob);
 
-        //std::cout << "setBlob input or output name : " << inName << std::endl;
-
+        // std::cout << "setBlob input or output name : " << inName << std::endl;
     }
 
-     //for non aync infer request
-    TBlob<float>::Ptr getBlob(const std::string& outName) {
-       Blob::Ptr outputBlob;
-       outputBlob = inferRequest.GetBlob(outName);
-       //std::cout << "GetBlob input or output name : " << outName << std::endl;
-       #ifdef NNLOG
-       ALOGI("Get input/output blob, name : ", outName.c_str());
-       #endif
-       return As<TBlob<float>>(outputBlob);
-       //return outputBlob;
+    // for non aync infer request
+    TBlob<float>::Ptr getBlob(const std::string &outName) {
+        Blob::Ptr outputBlob;
+        outputBlob = inferRequest.GetBlob(outName);
+// std::cout << "GetBlob input or output name : " << outName << std::endl;
+#ifdef NNLOG
+        ALOGI("Get input/output blob, name : ", outName.c_str());
+#endif
+        return As<TBlob<float>>(outputBlob);
+        // return outputBlob;
     }
 
     void Infer() {
-        #ifdef NNLOG
+#ifdef NNLOG
         ALOGI("Infer Network\n");
-        #endif
-//        inferRequest = executable_network.CreateInferRequest();
-/*
-        auto inName = inputInfo.begin()->first;
-        ALOGI("set input blob\n");
-        inferRequest.SetBlob(inName, in);
+#endif
+        //        inferRequest = executable_network.CreateInferRequest();
+        /*
+                auto inName = inputInfo.begin()->first;
+                ALOGI("set input blob\n");
+                inferRequest.SetBlob(inName, in);
 
-        ALOGI("aks prepare output blob\n");
-        const std::string firstOutName = outputInfo.begin()->first;
-        InferenceEngine::TBlob<PrecisionTrait<Precision::FP32>::value_type>::Ptr outputBlob;
-        outputBlob = InferenceEngine::make_shared_blob<PrecisionTrait<Precision::FP32>::value_type,
-                InferenceEngine::SizeVector>(Precision::FP32, outputInfo.begin()->second->getDims());
-        outputBlob->allocate();
+                ALOGI("aks prepare output blob\n");
+                const std::string firstOutName = outputInfo.begin()->first;
+                InferenceEngine::TBlob<PrecisionTrait<Precision::FP32>::value_type>::Ptr outputBlob;
+                outputBlob =
+           InferenceEngine::make_shared_blob<PrecisionTrait<Precision::FP32>::value_type,
+                        InferenceEngine::SizeVector>(Precision::FP32,
+           outputInfo.begin()->second->getDims()); outputBlob->allocate();
 
-        ALOGI("set output blob\n");
-        inferRequest.SetBlob(firstOutName, outputBlob);
+                ALOGI("set output blob\n");
+                inferRequest.SetBlob(firstOutName, outputBlob);
 
-*/
-        #ifdef NNLOG
+        */
+#ifdef NNLOG
         ALOGI("StartAsync scheduled");
-        #endif
-        inferRequest.StartAsync();  //for async infer
-        //ALOGI("async wait");
-        //inferRequest.Wait(1000);
-        inferRequest.Wait(10000); //check right value to infer
-        //inferRequest.Wait(IInferRequest::WaitMode::RESULT_READY);
+#endif
+        inferRequest.StartAsync();  // for async infer
+        // ALOGI("async wait");
+        // inferRequest.Wait(1000);
+        inferRequest.Wait(10000);  // check right value to infer
+// inferRequest.Wait(IInferRequest::WaitMode::RESULT_READY);
 
-        //std::cout << "output name : " << firstOutName << std::endl;
-        #ifdef NNLOG
+// std::cout << "output name : " << firstOutName << std::endl;
+#ifdef NNLOG
         ALOGI("infer request completed");
-        #endif
+#endif
 
         return;
     }
 };
+}  // namespace nnhal
+}  // namespace neuralnetworks
+}  // namespace hardware
+}  // namespace android

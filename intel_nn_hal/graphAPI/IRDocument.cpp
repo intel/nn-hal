@@ -43,15 +43,18 @@
 #include <log/log.h>
 #endif
 
-using namespace IRBuilder;
 using namespace std;
 using namespace InferenceEngine;
 
+namespace android {
+namespace hardware {
+namespace neuralnetworks {
+namespace nnhal {
 class InternalNetworkImpl : public InferenceEngine::details::CNNNetworkImpl {
-   public:
+public:
     InternalNetworkImpl() {}
     InternalNetworkImpl(const std::string netName) : InternalNetworkImpl() {
-        setPrecision(IRBuilder::g_layer_precision);
+        setPrecision(g_layer_precision);
         setName(netName);
     }
 
@@ -130,8 +133,7 @@ void IRDocument::optimize() {
 
             it = _layers.erase(it);
             network->remove(l->name);
-        }
-        else {
+        } else {
             ++it;
         }
     }
@@ -139,7 +141,7 @@ void IRDocument::optimize() {
 
 void IRDocument::build() {
     if (_processed) return;
-    network->setPrecision(IRBuilder::g_layer_precision);
+    network->setPrecision(g_layer_precision);
     InputsDataMap inputs;
     network->getInputsInfo(inputs);
     for (auto i : inputs) {
@@ -273,14 +275,15 @@ void IRDocument::crateDotFile(std::ostream &dot) const {
 InferenceEngine::InputInfo::Ptr IRDocument::createInput(const std::string &name,
                                                         const TensorDims &dims) const {
     Layout layout;
-    if (dims.size() == 4) layout = NCHW;
+    if (dims.size() == 4)
+        layout = NCHW;
     else if (dims.size() == 2)
         layout = InferenceEngine::Layout::NC;
     else
         layout = InferenceEngine::Layout::C;
 
     std::cout << "createInput input data dims[0] " << dims[0] << "dims[1]" << dims[1] << std::endl;
-    TensorDesc td(IRBuilder::g_layer_precision, dims, layout);
+    TensorDesc td(g_layer_precision, dims, layout);
 
     auto inputData = std::make_shared<InferenceEngine::Data>(name, td);
     InferenceEngine::InputInfo::Ptr info(new InferenceEngine::InputInfo());
@@ -365,7 +368,7 @@ void IRDocument::saveToIR(std::ostream &binFile, pugi::xml_node &parent, const I
     layer.append_attribute("type").set_value(irLayer->type.c_str());
     layer.append_attribute("id").set_value(irLayer->userValue.v_int);
     layer.append_attribute("precision")
-        .set_value(IRBuilder::g_layer_precision == Precision::FP16 ? "FP16" : "FP32");
+        .set_value(g_layer_precision == Precision::FP16 ? "FP16" : "FP32");
 
     if (!irLayer->params.empty()) {
         auto attr = layer.append_child("data");  // todo: need to check for type and overide it
@@ -421,3 +424,7 @@ void IRDocument::setName(const char *name) {
     _name = name;
     network->setName(_name);
 }
+}  // namespace nnhal
+}  // namespace neuralnetworks
+}  // namespace hardware
+}  // namespace android

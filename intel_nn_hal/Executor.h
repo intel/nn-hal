@@ -19,11 +19,11 @@
 
 #include <android/hardware/neuralnetworks/1.0/IPreparedModel.h>
 #include <android/hidl/memory/1.0/IMemory.h>
-#include <hidlmemory/mapping.h>
 #include <hardware/hardware.h>
+#include <hidlmemory/mapping.h>
 #include <sys/mman.h>
-#include <string>
 #include <fstream>
+#include <string>
 
 #include "IENetwork.h"
 
@@ -38,9 +38,9 @@ namespace V1_0 {
 namespace driver {
 namespace executor {
 
-
-template <class T> using  vec = std::vector<T>;
-typedef uint8_t * memory;
+template <class T>
+using vec = std::vector<T>;
+typedef uint8_t* memory;
 
 // The type and dimensions of an operand.
 struct Shape {
@@ -53,9 +53,9 @@ struct Shape {
 // Information we maintain about each operand during execution that
 // may change during execution.
 struct RunTimeOperandInfo {
-    //std::string name;
-    //uint32_t opIdx;
-    //void * opIdx;
+    // std::string name;
+    // uint32_t opIdx;
+    // void * opIdx;
 
     // TODO Storing the type here is redundant, as it won't change during execution.
     OperandType type;
@@ -86,7 +86,6 @@ struct RunTimeOperandInfo {
     }
 };
 
-
 // Used to keep a pointer to each of the memory pools.
 struct RunTimePoolInfo {
     sp<IMemory> memory;
@@ -97,32 +96,27 @@ struct RunTimePoolInfo {
     bool update();
 };
 
-
 bool setRunTimePoolInfosFromHidlMemories(std::vector<RunTimePoolInfo>* poolInfos,
                                          const hidl_vec<hidl_memory>& pools);
-
-
 
 // This class is used to execute a model
 class Executor {
 public:
-    Executor()
-          :mTargetDevice(TargetDevice::eMYRIAD), mNet("nnNet"), enginePtr(nullptr) {
+    Executor() : mTargetDevice(TargetDevice::eMYRIAD), mNet("nnNet"), enginePtr(nullptr) {
         IRBuilder::g_layer_precision = InferenceEngine::Precision::FP16;
     }
 
-    Executor(const TargetDevice device)
-          :mTargetDevice(device), mNet("nnNet"), enginePtr(nullptr) {
+    Executor(const TargetDevice device) : mTargetDevice(device), mNet("nnNet"), enginePtr(nullptr) {
         if (mTargetDevice == TargetDevice::eCPU)
-           IRBuilder::g_layer_precision = InferenceEngine::Precision::FP32;
+            IRBuilder::g_layer_precision = InferenceEngine::Precision::FP32;
         else if (mTargetDevice == TargetDevice::eMYRIAD)
-           IRBuilder::g_layer_precision = InferenceEngine::Precision::FP16;
+            IRBuilder::g_layer_precision = InferenceEngine::Precision::FP16;
         else
-           IRBuilder::g_layer_precision = InferenceEngine::Precision::UNSPECIFIED;
+            IRBuilder::g_layer_precision = InferenceEngine::Precision::UNSPECIFIED;
     }
 
-    ~Executor() {deinitialize();}
-    //bool initialize();
+    ~Executor() { deinitialize(); }
+    // bool initialize();
     // Executes the model. The results will be stored at the locations
     // specified in the constructor.
     // The model must outlive the executor.  We prevent it from being modified
@@ -134,7 +128,7 @@ public:
 protected:
     void deinitialize();
     bool initializeRunTimeInfo(const std::vector<RunTimePoolInfo>& modelPoolInfos,
-                                            const std::vector<RunTimePoolInfo>& requestPoolInfos);
+                               const std::vector<RunTimePoolInfo>& requestPoolInfos);
 
     bool executeOperation(const Operation& operation);
 
@@ -148,7 +142,7 @@ protected:
     bool operationLRN(const Operation& operation);
     bool operationMaxPool2D(const Operation& operation);
     bool operationLogisticSigmoid(const Operation& operation);
-    //bool operationLSTM(const Operation& operation);
+    // bool operationLSTM(const Operation& operation);
     bool operationMUL(const Operation& operation);
     bool operationRELU(const Operation& operation);
     bool operationRELU1(const Operation& operation);
@@ -160,63 +154,59 @@ protected:
     void initializeInput();
     void finalizeOutput(/*RunTimeOperandInfo* output*/);
 
-    OutputPort handleFusion(const OutputPort &out, int32_t fusedOp);
-    template<typename T>
-    T GetConstFromBuffer(const uint8_t *buf, uint32_t len);
-    template<typename T>
-    std::vector<T> GetConstVecFromBuffer(const uint8_t *buf, uint32_t len);
-    const uint8_t *GetOperandMemory(const Model *model, uint32_t index, uint32_t &len_out);
+    OutputPort handleFusion(const OutputPort& out, int32_t fusedOp);
     template <typename T>
-    T ParseOperationInput(const Model *model, const Operation& operation, uint32_t index);
+    T GetConstFromBuffer(const uint8_t* buf, uint32_t len);
     template <typename T>
-    T GetConstOperand(const Model *model, uint32_t index);
+    std::vector<T> GetConstVecFromBuffer(const uint8_t* buf, uint32_t len);
+    const uint8_t* GetOperandMemory(const Model* model, uint32_t index, uint32_t& len_out);
     template <typename T>
-    std::vector<T> GetConstVecOperand(const Model *model, uint32_t index);
+    T ParseOperationInput(const Model* model, const Operation& operation, uint32_t index);
+    template <typename T>
+    T GetConstOperand(const Model* model, uint32_t index);
+    template <typename T>
+    std::vector<T> GetConstVecOperand(const Model* model, uint32_t index);
     virtual Blob::Ptr GetConstOperandAsTensor(uint32_t index);
     virtual Blob::Ptr GetConstWeightsOperandAsTensor(uint32_t index);
-    virtual Blob::Ptr GetInOutOperandAsBlob(RunTimeOperandInfo& op, const uint8_t *buf, uint32_t& len);
-    void SetOperandMemory(const Model *model, uint32_t index, uint32_t &len_out, const uint8_t *buf);
-    void SetOperandFromTensor(uint8_t* buf, uint32_t &length, Blob::Ptr infOutput);
+    virtual Blob::Ptr GetInOutOperandAsBlob(RunTimeOperandInfo& op, const uint8_t* buf,
+                                            uint32_t& len);
+    void SetOperandMemory(const Model* model, uint32_t index, uint32_t& len_out,
+                          const uint8_t* buf);
+    void SetOperandFromTensor(uint8_t* buf, uint32_t& length, Blob::Ptr infOutput);
     bool isConst(int index);
     OutputPort getPort(int index);
 
     TargetDevice mTargetDevice;
     std::vector<RunTimeOperandInfo> mOperands;
     IRDocument mNet;
-    std::vector<OutputPort> mPorts;  //typedef std::shared_ptr<Data> DataPtr;
+    std::vector<OutputPort> mPorts;  // typedef std::shared_ptr<Data> DataPtr;
     ExecuteNetwork* enginePtr;
 
     // The model and the request that we'll execute. Only valid while run()
     // is being executed.
     const Model* mModel = nullptr;
     const Request* mRequest = nullptr;
-
-
 };
 
 class VpuExecutor : public Executor {
 public:
-    VpuExecutor()
-          :Executor(TargetDevice::eMYRIAD) {
-    }
+    VpuExecutor() : Executor(TargetDevice::eMYRIAD) {}
 
     virtual Blob::Ptr GetConstOperandAsTensor(uint32_t index) override;
-    virtual Blob::Ptr GetInOutOperandAsBlob(RunTimeOperandInfo& op, const uint8_t *buf, uint32_t& len) override;
+    virtual Blob::Ptr GetInOutOperandAsBlob(RunTimeOperandInfo& op, const uint8_t* buf,
+                                            uint32_t& len) override;
     virtual Blob::Ptr GetConstWeightsOperandAsTensor(uint32_t index) override;
 };
 
 class CpuExecutor : public Executor {
 public:
-    CpuExecutor()
-          :Executor(TargetDevice::eCPU) {
-    }
+    CpuExecutor() : Executor(TargetDevice::eCPU) {}
 
     virtual Blob::Ptr GetConstOperandAsTensor(uint32_t index) override;
-    virtual Blob::Ptr GetInOutOperandAsBlob(RunTimeOperandInfo& op, const uint8_t *buf, uint32_t& len) override;
+    virtual Blob::Ptr GetInOutOperandAsBlob(RunTimeOperandInfo& op, const uint8_t* buf,
+                                            uint32_t& len) override;
     virtual Blob::Ptr GetConstWeightsOperandAsTensor(uint32_t index) override;
 };
-
-
 
 class PreparedModel : public IPreparedModel {
 public:
@@ -224,13 +214,13 @@ public:
         IRBuilder::g_layer_precision = InferenceEngine::Precision::FP16;
     }
     PreparedModel(const TargetDevice device, const Model& model)
-          :mTargetDevice(device), mModel(model) {
+        : mTargetDevice(device), mModel(model) {
         if (mTargetDevice == TargetDevice::eCPU)
-           IRBuilder::g_layer_precision = InferenceEngine::Precision::FP32;
+            IRBuilder::g_layer_precision = InferenceEngine::Precision::FP32;
         else if (mTargetDevice == TargetDevice::eMYRIAD)
-           IRBuilder::g_layer_precision = InferenceEngine::Precision::FP16;
+            IRBuilder::g_layer_precision = InferenceEngine::Precision::FP16;
         else
-           IRBuilder::g_layer_precision = InferenceEngine::Precision::UNSPECIFIED;
+            IRBuilder::g_layer_precision = InferenceEngine::Precision::UNSPECIFIED;
     }
     ~PreparedModel() override {}
     bool initialize();
@@ -244,30 +234,23 @@ private:
     Model mModel;
     std::vector<RunTimePoolInfo> mPoolInfos;
     TargetDevice mTargetDevice;
-
 };
 
 class VpuPreparedModel : public PreparedModel {
 public:
-    VpuPreparedModel(const Model& model)
-          :PreparedModel(TargetDevice::eMYRIAD, model) {
-    }
-
+    VpuPreparedModel(const Model& model) : PreparedModel(TargetDevice::eMYRIAD, model) {}
 };
 
 class CpuPreparedModel : public PreparedModel {
 public:
-    CpuPreparedModel(const Model& model)
-          :PreparedModel(TargetDevice::eCPU, model) {
-    }
-
+    CpuPreparedModel(const Model& model) : PreparedModel(TargetDevice::eCPU, model) {}
 };
 
-}
+}  // namespace executor
 }  // namespace driver
 }  // namespace V1_0
 }  // namespace neuralnetworks
 }  // namespace hardware
 }  // namespace android
 
-#endif // ANDROID_ML_NN_PREPAREDMODEL_H
+#endif  // ANDROID_ML_NN_PREPAREDMODEL_H
