@@ -1,0 +1,10 @@
+service neuralnetworks-hal-1-1-cpu /vendor/bin/hw/android.hardware.neuralnetworks@1.1-generic-service -D CPU
+    class hal
+    user root
+    group root
+
+service neuralnetworks-hal-1-1-gna /vendor/bin/hw/android.hardware.neuralnetworks@1.1-generic-service -D GNA
+    class hal
+    user root
+    group root
+

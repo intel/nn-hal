@@ -35,12 +35,11 @@
 #include "ie_icnn_network.hpp"
 #include "ie_common.h"
 
-
-class InternalNetworkImpl;
-
-namespace IRBuilder
-{
-
+namespace android {
+namespace hardware {
+namespace neuralnetworks {
+namespace nnhal {
+    class InternalNetworkImpl;
 class IRDocument
 {
 private:
@@ -60,9 +59,7 @@ private:
     bool _processed = false;
 
     std::map<const float *, size_t> _segmentsMap={}; //org
-
-    //std::map<const short*, size_t> _segmentsMap;
-
+    
     static bool shouldRemove(const IRLayer &l);
     void process(const IRLayer &value);
     void optimize();
@@ -104,4 +101,7 @@ public:
     InferenceEngine::ICNNNetwork *getNetwork();
 };
 
-}  // namespace IRBuilder
+}  // namespace nnhal
+}  // namespace neuralnetworks
+}  // namespace hardware
+}  // namespace android 
