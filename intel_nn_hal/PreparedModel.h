@@ -155,6 +155,7 @@ protected:
     bool operationReshape(const Operation& operation);
     bool operationSoftmax(const Operation& operation);
     bool operationTANH(const Operation& operation);
+    bool operationMean(const Operation& operation);
 
     void initializeInput();
     bool finalizeOutput(/*RunTimeOperandInfo* output*/);

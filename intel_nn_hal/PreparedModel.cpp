@@ -980,6 +980,9 @@ bool PreparedModel::initialize() {
             case OperationType::ADD:
                 success = operationAdd(operation);
                 break;
+            case OperationType::MEAN:
+                success = operationMean(operation);
+                break;
             default:
                 VLOG(L1, "unsupported operation %d", operation.type);
                 return false;
@@ -1652,6 +1655,8 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
                 return false;
             }
         } break;
+        case OperationType::MEAN:
+            break;
         default:
             VLOG(L1, "unsupport opration %d", operation.type);
             return false;
@@ -2809,6 +2814,90 @@ bool PreparedModel::operationSoftmax(const Operation& operation) {
 bool PreparedModel::operationTANH(const Operation& operation) {
     VLOG(L1, "OperationType::TANH");
     mPorts[operation.outputs[0]] = Tanh(getPort(operation.inputs[0]));
+
+    return true;
+}
+
+bool PreparedModel::operationMean(const Operation& operation) {
+    /**
+     * Computes the mean of elements across dimensions of a tensor.
+     *
+     * Reduces the input tensor along the given dimensions to reduce. Unless
+     * keep_dims is true, the rank of the tensor is reduced by 1 for each entry
+     * in axis. If keep_dims is true, the reduced dimensions are retained with
+     * length 1.
+     *
+     * If dimensions to reduce have no entries, all dimensions are reduced, and
+     * a tensor with a single element is returned.
+     *
+     * Supported tensor {@link OperandType}:
+     * * {@link OperandType::TENSOR_FLOAT32}
+     * * {@link OperandType::TENSOR_QUANT8_ASYMM}
+     *
+     * Supported tensor rank: up to 4
+     *
+     * Inputs:
+     * * 0: A tensor, specifying the input.
+     * * 1: A 1-D Tensor of {@link OperandType::TENSOR_INT32}. The dimensions
+     *      to reduce. If None (the default), reduces all dimensions. Must be in
+     *      the range [-rank(input_tensor), rank(input_tensor)).
+     * * 2: An {@link OperandType::INT32} scalar, keep_dims. If positive,
+     *      retains reduced dimensions with length 1.
+     *
+     * Outputs:
+     * * 0: A tensor of the same {@link OperandType} as input0.
+     */
+    auto input = getPort(operation.inputs[0]);
+    auto inputDims = input->getTensorDesc().getDims();
+    auto width = 0, height = 0;
+
+    switch(input->getLayout()) {
+        case InferenceEngine::NCHW:
+            width = inputDims[3];
+            height = inputDims[2];
+            break;
+        case InferenceEngine::NHWC:
+            width = inputDims[2];
+            height = inputDims[1];
+            break;
+        default:
+            VLOG(L1, "Invalid layout. Currently MEAN does not support this layout");
+            return false;
+    }
+
+    std::vector<uint32_t> dimsToReduce = GetConstVecOperand<uint32_t>(mModel, operation.inputs[1]);
+    // We can do mean on 1 axis also. but only along w or h
+    // not along c. Hence restricting to 2 axis
+    if (dimsToReduce.size() == 2) {
+        std::vector<uint32_t> validDimensions = {1,2};
+        std::sort(dimsToReduce.begin(), dimsToReduce.end());
+
+        if (!std::equal(dimsToReduce.begin(), dimsToReduce.end(),
+            validDimensions.begin(), validDimensions.end())) {
+
+            VLOG(L1, "Invalid dimensions. Mean supported on axis 1,2 only");
+            return false;
+        }
+    } else {
+        VLOG(L1, "Error: Invalid number of dimensions");
+        return false;
+    }
+
+    // We do not yet support keepDimensions
+    auto keepDimesions = PARAM_I32(2);
+    if (keepDimesions != 0)
+        return false;
+
+    // Fetching width & height
+    Point2D pad_start = {0,0};
+    Point2D pad_end = {0,0};
+    Point2D stride = {width,height};
+    Point2D kernel = {width,height};
+    std::string padType = "valid";
+
+    auto out = Pooling(input, kernel, stride, pad_start, pad_end, padType,
+                       InferenceEngine::PoolingLayer::PoolType::AVG);
+    mPorts[operation.outputs[0]] = out;
 
     return true;
 }
