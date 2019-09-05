@@ -1471,11 +1471,6 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
             // filter in == channel
             // Check Input/Filter  Operand type
 
-            if (oper_size == EXPL_PAD_PARAMS_CONV) {
-                VLOG(L1, "NNERR: Explicit padding not supported!!");
-                return false;
-            }
-
             if (input0.type != OperandType::TENSOR_FLOAT32 ||
                 input1.type != OperandType::TENSOR_FLOAT32 ||
                 input2.type != OperandType::TENSOR_FLOAT32) {
@@ -1568,10 +1563,6 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
 
             int oper_size = operation.inputs.size();
 
-            if (oper_size == EXPL_PAD_PARAMS_DW_CONV) {
-                VLOG(L1, "NNERR: Explicit padding not supported!!");
-                return false;
-            }
             // Check Input/Filter  Operand type
             if (input0.type != OperandType::TENSOR_FLOAT32 ||
                 input1.type != OperandType::TENSOR_FLOAT32 ||
