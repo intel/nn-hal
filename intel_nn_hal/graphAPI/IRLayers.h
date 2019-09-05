@@ -70,8 +70,8 @@ inline OutputPort addOutput(const IRLayer &layer, const InferenceEngine::SizeVec
     } else if (dims.size() == 4) {
         std::cout << "addOutput dims size " << dims.size() << std::endl;
         // InferenceEngine::TensorDesc td(g_layer_precision, dims, InferenceEngine::Layout::ANY);
-        InferenceEngine::TensorDesc td(g_layer_precision, dims, InferenceEngine::Layout::NCHW);
-        // InferenceEngine::TensorDesc td(g_layer_precision, dims, InferenceEngine::Layout::NHWC);
+        // InferenceEngine::TensorDesc td(g_layer_precision, dims, InferenceEngine::Layout::NCHW);
+        InferenceEngine::TensorDesc td(g_layer_precision, dims, InferenceEngine::Layout::NHWC);
         data = std::make_shared<InferenceEngine::Data>(d_name, td);
 
     } else {
