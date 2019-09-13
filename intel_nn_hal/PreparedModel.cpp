@@ -1970,10 +1970,10 @@ bool PreparedModel::operationAveragePool2D(const Operation& operation) {
     auto input = getPort(operation.inputs[0]);
     const auto indims = input->getTensorDesc().getDims();
 
-    Point2D pad_start;
-    Point2D pad_end;
-    Point2D stride;
-    Point2D kernel;
+    Point2D pad_start = {0, 0};
+    Point2D pad_end = {0, 0};
+    Point2D stride = {0, 0};
+    Point2D kernel = {0, 0};
     std::string padType;
     int fusion_index = -1;
 
@@ -2067,10 +2067,10 @@ bool PreparedModel::operationMaxPool2D(const Operation& operation) {
     auto input = getPort(operation.inputs[0]);
     const auto indims = input->getTensorDesc().getDims();
 
-    Point2D pad_start;
-    Point2D pad_end;
-    Point2D stride;
-    Point2D kernel;
+    Point2D pad_start = {0, 0};
+    Point2D pad_end = {0, 0};
+    Point2D stride = {0, 0};
+    Point2D kernel = {0, 0};
     std::string padType;
     int fusion_index = -1;
 
