@@ -399,7 +399,7 @@ inline OutputPort Convolution(const OutputPort &src, const ConvolutionParams &pr
         size_t IH = inDims[2];
         size_t IW = inDims[3];
         size_t KH = 0, KW = 0;
-        float OH_temp, OW_temp;
+        float OH_temp = 1.f, OW_temp = 1.f;
 
         if (ret->_dilation[InferenceEngine::Y_AXIS])
             KH = (ret->_kernel[InferenceEngine::Y_AXIS] - 1) *

@@ -244,11 +244,11 @@ class ExecuteNetwork {
     OutputsDataMap outputInfo = {};
     IInferRequest::Ptr req;
     InferRequest inferRequest;
-    ResponseDesc resp;
+    ResponseDesc resp = {};
 
 public:
     ExecuteNetwork() : network(nullptr) {}
-    ExecuteNetwork(IRDocument &doc, TargetDevice target = TargetDevice::eCPU) : network(nullptr) {
+    ExecuteNetwork(IRDocument &doc, TargetDevice target = TargetDevice::eCPU) : network(nullptr), executable_network(), req(nullptr), inferRequest() {
         InferenceEngine::PluginDispatcher dispatcher(
             {"/vendor/lib64", "/vendor/lib", "/system/lib64", "/system/lib", "", "./"});
         enginePtr = dispatcher.getSuitablePlugin(target);
