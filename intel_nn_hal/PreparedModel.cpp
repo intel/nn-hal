@@ -106,8 +106,6 @@ unsigned int debugMask = ((1 << (L1 + 1)) - 1);
 #define EXPL_PAD_PARAMS_DW_CONV 11
 #define IMPL_PAD_PARAMS_DW_CONV 8
 #define SOFTMAX_INPUT_PARAMS 2
-#define EXPL_PAD 1
-#define IMPL_PAD 2
 #define NHWC_DIM_NUM 4
 #define NHWC_CH_IDX 3
 #define NHWC_HT_IDX 1

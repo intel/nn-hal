@@ -29,6 +29,9 @@
 #include "Driver.h"
 #include "IENetwork.h"
 
+#define EXPL_PAD 1
+#define IMPL_PAD 2
+
 using ::android::hidl::memory::V1_0::IMemory;
 using namespace InferenceEngine;
 
@@ -106,12 +109,12 @@ bool setRunTimePoolInfosFromHidlMemories(std::vector<RunTimePoolInfo>* poolInfos
 class PreparedModel : public IPreparedModel {
 public:
     PreparedModel(const Model& model)
-        : mTargetDevice(TargetDevice::eMYRIAD), mModel(model), mNet("nnNet"), enginePtr(nullptr), mPadreq(false) {
+        : mTargetDevice(TargetDevice::eMYRIAD), mModel(model), mNet("nnNet"), enginePtr(nullptr), mPadreq(EXPL_PAD) {
         g_layer_precision = InferenceEngine::Precision::FP16;
     }
 
     PreparedModel(const TargetDevice device, const Model& model)
-        : mTargetDevice(device), mModel(model), mNet("nnNet"), enginePtr(nullptr) {
+        : mTargetDevice(device), mModel(model), mNet("nnNet"), enginePtr(nullptr), mPadreq(EXPL_PAD) {
         if (mTargetDevice == TargetDevice::eCPU)
             g_layer_precision = InferenceEngine::Precision::FP32;
         else if (mTargetDevice == TargetDevice::eMYRIAD)
@@ -182,7 +185,7 @@ protected:
     IRDocument mNet;
     std::vector<OutputPort> mPorts;  // typedef std::shared_ptr<Data> DataPtr;
     ExecuteNetwork* enginePtr;
-    bool mPadreq;
+    uint32_t mPadreq;
 };
 
 class VpuPreparedModel : public PreparedModel {
