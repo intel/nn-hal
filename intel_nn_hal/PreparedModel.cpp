@@ -1194,7 +1194,7 @@ bool PreparedModel::initialize() {
     std::string graphfile("/data/local/graphfile");
     if (mModel.operations.size() > 1) {
         mNet.save(graphfile);
-        VLOG(L1, "saving to IR if oepration count > 1");
+        VLOG(L1, "saving to IR if operation count > 1");
     } else
         VLOG(L1, "NOT Saving to IR as operation count is 1,appending TBD!!");
 
@@ -1823,7 +1823,7 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
             }
         } break;
         default:
-            VLOG(L1, "unsupport opration %d", operation.type);
+            VLOG(L1, "unsupport operation %d", operation.type);
             return false;
     }
 #ifdef DISABLE_ALL_QUANT
@@ -4031,6 +4031,338 @@ Blob::Ptr CpuPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const 
         VLOG(L1, "not supporting const tensors of type ", op.type);
         nnAssert(false);
     }
+    return nullptr;
+}
+
+Blob::Ptr GpuPreparedModel::GetConstOperandAsTensor(int operand_idx, int operation_idx)
+{
+    dumpOperand(operand_idx);
+    const auto op = mModel.operands[operand_idx];
+    uint32_t len = 0;
+
+    const uint8_t* buf = GetOperandMemory(mModel, operand_idx, len);
+
+    if (OperandType::TENSOR_FLOAT32 == op.type || OperandType::FLOAT32 == op.type)
+    {
+        vec<unsigned int> order;
+        Layout layout;
+
+        if (op.dimensions.size() == 4)
+        {
+            order = {0, 3, 1, 2};  // nhwc -> nchw
+            layout = Layout::OIHW;  // weights layout
+        }
+        else if (op.dimensions.size() == 2)
+        {
+            order = {0, 1};
+            layout = Layout::NC;
+        }
+        else
+        {
+            order = {0};  //(op.dimensions.size() < 2)
+            layout = Layout::C;
+        }
+
+        auto inputDims = toDims(op.dimensions);
+        TensorDesc td(InferenceEngine::Precision::FP32, permuteDims(inputDims, order), layout);
+
+        if (nullptr == buf)
+        {
+            InferenceEngine::TBlob<float>::Ptr blob = std::make_shared<InferenceEngine::TBlob<float> >(td);
+            blob->allocate();
+            return blob;
+        }
+        else
+        {
+            if (inputDims.size() != 4)
+            {
+                InferenceEngine::TBlob<float>::Ptr blob = std::make_shared<InferenceEngine::TBlob<float> >(td, (float*)buf, len);
+                return blob;
+            } else {
+                InferenceEngine::TBlob<float>::Ptr blob = std::make_shared<InferenceEngine::TBlob<float> >(td);
+                blob->allocate();
+
+                const auto& dims_ohwi = inputDims;  // toDims(op.dimensions);
+                const size_t out_depth = dims_ohwi[0];
+                const size_t in_depth = dims_ohwi[3];
+                const size_t height = dims_ohwi[1];
+                const size_t width = dims_ohwi[2];
+                const float* inputFilter = reinterpret_cast<const float*>(buf);  // OHWI memory layout
+                size_t offset = 0;  // blob->size() == o*i*h*w and simlar to nchw memory layout
+
+                for (size_t o = 0; o < out_depth; o++)
+                {
+                    for (size_t i = 0; i < in_depth; i++)
+                    {
+                        for (size_t h = 0; h < height; h++)
+                        {
+                            for (size_t w = 0; w < width; w++)
+                            {
+                                const size_t offset_ohwi = o * height * width * in_depth +
+                                                     h * width * in_depth + w * in_depth +
+                                                     i;  // similar to NHWC memory layout
+                                blob->buffer().as<float*>()[offset++] = inputFilter[offset_ohwi];
+                            }
+                        }
+                    }
+                }
+
+                return blob;
+            }
+        }
+    }
+    else if (OperandType::TENSOR_INT32 == op.type)
+    {
+        TensorDesc td(InferenceEngine::Precision::I32, toDims(op.dimensions), Layout::ANY);
+
+        if (nullptr == buf)
+        {
+            InferenceEngine::TBlob<float>::Ptr blob = std::make_shared<InferenceEngine::TBlob<float> >(td);
+            blob->allocate();
+            return blob;
+        }
+        else
+        {
+            InferenceEngine::TBlob<float>::Ptr blob = std::make_shared<InferenceEngine::TBlob<float> >(td, (float*)buf, len);
+            return blob;
+        }
+    }
+    else
+    {
+        nnAssert(false);
+    }
+
+    return nullptr;
+}
+
+Blob::Ptr GpuPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const uint8_t* buf, uint32_t& len)
+{
+    if (OperandType::TENSOR_FLOAT32 == op.type || OperandType::FLOAT32 == op.type)
+    {
+        if (op.lifetime == OperandLifeTime::MODEL_INPUT)
+        {
+            vec<unsigned int> order;
+            Layout layout;
+
+            if (op.dimensions.size() == 4)
+            {
+                order = {0, 3, 1, 2};  // nhwc -> nchw
+                layout = Layout::NCHW;
+                // layout = Layout::NHWC;
+            }
+            else if (op.dimensions.size() == 2)
+            {
+                order = {0, 1};
+                layout = Layout::NC;
+            }
+            else
+            {
+                order = {0};  //(op.dimensions.size() < 2)
+                layout = Layout::C;
+            }
+
+            auto inputDims = toDims(op.dimensions);
+            TensorDesc td(InferenceEngine::Precision::FP32, permuteDims(inputDims, order), layout);
+
+            if (buf == nullptr)
+            {
+                InferenceEngine::TBlob<float>::Ptr blob = std::make_shared<InferenceEngine::TBlob<float> >(td);
+                blob->allocate();
+                return blob;
+            }
+            else
+            {
+                if (inputDims.size() != 4)
+                {
+                    InferenceEngine::TBlob<float>::Ptr blob = std::make_shared<InferenceEngine::TBlob<float> >(td, (float*)buf, len);
+                    return blob;
+                }
+                else
+                {
+                    InferenceEngine::TBlob<float>::Ptr blob = std::make_shared<InferenceEngine::TBlob<float> >(td);
+                    blob->allocate();
+
+                    const auto& dims_nhwc = inputDims;  // toDims(op.dimensions);
+                    const size_t batch = dims_nhwc[0];
+                    const size_t in_depth = dims_nhwc[3];  // channels
+                    const size_t height = dims_nhwc[1];
+                    const size_t width = dims_nhwc[2];
+                    const float* input = reinterpret_cast<const float*>(buf);  // OHWI memory layout
+                    size_t offset = 0;  // blob->size() == o*i*h*w and simlar to nchw memory layout
+
+                    // convert NHWC -> NCHW
+
+                    for (size_t b = 0; b < batch; b++)
+                    {
+                        for (size_t i = 0; i < in_depth; i++)
+                        {
+                            for (size_t h = 0; h < height; h++)
+                            {
+                                for (size_t w = 0; w < width; w++)
+                                {
+                                    const size_t offset_nhwc = b * height * width * in_depth +
+                                                         h * width * in_depth + w * in_depth +
+                                                         i;  // similar to NHWC memory layout
+                                    blob->buffer().as<float*>()[offset++] = input[offset_nhwc];
+                                }
+                            }
+                        }
+                    }
+
+                    return blob;
+                }
+            }
+        }
+        else if (op.lifetime == OperandLifeTime::MODEL_OUTPUT)
+        {
+            vec<unsigned int> order;
+            Layout layout;
+
+            if (op.dimensions.size() == 4)
+            {
+                // order = {0,3,1,2};  //nhwc -> nchw
+                layout = Layout::NHWC;
+            }
+            else if (op.dimensions.size() == 2)
+            {
+                // order = {0, 1};
+                layout = Layout::NC;
+            }
+            else
+            {
+                // order = {0}; //(op.dimensions.size() < 2)
+                layout = Layout::C;
+            }
+
+            TensorDesc td(InferenceEngine::Precision::FP32, toDims(op.dimensions), layout);  // nhwc
+            if (nullptr == buf)
+            {
+                InferenceEngine::TBlob<float>::Ptr blob = std::make_shared<InferenceEngine::TBlob<float> >(td);
+                blob->allocate();
+                return blob;
+            }
+            else
+            {
+                InferenceEngine::TBlob<float>::Ptr blob = InferenceEngine::make_shared_blob<float>(td, (float*)buf, len);
+                return blob;
+            }
+        }
+    }
+    else if (OperandType::TENSOR_INT32 == op.type)
+    {
+        TensorDesc td(InferenceEngine::Precision::I32, toDims(op.dimensions), Layout::ANY);
+        return std::make_shared<InferenceEngine::TBlob<int32_t> >(td, (int32_t*)buf, len);
+    }
+    else
+    {
+        nnAssert(false);
+    }
+
+    return nullptr;
+}
+
+Blob::Ptr GpuPreparedModel::GetConstWeightsOperandAsTensor(uint32_t index)
+{
+    dumpOperand(index);
+    const auto op = mModel.operands[index];
+    uint32_t len = 0;
+    const uint8_t* buf = GetOperandMemory(mModel, index, len);
+
+    if (OperandType::TENSOR_FLOAT32 == op.type || OperandType::FLOAT32 == op.type)
+    {
+        vec<unsigned int> order;
+        Layout layout;
+
+        if (op.dimensions.size() == 4)
+        {
+            order = {3, 0, 1, 2};  // IHWO -> OIHW for depth conv
+            layout = Layout::OIHW;  // weights layout
+        }
+        else if (op.dimensions.size() == 2)
+        {
+            order = {0, 1};
+            layout = Layout::NC;
+        }
+        else
+        {
+            order = {0};  //(op.dimensions.size() < 2)
+            layout = Layout::C;
+        }
+
+        auto inputDims = toDims(op.dimensions);
+        TensorDesc td(InferenceEngine::Precision::FP32, permuteDims(inputDims, order), layout);
+
+        if (buf == nullptr)
+        {
+            InferenceEngine::TBlob<float>::Ptr blob = std::make_shared<InferenceEngine::TBlob<float> >(td);
+            blob->allocate();
+            return blob;
+        }
+        else
+        {
+            if (inputDims.size() != 4)
+            {
+                InferenceEngine::TBlob<float>::Ptr blob = std::make_shared<InferenceEngine::TBlob<float> >(td, (float*)buf, len);
+                return blob;
+            }
+            else
+            {
+                InferenceEngine::TBlob<float>::Ptr blob = std::make_shared<InferenceEngine::TBlob<float> >(td);
+                blob->allocate();
+
+                const auto& dims_ohwi = inputDims;  // toDims(op.dimensions);
+                const size_t out_depth = dims_ohwi[0];
+                const size_t in_depth = dims_ohwi[3];
+                const size_t height = dims_ohwi[1];
+                const size_t width = dims_ohwi[2];
+                const float* inputFilter = reinterpret_cast<const float*>(buf);  // OHWI memory layout
+                size_t offset = 0;  // blob->size() == o*i*h*w and simlar to nchw memory layout
+
+                // convert OHWI -> OIHW
+
+                // for depth conv need reorder as OIHW since for tflite O is always 1 and IE expects
+                // reorder to [in_channels, depth_multiplier, filter_height, filter_width]
+                for (size_t i = 0; i < in_depth; i++)
+                {
+                    for (size_t o = 0; o < out_depth; o++)
+                    {
+                        for (size_t h = 0; h < height; h++)
+                        {
+                            for (size_t w = 0; w < width; w++)
+                            {
+                                size_t offset_ohwi = o * height * width * in_depth +
+                                                     h * width * in_depth + w * in_depth +
+                                                     i;  // similar to NHWC memory layout
+                                blob->buffer().as<float*>()[offset++] = inputFilter[offset_ohwi];
+                            }
+                        }
+                    }
+                }
+
+                return blob;
+            }
+        }
+    }
+    else if (op.type == OperandType::TENSOR_INT32)
+    {
+        TensorDesc td(InferenceEngine::Precision::I32, toDims(op.dimensions), Layout::ANY);
+
+        if (buf == nullptr) {
+            InferenceEngine::TBlob<float>::Ptr blob = std::make_shared<InferenceEngine::TBlob<float> >(td);
+            blob->allocate();
+            return blob;
+        }
+        else
+        {
+            InferenceEngine::TBlob<float>::Ptr blob = std::make_shared<InferenceEngine::TBlob<float> >(td, (float*)buf, len);
+            return blob;
+        }
+    }
+    else
+    {
+        nnAssert(false);
+    }
+
     return nullptr;
 }
 

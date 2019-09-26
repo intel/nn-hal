@@ -115,7 +115,7 @@ public:
 
     PreparedModel(const TargetDevice device, const Model& model)
         : mTargetDevice(device), mModel(model), mNet("nnNet"), enginePtr(nullptr), mPadreq(EXPL_PAD) {
-        if (mTargetDevice == TargetDevice::eCPU)
+        if (mTargetDevice == TargetDevice::eCPU || mTargetDevice == TargetDevice::eGPU)
             g_layer_precision = InferenceEngine::Precision::FP32;
         else if (mTargetDevice == TargetDevice::eMYRIAD)
             g_layer_precision = InferenceEngine::Precision::FP16;
@@ -207,6 +207,17 @@ public:
                                             uint32_t& len) override;
     virtual Blob::Ptr GetConstWeightsOperandAsTensor(uint32_t index) override;
 };
+
+class GpuPreparedModel : public PreparedModel {
+public:
+    GpuPreparedModel(const Model& model) : PreparedModel(TargetDevice::eGPU, model) {}
+
+    virtual Blob::Ptr GetConstOperandAsTensor(int operand_index, int operation_idx) override;
+    virtual Blob::Ptr GetInOutOperandAsBlob(RunTimeOperandInfo& op, const uint8_t *buf,
+                                            uint32_t& len) override;
+    virtual Blob::Ptr GetConstWeightsOperandAsTensor(uint32_t index) override;
+};
+
 
 }  // namespace nnhal
 }  // namespace neuralnetworks

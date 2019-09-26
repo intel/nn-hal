@@ -36,6 +36,8 @@ static sp<PreparedModel> ModelFactory(const char* name, const Model& model) {
         preparedModel = new CpuPreparedModel(model);
     else if (strcmp(name, "VPU") == 0)
         preparedModel = new VpuPreparedModel(model);
+    else if (strcmp(name, "GPU") == 0)
+        preparedModel = new GpuPreparedModel(model);
 
     return preparedModel;
 }
@@ -91,13 +93,28 @@ Return<void> Driver::getCapabilities(getCapabilities_cb cb) {
 Return<void> Driver::getCapabilities_1_1(getCapabilities_1_1_cb cb) {
     ALOGI("Entering %s", __func__);
     if (mName.compare("CPU") == 0) {
-        ALOGI("Cpu driver getCapabilities()");
+        ALOGI("CPU driver getCapabilities()");
         Capabilities capabilities = {
             .float32Performance = {.execTime = 0.9f, .powerUsage = 0.9f},
             .quantized8Performance = {.execTime = 0.9f, .powerUsage = 0.9f},
             .relaxedFloat32toFloat16Performance = {.execTime = 0.9f, .powerUsage = 0.9f}};
+
+        ALOGI("CPU MKLDNN driver Capabilities .execTime = 0.9f, .powerUsage = 0.9f");
         cb(ErrorStatus::NONE, capabilities);
-    } else { /* mName.compare("VPU") == 0 */
+    }
+    else if (mName.compare("GPU") == 0)
+    {
+        ALOGI("GPU driver getCapabilities()");
+        Capabilities capabilities = {
+            .float32Performance = {.execTime = 0.95f, .powerUsage = 0.85f},
+            .quantized8Performance = {.execTime = 0.95f, .powerUsage = 0.85f}};
+
+        ALOGI("GPU clDNN driver Capabilities .execTime = 0.95f, .powerUsage = 0.85f");
+        cb(ErrorStatus::NONE, capabilities);
+    }
+    // mName.compare("VPU") == 0
+    else
+    {
         ALOGI("Myriad driver getCapabilities()");
 
         Capabilities capabilities = {
