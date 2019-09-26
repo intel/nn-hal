@@ -133,7 +133,7 @@ LOCAL_C_INCLUDES += \
 
 LOCAL_CFLAGS += -DIE_THREAD=IE_THREAD_OMP -DIMPLEMENT_INFERENCE_ENGINE_API -DGAPI_STANDALONE -std=c++11  -Wall -Wno-unknown-pragmas -Wno-strict-overflow -fPIC -Wformat -Wformat-security -fstack-protector-all -msse4.2
 LOCAL_CFLAGS += -Wno-unused-variable -Wno-unused-parameter -Wno-non-virtual-dtor -Wno-missing-field-initializers  -fexceptions -frtti -Wno-error
-LOCAL_CFLAGS += -DENABLE_MKL_DNN -D__ANDROID__ -DNDEBUG -DIMPLEMENT_INFERENCE_ENGINE_API -fvisibility=default -std=gnu++11 -D_FORTIFY_SOURCE=2 -fPIE -DUSE_STATIC_IE
+LOCAL_CFLAGS += -DENABLE_MKL_DNN -DENABLE_CLDNN -D__ANDROID__ -DNDEBUG -DIMPLEMENT_INFERENCE_ENGINE_API -fvisibility=default -std=gnu++11 -D_FORTIFY_SOURCE=2 -fPIE -DUSE_STATIC_IE
 #LOCAL_CFLAGS += -DNNLOG
 
 
