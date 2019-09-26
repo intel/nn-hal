@@ -81,7 +81,8 @@ include $(BUILD_SHARED_LIBRARY)
 ###############################################################
 include $(CLEAR_VARS)
 LOCAL_MODULE := android.hardware.neuralnetworks@1.1-generic-service
-LOCAL_INIT_RC := android.hardware.neuralnetworks@1.1-generic.rc
+LOCAL_INIT_RC := android.hardware.neuralnetworks@1.1-generic-cpu.rc \
+    android.hardware.neuralnetworks@1.1-generic-gpu.rc
 LOCAL_MODULE_RELATIVE_PATH := hw
 LOCAL_PROPRIETARY_MODULE := true
 LOCAL_MODULE_OWNER := intel
