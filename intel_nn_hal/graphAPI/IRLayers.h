@@ -161,20 +161,14 @@ static IRLayer create(const IRBlob::Ptr &weights, const OutputPort &src) {
     prm.precision = g_layer_precision;
     prm.name = name;
 
-    // auto inDims = src->getDims(); // (batch, IFM)
     auto inDims = src->getTensorDesc().getDims();  // (batch, IFM)
-    // std::cout << "inDims size "<<inDims.size()<< "inDims[0] "<<inDims[0]<< "inDims[1]
-    // "<<inDims[1]<< std::endl;
 
     auto wDim = weights->getTensorDesc().getDims();
-    // std::cout << "wDim size "<<wDim.size()<<"wDim[0] "<<wDim[0]<< "wDim[1] "<<wDim[1]<<
-    // std::endl;
 
     IR_ASSERT(inDims.size() == 2);
 
     unsigned int ofm = 0;
     if (wDim.size() == 2) {
-        // std::cout << "inDims[1]"<<inDims[1]<< "wDim[1]" <<wDim[1]<< std::endl;
 
 #ifdef NNLOG
         ALOGI("inDims[0] = %d inDims[1] = %d", inDims[0], inDims[1]);
@@ -235,23 +229,6 @@ static OutputPort ScaleShiftNode(const OutputPort &src, const IRBlob::Ptr &scale
     return addOutput(l, src->getTensorDesc().getDims());
 }
 
-/*
-inline IRLayer AddConst(const IRLayer &lhs, const IRBlob::Ptr &biases)
-{
-    auto fc = As<InferenceEngine::WeightableLayer>(lhs);
-    if (fc) {
-      // todo: check if biases was not already being set
-      fc->_biases = biases;
-      fc->blobs["biases"] = biases;
-      return lhs; // it was fused with prev layer
-    } else {
-        // need to create an add with Const here using ScaleShift with no weights...
-            THROW_IE_EXCEPTION << "not implemented yet" ;
-    }
-
-}
-*/
-
 inline OutputPort AddTryConst(const OutputPort &src, const IRBlob::Ptr &biases) {
     auto fc = As<InferenceEngine::WeightableLayer>(LayerOf(src));
     if (fc) {
@@ -274,13 +251,6 @@ inline OutputPort AddTryConst(const OutputPort &src, const IRBlob::Ptr &biases) 
 inline OutputPort operator+(const OutputPort &src, const IRBlob::Ptr &biases) {
     return AddTryConst(src, biases);
 }
-/*
-inline OutputPort operator+(const OutputPort &src, const IRBlob::Ptr &biases)
-{
-    auto l = LayerOf(src);
-    return output(AddConst(l, biases));
-}
-*/
 
 namespace ConvLayer {
 static IRLayer create(const OutputPort &src) {
@@ -510,14 +480,6 @@ inline OutputPort Pooling(const OutputPort &inp, const Point2D &kernel, const Po
     auto ret = std::make_shared<InferenceEngine::PoolingLayer>(prm);
     ret->type = "Pooling";
 
-    /*
-        ret->_kernel_x = kernel.x;
-        ret->_kernel_y = kernel.y;
-        ret->_stride_x = stride.x;
-        ret->_stride_y = stride.y;
-        ret->_padding_x = pad.x;
-        ret->_padding_y = pad.y;
-    */
     ret->_kernel.clear();
     ret->_kernel.insert(InferenceEngine::X_AXIS, kernel.x);
     ret->_kernel.insert(InferenceEngine::Y_AXIS, kernel.y);
@@ -951,29 +913,7 @@ inline OutputPort Reshape(const TensorDims &newDims, const OutputPort &src) {
 
 static OutputPort Softmax(const OutputPort &src) {
     auto inputDims = src->getTensorDesc().getDims();
-    /*
-        //handle 2D and 4D tensors
-        TensorDims newDims;
-        if (inputDims.size() == 2) {
-            uint32_t batch_size = inputDims[0];//getSizeOfDimension(inputShape, 0);
-            uint32_t input_size = sizeOf(inputDims) / batch_size; //getNumberOfElements(inputShape)
-       / batch_size;
 
-            newDims = {batch_size, input_size, 1, 1};
-            inputDims = newDims;
-
-
-        } else if (inputDims.size() == 4) {
-            //dim = convertShapeToDims(inputShape);
-            //newDims = inputDims;
-        } else {
-            #ifdef NNLOG
-            ALOGI("Softmax only 2D and 4D tensors supported");
-            #endif
-            //return false;
-        }
-
-    */
     std::string name = "Softmax-";  // todo: make it unique
     name = name << layer_name_count++;
     InferenceEngine::LayerParams prm;
@@ -986,11 +926,6 @@ static OutputPort Softmax(const OutputPort &src) {
     addOutput(l, inputDims);
 
     return output(l);
-    /*
-        auto op = output(l);
-        op->setDims(newDims);
-        return op;
-    */
 }
 
 inline OutputPort Gather(const std::vector<OutputPort> inputs, int axis = 1) {

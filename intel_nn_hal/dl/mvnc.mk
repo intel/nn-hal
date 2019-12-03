@@ -1,7 +1,7 @@
-LOCAL_PATH := $(call my-dir)
+LOCAL_PATH := $(call my-dir)/../../../dldt
 include $(CLEAR_VARS)
 
-LIBUSB_HEADER:= $(LOCAL_PATH)/../../../../../../../external/libusb/libusb
+LIBUSB_HEADER:= $(LOCAL_PATH)/../../../../../external/libusb/libusb
 
 MV_COMMON_BASE:= $(LOCAL_PATH)/inference-engine/thirdparty/movidius
 XLINK_BASE:= $(MV_COMMON_BASE)/XLink
@@ -9,26 +9,31 @@ XLINK_BASE:= $(MV_COMMON_BASE)/XLink
 
 LOCAL_MODULE := libmvnc
 LOCAL_PROPRIETARY_MODULE := true
-#LOCAL_MULTILIB := 64
-LOCAL_MULTILIB := both
+LOCAL_MULTILIB := 64
 LOCAL_MODULE_OWNER := intel
 
 LOCAL_SRC_FILES := \
 	inference-engine/thirdparty/movidius/mvnc/src/mvnc_api.c \
-	inference-engine/thirdparty/movidius/mvnc/src/fp16.c \
-	inference-engine/thirdparty/movidius/XLink/pc/UsbLinkPlatform.c \
-	inference-engine/thirdparty/movidius/XLink/pc/usb_boot.c \
-	inference-engine/thirdparty/movidius/XLink/shared/XLink.c \
-	inference-engine/thirdparty/movidius/XLink/shared/XLinkDispatcher.c \
+	inference-engine/thirdparty/movidius/watchdog/watchdog.cpp \
+	# inference-engine/thirdparty/movidius/USB_WIN/gettime.c \
+	# inference-engine/thirdparty/movidius/USB_WIN/usb_winusb.c \
+	# inference-engine/thirdparty/movidius/WinPthread/win_pthread.c \
+	# inference-engine/thirdparty/movidius/WinPthread/win_semaphore.c \
 
 LOCAL_C_INCLUDES += \
+	$(LOCAL_PATH)/inference-engine/thirdparty/movidius/mvnc \
 	$(LOCAL_PATH)/inference-engine/thirdparty/movidius/mvnc/include \
+	$(LOCAL_PATH)/inference-engine/thirdparty/movidius/shared \
 	$(LOCAL_PATH)/inference-engine/thirdparty/movidius/shared/include \
+	$(LOCAL_PATH)/inference-engine/thirdparty/movidius/watchdog \
+	$(LOCAL_PATH)/inference-engine/thirdparty/movidius/XLink \
 	$(LOCAL_PATH)/inference-engine/thirdparty/movidius/XLink/pc \
 	$(LOCAL_PATH)/inference-engine/thirdparty/movidius/XLink/shared \
 	$(LIBUSB_HEADER) \
-	$(LOCAL_PATH)/../../../../../../../external/libusb \
-	$(LOCAL_PATH)/../../../../../../../external/libusb/libusb
+	$(LOCAL_PATH)/../../../../../external/libusb \
+	$(LOCAL_PATH)/../../../../../external/libusb/libusb \
+	# $(LOCAL_PATH)/inference-engine/thirdparty/movidius/WinPthread \
+	# $(LOCAL_PATH)/inference-engine/thirdparty/movidius/USB_WIN \
 
 XLINK_CFLAGS:= -I$(XLINK_BASE)/shared \
 							 -I$(XLINK_BASE)/pc \
@@ -47,10 +52,13 @@ LOCAL_CFLAGS += \
 	-Wformat \
 	-Wformat-security \
 	-fstack-protector-strong \
-	-D_FORTIFY_SOURCE=2
+	-fno-exceptions \
+	-frtti \
+	-fexceptions
 
 LOCAL_CFLAGS += \
 	-DENABLE_MYRIAD=1 \
+	-DENABLE_VPU \
 	-DENABLE_OBJECT_DETECTION_TESTS=1 \
 	-DENABLE_SEGMENTATION_TESTS=1 \
 	-DHAVE_STRUCT_TIMESPEC \
@@ -58,11 +66,85 @@ LOCAL_CFLAGS += \
 	-DUSE_USB_VSC \
 	-D_CRT_SECURE_NO_WARNINGS \
 	-D__PC__ \
-	-D__ANDROID__
+	-D__ANDROID__ \
+	-D_FORTIFY_SOURCE=2 \
 
-LOCAL_SHARED_LIBRARIES := libusb1.0 liblog
+LOCAL_SHARED_LIBRARIES := libusb liblog
+LOCAL_STATIC_LIBRARIES := libXLink
+
 
 include $(BUILD_SHARED_LIBRARY)
+##########################################################################
+
+include $(CLEAR_VARS)
+
+LOCAL_MODULE := libXLink
+LOCAL_PROPRIETARY_MODULE := true
+# LOCAL_MULTILIB := both
+LOCAL_MULTILIB := 64
+LOCAL_MODULE_OWNER := intel
+
+
+LOCAL_SRC_FILES := \
+	inference-engine/thirdparty/movidius/XLink/pc/pcie_host.c \
+	inference-engine/thirdparty/movidius/XLink/pc/usb_boot.c \
+	inference-engine/thirdparty/movidius/XLink/pc/XLinkPlatform.c \
+	inference-engine/thirdparty/movidius/XLink/shared/XLink.c \
+	inference-engine/thirdparty/movidius/XLink/shared/XLinkDispatcher.c \
+
+LOCAL_C_INCLUDES += \
+	$(LOCAL_PATH)/inference-engine/include \
+	$(LOCAL_PATH)/inference-engine/src/inference_engine \
+	$(LOCAL_PATH)/inference-engine/thirdparty/movidius/XLink \
+	$(LOCAL_PATH)/inference-engine/thirdparty/movidius/XLink/pc \
+	$(LOCAL_PATH)/inference-engine/thirdparty/movidius/XLink/shared \
+	$(LOCAL_PATH)/inference-engine/thirdparty/movidius/shared \
+	$(LOCAL_PATH)/inference-engine/thirdparty/movidius/shared/include \
+	$(LIBUSB_HEADER) \
+	$(LOCAL_PATH)/../../../../../external/libusb \
+	$(LOCAL_PATH)/../../../../../external/libusb/libusb \
+
+XLINK_CFLAGS:= -I$(XLINK_BASE)/shared \
+							 -I$(XLINK_BASE)/pc \
+							 -I$(MV_COMMON_BASE)/shared/include
+
+LOCAL_CFLAGS += \
+	-fvisibility=default \
+	-Wno-error \
+	-O2 \
+	-Wall \
+	-pthread \
+	-fPIE \
+	-fPIC \
+	-MMD \
+	-MP \
+	-Wformat \
+	-Wformat-security \
+	-fstack-protector-strong \
+	-fno-exceptions \
+	-frtti \
+	-fexceptions
+
+LOCAL_CFLAGS += \
+	-DENABLE_MYRIAD=1 \
+	-DENABLE_VPU \
+	-DENABLE_OBJECT_DETECTION_TESTS=1 \
+	-DENABLE_SEGMENTATION_TESTS=1 \
+	-DHAVE_STRUCT_TIMESPEC \
+	-DDEVICE_SHELL_ENABLED \
+	-DUSE_USB_VSC \
+	-D_CRT_SECURE_NO_WARNINGS \
+	-D__PC__ \
+	-D__ANDROID__ \
+	-D_FORTIFY_SOURCE=2 \
+
+LOCAL_SHARED_LIBRARIES := libusb liblog
+LOCAL_STATIC_LIBRARIES :=
+
+include $(BUILD_STATIC_LIBRARY)
+
+#########################################################################
+
 ####################################################
 #include $(BUILD_STATIC_LIBRARY)
 $(info LOCAL_PATH =$(LOCAL_PATH))

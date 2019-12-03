@@ -13,7 +13,7 @@ LOCAL_C_INCLUDES += \
 	$(LOCAL_PATH)/inference-engine/thirdparty/mkl-dnn/src/common \
 	$(LOCAL_PATH)/inference-engine/thirdparty/mkl-dnn/src/cpu \
 	$(LOCAL_PATH)/inference-engine/thirdparty/mkl-dnn/src/cpu/gemm \
-	$(LOCAL_PATH)/inference-engine/thirdparty/mkl-dnn/src/cpu/xbyak
+	$(LOCAL_PATH)/inference-engine/thirdparty/mkl-dnn/src/cpu/xbyak \
 
 LOCAL_C_INCLUDES += \
 	$(LOCAL_PATH)/inference-engine/include \
@@ -44,18 +44,18 @@ LOCAL_CFLAGS += \
 	-Wno-unused-parameter \
 	-Wno-non-virtual-dtor \
 	-Wno-missing-field-initializers \
-	-D_FORTIFY_SOURCE=2
+	-D_FORTIFY_SOURCE=2 \
+	-DCI_BUILD_NUMBER='""'
 
 LOCAL_CFLAGS += \
 	-DENABLE_MKL_DNN \
-	-DMKLDNN_OPENMP \
-	-DIE_THREAD=1 \
-	-DIE_THREAD_OMP=1 \
 	-DMKL_VERSION=\"v0.15_beta\" \
 	-DMKLDNN_DEPRECATED_ROI \
 	-DNDEBUG \
 	-D__ANDROID__ -DNNLOG -DDEBUG \
-	-DIMPLEMENT_INFERENCE_ENGINE_API
+	-DIMPLEMENT_INFERENCE_ENGINE_API \
+	-DIMPLEMENT_INFERENCE_ENGINE_PLUGIN \
+	-DIE_THREAD=IE_THREAD_OMP \
 
 LOCAL_STATIC_LIBRARIES := libomp
 LOCAL_SHARED_LIBRARIES := liblog libinference_engine libmkldnn
@@ -107,6 +107,8 @@ inference-engine/src/mkldnn_plugin/nodes/mkldnn_tile_node.cpp \
 inference-engine/src/mkldnn_plugin/utils/blob_dump.cpp \
 inference-engine/src/mkldnn_plugin/mkldnn/iml_type_mapper.cpp \
 inference-engine/src/mkldnn_plugin/mkldnn/omp_manager.cpp \
+inference-engine/src/mkldnn_plugin/nodes/mkldnn_bin_conv_node.cpp \
+inference-engine/src/mkldnn_plugin/nodes/mkldnn_quantize_node.cpp
 
 
 
