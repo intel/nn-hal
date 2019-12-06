@@ -70,7 +70,6 @@ LOCAL_SHARED_LIBRARIES := \
 	libhidlmemory \
 	android.hardware.neuralnetworks@1.0 \
 	android.hardware.neuralnetworks@1.1 \
-	android.hardware.neuralnetworks@1.2 \
 	android.hidl.allocator@1.0 \
 	android.hidl.memory@1.0 \
 	libinference_engine

@@ -144,7 +144,7 @@ LOCAL_CFLAGS += -DENABLE_MKL_DNN -D__ANDROID__ -DNDEBUG -DIMPLEMENT_INFERENCE_EN
 #set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/cpu_x86_sse42/ie_preprocess_data_sse42.cpp PROPERTIES COMPILE_FLAGS -msse4.2)
 
 LOCAL_SHARED_LIBRARIES := liblog
-LOCAL_STATIC_LIBRARIES := libpugixml libade
+LOCAL_STATIC_LIBRARIES := libpugixml libade libomp
 
 include $(BUILD_SHARED_LIBRARY)
 ##########################################################################
@@ -205,7 +205,7 @@ LOCAL_C_INCLUDES += \
 	$(LOCAL_PATH)/inference-engine/include \
 	$(LOCAL_PATH)/inference-engine/src/inference_engine \
 	$(LOCAL_PATH)/../ade/sources/ade/include \
-	$(LOCAL_PATH)/..//ade/sources/ade/include/ade \
+	$(LOCAL_PATH)/../ade/sources/ade/include/ade \
 	$(LOCAL_PATH)/../ade/sources/ade/include/ade/communication \
 	$(LOCAL_PATH)/../ade/sources/ade/include/ade/execution_engine \
 	$(LOCAL_PATH)/../ade/sources/ade/include/ade/helpers \

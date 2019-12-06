@@ -10,6 +10,7 @@ include $(LOCAL_PATH)/ie.mk
 include $(MY_LOCAL_PATH)/mkldnn_plugin.mk
 
 include $(MY_LOCAL_PATH)/mkldnn.mk
+include $(MY_LOCAL_PATH)/cpu_extension.mk
 
 #include $(LOCAL_PATH)/format_reader.mk
 #include $(LOCAL_PATH)/prebuild.mk
