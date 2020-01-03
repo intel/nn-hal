@@ -247,7 +247,7 @@ class ExecuteNetwork {
     ResponseDesc resp = {};
 
 public:
-    ExecuteNetwork() : network(nullptr) {}
+    ExecuteNetwork() : network(nullptr), enginePtr(nullptr) {}
     ExecuteNetwork(IRDocument &doc, TargetDevice target = TargetDevice::eCPU) : network(nullptr), executable_network(), req(nullptr), inferRequest() {
         InferenceEngine::PluginDispatcher dispatcher(
             {"/vendor/lib64", "/vendor/lib", "/system/lib64", "/system/lib", "", "./"});
