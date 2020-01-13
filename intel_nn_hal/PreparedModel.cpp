@@ -183,7 +183,7 @@ namespace neuralnetworks {
 namespace nnhal {
 
 using namespace android::nn;
-//using time_point = std::chrono::steady_clock::time_point;
+// using time_point = std::chrono::steady_clock::time_point;
 
 static const Timing kNoTiming = {.timeOnDevice = UINT64_MAX, .timeInDriver = UINT64_MAX};
 
@@ -1235,7 +1235,9 @@ static Return<void> notify(const sp<V1_2::IExecutionCallback>& callback, const E
     return callback->notify_1_2(status, outputShapes, timing);
 }
 
-void PreparedModel::asyncExecute(const Request& request, MeasureTiming measure, time_point driverStart, const sp<V1_0::IExecutionCallback>& callback) {
+void PreparedModel::asyncExecute(const Request& request, MeasureTiming measure,
+                                 time_point driverStart,
+                                 const sp<V1_0::IExecutionCallback>& callback) {
     std::vector<RunTimePoolInfo> requestPoolInfos;
     if (!setRunTimePoolInfosFromHidlMemories(&requestPoolInfos, request.pools)) {
         notify(callback, ErrorStatus::GENERAL_FAILURE, {}, kNoTiming);
@@ -1307,10 +1309,10 @@ void PreparedModel::asyncExecute(const Request& request, MeasureTiming measure, 
     }
 
     InferenceEngine::TBlob<float>::Ptr outBlob =
-            enginePtr->getBlob(mPorts[mModel.outputIndexes[0]]->name);
-    
+        enginePtr->getBlob(mPorts[mModel.outputIndexes[0]]->name);
+
     InferenceEngine::TBlob<float>::Ptr inBlob =
-            enginePtr->getBlob(mPorts[mModel.inputIndexes[0]]->name);
+        enginePtr->getBlob(mPorts[mModel.inputIndexes[0]]->name);
     hidl_vec<OutputShape> outputShapes;
 #ifdef NN_DEBUG
     {
@@ -1324,7 +1326,7 @@ void PreparedModel::asyncExecute(const Request& request, MeasureTiming measure, 
 
         VLOG(L1, "Model input0 are:");
         const RunTimeOperandInfo& input = mOperands[mModel.inputIndexes[0]];
-        
+
         nelem = (inBlob->size() > 20 ? 20 : inBlob->size());
         for (int i = 0; i < nelem; i++) {
             VLOG(L1, "inBlob elements %d = %f", i, inBlob->readOnly()[i]);
@@ -1345,7 +1347,9 @@ void PreparedModel::asyncExecute(const Request& request, MeasureTiming measure, 
         ALOGE("hidl callback failed to return properly: %s", returned.description().c_str());
     }
 }
-void PreparedModel::asyncExecute_1_2(const Request& request, MeasureTiming measure, time_point driverStart, const sp<V1_2::IExecutionCallback>& callback) {
+void PreparedModel::asyncExecute_1_2(const Request& request, MeasureTiming measure,
+                                     time_point driverStart,
+                                     const sp<V1_2::IExecutionCallback>& callback) {
     std::vector<RunTimePoolInfo> requestPoolInfos;
     if (!setRunTimePoolInfosFromHidlMemories(&requestPoolInfos, request.pools)) {
         notify(callback, ErrorStatus::GENERAL_FAILURE, {}, kNoTiming);
@@ -1417,10 +1421,10 @@ void PreparedModel::asyncExecute_1_2(const Request& request, MeasureTiming measu
     }
 
     InferenceEngine::TBlob<float>::Ptr outBlob =
-            enginePtr->getBlob(mPorts[mModel.outputIndexes[0]]->name);
-    
+        enginePtr->getBlob(mPorts[mModel.outputIndexes[0]]->name);
+
     InferenceEngine::TBlob<float>::Ptr inBlob =
-            enginePtr->getBlob(mPorts[mModel.inputIndexes[0]]->name);
+        enginePtr->getBlob(mPorts[mModel.inputIndexes[0]]->name);
     hidl_vec<OutputShape> outputShapes;
 #ifdef NN_DEBUG
     {
@@ -1434,7 +1438,7 @@ void PreparedModel::asyncExecute_1_2(const Request& request, MeasureTiming measu
 
         VLOG(L1, "Model input0 are:");
         const RunTimeOperandInfo& input = mOperands[mModel.inputIndexes[0]];
-        
+
         nelem = (inBlob->size() > 20 ? 20 : inBlob->size());
         for (int i = 0; i < nelem; i++) {
             VLOG(L1, "inBlob elements %d = %f", i, inBlob->readOnly()[i]);
@@ -1456,8 +1460,8 @@ void PreparedModel::asyncExecute_1_2(const Request& request, MeasureTiming measu
     }
 }
 
-Return<ErrorStatus> PreparedModel::executeBase(const Request& request, MeasureTiming measure, 
-                                 const sp<V1_0::IExecutionCallback>& callback) {
+Return<ErrorStatus> PreparedModel::executeBase(const Request& request, MeasureTiming measure,
+                                               const sp<V1_0::IExecutionCallback>& callback) {
     VLOG(L1, "executebase");
 
     time_point driverStart;
@@ -1476,14 +1480,13 @@ Return<ErrorStatus> PreparedModel::executeBase(const Request& request, MeasureTi
     // is expected to live forever.
     std::thread([this, request, measure, driverStart, callback] {
         asyncExecute(request, measure, driverStart, callback);
-    })
-            .detach();
+    }).detach();
 
     return ErrorStatus::NONE;
 }
 
-Return<ErrorStatus> PreparedModel::executeBase_1_2(const Request& request, MeasureTiming measure, 
-                                 const sp<V1_2::IExecutionCallback>& callback) {
+Return<ErrorStatus> PreparedModel::executeBase_1_2(const Request& request, MeasureTiming measure,
+                                                   const sp<V1_2::IExecutionCallback>& callback) {
     VLOG(L1, "executebase");
 
     time_point driverStart;
@@ -1502,8 +1505,7 @@ Return<ErrorStatus> PreparedModel::executeBase_1_2(const Request& request, Measu
     // is expected to live forever.
     std::thread([this, request, measure, driverStart, callback] {
         asyncExecute_1_2(request, measure, driverStart, callback);
-    })
-            .detach();
+    }).detach();
 
     return ErrorStatus::NONE;
 }
@@ -1515,14 +1517,13 @@ Return<ErrorStatus> PreparedModel::execute(const Request& request,
 }
 
 Return<ErrorStatus> PreparedModel::execute_1_2(const Request& request, MeasureTiming measure,
-                                                     const sp<V1_2::IExecutionCallback>& callback) {
+                                               const sp<V1_2::IExecutionCallback>& callback) {
     VLOG(L1, "Begin to execute_1_2");
     return executeBase_1_2(request, measure, callback);
 }
 
-Return<void> PreparedModel::executeSynchronously(const Request& request,
-                                                       MeasureTiming measure,
-                                                       executeSynchronously_cb cb) {
+Return<void> PreparedModel::executeSynchronously(const Request& request, MeasureTiming measure,
+                                                 executeSynchronously_cb cb) {
     VLOG(L1, "Begin to executeSynchronously");
     time_point driverStart, driverEnd, deviceStart, deviceEnd;
     if (measure == MeasureTiming::YES) driverStart = now();
@@ -1598,10 +1599,10 @@ Return<void> PreparedModel::executeSynchronously(const Request& request,
     }
 
     InferenceEngine::TBlob<float>::Ptr outBlob =
-            enginePtr->getBlob(mPorts[mModel.outputIndexes[0]]->name);
-    
+        enginePtr->getBlob(mPorts[mModel.outputIndexes[0]]->name);
+
     InferenceEngine::TBlob<float>::Ptr inBlob =
-            enginePtr->getBlob(mPorts[mModel.inputIndexes[0]]->name);
+        enginePtr->getBlob(mPorts[mModel.inputIndexes[0]]->name);
     hidl_vec<OutputShape> outputShapes;
 #ifdef NN_DEBUG
     {
@@ -1615,7 +1616,7 @@ Return<void> PreparedModel::executeSynchronously(const Request& request,
 
         VLOG(L1, "Model input0 are:");
         const RunTimeOperandInfo& input = mOperands[mModel.inputIndexes[0]];
-        
+
         nelem = (inBlob->size() > 20 ? 20 : inBlob->size());
         for (int i = 0; i < nelem; i++) {
             VLOG(L1, "inBlob elements %d = %f", i, inBlob->readOnly()[i]);
@@ -1644,7 +1645,7 @@ Return<void> PreparedModel::executeSynchronously(const Request& request,
 //     public:
 //     BurstExecutorWithCache(V1_2::IPreparedModel* preparedModel)
 //         : mPreparedModel(preparedModel){}
-    
+
 //     bool isCacheEntryPresent(int32_t slot) const override {
 //         const auto it = mMemoryCache.find(slot);
 //         return (it != mMemoryCache.end()) && it->second.has_valid();
@@ -1684,88 +1685,88 @@ Return<void> PreparedModel::executeSynchronously(const Request& request,
 //         requestPoolInfos.reserve(slots.size());
 //         std::transform(slots.begin(), slots.end(), std::back_inserter(requestPoolInfos),
 //                        [this](int32_t slot) { return *mMemoryCache[slot]; });
-        //execution
-        // if (measure == MeasureTiming::YES) deviceStart = now();
-        // auto inOutData = [this, &requestPoolInfos](const std::vector<uint32_t>& indexes,
-        //                                        const hidl_vec<RequestArgument>& arguments,
-        //                                        bool inputFromRequest, ExecuteNetwork* enginePtr,
-        //                                        std::vector<OutputPort> mPorts) {
-        //     // do memcpy for input data
-        //     for (size_t i = 0; i < indexes.size(); i++) {
-        //         RunTimeOperandInfo& operand = mOperands[indexes[i]];
-        //         const RequestArgument& arg = arguments[i];
-        //         auto poolIndex = arg.location.poolIndex;
-        //         nnAssert(poolIndex < requestPoolInfos.size());
-        //         auto& r = requestPoolInfos[poolIndex];
-        //         if (arg.dimensions.size() > 0) {
-        //             // It's the responsibility of the caller to validate that
-        //             // from.dimensions only modifies the dimensions that were
-        //             // unspecified in the model.  That's the case in SampleDriver.cpp
-        //             // with the call to validateRequest().
-        //             operand.dimensions = arg.dimensions;
-        //         }
-        //         operand.buffer = r.buffer + arg.location.offset;  // r.getBuffer()
-        //         operand.length = arg.location.length;  // sizeOfData(operand.type, operand.dimensions);
+// execution
+// if (measure == MeasureTiming::YES) deviceStart = now();
+// auto inOutData = [this, &requestPoolInfos](const std::vector<uint32_t>& indexes,
+//                                        const hidl_vec<RequestArgument>& arguments,
+//                                        bool inputFromRequest, ExecuteNetwork* enginePtr,
+//                                        std::vector<OutputPort> mPorts) {
+//     // do memcpy for input data
+//     for (size_t i = 0; i < indexes.size(); i++) {
+//         RunTimeOperandInfo& operand = mOperands[indexes[i]];
+//         const RequestArgument& arg = arguments[i];
+//         auto poolIndex = arg.location.poolIndex;
+//         nnAssert(poolIndex < requestPoolInfos.size());
+//         auto& r = requestPoolInfos[poolIndex];
+//         if (arg.dimensions.size() > 0) {
+//             // It's the responsibility of the caller to validate that
+//             // from.dimensions only modifies the dimensions that were
+//             // unspecified in the model.  That's the case in SampleDriver.cpp
+//             // with the call to validateRequest().
+//             operand.dimensions = arg.dimensions;
+//         }
+//         operand.buffer = r.buffer + arg.location.offset;  // r.getBuffer()
+//         operand.length = arg.location.length;  // sizeOfData(operand.type, operand.dimensions);
 
-        //         VLOG(L1, "Copy request input/output to model input/output");
-        //         if (inputFromRequest) {
-        //             auto inputBlob = GetInOutOperandAsBlob(
-        //                 operand, const_cast<uint8_t*>(r.buffer + arg.location.offset),
-        //                 operand.length);  // if not doing memcpy
-        //             VLOG(L1, "setBlob for mPorts[%d]->name %s", indexes[i],
-        //                 mPorts[indexes[i]]->name.c_str());
-        //             enginePtr->setBlob(mPorts[indexes[i]]->name,
-        //                             inputBlob);  // setInputBlob(const std::string &,IRBlob::Ptr);
+//         VLOG(L1, "Copy request input/output to model input/output");
+//         if (inputFromRequest) {
+//             auto inputBlob = GetInOutOperandAsBlob(
+//                 operand, const_cast<uint8_t*>(r.buffer + arg.location.offset),
+//                 operand.length);  // if not doing memcpy
+//             VLOG(L1, "setBlob for mPorts[%d]->name %s", indexes[i],
+//                 mPorts[indexes[i]]->name.c_str());
+//             enginePtr->setBlob(mPorts[indexes[i]]->name,
+//                             inputBlob);  // setInputBlob(const std::string &,IRBlob::Ptr);
 
-        //         } else {
-        //             auto outputBlob = GetInOutOperandAsBlob(
-        //                 operand, const_cast<uint8_t*>(r.buffer + arg.location.offset),
-        //                 operand.length);  // if not doing memcpy
-        //             enginePtr->setBlob(mPorts[indexes[i]]->name, outputBlob);
-        //         }
-        //     }
-        // };
+//         } else {
+//             auto outputBlob = GetInOutOperandAsBlob(
+//                 operand, const_cast<uint8_t*>(r.buffer + arg.location.offset),
+//                 operand.length);  // if not doing memcpy
+//             enginePtr->setBlob(mPorts[indexes[i]]->name, outputBlob);
+//         }
+//     }
+// };
 
-        // compile it
+// compile it
 
-        // InfEng inference_engine(InferenceEngine::TargetDevice::eMYRIAD);
+// InfEng inference_engine(InferenceEngine::TargetDevice::eMYRIAD);
 
-        // auto executeNet1 = inference_engine.Compile(mNet);
+// auto executeNet1 = inference_engine.Compile(mNet);
 
-    //     VLOG(L1, "pass request inputs/outputs buffer to network/model respectively");
+//     VLOG(L1, "pass request inputs/outputs buffer to network/model respectively");
 
-    //     inOutData(mModel.inputIndexes, request.inputs, true, enginePtr, mPorts);
-    //     inOutData(mModel.outputIndexes, request.outputs, false, enginePtr, mPorts);
+//     inOutData(mModel.inputIndexes, request.inputs, true, enginePtr, mPorts);
+//     inOutData(mModel.outputIndexes, request.outputs, false, enginePtr, mPorts);
 
-    //     VLOG(L1, "Run");
+//     VLOG(L1, "Run");
 
-    //     enginePtr->Infer();
-    //     if (measure == MeasureTiming::YES) deviceEnd = now();
+//     enginePtr->Infer();
+//     if (measure == MeasureTiming::YES) deviceEnd = now();
 
-    //     VLOG(L1, "update shared memories");
-    //     for (auto runtimeInfo : requestPoolInfos) {
-    //         runtimeInfo.update();
-    //     }
+//     VLOG(L1, "update shared memories");
+//     for (auto runtimeInfo : requestPoolInfos) {
+//         runtimeInfo.update();
+//     }
 
-    //     InferenceEngine::TBlob<float>::Ptr outBlob =
-    //             enginePtr->getBlob(mPorts[mModel.outputIndexes[0]]->name);
-        
-    //     InferenceEngine::TBlob<float>::Ptr inBlob =
-    //             enginePtr->getBlob(mPorts[mModel.inputIndexes[0]]->name);
+//     InferenceEngine::TBlob<float>::Ptr outBlob =
+//             enginePtr->getBlob(mPorts[mModel.outputIndexes[0]]->name);
 
-    // #ifdef NN_DEBUG
-    //     {
-    //         VLOG(L1, "Model output0 are:");
-    //         const RunTimeOperandInfo& output = mOperands[mModel.outputIndexes[0]];
+//     InferenceEngine::TBlob<float>::Ptr inBlob =
+//             enginePtr->getBlob(mPorts[mModel.inputIndexes[0]]->name);
 
-    //         auto nelem = (outBlob->size() > 20 ? 20 : outBlob->size());
-    //         for (int i = 0; i < nelem; i++) {
-    //             VLOG(L1, "outBlob elements %d = %f", i, outBlob->readOnly()[i]);
-    //         }
+// #ifdef NN_DEBUG
+//     {
+//         VLOG(L1, "Model output0 are:");
+//         const RunTimeOperandInfo& output = mOperands[mModel.outputIndexes[0]];
 
-    //         VLOG(L1, "Model input0 are:");
+//         auto nelem = (outBlob->size() > 20 ? 20 : outBlob->size());
+//         for (int i = 0; i < nelem; i++) {
+//             VLOG(L1, "outBlob elements %d = %f", i, outBlob->readOnly()[i]);
+//         }
+
+//         VLOG(L1, "Model input0 are:");
 //             const RunTimeOperandInfo& input = mOperands[mModel.inputIndexes[0]];
-            
+
 //             nelem = (inBlob->size() > 20 ? 20 : inBlob->size());
 //             for (int i = 0; i < nelem; i++) {
 //                 VLOG(L1, "inBlob elements %d = %f", i, inBlob->readOnly()[i]);
@@ -1775,8 +1776,10 @@ Return<void> PreparedModel::executeSynchronously(const Request& request,
 //         Return<void> returned;
 //         if (measureTiming == MeasureTiming::YES) {
 //             driverEnd = now();
-//             Timing timing = {.timeOnDevice = uint64_t(microsecondsDuration(deviceEnd, deviceStart)),
-//                             .timeInDriver = uint64_t(microsecondsDuration(driverEnd, driverStart))};
+//             Timing timing = {.timeOnDevice = uint64_t(microsecondsDuration(deviceEnd,
+//             deviceStart)),
+//                             .timeInDriver = uint64_t(microsecondsDuration(driverEnd,
+//                             driverStart))};
 //             VLOG(L1, "BurstExecutorWithCache::execute timing = %s", toString(timing));
 //             std::make_tuple(ErrorStatus::NONE, outBlob, timing);
 //         } else {
@@ -1789,10 +1792,9 @@ Return<void> PreparedModel::executeSynchronously(const Request& request,
 // }
 
 Return<void> PreparedModel::configureExecutionBurst(
-        const sp<V1_2::IBurstCallback>& callback,
-        const MQDescriptorSync<V1_2::FmqRequestDatum>& requestChannel,
-        const MQDescriptorSync<V1_2::FmqResultDatum>& resultChannel,
-        configureExecutionBurst_cb cb) {
+    const sp<V1_2::IBurstCallback>& callback,
+    const MQDescriptorSync<V1_2::FmqRequestDatum>& requestChannel,
+    const MQDescriptorSync<V1_2::FmqResultDatum>& resultChannel, configureExecutionBurst_cb cb) {
     VLOG(L1, "Driver::configureExecutionBurst");
 
     // Alternatively, the burst could be configured via:
@@ -3810,7 +3812,7 @@ IRBlob::Ptr CpuPreparedModel::GetConstWeightsOperandAsTensor(uint32_t index) {
         Layout layout;
         if (op.dimensions.size() == 4) {
             // order = {0,3,1,2};  //nhwc -> nchw
-            order = {3, 0, 1, 2};  // IHWO -> OIHW for depth conv
+            order = {3, 0, 1, 2};   // IHWO -> OIHW for depth conv
             layout = Layout::OIHW;  // weights layout
         } else if (op.dimensions.size() == 2) {
             order = {0, 1};
@@ -3900,7 +3902,7 @@ IRBlob::Ptr CpuPreparedModel::GetConstOperandAsTensor(int operand_idx, int opera
         vec<unsigned int> order;
         Layout layout;
         if (op.dimensions.size() == 4) {
-            order = {0, 3, 1, 2};  // nhwc -> nchw
+            order = {0, 3, 1, 2};   // nhwc -> nchw
             layout = Layout::OIHW;  // weights layout
         } else if (op.dimensions.size() == 2) {
             order = {0, 1};
@@ -4076,31 +4078,24 @@ Blob::Ptr CpuPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const 
     return nullptr;
 }
 
-Blob::Ptr GpuPreparedModel::GetConstOperandAsTensor(int operand_idx, int operation_idx)
-{
+Blob::Ptr GpuPreparedModel::GetConstOperandAsTensor(int operand_idx, int operation_idx) {
     dumpOperand(operand_idx);
     const auto op = mModel.operands[operand_idx];
     uint32_t len = 0;
 
     const uint8_t* buf = GetOperandMemory(mModel, operand_idx, len);
 
-    if (OperandType::TENSOR_FLOAT32 == op.type || OperandType::FLOAT32 == op.type)
-    {
+    if (OperandType::TENSOR_FLOAT32 == op.type || OperandType::FLOAT32 == op.type) {
         vec<unsigned int> order;
         Layout layout;
 
-        if (op.dimensions.size() == 4)
-        {
-            order = {0, 3, 1, 2};  // nhwc -> nchw
+        if (op.dimensions.size() == 4) {
+            order = {0, 3, 1, 2};   // nhwc -> nchw
             layout = Layout::OIHW;  // weights layout
-        }
-        else if (op.dimensions.size() == 2)
-        {
+        } else if (op.dimensions.size() == 2) {
             order = {0, 1};
             layout = Layout::NC;
-        }
-        else
-        {
+        } else {
             order = {0};  //(op.dimensions.size() < 2)
             layout = Layout::C;
         }
@@ -4108,20 +4103,19 @@ Blob::Ptr GpuPreparedModel::GetConstOperandAsTensor(int operand_idx, int operati
         auto inputDims = toDims(op.dimensions);
         TensorDesc td(InferenceEngine::Precision::FP32, permuteDims(inputDims, order), layout);
 
-        if (nullptr == buf)
-        {
-            InferenceEngine::TBlob<float>::Ptr blob = std::make_shared<InferenceEngine::TBlob<float> >(td);
+        if (nullptr == buf) {
+            InferenceEngine::TBlob<float>::Ptr blob =
+                std::make_shared<InferenceEngine::TBlob<float>>(td);
             blob->allocate();
             return blob;
-        }
-        else
-        {
-            if (inputDims.size() != 4)
-            {
-                InferenceEngine::TBlob<float>::Ptr blob = std::make_shared<InferenceEngine::TBlob<float> >(td, (float*)buf, len);
+        } else {
+            if (inputDims.size() != 4) {
+                InferenceEngine::TBlob<float>::Ptr blob =
+                    std::make_shared<InferenceEngine::TBlob<float>>(td, (float*)buf, len);
                 return blob;
             } else {
-                InferenceEngine::TBlob<float>::Ptr blob = std::make_shared<InferenceEngine::TBlob<float> >(td);
+                InferenceEngine::TBlob<float>::Ptr blob =
+                    std::make_shared<InferenceEngine::TBlob<float>>(td);
                 blob->allocate();
 
                 const auto& dims_ohwi = inputDims;  // toDims(op.dimensions);
@@ -4129,20 +4123,17 @@ Blob::Ptr GpuPreparedModel::GetConstOperandAsTensor(int operand_idx, int operati
                 const size_t in_depth = dims_ohwi[3];
                 const size_t height = dims_ohwi[1];
                 const size_t width = dims_ohwi[2];
-                const float* inputFilter = reinterpret_cast<const float*>(buf);  // OHWI memory layout
+                const float* inputFilter =
+                    reinterpret_cast<const float*>(buf);  // OHWI memory layout
                 size_t offset = 0;  // blob->size() == o*i*h*w and simlar to nchw memory layout
 
-                for (size_t o = 0; o < out_depth; o++)
-                {
-                    for (size_t i = 0; i < in_depth; i++)
-                    {
-                        for (size_t h = 0; h < height; h++)
-                        {
-                            for (size_t w = 0; w < width; w++)
-                            {
+                for (size_t o = 0; o < out_depth; o++) {
+                    for (size_t i = 0; i < in_depth; i++) {
+                        for (size_t h = 0; h < height; h++) {
+                            for (size_t w = 0; w < width; w++) {
                                 const size_t offset_ohwi = o * height * width * in_depth +
-                                                     h * width * in_depth + w * in_depth +
-                                                     i;  // similar to NHWC memory layout
+                                                           h * width * in_depth + w * in_depth +
+                                                           i;  // similar to NHWC memory layout
                                 blob->buffer().as<float*>()[offset++] = inputFilter[offset_ohwi];
                             }
                         }
@@ -4152,53 +4143,41 @@ Blob::Ptr GpuPreparedModel::GetConstOperandAsTensor(int operand_idx, int operati
                 return blob;
             }
         }
-    }
-    else if (OperandType::TENSOR_INT32 == op.type)
-    {
+    } else if (OperandType::TENSOR_INT32 == op.type) {
         TensorDesc td(InferenceEngine::Precision::I32, toDims(op.dimensions), Layout::ANY);
 
-        if (nullptr == buf)
-        {
-            InferenceEngine::TBlob<float>::Ptr blob = std::make_shared<InferenceEngine::TBlob<float> >(td);
+        if (nullptr == buf) {
+            InferenceEngine::TBlob<float>::Ptr blob =
+                std::make_shared<InferenceEngine::TBlob<float>>(td);
             blob->allocate();
             return blob;
-        }
-        else
-        {
-            InferenceEngine::TBlob<float>::Ptr blob = std::make_shared<InferenceEngine::TBlob<float> >(td, (float*)buf, len);
+        } else {
+            InferenceEngine::TBlob<float>::Ptr blob =
+                std::make_shared<InferenceEngine::TBlob<float>>(td, (float*)buf, len);
             return blob;
         }
-    }
-    else
-    {
+    } else {
         nnAssert(false);
     }
 
     return nullptr;
 }
 
-Blob::Ptr GpuPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const uint8_t* buf, uint32_t& len)
-{
-    if (OperandType::TENSOR_FLOAT32 == op.type || OperandType::FLOAT32 == op.type)
-    {
-        if (op.lifetime == OperandLifeTime::MODEL_INPUT)
-        {
+Blob::Ptr GpuPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const uint8_t* buf,
+                                                  uint32_t& len) {
+    if (OperandType::TENSOR_FLOAT32 == op.type || OperandType::FLOAT32 == op.type) {
+        if (op.lifetime == OperandLifeTime::MODEL_INPUT) {
             vec<unsigned int> order;
             Layout layout;
 
-            if (op.dimensions.size() == 4)
-            {
+            if (op.dimensions.size() == 4) {
                 order = {0, 3, 1, 2};  // nhwc -> nchw
                 layout = Layout::NCHW;
                 // layout = Layout::NHWC;
-            }
-            else if (op.dimensions.size() == 2)
-            {
+            } else if (op.dimensions.size() == 2) {
                 order = {0, 1};
                 layout = Layout::NC;
-            }
-            else
-            {
+            } else {
                 order = {0};  //(op.dimensions.size() < 2)
                 layout = Layout::C;
             }
@@ -4206,22 +4185,19 @@ Blob::Ptr GpuPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const 
             auto inputDims = toDims(op.dimensions);
             TensorDesc td(InferenceEngine::Precision::FP32, permuteDims(inputDims, order), layout);
 
-            if (buf == nullptr)
-            {
-                InferenceEngine::TBlob<float>::Ptr blob = std::make_shared<InferenceEngine::TBlob<float> >(td);
+            if (buf == nullptr) {
+                InferenceEngine::TBlob<float>::Ptr blob =
+                    std::make_shared<InferenceEngine::TBlob<float>>(td);
                 blob->allocate();
                 return blob;
-            }
-            else
-            {
-                if (inputDims.size() != 4)
-                {
-                    InferenceEngine::TBlob<float>::Ptr blob = std::make_shared<InferenceEngine::TBlob<float> >(td, (float*)buf, len);
+            } else {
+                if (inputDims.size() != 4) {
+                    InferenceEngine::TBlob<float>::Ptr blob =
+                        std::make_shared<InferenceEngine::TBlob<float>>(td, (float*)buf, len);
                     return blob;
-                }
-                else
-                {
-                    InferenceEngine::TBlob<float>::Ptr blob = std::make_shared<InferenceEngine::TBlob<float> >(td);
+                } else {
+                    InferenceEngine::TBlob<float>::Ptr blob =
+                        std::make_shared<InferenceEngine::TBlob<float>>(td);
                     blob->allocate();
 
                     const auto& dims_nhwc = inputDims;  // toDims(op.dimensions);
@@ -4234,17 +4210,13 @@ Blob::Ptr GpuPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const 
 
                     // convert NHWC -> NCHW
 
-                    for (size_t b = 0; b < batch; b++)
-                    {
-                        for (size_t i = 0; i < in_depth; i++)
-                        {
-                            for (size_t h = 0; h < height; h++)
-                            {
-                                for (size_t w = 0; w < width; w++)
-                                {
+                    for (size_t b = 0; b < batch; b++) {
+                        for (size_t i = 0; i < in_depth; i++) {
+                            for (size_t h = 0; h < height; h++) {
+                                for (size_t w = 0; w < width; w++) {
                                     const size_t offset_nhwc = b * height * width * in_depth +
-                                                         h * width * in_depth + w * in_depth +
-                                                         i;  // similar to NHWC memory layout
+                                                               h * width * in_depth + w * in_depth +
+                                                               i;  // similar to NHWC memory layout
                                     blob->buffer().as<float*>()[offset++] = input[offset_nhwc];
                                 }
                             }
@@ -4254,79 +4226,60 @@ Blob::Ptr GpuPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const 
                     return blob;
                 }
             }
-        }
-        else if (op.lifetime == OperandLifeTime::MODEL_OUTPUT)
-        {
+        } else if (op.lifetime == OperandLifeTime::MODEL_OUTPUT) {
             vec<unsigned int> order;
             Layout layout;
 
-            if (op.dimensions.size() == 4)
-            {
+            if (op.dimensions.size() == 4) {
                 // order = {0,3,1,2};  //nhwc -> nchw
                 layout = Layout::NHWC;
-            }
-            else if (op.dimensions.size() == 2)
-            {
+            } else if (op.dimensions.size() == 2) {
                 // order = {0, 1};
                 layout = Layout::NC;
-            }
-            else
-            {
+            } else {
                 // order = {0}; //(op.dimensions.size() < 2)
                 layout = Layout::C;
             }
 
             TensorDesc td(InferenceEngine::Precision::FP32, toDims(op.dimensions), layout);  // nhwc
-            if (nullptr == buf)
-            {
-                InferenceEngine::TBlob<float>::Ptr blob = std::make_shared<InferenceEngine::TBlob<float> >(td);
+            if (nullptr == buf) {
+                InferenceEngine::TBlob<float>::Ptr blob =
+                    std::make_shared<InferenceEngine::TBlob<float>>(td);
                 blob->allocate();
                 return blob;
-            }
-            else
-            {
-                InferenceEngine::TBlob<float>::Ptr blob = InferenceEngine::make_shared_blob<float>(td, (float*)buf, len);
+            } else {
+                InferenceEngine::TBlob<float>::Ptr blob =
+                    InferenceEngine::make_shared_blob<float>(td, (float*)buf, len);
                 return blob;
             }
         }
-    }
-    else if (OperandType::TENSOR_INT32 == op.type)
-    {
+    } else if (OperandType::TENSOR_INT32 == op.type) {
         TensorDesc td(InferenceEngine::Precision::I32, toDims(op.dimensions), Layout::ANY);
-        return std::make_shared<InferenceEngine::TBlob<int32_t> >(td, (int32_t*)buf, len);
-    }
-    else
-    {
+        return std::make_shared<InferenceEngine::TBlob<int32_t>>(td, (int32_t*)buf, len);
+    } else {
         nnAssert(false);
     }
 
     return nullptr;
 }
 
-Blob::Ptr GpuPreparedModel::GetConstWeightsOperandAsTensor(uint32_t index)
-{
+Blob::Ptr GpuPreparedModel::GetConstWeightsOperandAsTensor(uint32_t index) {
     dumpOperand(index);
     const auto op = mModel.operands[index];
     uint32_t len = 0;
     const uint8_t* buf = GetOperandMemory(mModel, index, len);
 
-    if (OperandType::TENSOR_FLOAT32 == op.type || OperandType::FLOAT32 == op.type)
-    {
+    if (OperandType::TENSOR_FLOAT32 == op.type || OperandType::FLOAT32 == op.type) {
         vec<unsigned int> order;
         Layout layout;
 
-        if (op.dimensions.size() == 4)
-        {
-            order = {3, 0, 1, 2};  // IHWO -> OIHW for depth conv
+        if (op.dimensions.size() == 4) {
+            order = {3, 0, 1, 2};   // IHWO -> OIHW for depth conv
             layout = Layout::OIHW;  // weights layout
-        }
-        else if (op.dimensions.size() == 2)
-        {
+        } else if (op.dimensions.size() == 2) {
             order = {0, 1};
             layout = Layout::NC;
-        }
-        else
-        {
+        } else {
             order = {0};  //(op.dimensions.size() < 2)
             layout = Layout::C;
         }
@@ -4334,22 +4287,19 @@ Blob::Ptr GpuPreparedModel::GetConstWeightsOperandAsTensor(uint32_t index)
         auto inputDims = toDims(op.dimensions);
         TensorDesc td(InferenceEngine::Precision::FP32, permuteDims(inputDims, order), layout);
 
-        if (buf == nullptr)
-        {
-            InferenceEngine::TBlob<float>::Ptr blob = std::make_shared<InferenceEngine::TBlob<float> >(td);
+        if (buf == nullptr) {
+            InferenceEngine::TBlob<float>::Ptr blob =
+                std::make_shared<InferenceEngine::TBlob<float>>(td);
             blob->allocate();
             return blob;
-        }
-        else
-        {
-            if (inputDims.size() != 4)
-            {
-                InferenceEngine::TBlob<float>::Ptr blob = std::make_shared<InferenceEngine::TBlob<float> >(td, (float*)buf, len);
+        } else {
+            if (inputDims.size() != 4) {
+                InferenceEngine::TBlob<float>::Ptr blob =
+                    std::make_shared<InferenceEngine::TBlob<float>>(td, (float*)buf, len);
                 return blob;
-            }
-            else
-            {
-                InferenceEngine::TBlob<float>::Ptr blob = std::make_shared<InferenceEngine::TBlob<float> >(td);
+            } else {
+                InferenceEngine::TBlob<float>::Ptr blob =
+                    std::make_shared<InferenceEngine::TBlob<float>>(td);
                 blob->allocate();
 
                 const auto& dims_ohwi = inputDims;  // toDims(op.dimensions);
@@ -4357,21 +4307,18 @@ Blob::Ptr GpuPreparedModel::GetConstWeightsOperandAsTensor(uint32_t index)
                 const size_t in_depth = dims_ohwi[3];
                 const size_t height = dims_ohwi[1];
                 const size_t width = dims_ohwi[2];
-                const float* inputFilter = reinterpret_cast<const float*>(buf);  // OHWI memory layout
+                const float* inputFilter =
+                    reinterpret_cast<const float*>(buf);  // OHWI memory layout
                 size_t offset = 0;  // blob->size() == o*i*h*w and simlar to nchw memory layout
 
                 // convert OHWI -> OIHW
 
                 // for depth conv need reorder as OIHW since for tflite O is always 1 and IE expects
                 // reorder to [in_channels, depth_multiplier, filter_height, filter_width]
-                for (size_t i = 0; i < in_depth; i++)
-                {
-                    for (size_t o = 0; o < out_depth; o++)
-                    {
-                        for (size_t h = 0; h < height; h++)
-                        {
-                            for (size_t w = 0; w < width; w++)
-                            {
+                for (size_t i = 0; i < in_depth; i++) {
+                    for (size_t o = 0; o < out_depth; o++) {
+                        for (size_t h = 0; h < height; h++) {
+                            for (size_t w = 0; w < width; w++) {
                                 size_t offset_ohwi = o * height * width * in_depth +
                                                      h * width * in_depth + w * in_depth +
                                                      i;  // similar to NHWC memory layout
@@ -4384,24 +4331,20 @@ Blob::Ptr GpuPreparedModel::GetConstWeightsOperandAsTensor(uint32_t index)
                 return blob;
             }
         }
-    }
-    else if (op.type == OperandType::TENSOR_INT32)
-    {
+    } else if (op.type == OperandType::TENSOR_INT32) {
         TensorDesc td(InferenceEngine::Precision::I32, toDims(op.dimensions), Layout::ANY);
 
         if (buf == nullptr) {
-            InferenceEngine::TBlob<float>::Ptr blob = std::make_shared<InferenceEngine::TBlob<float> >(td);
+            InferenceEngine::TBlob<float>::Ptr blob =
+                std::make_shared<InferenceEngine::TBlob<float>>(td);
             blob->allocate();
             return blob;
-        }
-        else
-        {
-            InferenceEngine::TBlob<float>::Ptr blob = std::make_shared<InferenceEngine::TBlob<float> >(td, (float*)buf, len);
+        } else {
+            InferenceEngine::TBlob<float>::Ptr blob =
+                std::make_shared<InferenceEngine::TBlob<float>>(td, (float*)buf, len);
             return blob;
         }
-    }
-    else
-    {
+    } else {
         nnAssert(false);
     }
 

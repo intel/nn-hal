@@ -149,10 +149,10 @@ bool testAlexNet() {
         Blob::Ptr in = nullptr;
 #ifdef ENABLE_MYRIAD
         in = readBlobFromFile<short>("AlexNet-bins/input.bin", {1, 3, 227, 227},
-                                          InferenceEngine::NCHW);
+                                     InferenceEngine::NCHW);
 #elif ENABLE_MKLDNN
         in = readBlobFromFile<float>("AlexNet-bins/input.bin", {1, 3, 227, 227},
-                                          InferenceEngine::NCHW);
+                                     InferenceEngine::NCHW);
 #else
         std::cerr << "Device Type not specified.";
         return false;

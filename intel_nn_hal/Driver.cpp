@@ -66,17 +66,18 @@ Return<ErrorStatus> Driver::prepareModel(const V1_0_Model& model,
     return ErrorStatus::NONE;
 }
 
-Return<ErrorStatus> Driver::prepareModel_1_1(const V1_1_Model& model, ExecutionPreference preference,
+Return<ErrorStatus> Driver::prepareModel_1_1(const V1_1_Model& model,
+                                             ExecutionPreference preference,
                                              const sp<V1_0::IPreparedModelCallback>& callback) {
     ALOGI("Entering %s", __func__);
 
     return ErrorStatus::NONE;
 }
 
-Return<ErrorStatus> Driver::prepareModel_1_2(
-        const Model& model, ExecutionPreference preference, const hidl_vec<hidl_handle>&,
-        const hidl_vec<hidl_handle>&, const HidlToken&,
-        const sp<V1_2::IPreparedModelCallback>& callback)  {
+Return<ErrorStatus> Driver::prepareModel_1_2(const Model& model, ExecutionPreference preference,
+                                             const hidl_vec<hidl_handle>&,
+                                             const hidl_vec<hidl_handle>&, const HidlToken&,
+                                             const sp<V1_2::IPreparedModelCallback>& callback) {
     ALOGI("Entering %s", __func__);
 
     if (callback.get() == nullptr) {
@@ -136,8 +137,8 @@ Return<void> Driver::getNumberOfCacheFilesNeeded(getNumberOfCacheFilesNeeded_cb 
 }
 
 Return<ErrorStatus> Driver::prepareModelFromCache(
-        const hidl_vec<hidl_handle>&, const hidl_vec<hidl_handle>&, const HidlToken&,
-        const sp<V1_2::IPreparedModelCallback>& callback) {
+    const hidl_vec<hidl_handle>&, const hidl_vec<hidl_handle>&, const HidlToken&,
+    const sp<V1_2::IPreparedModelCallback>& callback) {
     ALOGI("Entering %s", __func__);
     callback->notify_1_2(ErrorStatus::GENERAL_FAILURE, nullptr);
     return ErrorStatus::GENERAL_FAILURE;
@@ -151,7 +152,7 @@ Return<void> Driver::getCapabilities(getCapabilities_cb cb) {
 
 Return<void> Driver::getCapabilities_1_1(getCapabilities_1_1_cb cb) {
     ALOGI("Entering %s", __func__);
-    
+
     return Void();
 }
 
@@ -167,9 +168,7 @@ Return<void> Driver::getCapabilities_1_2(getCapabilities_1_2_cb cb) {
 
         ALOGI("CPU MKLDNN driver Capabilities .execTime = 0.9f, .powerUsage = 0.9f");
         cb(ErrorStatus::NONE, capabilities);
-    }
-    else if (mName.compare("GPU") == 0)
-    {
+    } else if (mName.compare("GPU") == 0) {
         ALOGI("GPU driver getCapabilities()");
         Capabilities capabilities = {
             .relaxedFloat32toFloat16PerformanceScalar = {.execTime = 0.95f, .powerUsage = 0.85f},
@@ -180,8 +179,7 @@ Return<void> Driver::getCapabilities_1_2(getCapabilities_1_2_cb cb) {
         cb(ErrorStatus::NONE, capabilities);
     }
     // mName.compare("VPU") == 0
-    else
-    {
+    else {
         ALOGI("Myriad driver getCapabilities()");
         Capabilities capabilities = {
             .relaxedFloat32toFloat16PerformanceScalar = {.execTime = 1.1f, .powerUsage = 1.1f},
@@ -208,7 +206,7 @@ Return<void> Driver::getSupportedOperations_1_1(const V1_1_Model& model,
 }
 
 Return<void> Driver::getSupportedOperations_1_2(const Model& model,
-                                                          getSupportedOperations_1_2_cb cb) {
+                                                getSupportedOperations_1_2_cb cb) {
     ALOGI("Entering %s", __func__);
 
     int count = model.operations.size();
