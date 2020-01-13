@@ -29,7 +29,6 @@
 #include "IRLayers.h"
 
 #include <fstream>
-#include "debug.h"
 #include "ie_exception_conversion.hpp"
 #include "ie_iinfer_request.hpp"
 #include "ie_infer_request.hpp"

@@ -169,7 +169,6 @@ static IRLayer create(const IRBlob::Ptr &weights, const OutputPort &src) {
 
     unsigned int ofm = 0;
     if (wDim.size() == 2) {
-
 #ifdef NNLOG
         ALOGI("inDims[0] = %d inDims[1] = %d", inDims[0], inDims[1]);
         ALOGI("wDim[0] = %d wDim[1] = %d", wDim[0], wDim[1]);

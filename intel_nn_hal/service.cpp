@@ -30,7 +30,7 @@ int main(int argc, char* argv[]) {
         if (strcmp(argv[1], "-D") != 0) return 0;
         const char* deviceType = argv[2];
         android::sp<Driver> device = new Driver(deviceType);
-        ALOGD("NN-HAL-1.1(%s) is ready.", deviceType);
+        ALOGD("NN-HAL-1.2(%s) is ready.", deviceType);
         configureRpcThreadpool(4, true);
         android::status_t status = device->registerAsService(deviceType);
         LOG_ALWAYS_FATAL_IF(status != android::OK, "Error while registering as service for %s: %d",
