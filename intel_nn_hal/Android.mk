@@ -3,7 +3,7 @@ LOCAL_PATH := $(call my-dir)
 ##############################################################
 include $(CLEAR_VARS)
 
-LOCAL_MODULE := android.hardware.neuralnetworks@1.1-generic-impl
+LOCAL_MODULE := android.hardware.neuralnetworks@1.2-generic-impl
 LOCAL_PROPRIETARY_MODULE := true
 LOCAL_MODULE_OWNER := intel
 #LOCAL_MULTILIB := both
@@ -35,10 +35,11 @@ LOCAL_C_INCLUDES += \
 	$(LOCAL_PATH)/../../dldt/inference-engine/src/inference_engine/cpp_interfaces/base \
 	$(LOCAL_PATH)/../../dldt/inference-engine/src/inference_engine/cpp_interfaces/impl \
 	$(LOCAL_PATH)/../../dldt/inference-engine/src/inference_engine/cpp_interfaces/interface \
-	frameworks/ml/nn/common/include
+	frameworks/ml/nn/common/include \
+	frameworks/ml/nn/runtime/include
 
 LOCAL_CFLAGS += \
-	-std=c++14 \
+	-std=c++17 \
 	-fPIC \
 	-fPIE \
 	-Wall \
@@ -47,6 +48,13 @@ LOCAL_CFLAGS += \
 	-Wno-non-virtual-dtor \
 	-Wno-missing-field-initializers \
 	-Wno-error \
+	-Wextra \
+	-Wno-extern-c-compat \
+	-Wno-sign-compare \
+	-Wno-unused-local-typedef \
+	-Wno-unused-private-field \
+	-Wno-invalid-partial-specialization \
+	-Wno-array-bounds \
 	-D_FORTIFY_SOURCE=2 \
 	-fvisibility=default \
 	-fexceptions
@@ -60,14 +68,19 @@ LOCAL_CFLAGS +=  -DNN_DEBUG
 #LOCAL_CFLAGS +=  -DNNLOG
 
 LOCAL_SHARED_LIBRARIES := \
-	libhidlbase \
-	libhidltransport \
-	libutils \
-	liblog \
-	libcutils \
-	libhardware \
 	libbase \
+	libcutils \
+	libdl \
+	libfmq \
+	libhardware \
+	libhidlbase \
 	libhidlmemory \
+	libhidltransport \
+	libnativewindow \
+	libtextclassifier_hash \
+	liblog \
+	libui \
+	libutils \
 	android.hardware.neuralnetworks@1.0 \
 	android.hardware.neuralnetworks@1.1 \
 	android.hardware.neuralnetworks@1.2 \
@@ -80,8 +93,8 @@ LOCAL_STATIC_LIBRARIES := libgraphAPI libpugixml libneuralnetworks_common
 include $(BUILD_SHARED_LIBRARY)
 ###############################################################
 include $(CLEAR_VARS)
-LOCAL_MODULE := android.hardware.neuralnetworks@1.1-generic-service
-LOCAL_INIT_RC := android.hardware.neuralnetworks@1.1-generic-cpu.rc \
+LOCAL_MODULE := android.hardware.neuralnetworks@1.2-generic-service
+LOCAL_INIT_RC := android.hardware.neuralnetworks@1.2-generic-cpu.rc \
     android.hardware.neuralnetworks@1.1-generic-gpu.rc
 LOCAL_MODULE_RELATIVE_PATH := hw
 LOCAL_PROPRIETARY_MODULE := true
@@ -90,9 +103,11 @@ LOCAL_SRC_FILES := \
 	service.cpp
 
 LOCAL_C_INCLUDES += \
-	$(LOCAL_PATH)
+	$(LOCAL_PATH) \
+	frameworks/ml/nn/common/include \
+	frameworks/ml/nn/runtime/include
 
-LOCAL_CFLAGS += -fexceptions -fPIE
+LOCAL_CFLAGS += -fexceptions -fPIE -std=c++17
 
 LOCAL_SHARED_LIBRARIES := \
 	libhidlbase \
@@ -101,8 +116,8 @@ LOCAL_SHARED_LIBRARIES := \
 	liblog \
 	libcutils \
 	libhardware \
-	android.hardware.neuralnetworks@1.1 \
-	android.hardware.neuralnetworks@1.1-generic-impl
+	android.hardware.neuralnetworks@1.2 \
+	android.hardware.neuralnetworks@1.2-generic-impl
 
 LOCAL_MULTILIB := 64
 

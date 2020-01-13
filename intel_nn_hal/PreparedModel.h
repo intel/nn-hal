@@ -17,8 +17,8 @@
 #ifndef ANDROID_ML_NN_PREPAREDMODEL_H
 #define ANDROID_ML_NN_PREPAREDMODEL_H
 
-#include <android/hardware/neuralnetworks/1.0/IPreparedModel.h>
-#include <android/hardware/neuralnetworks/1.1/types.h>
+#include <android/hardware/neuralnetworks/1.2/IPreparedModel.h>
+#include <android/hardware/neuralnetworks/1.2/types.h>
 #include <android/hidl/memory/1.0/IMemory.h>
 #include <hardware/hardware.h>
 #include <hidlmemory/mapping.h>
@@ -33,13 +33,26 @@
 #define IMPL_PAD 2
 
 using ::android::hidl::memory::V1_0::IMemory;
+using ::android::hardware::MQDescriptorSync;
 using namespace InferenceEngine;
 
 namespace android {
 namespace hardware {
 namespace neuralnetworks {
 namespace nnhal {
+namespace {
 
+using time_point = std::chrono::steady_clock::time_point;
+
+auto now() {
+    return std::chrono::steady_clock::now();
+};
+
+auto microsecondsDuration(decltype(now()) end, decltype(now()) start) {
+    return std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+};
+
+}  // namespace
 template <class T>
 using vec = std::vector<T>;
 typedef uint8_t* memory;
@@ -106,7 +119,8 @@ bool setRunTimePoolInfosFromHidlMemories(std::vector<RunTimePoolInfo>* poolInfos
 //
 // Since these drivers simulate hardware, they must run the computations
 // on the CPU.  An actual driver would not do that.
-class PreparedModel : public IPreparedModel {
+template <typename T_IExecutionCallback>;
+class PreparedModel : public V1_2::IPreparedModel {
 public:
     PreparedModel(const Model& model)
         : mTargetDevice(TargetDevice::eMYRIAD), mModel(model), mNet("nnNet"), enginePtr(nullptr), mPadreq(EXPL_PAD) {
@@ -126,13 +140,32 @@ public:
     ~PreparedModel() override { deinitialize(); }
     bool initialize();
     Return<ErrorStatus> execute(const Request& request,
-                                const sp<IExecutionCallback>& callback) override;
+                                const sp<V1_0::IExecutionCallback>& callback) override;
+    Return<ErrorStatus> execute_1_2(const Request& request, MeasureTiming measure,
+                                    const sp<V1_2::IExecutionCallback>& callback) override;
+    Return<void> executeSynchronously(const Request& request, MeasureTiming measure,
+                                      executeSynchronously_cb cb) override;
+    Return<void> configureExecutionBurst(
+            const sp<V1_2::IBurstCallback>& callback,
+            const MQDescriptorSync<V1_2::FmqRequestDatum>& requestChannel,
+            const MQDescriptorSync<V1_2::FmqResultDatum>& resultChannel,
+            configureExecutionBurst_cb cb) override;
+
+    // Return<ErrorStatus> executeBase(const Request& request, MeasureTiming measure,
+    //                             const sp<T_IExecutionCallback>& callback);
     static bool isOperationSupported(const Operation& operation, const Model& model);
 
 protected:
     void deinitialize();
     bool initializeRunTimeOperandInfo();
-    void asyncExecute(const Request& request, const sp<IExecutionCallback>& callback);
+    Return<ErrorStatus> executeBase(const Request& request, MeasureTiming measure, 
+                                const sp<V1_0::IExecutionCallback>& callback);
+    Return<ErrorStatus> executeBase_1_2(const Request& request, MeasureTiming measure, 
+                                const sp<V1_2::IExecutionCallback>& callback);
+    void asyncExecute(const Request& request, MeasureTiming measure, time_point driverStart, 
+                                const sp<V1_0::IExecutionCallback>& callback);
+    void asyncExecute_1_2(const Request& request, MeasureTiming measure, time_point driverStart, 
+                                const sp<V1_2::IExecutionCallback>& callback);
 
     bool operationAdd(const Operation& operation);
     bool operationAveragePool2D(const Operation& operation);

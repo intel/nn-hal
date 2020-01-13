@@ -16,36 +16,57 @@
 
 #ifndef ANDROID_ML_NN_VPU_DRIVER_H
 #define ANDROID_ML_NN_VPU_DRIVER_H
-
+#include <android/hardware/neuralnetworks/1.0/IDevice.h>
+#include <android/hardware/neuralnetworks/1.0/IExecutionCallback.h>
+#include <android/hardware/neuralnetworks/1.0/IPreparedModel.h>
+#include <android/hardware/neuralnetworks/1.0/IPreparedModelCallback.h>
 #include <android/hardware/neuralnetworks/1.0/types.h>
 #include <android/hardware/neuralnetworks/1.1/IDevice.h>
 #include <android/hardware/neuralnetworks/1.1/types.h>
-#include <hardware/hardware.h>
+#include <android/hardware/neuralnetworks/1.2/IDevice.h>
+#include <android/hardware/neuralnetworks/1.2/IExecutionCallback.h>
+#include <android/hardware/neuralnetworks/1.2/IPreparedModel.h>
+#include <android/hardware/neuralnetworks/1.2/IPreparedModelCallback.h>
+#include <android/hardware/neuralnetworks/1.2/types.h>
+//#include <android/hidl/allocator/1.0/IAllocator.h>
+//#include <android/hidl/memory/1.0/IMemory.h>
+//#include <hidlmemory/mapping.h>
 #include <string>
+//#include "android/frameworks/ml/nn/runtime/include/NeuralNetworks.h"
+//#include "NeuralNetworks.h"
 
 namespace android {
 namespace hardware {
 namespace neuralnetworks {
 namespace nnhal {
 
-using Model = ::android::hardware::neuralnetworks::V1_1::Model;
-using V10_Model = ::android::hardware::neuralnetworks::V1_0::Model;
-using Operation = ::android::hardware::neuralnetworks::V1_1::Operation;
-using V10_Operation = ::android::hardware::neuralnetworks::V1_0::Operation;
-using OperationType = ::android::hardware::neuralnetworks::V1_1::OperationType;
-using OperandType = ::android::hardware::neuralnetworks::V1_0::OperandType;
-using Capabilities = ::android::hardware::neuralnetworks::V1_1::Capabilities;
-using V10_Capabilities = ::android::hardware::neuralnetworks::V1_0::Capabilities;
+using Model = ::android::hardware::neuralnetworks::V1_2::Model;
+using Operand = ::android::hardware::neuralnetworks::V1_2::Operand;
+using V1_0_Model = ::android::hardware::neuralnetworks::V1_0::Model;
+using V1_1_Model = ::android::hardware::neuralnetworks::V1_1::Model;
+using Operation = ::android::hardware::neuralnetworks::V1_2::Operation;
+using V1_0_Operation = ::android::hardware::neuralnetworks::V1_0::Operation;
+using V1_1_Operation = ::android::hardware::neuralnetworks::V1_1::Operation;
+using OperationType = ::android::hardware::neuralnetworks::V1_2::OperationType;
+using OperandType = ::android::hardware::neuralnetworks::V1_2::OperandType;
+using Capabilities = ::android::hardware::neuralnetworks::V1_2::Capabilities;
+using V1_0_Capabilities = ::android::hardware::neuralnetworks::V1_0::Capabilities;
+using V1_1_Capabilities = ::android::hardware::neuralnetworks::V1_1::Capabilities;
 
 using namespace ::android::hardware::neuralnetworks::V1_1;
 using namespace ::android::hardware::neuralnetworks::V1_0;
+using namespace ::android::hardware::neuralnetworks::V1_2;
+using ::android::hardware::MQDescriptorSync;
+
+using HidlToken = android::hardware::hidl_array<uint8_t, 32>;
+//using HidlToken = android::hardware::hidl_array<uint8_t, ANEURALNETWORKS_BYTE_SIZE_OF_CACHE_TOKEN>;
 
 // Base class used to create vpu drivers for the NN HAL.  This class
 // provides some implementation of the more common functions.
 //
 // Since these drivers simulate hardware, they must run the computations
 // on the CPU.  An actual driver would not do that.
-class Driver : public ::android::hardware::neuralnetworks::V1_1::IDevice {
+class Driver : public ::android::hardware::neuralnetworks::V1_2::IDevice {
 public:
     Driver() {}
     Driver(const char* name) : mName(name) {}
@@ -53,15 +74,30 @@ public:
     ~Driver() override {}
     Return<void> getCapabilities(getCapabilities_cb cb) override;
     Return<void> getCapabilities_1_1(getCapabilities_1_1_cb cb) override;
-    Return<void> getSupportedOperations(const V10_Model& model,
+    Return<void> getCapabilities_1_2(getCapabilities_1_2_cb cb) override;
+    Return<void> getSupportedOperations(const V1_0_Model& model,
                                         getSupportedOperations_cb cb) override;
-    Return<void> getSupportedOperations_1_1(const Model& model,
+    Return<void> getSupportedOperations_1_1(const V1_1_Model& model,
                                             getSupportedOperations_1_1_cb cb) override;
-    Return<ErrorStatus> prepareModel(const V10_Model& model,
-                                     const sp<IPreparedModelCallback>& callback) override;
-    Return<ErrorStatus> prepareModel_1_1(const Model& model, ExecutionPreference preference,
-                                         const sp<IPreparedModelCallback>& callback) override;
+    Return<void> getSupportedOperations_1_2(const Model& model,
+                                            getSupportedOperations_1_2_cb cb) override;
+    Return<ErrorStatus> prepareModel(const V1_0_Model& model,
+                                     const sp<V1_0::IPreparedModelCallback>& callback) override;
+    Return<ErrorStatus> prepareModel_1_1(const V1_1_Model& model, ExecutionPreference preference,
+                                         const sp<V1_0::IPreparedModelCallback>& callback) override;
+    Return<ErrorStatus> prepareModel_1_2(const Model& model, ExecutionPreference preference,
+                                         const hidl_vec<hidl_handle>& modelCache,
+                                         const hidl_vec<hidl_handle>& dataCache,
+                                         const HidlToken& token,
+                                         const sp<V1_2::IPreparedModelCallback>& callback) override;
+    Return<ErrorStatus> prepareModelFromCache(
+            const hidl_vec<hidl_handle>& modelCache, const hidl_vec<hidl_handle>& dataCache,
+            const HidlToken& token, const sp<V1_2::IPreparedModelCallback>& callback) override;
     Return<DeviceStatus> getStatus() override;
+    Return<void> getVersionString(getVersionString_cb cb) override;
+    Return<void> getType(getType_cb cb) override;
+    Return<void> getSupportedExtensions(getSupportedExtensions_cb) override;
+    Return<void> getNumberOfCacheFilesNeeded(getNumberOfCacheFilesNeeded_cb cb) override;
 
 protected:
     std::string mName;

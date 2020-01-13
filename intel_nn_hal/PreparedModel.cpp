@@ -23,6 +23,8 @@
 #include <fstream>
 #include <thread>
 #include "ValidateHal.h"
+//#include "ExecutionBurstServer.h"
+//#include "OperationsUtils.h"
 
 #define DISABLE_ALL_QUANT
 //#define NN_DEBUG
@@ -181,6 +183,9 @@ namespace neuralnetworks {
 namespace nnhal {
 
 using namespace android::nn;
+//using time_point = std::chrono::steady_clock::time_point;
+
+static const Timing kNoTiming = {.timeOnDevice = UINT64_MAX, .timeInDriver = UINT64_MAX};
 
 enum PaddingScheme {
     kPaddingUnknown = 0,
@@ -980,7 +985,7 @@ bool PreparedModel::initializeRunTimeOperandInfo() {
 
     // Start by setting the runtime info to what's in the model.
     for (size_t i = 0; i < count; i++) {
-        const Operand& from = mModel.operands[i];
+        const V1_2::Operand& from = mModel.operands[i];
         RunTimeOperandInfo& to = mOperands[i];
         to.dimensions.resize(from.dimensions.size());
         for (size_t j = 0; j < from.dimensions.size(); j++) {
@@ -1220,13 +1225,25 @@ void printOperandbuf(int level, const uint8_t* buffer, const std::vector<uint32_
 }
 
 #endif
+static Return<void> notify(const sp<V1_0::IExecutionCallback>& callback, const ErrorStatus& status,
+                           const hidl_vec<OutputShape>&, Timing) {
+    return callback->notify(status);
+}
 
-void PreparedModel::asyncExecute(const Request& request, const sp<IExecutionCallback>& callback) {
+static Return<void> notify(const sp<V1_2::IExecutionCallback>& callback, const ErrorStatus& status,
+                           const hidl_vec<OutputShape>& outputShapes, Timing timing) {
+    return callback->notify_1_2(status, outputShapes, timing);
+}
+
+void PreparedModel::asyncExecute(const Request& request, MeasureTiming measure, time_point driverStart, const sp<V1_0::IExecutionCallback>& callback) {
     std::vector<RunTimePoolInfo> requestPoolInfos;
     if (!setRunTimePoolInfosFromHidlMemories(&requestPoolInfos, request.pools)) {
-        callback->notify(ErrorStatus::GENERAL_FAILURE);
+        notify(callback, ErrorStatus::GENERAL_FAILURE, {}, kNoTiming);
         return;
     }
+
+    time_point driverEnd, deviceStart, deviceEnd;
+    if (measure == MeasureTiming::YES) deviceStart = now();
 
     auto inOutData = [this, &requestPoolInfos](const std::vector<uint32_t>& indexes,
                                                const hidl_vec<RequestArgument>& arguments,
@@ -1282,18 +1299,23 @@ void PreparedModel::asyncExecute(const Request& request, const sp<IExecutionCall
     VLOG(L1, "Run");
 
     enginePtr->Infer();
+    if (measure == MeasureTiming::YES) deviceEnd = now();
 
     VLOG(L1, "update shared memories");
     for (auto runtimeInfo : requestPoolInfos) {
         runtimeInfo.update();
     }
 
+    InferenceEngine::TBlob<float>::Ptr outBlob =
+            enginePtr->getBlob(mPorts[mModel.outputIndexes[0]]->name);
+    
+    InferenceEngine::TBlob<float>::Ptr inBlob =
+            enginePtr->getBlob(mPorts[mModel.inputIndexes[0]]->name);
+    hidl_vec<OutputShape> outputShapes;
 #ifdef NN_DEBUG
     {
         VLOG(L1, "Model output0 are:");
         const RunTimeOperandInfo& output = mOperands[mModel.outputIndexes[0]];
-        InferenceEngine::TBlob<float>::Ptr outBlob =
-            enginePtr->getBlob(mPorts[mModel.outputIndexes[0]]->name);
 
         auto nelem = (outBlob->size() > 20 ? 20 : outBlob->size());
         for (int i = 0; i < nelem; i++) {
@@ -1302,42 +1324,496 @@ void PreparedModel::asyncExecute(const Request& request, const sp<IExecutionCall
 
         VLOG(L1, "Model input0 are:");
         const RunTimeOperandInfo& input = mOperands[mModel.inputIndexes[0]];
-        InferenceEngine::TBlob<float>::Ptr inBlob =
-            enginePtr->getBlob(mPorts[mModel.inputIndexes[0]]->name);
+        
         nelem = (inBlob->size() > 20 ? 20 : inBlob->size());
         for (int i = 0; i < nelem; i++) {
             VLOG(L1, "inBlob elements %d = %f", i, inBlob->readOnly()[i]);
         }
     }
 #endif
+    Return<void> returned;
+    if (measure == MeasureTiming::YES) {
+        driverEnd = now();
+        Timing timing = {.timeOnDevice = uint64_t(microsecondsDuration(deviceEnd, deviceStart)),
+                         .timeInDriver = uint64_t(microsecondsDuration(driverEnd, driverStart))};
+        // VLOG(L1, "Driver::asyncExecute timing = %s", toString(timing));
+        returned = notify(callback, ErrorStatus::NONE, outputShapes, timing);
+    } else {
+        returned = notify(callback, ErrorStatus::NONE, outputShapes, kNoTiming);
+    }
+    if (!returned.isOk()) {
+        ALOGE("hidl callback failed to return properly: %s", returned.description().c_str());
+    }
+}
+void PreparedModel::asyncExecute_1_2(const Request& request, MeasureTiming measure, time_point driverStart, const sp<V1_2::IExecutionCallback>& callback) {
+    std::vector<RunTimePoolInfo> requestPoolInfos;
+    if (!setRunTimePoolInfosFromHidlMemories(&requestPoolInfos, request.pools)) {
+        notify(callback, ErrorStatus::GENERAL_FAILURE, {}, kNoTiming);
+        return;
+    }
 
-    Return<void> returned = callback->notify(ErrorStatus::NONE);
+    time_point driverEnd, deviceStart, deviceEnd;
+    if (measure == MeasureTiming::YES) deviceStart = now();
+
+    auto inOutData = [this, &requestPoolInfos](const std::vector<uint32_t>& indexes,
+                                               const hidl_vec<RequestArgument>& arguments,
+                                               bool inputFromRequest, ExecuteNetwork* enginePtr,
+                                               std::vector<OutputPort> mPorts) {
+        // do memcpy for input data
+        for (size_t i = 0; i < indexes.size(); i++) {
+            RunTimeOperandInfo& operand = mOperands[indexes[i]];
+            const RequestArgument& arg = arguments[i];
+            auto poolIndex = arg.location.poolIndex;
+            nnAssert(poolIndex < requestPoolInfos.size());
+            auto& r = requestPoolInfos[poolIndex];
+            if (arg.dimensions.size() > 0) {
+                // It's the responsibility of the caller to validate that
+                // from.dimensions only modifies the dimensions that were
+                // unspecified in the model.  That's the case in SampleDriver.cpp
+                // with the call to validateRequest().
+                operand.dimensions = arg.dimensions;
+            }
+            operand.buffer = r.buffer + arg.location.offset;  // r.getBuffer()
+            operand.length = arg.location.length;  // sizeOfData(operand.type, operand.dimensions);
+
+            VLOG(L1, "Copy request input/output to model input/output");
+            if (inputFromRequest) {
+                auto inputBlob = GetInOutOperandAsBlob(
+                    operand, const_cast<uint8_t*>(r.buffer + arg.location.offset),
+                    operand.length);  // if not doing memcpy
+                VLOG(L1, "setBlob for mPorts[%d]->name %s", indexes[i],
+                     mPorts[indexes[i]]->name.c_str());
+                enginePtr->setBlob(mPorts[indexes[i]]->name,
+                                   inputBlob);  // setInputBlob(const std::string &,IRBlob::Ptr);
+
+            } else {
+                auto outputBlob = GetInOutOperandAsBlob(
+                    operand, const_cast<uint8_t*>(r.buffer + arg.location.offset),
+                    operand.length);  // if not doing memcpy
+                enginePtr->setBlob(mPorts[indexes[i]]->name, outputBlob);
+            }
+        }
+    };
+
+    // compile it
+
+    // InfEng inference_engine(InferenceEngine::TargetDevice::eMYRIAD);
+
+    // auto executeNet1 = inference_engine.Compile(mNet);
+
+    VLOG(L1, "pass request inputs/outputs buffer to network/model respectively");
+
+    inOutData(mModel.inputIndexes, request.inputs, true, enginePtr, mPorts);
+    inOutData(mModel.outputIndexes, request.outputs, false, enginePtr, mPorts);
+
+    VLOG(L1, "Run");
+
+    enginePtr->Infer();
+    if (measure == MeasureTiming::YES) deviceEnd = now();
+
+    VLOG(L1, "update shared memories");
+    for (auto runtimeInfo : requestPoolInfos) {
+        runtimeInfo.update();
+    }
+
+    InferenceEngine::TBlob<float>::Ptr outBlob =
+            enginePtr->getBlob(mPorts[mModel.outputIndexes[0]]->name);
+    
+    InferenceEngine::TBlob<float>::Ptr inBlob =
+            enginePtr->getBlob(mPorts[mModel.inputIndexes[0]]->name);
+    hidl_vec<OutputShape> outputShapes;
+#ifdef NN_DEBUG
+    {
+        VLOG(L1, "Model output0 are:");
+        const RunTimeOperandInfo& output = mOperands[mModel.outputIndexes[0]];
+
+        auto nelem = (outBlob->size() > 20 ? 20 : outBlob->size());
+        for (int i = 0; i < nelem; i++) {
+            VLOG(L1, "outBlob elements %d = %f", i, outBlob->readOnly()[i]);
+        }
+
+        VLOG(L1, "Model input0 are:");
+        const RunTimeOperandInfo& input = mOperands[mModel.inputIndexes[0]];
+        
+        nelem = (inBlob->size() > 20 ? 20 : inBlob->size());
+        for (int i = 0; i < nelem; i++) {
+            VLOG(L1, "inBlob elements %d = %f", i, inBlob->readOnly()[i]);
+        }
+    }
+#endif
+    Return<void> returned;
+    if (measure == MeasureTiming::YES) {
+        driverEnd = now();
+        Timing timing = {.timeOnDevice = uint64_t(microsecondsDuration(deviceEnd, deviceStart)),
+                         .timeInDriver = uint64_t(microsecondsDuration(driverEnd, driverStart))};
+        // ALOGE("Driver::asyncExecute timing = %s", toString(timing));
+        returned = notify(callback, ErrorStatus::NONE, outputShapes, timing);
+    } else {
+        returned = notify(callback, ErrorStatus::NONE, outputShapes, kNoTiming);
+    }
     if (!returned.isOk()) {
         ALOGE("hidl callback failed to return properly: %s", returned.description().c_str());
     }
 }
 
-Return<ErrorStatus> PreparedModel::execute(const Request& request,
-                                           const sp<IExecutionCallback>& callback) {
-    VLOG(L1, "Begin to execute");
+Return<ErrorStatus> PreparedModel::executeBase(const Request& request, MeasureTiming measure, 
+                                 const sp<V1_0::IExecutionCallback>& callback) {
+    VLOG(L1, "executebase");
+
+    time_point driverStart;
+    if (measure == MeasureTiming::YES) driverStart = now();
 
     if (callback.get() == nullptr) {
         ALOGE("invalid callback passed to execute");
         return ErrorStatus::INVALID_ARGUMENT;
     }
-
-    if (validateRequest(request, mModel) == false) {
-        callback->notify(ErrorStatus::INVALID_ARGUMENT);
+    if (!validateRequest(request, mModel)) {
+        notify(callback, ErrorStatus::INVALID_ARGUMENT, {}, kNoTiming);
         return ErrorStatus::INVALID_ARGUMENT;
     }
 
-    // This thread is intentionally detached because the vpu driver service
+    // This thread is intentionally detached because the driver service
     // is expected to live forever.
-    std::thread([this, request, callback] { asyncExecute(request, callback); }).detach();
-
-    VLOG(L1, "Start execute thread done");
+    std::thread([this, request, measure, driverStart, callback] {
+        asyncExecute(request, measure, driverStart, callback);
+    })
+            .detach();
 
     return ErrorStatus::NONE;
+}
+
+Return<ErrorStatus> PreparedModel::executeBase_1_2(const Request& request, MeasureTiming measure, 
+                                 const sp<V1_2::IExecutionCallback>& callback) {
+    VLOG(L1, "executebase");
+
+    time_point driverStart;
+    if (measure == MeasureTiming::YES) driverStart = now();
+
+    if (callback.get() == nullptr) {
+        ALOGE("invalid callback passed to execute");
+        return ErrorStatus::INVALID_ARGUMENT;
+    }
+    if (!validateRequest(request, mModel)) {
+        notify(callback, ErrorStatus::INVALID_ARGUMENT, {}, kNoTiming);
+        return ErrorStatus::INVALID_ARGUMENT;
+    }
+
+    // This thread is intentionally detached because the driver service
+    // is expected to live forever.
+    std::thread([this, request, measure, driverStart, callback] {
+        asyncExecute_1_2(request, measure, driverStart, callback);
+    })
+            .detach();
+
+    return ErrorStatus::NONE;
+}
+
+Return<ErrorStatus> PreparedModel::execute(const Request& request,
+                                           const sp<V1_0::IExecutionCallback>& callback) {
+    VLOG(L1, "Begin to execute");
+    return executeBase(request, MeasureTiming::NO, callback);
+}
+
+Return<ErrorStatus> PreparedModel::execute_1_2(const Request& request, MeasureTiming measure,
+                                                     const sp<V1_2::IExecutionCallback>& callback) {
+    VLOG(L1, "Begin to execute_1_2");
+    return executeBase_1_2(request, measure, callback);
+}
+
+Return<void> PreparedModel::executeSynchronously(const Request& request,
+                                                       MeasureTiming measure,
+                                                       executeSynchronously_cb cb) {
+    VLOG(L1, "Begin to executeSynchronously");
+    time_point driverStart, driverEnd, deviceStart, deviceEnd;
+    if (measure == MeasureTiming::YES) driverStart = now();
+
+    if (!validateRequest(request, mModel)) {
+        cb(ErrorStatus::INVALID_ARGUMENT, {}, kNoTiming);
+        return Void();
+    }
+    std::vector<RunTimePoolInfo> requestPoolInfos;
+    if (!setRunTimePoolInfosFromHidlMemories(&requestPoolInfos, request.pools)) {
+        cb(ErrorStatus::GENERAL_FAILURE, {}, kNoTiming);
+        return Void();
+    }
+    auto inOutData = [this, &requestPoolInfos](const std::vector<uint32_t>& indexes,
+                                               const hidl_vec<RequestArgument>& arguments,
+                                               bool inputFromRequest, ExecuteNetwork* enginePtr,
+                                               std::vector<OutputPort> mPorts) {
+        // do memcpy for input data
+        for (size_t i = 0; i < indexes.size(); i++) {
+            RunTimeOperandInfo& operand = mOperands[indexes[i]];
+            const RequestArgument& arg = arguments[i];
+            auto poolIndex = arg.location.poolIndex;
+            nnAssert(poolIndex < requestPoolInfos.size());
+            auto& r = requestPoolInfos[poolIndex];
+            if (arg.dimensions.size() > 0) {
+                // It's the responsibility of the caller to validate that
+                // from.dimensions only modifies the dimensions that were
+                // unspecified in the model.  That's the case in SampleDriver.cpp
+                // with the call to validateRequest().
+                operand.dimensions = arg.dimensions;
+            }
+            operand.buffer = r.buffer + arg.location.offset;  // r.getBuffer()
+            operand.length = arg.location.length;  // sizeOfData(operand.type, operand.dimensions);
+
+            VLOG(L1, "Copy request input/output to model input/output");
+            if (inputFromRequest) {
+                auto inputBlob = GetInOutOperandAsBlob(
+                    operand, const_cast<uint8_t*>(r.buffer + arg.location.offset),
+                    operand.length);  // if not doing memcpy
+                VLOG(L1, "setBlob for mPorts[%d]->name %s", indexes[i],
+                     mPorts[indexes[i]]->name.c_str());
+                enginePtr->setBlob(mPorts[indexes[i]]->name,
+                                   inputBlob);  // setInputBlob(const std::string &,IRBlob::Ptr);
+
+            } else {
+                auto outputBlob = GetInOutOperandAsBlob(
+                    operand, const_cast<uint8_t*>(r.buffer + arg.location.offset),
+                    operand.length);  // if not doing memcpy
+                enginePtr->setBlob(mPorts[indexes[i]]->name, outputBlob);
+            }
+        }
+    };
+
+    // compile it
+
+    // InfEng inference_engine(InferenceEngine::TargetDevice::eMYRIAD);
+
+    // auto executeNet1 = inference_engine.Compile(mNet);
+
+    VLOG(L1, "pass request inputs/outputs buffer to network/model respectively");
+
+    inOutData(mModel.inputIndexes, request.inputs, true, enginePtr, mPorts);
+    inOutData(mModel.outputIndexes, request.outputs, false, enginePtr, mPorts);
+
+    VLOG(L1, "Run");
+
+    enginePtr->Infer();
+    if (measure == MeasureTiming::YES) deviceEnd = now();
+
+    VLOG(L1, "update shared memories");
+    for (auto runtimeInfo : requestPoolInfos) {
+        runtimeInfo.update();
+    }
+
+    InferenceEngine::TBlob<float>::Ptr outBlob =
+            enginePtr->getBlob(mPorts[mModel.outputIndexes[0]]->name);
+    
+    InferenceEngine::TBlob<float>::Ptr inBlob =
+            enginePtr->getBlob(mPorts[mModel.inputIndexes[0]]->name);
+    hidl_vec<OutputShape> outputShapes;
+#ifdef NN_DEBUG
+    {
+        VLOG(L1, "Model output0 are:");
+        const RunTimeOperandInfo& output = mOperands[mModel.outputIndexes[0]];
+
+        auto nelem = (outBlob->size() > 20 ? 20 : outBlob->size());
+        for (int i = 0; i < nelem; i++) {
+            VLOG(L1, "outBlob elements %d = %f", i, outBlob->readOnly()[i]);
+        }
+
+        VLOG(L1, "Model input0 are:");
+        const RunTimeOperandInfo& input = mOperands[mModel.inputIndexes[0]];
+        
+        nelem = (inBlob->size() > 20 ? 20 : inBlob->size());
+        for (int i = 0; i < nelem; i++) {
+            VLOG(L1, "inBlob elements %d = %f", i, inBlob->readOnly()[i]);
+        }
+    }
+#endif
+    Return<void> returned;
+    if (measure == MeasureTiming::YES) {
+        driverEnd = now();
+        Timing timing = {.timeOnDevice = uint64_t(microsecondsDuration(deviceEnd, deviceStart)),
+                         .timeInDriver = uint64_t(microsecondsDuration(driverEnd, driverStart))};
+        VLOG(L1, "Driver::executeSynchronously timing = %s", timing);
+        cb(ErrorStatus::NONE, outputShapes, timing);
+    } else {
+        cb(ErrorStatus::NONE, outputShapes, kNoTiming);
+    }
+    return Void();
+}
+
+// BurstExecutorWithCache maps hidl_memory when it is first seen, and preserves
+// the mapping until either (1) the memory is freed in the runtime, or (2) the
+// burst object is destroyed. This allows for subsequent executions operating on
+// pools that have been used before to reuse the mapping instead of mapping and
+// unmapping the memory on each execution.
+// class BurstExecutorWithCache : public ExecutionBurstServer::IBurstExecutorWithCache {
+//     public:
+//     BurstExecutorWithCache(V1_2::IPreparedModel* preparedModel)
+//         : mPreparedModel(preparedModel){}
+    
+//     bool isCacheEntryPresent(int32_t slot) const override {
+//         const auto it = mMemoryCache.find(slot);
+//         return (it != mMemoryCache.end()) && it->second.has_valid();
+//     }
+//     void addCacheEntry(const hidl_memory& memory, int32_t slot) override {
+//         mMemoryCache[slot] = memory;
+//     }
+//     void removeCacheEntry(int32_t slot) override { mMemoryCache.erase(slot); }
+//     std::tuple<ErrorStatus, hidl_vec<OutputShape>, Timing> execute(
+//             const Request& request, const std::vector<int32_t>& slots,
+//             MeasureTiming measure) override {
+//         VLOG(L1, "BurstExecutorWithCache::execute");
+//         time_point driverStart, driverEnd, deviceStart, deviceEnd;
+//         if (measure == MeasureTiming::YES) driverStart = now();
+
+//         // ensure all relevant pools are valid
+//         if (!std::all_of(slots.begin(), slots.end(),
+//                          [this](int32_t slot) { return isCacheEntryPresent(slot); })) {
+//             return {ErrorStatus::INVALID_ARGUMENT, {}, kNoTiming};
+//         }
+
+//         // finish the request object (for validation)
+//         hidl_vec<hidl_memory> pools(slots.size());
+//         std::transform(slots.begin(), slots.end(), pools.begin(),
+//                        [this](int32_t slot) { return mMemoryCache[slot]; });
+
+//         Request fullRequest = request;
+//         fullRequest.pools = std::move(pools);
+
+//          // validate request object against the model
+//         if (!validateRequest(fullRequest, mModel)) {
+//             return {ErrorStatus::INVALID_ARGUMENT, {}, kNoTiming};
+//         }
+
+//         // select relevant entries from cache
+//         std::vector<RunTimePoolInfo> requestPoolInfos;
+//         requestPoolInfos.reserve(slots.size());
+//         std::transform(slots.begin(), slots.end(), std::back_inserter(requestPoolInfos),
+//                        [this](int32_t slot) { return *mMemoryCache[slot]; });
+        //execution
+        // if (measure == MeasureTiming::YES) deviceStart = now();
+        // auto inOutData = [this, &requestPoolInfos](const std::vector<uint32_t>& indexes,
+        //                                        const hidl_vec<RequestArgument>& arguments,
+        //                                        bool inputFromRequest, ExecuteNetwork* enginePtr,
+        //                                        std::vector<OutputPort> mPorts) {
+        //     // do memcpy for input data
+        //     for (size_t i = 0; i < indexes.size(); i++) {
+        //         RunTimeOperandInfo& operand = mOperands[indexes[i]];
+        //         const RequestArgument& arg = arguments[i];
+        //         auto poolIndex = arg.location.poolIndex;
+        //         nnAssert(poolIndex < requestPoolInfos.size());
+        //         auto& r = requestPoolInfos[poolIndex];
+        //         if (arg.dimensions.size() > 0) {
+        //             // It's the responsibility of the caller to validate that
+        //             // from.dimensions only modifies the dimensions that were
+        //             // unspecified in the model.  That's the case in SampleDriver.cpp
+        //             // with the call to validateRequest().
+        //             operand.dimensions = arg.dimensions;
+        //         }
+        //         operand.buffer = r.buffer + arg.location.offset;  // r.getBuffer()
+        //         operand.length = arg.location.length;  // sizeOfData(operand.type, operand.dimensions);
+
+        //         VLOG(L1, "Copy request input/output to model input/output");
+        //         if (inputFromRequest) {
+        //             auto inputBlob = GetInOutOperandAsBlob(
+        //                 operand, const_cast<uint8_t*>(r.buffer + arg.location.offset),
+        //                 operand.length);  // if not doing memcpy
+        //             VLOG(L1, "setBlob for mPorts[%d]->name %s", indexes[i],
+        //                 mPorts[indexes[i]]->name.c_str());
+        //             enginePtr->setBlob(mPorts[indexes[i]]->name,
+        //                             inputBlob);  // setInputBlob(const std::string &,IRBlob::Ptr);
+
+        //         } else {
+        //             auto outputBlob = GetInOutOperandAsBlob(
+        //                 operand, const_cast<uint8_t*>(r.buffer + arg.location.offset),
+        //                 operand.length);  // if not doing memcpy
+        //             enginePtr->setBlob(mPorts[indexes[i]]->name, outputBlob);
+        //         }
+        //     }
+        // };
+
+        // compile it
+
+        // InfEng inference_engine(InferenceEngine::TargetDevice::eMYRIAD);
+
+        // auto executeNet1 = inference_engine.Compile(mNet);
+
+    //     VLOG(L1, "pass request inputs/outputs buffer to network/model respectively");
+
+    //     inOutData(mModel.inputIndexes, request.inputs, true, enginePtr, mPorts);
+    //     inOutData(mModel.outputIndexes, request.outputs, false, enginePtr, mPorts);
+
+    //     VLOG(L1, "Run");
+
+    //     enginePtr->Infer();
+    //     if (measure == MeasureTiming::YES) deviceEnd = now();
+
+    //     VLOG(L1, "update shared memories");
+    //     for (auto runtimeInfo : requestPoolInfos) {
+    //         runtimeInfo.update();
+    //     }
+
+    //     InferenceEngine::TBlob<float>::Ptr outBlob =
+    //             enginePtr->getBlob(mPorts[mModel.outputIndexes[0]]->name);
+        
+    //     InferenceEngine::TBlob<float>::Ptr inBlob =
+    //             enginePtr->getBlob(mPorts[mModel.inputIndexes[0]]->name);
+
+    // #ifdef NN_DEBUG
+    //     {
+    //         VLOG(L1, "Model output0 are:");
+    //         const RunTimeOperandInfo& output = mOperands[mModel.outputIndexes[0]];
+
+    //         auto nelem = (outBlob->size() > 20 ? 20 : outBlob->size());
+    //         for (int i = 0; i < nelem; i++) {
+    //             VLOG(L1, "outBlob elements %d = %f", i, outBlob->readOnly()[i]);
+    //         }
+
+    //         VLOG(L1, "Model input0 are:");
+//             const RunTimeOperandInfo& input = mOperands[mModel.inputIndexes[0]];
+            
+//             nelem = (inBlob->size() > 20 ? 20 : inBlob->size());
+//             for (int i = 0; i < nelem; i++) {
+//                 VLOG(L1, "inBlob elements %d = %f", i, inBlob->readOnly()[i]);
+//             }
+//         }
+//     #endif
+//         Return<void> returned;
+//         if (measureTiming == MeasureTiming::YES) {
+//             driverEnd = now();
+//             Timing timing = {.timeOnDevice = uint64_t(microsecondsDuration(deviceEnd, deviceStart)),
+//                             .timeInDriver = uint64_t(microsecondsDuration(driverEnd, driverStart))};
+//             VLOG(L1, "BurstExecutorWithCache::execute timing = %s", toString(timing));
+//             std::make_tuple(ErrorStatus::NONE, outBlob, timing);
+//         } else {
+//             std::make_tuple(ErrorStatus::NONE, outputShapes, kNoTiming);
+//         }
+//     }
+//     private:
+//     V1_2::IPreparedModel* mPreparedModel;
+//     std::map<int32_t, hidl_memory> mMemoryCache;  // cached requestPoolInfos
+// }
+
+Return<void> PreparedModel::configureExecutionBurst(
+        const sp<V1_2::IBurstCallback>& callback,
+        const MQDescriptorSync<V1_2::FmqRequestDatum>& requestChannel,
+        const MQDescriptorSync<V1_2::FmqResultDatum>& resultChannel,
+        configureExecutionBurst_cb cb) {
+    VLOG(L1, "Driver::configureExecutionBurst");
+
+    // Alternatively, the burst could be configured via:
+    // const sp<V1_2::IBurstContext> burst =
+    //         ExecutionBurstServer::create(callback, requestChannel,
+    //                                      resultChannel, this);
+    //
+    // However, this alternative representation does not include a memory map
+    // caching optimization, and adds overhead.
+    // const std::shared_ptr<BurstExecutorWithCache> executorWithCache =
+    //         std::make_shared<BurstExecutorWithCache>(this);
+    // const sp<V1_2::IBurstContext> burst = ExecutionBurstServer::create(
+    //         callback, requestChannel, resultChannel, executorWithCache);
+
+    // if (burst == nullptr) {
+    //     cb(ErrorStatus::GENERAL_FAILURE, {});
+    // } else {
+    //     cb(ErrorStatus::NONE, burst);
+    // }
+    cb(ErrorStatus::GENERAL_FAILURE, {});
+    return Void();
 }
 
 template <typename T>

@@ -15,6 +15,6 @@ include $(MY_LOCAL_PATH)/cpu_extension.mk
 #include $(MY_LOCAL_PATH)/format_reader.mk
 #include $(LOCAL_PATH)/prebuild.mk
 
-include $(MY_LOCAL_PATH)/cldnn_plugin.mk
+#include $(MY_LOCAL_PATH)/cldnn_plugin.mk
 
-include $(MY_LOCAL_PATH)/cldnn.mk
+#include $(MY_LOCAL_PATH)/cldnn.mk
