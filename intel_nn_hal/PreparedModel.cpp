@@ -860,7 +860,7 @@ const uint8_t* PreparedModel::GetOperandMemory(const Model& model, uint32_t inde
         // nnAssert(false);
         return nullptr;
     }
-
+    
     ALOGE("operand is expected to be const, but lifetime is %d", op.lifetime);
     nnAssert(false);  // temp fix since some time const operand set as TEMPORARY_VARIABLE
     return nullptr;
@@ -1168,7 +1168,7 @@ void PreparedModel::deinitialize() {
     delete enginePtr;
     enginePtr = nullptr;
 
-    for (const auto& operand : mOperands) {
+    // for (const auto& operand : mOperands) {
         /*        for (const auto& buf : operand.buffer) {
                     VLOG(L1, "free buffer %p of operand %p", buf, &operand);
                     if (buf != nullptr)
@@ -1177,29 +1177,30 @@ void PreparedModel::deinitialize() {
         // VLOG(L1, "free buffer %p of operand %p", operand.buffer, &operand);
         // if (operand.buffer)
         //    delete operand.buffer;
-    }
+    // }
     VLOG(L1, "free engine");
 }
 
 #ifdef NN_DEBUG
 template <typename T>
-void printBuffer(int level, T* buf, int num, int items, const char* format) {
+void printBuffer(int level, T* buf, int num, int items, const char* format, uint32_t buf_len) {
     char str[1024];
     int start = 0;
     int n = 0;
     while (n < num) {
         int offset = 0;
         n = (n + items) > num ? num : n + items;
-        offset = sprintf(str, "[%d->%d]:\t", start, n);
+        offset = snprintf(str, sizeof(str), "[%d->%d]:\t", start, n);
         for (int i = start; i < n; i++) {
-            offset += sprintf(str + offset, format, buf[i]);
+            if (i<buf_len)
+                offset += snprintf(str + offset, sizeof(str + offset), format, buf[i]);
         }
         start = n;
         VLOG(level, "%s", str);
     }
 }
 
-void printOperandbuf(int level, const uint8_t* buffer, const std::vector<uint32_t>& dims,
+void printOperandbuf(int level, const uint8_t* buffer, const std::vector<uint32_t>& dims, uint32_t buffer_length,
                      int limit = 0) {
     auto dimsize = dims.size();
     auto type = OperandType::TENSOR_FLOAT32;  // operand.type;
@@ -1210,7 +1211,7 @@ void printOperandbuf(int level, const uint8_t* buffer, const std::vector<uint32_
 
     if (type == OperandType::TENSOR_FLOAT32) {
         // float *buf = static_cast<float *>(operand.buffer);
-        printBuffer<float>(level, (float*)buffer, size, 10, "%f\t");
+        printBuffer<float>(level, (float*)buffer, size, 10, "%f\t", buffer_length);
     } else if (type == OperandType::TENSOR_INT32) {
         // int32_t *buf = static_cast<int32_t *>(data_handle());
         // printBuffer<int32_t>(level, buf, size, 10, "%d\t");
@@ -1291,7 +1292,6 @@ void PreparedModel::asyncExecute(const Request& request, const sp<IExecutionCall
 #ifdef NN_DEBUG
     {
         VLOG(L1, "Model output0 are:");
-        const RunTimeOperandInfo& output = mOperands[mModel.outputIndexes[0]];
         InferenceEngine::TBlob<float>::Ptr outBlob =
             enginePtr->getBlob(mPorts[mModel.outputIndexes[0]]->name);
 
@@ -1301,7 +1301,6 @@ void PreparedModel::asyncExecute(const Request& request, const sp<IExecutionCall
         }
 
         VLOG(L1, "Model input0 are:");
-        const RunTimeOperandInfo& input = mOperands[mModel.inputIndexes[0]];
         InferenceEngine::TBlob<float>::Ptr inBlob =
             enginePtr->getBlob(mPorts[mModel.inputIndexes[0]]->name);
         nelem = (inBlob->size() > 20 ? 20 : inBlob->size());
@@ -2166,7 +2165,6 @@ bool PreparedModel::operationConv2D(const Operation& operation) {
 
     ConvolutionParams prms;
 
-    int batches = (int)inputDims[0];
     int in_channels = (int)inputDims[1];
     int input_height = (int)inputDims[2];
     int input_width = (int)inputDims[3];
