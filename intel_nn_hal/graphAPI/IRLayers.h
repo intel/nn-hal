@@ -385,8 +385,6 @@ inline OutputPort Convolution(const OutputPort &src, const ConvolutionParams &pr
 
         size_t SH = ret->_stride[InferenceEngine::Y_AXIS];
         size_t SW = ret->_stride[InferenceEngine::X_AXIS];
-        size_t PH = ret->_padding[InferenceEngine::Y_AXIS];
-        size_t PW = ret->_padding[InferenceEngine::X_AXIS];
         size_t OC = ret->_out_depth;
 
         if (prms.padType == "valid") {
@@ -571,8 +569,6 @@ inline OutputPort Pooling(const OutputPort &inp, const Point2D &kernel, const Po
         size_t KW = ret->_kernel[InferenceEngine::X_AXIS];
         size_t SH = ret->_stride[InferenceEngine::Y_AXIS];
         size_t SW = ret->_stride[InferenceEngine::X_AXIS];
-        size_t PH = ret->_padding[InferenceEngine::Y_AXIS];
-        size_t PW = ret->_padding[InferenceEngine::X_AXIS];
 
         if (padType == "valid") {
             OHTemp = std::ceil((IH - KH + 1.f) / SH);
@@ -951,11 +947,11 @@ inline OutputPort operator+(const OutputPort &a, const OutputPort &b) {
 
 inline OutputPort AddConst(IRDocument &doc, const OutputPort &src, const IRBlob::Ptr &biases) {
     // this depends on the plugin, see E-mail
-    bool useScaleShift = false;
+    // bool useScaleShift = false;
 
-    if (useScaleShift) {
-        return ScaleShiftNode(src, nullptr, biases);
-    }
+    // if (useScaleShift) {
+    //     return ScaleShiftNode(src, nullptr, biases);
+    // }
     // use const layer with elment wise add
     auto constNode = Generic("Const");
     doc.add(constNode);

@@ -1172,9 +1172,9 @@ void printBuffer(int level, T* buf, int num, int items, const char* format) {
     while (n < num) {
         int offset = 0;
         n = (n + items) > num ? num : n + items;
-        offset = sprintf(str, "[%d->%d]:\t", start, n);
+        offset = snprintf(str, sizeof(str), "[%d->%d]:\t", start, n);
         for (int i = start; i < n; i++) {
-            offset += sprintf(str + offset, format, buf[i]);
+            offset += snprintf(str + offset, sizeof(str + offset), format, buf[i]);
         }
         start = n;
         VLOG(level, "%s", str);
