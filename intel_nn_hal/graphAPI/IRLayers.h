@@ -52,7 +52,6 @@ namespace nnhal {
 
 extern int layer_name_count;
 extern InferenceEngine::Precision g_layer_precision;
-inline size_t sizeOf(const TensorDims &dims);
 
 inline OutputPort addOutput(const IRLayer &layer, const InferenceEngine::SizeVector &dims) {
     std::string d_name = layer->name;
@@ -82,7 +81,7 @@ inline OutputPort addOutput(const IRLayer &layer, const InferenceEngine::SizeVec
     }
 
     layer->outData.push_back(data);
-    data->creatorLayer = layer;
+    data->getCreatorLayer() = layer;
 
 #ifdef NNLOG
     std::vector<size_t> outdims = data->getTensorDesc().getDims();
@@ -134,7 +133,7 @@ inline IRLayer Generic(const std::string &type, const OutputPort &src) {
 
 inline OutputPort output(const IRLayer &src, int index = 0) { return src->outData[index]; }
 
-inline IRLayer LayerOf(const OutputPort &src) { return src->creatorLayer.lock(); }
+inline IRLayer LayerOf(const OutputPort &src) { return src->getCreatorLayer().lock(); }
 
 inline IRLayer Generic(const std::string &type, const IRLayer &src) {
     return Generic(type, output(src));
@@ -832,7 +831,13 @@ inline OutputPort L2Normalization(const OutputPort &src, bool isAcross, bool isS
 }
 
 inline OutputPort Reshape(const TensorDims &newDims, const OutputPort &src) {
-    if (sizeOf(src->getTensorDesc().getDims()) != sizeOf(newDims))
+    auto sizeOfTensor = [](const TensorDims& dims) {
+        size_t ret = dims[0];
+        for (int i = 1; i < dims.size(); ++i) ret *= dims[i];
+        return ret;
+    };
+
+    if (sizeOfTensor(src->getTensorDesc().getDims()) != sizeOfTensor(newDims))
         THROW("Cannot reorder different volumes");
 
     /*//first implementation

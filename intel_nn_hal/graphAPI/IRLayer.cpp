@@ -48,7 +48,9 @@ const std::string ActivationLayer::Tanh("tanh");
 const std::string ActivationLayer::ReLU("ReLU");
 
 void operator>>(const InferenceEngine::DataPtr &lhs, const InferenceEngine::CNNLayerPtr &rhs) {
-    lhs->inputTo[rhs->name] = rhs;
+//    lhs->inputTo[rhs->name] = rhs;
+	auto inputTo = lhs->getInputTo();
+    inputTo[rhs->name] = rhs;
     rhs->insData.push_back(lhs);
 }
 }  // namespace nnhal

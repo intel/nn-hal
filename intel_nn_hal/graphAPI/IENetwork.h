@@ -40,7 +40,6 @@
 #ifdef ENABLE_MYRIAD
 #include "vpu_plugin_config.hpp"
 #endif
-#include "gna_config.hpp"
 using namespace InferenceEngine::details;
 using namespace InferenceEngine;
 
@@ -65,13 +64,9 @@ void dumpBlob(const std::string &prefix, size_t len, TBlob<short>::Ptr blob)
     auto dims = blob->getTensorDesc().getDims();
     //std::cout << prefix << dims;
     ALOGI("prefix %s", prefix.c_str());
-
     auto mem = blob->readOnly();
-
     const float *pf = mem.as<const float*>();
-
     if (len > blob->size()) len = blob->size();
-
     for (unsigned int i=0; i<len; i++)
     {
         if (0==i % 16)
@@ -85,7 +80,6 @@ void dumpBlob(const std::string &prefix, size_t len, TBlob<short>::Ptr blob)
     //std::cout << std::endl;
     ALOGI("-end");
 }
-
 */
 static void setConfig(std::map<std::string, std::string> &config) {
     // config[VPUConfigParams::FIRST_SHAVE] = "0";
@@ -119,14 +113,13 @@ class ExecuteNetwork {
     IInferRequest::Ptr req;
     InferRequest inferRequest;
     ResponseDesc resp;
-    TargetDevice targetDevice;
 
 public:
     ExecuteNetwork() : network(nullptr) {}
-    ExecuteNetwork(IRDocument &doc, TargetDevice target = TargetDevice::eCPU) : network(nullptr) {
-        InferenceEngine::PluginDispatcher dispatcher(
-            {"/vendor/lib64", "/vendor/lib", "/system/lib64", "/system/lib", "", "./"});
-        enginePtr = dispatcher.getSuitablePlugin(target);
+    ExecuteNetwork(IRDocument &doc, std::string target = "CPU") : network(nullptr) {
+ //       InferenceEngine::PluginDispatcher dispatcher(
+  //          {"/vendor/lib64", "/vendor/lib", "/system/lib64", "/system/lib", "", "./"});
+   //     enginePtr = dispatcher.getPluginByDevice(target);
 
         network = doc.getNetwork();
         network->getInputsInfo(inputInfo);
@@ -135,7 +128,6 @@ public:
         // size_t batch = 1;
         // network->setBatchSize(batch);
 
-        targetDevice = target;
 #ifdef NNLOG
         ALOGI("%s Plugin loaded", InferenceEngine::TargetDeviceInfo::name(target));
 #endif
@@ -149,54 +141,17 @@ public:
 
     //~ExecuteNetwork(){ }
     void loadNetwork() {
-    ALOGI("IENetwork.h void loadNetwork()");
+        std::map<std::string, std::string> networkConfig;
+        setConfig(networkConfig);
 
-    InferencePlugin plugin(enginePtr);
-    switch (targetDevice) {
-        case TargetDevice::eGNA:
-        {
-          ALOGI("IENetwork.h TargetDevice eGNA");
-          std::map<std::string, std::string> config;
-	    //config[CONFIG_KEY(LOG_LEVEL)] = CONFIG_VALUE(LOG_INFO);
-          std::map<std::string, std::string> gnaPluginConfig;
-          gnaPluginConfig[GNAConfigParams::KEY_GNA_DEVICE_MODE] = "GNA_HW";
-          gnaPluginConfig[GNAConfigParams::KEY_GNA_PRECISION] = "I16";
-          std::string scaleFactorConfigKey_1 = GNA_CONFIG_KEY(SCALE_FACTOR) + std::string("_") + std::to_string(1);
-          std::string scaleFactorConfigKey_2 = GNA_CONFIG_KEY(SCALE_FACTOR) + std::string("_") + std::to_string(2);
-          gnaPluginConfig[scaleFactorConfigKey_1] = std::to_string(2048);
-          gnaPluginConfig[scaleFactorConfigKey_2] = std::to_string(2048);
-          gnaPluginConfig[GNA_CONFIG_KEY(COMPACT_MODE)] = CONFIG_VALUE(NO);
-          config.insert(std::begin(gnaPluginConfig), std::end(gnaPluginConfig));
-          ALOGI("IENetwork.h Create plugin");
-          CNNNetReader netBuilder;
-          ALOGI("IENetwork.h CNNNetReader netBuilder");
-          netBuilder.ReadNetwork("/data/local/graphfile.xml");
-          ALOGI("IENetwork.h CNNNetReader netBuilder Done Read N/W");
-          /* Extract model name and load weights **/
-          netBuilder.ReadWeights("/data/local/graphfile.bin");
-          int batchSize = 1;
-          // ----------------------------------------------------------------------------------------------
-          ALOGI("IENetwork.h main.cpp inputInfo");
-          // --------------------------- Set batch size ---------------------------------------------------
-          /** Set batch size.  Unlike in imaging, batching in time (rather than space) is done for speech recognition. **/
-          netBuilder.getNetwork().setBatchSize(batchSize);
-          InferenceEngine::CNNNetwork cnnnetwork = netBuilder.getNetwork();
-          InferenceEngine::ICNNNetwork &icnnnetwork = cnnnetwork;
-          executable_network = plugin.LoadNetwork(icnnnetwork, config);
-          break;
-        }
-        default:
-          ALOGI("IENetwork.h default");
-          std::map<std::string, std::string> networkConfig;
-          setConfig(networkConfig);
-          executable_network = plugin.LoadNetwork(*network, networkConfig);
-          //std::cout << "Network loaded" << std::endl;
-          break;
-	}
+        InferencePlugin plugin(enginePtr);
+        executable_network = plugin.LoadNetwork(*network, networkConfig);
+        // std::cout << "Network loaded" << std::endl;
+        ALOGI("Network loaded");
 
-    inferRequest = executable_network.CreateInferRequest();
-    ALOGI("IENetwork.h inferRequest");
-  }
+        inferRequest = executable_network.CreateInferRequest();
+        // std::cout << "infer request created" << std::endl;
+    }
 
     void prepareInput() {
 #ifdef NNLOG
@@ -275,7 +230,6 @@ public:
                 auto inName = inputInfo.begin()->first;
                 ALOGI("set input blob\n");
                 inferRequest.SetBlob(inName, in);
-
                 ALOGI("aks prepare output blob\n");
                 const std::string firstOutName = outputInfo.begin()->first;
                 InferenceEngine::TBlob<PrecisionTrait<Precision::FP32>::value_type>::Ptr outputBlob;
@@ -283,10 +237,8 @@ public:
            InferenceEngine::make_shared_blob<PrecisionTrait<Precision::FP32>::value_type,
                         InferenceEngine::SizeVector>(Precision::FP32,
            outputInfo.begin()->second->getDims()); outputBlob->allocate();
-
                 ALOGI("set output blob\n");
                 inferRequest.SetBlob(firstOutName, outputBlob);
-
         */
 #ifdef NNLOG
         ALOGI("StartAsync scheduled");

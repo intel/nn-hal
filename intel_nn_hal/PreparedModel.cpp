@@ -29,154 +29,6 @@
 #define DISABLE_ALL_QUANT
 //#define NN_DEBUG
 
-enum DebugLevel {
-    L0,
-    L1,
-    L2,
-    L3,
-    L4,
-};
-
-unsigned int debugMask = ((1 << (L1 + 1)) - 1);
-
-#ifdef NN_DEBUG
-#define VLOG(l, x, ...)                                                          \
-    do {                                                                         \
-        if (debugMask & (1 << l)) ALOGI("[%s] " x, __FUNCTION__, ##__VA_ARGS__); \
-    } while (0)
-
-#define VLOGDIMS(l, d, header)                                                         \
-    do {                                                                               \
-        auto size = (d).size();                                                        \
-        VLOG(l, "%s: vectors {%d, %d, %d, %d}", header, (d)[0], size > 1 ? (d)[1] : 0, \
-             size > 2 ? (d)[2] : 0, size > 3 ? (d)[3] : 0);                            \
-    } while (0)
-
-#define dumpOperand(index)                                      \
-    do {                                                        \
-        const auto op = mModel.operands[index];                 \
-        ALOGI("---------------------------------------------"); \
-        ALOGI("Operand index: %d", index);                      \
-        ALOGI("%s", toString(op).c_str());                      \
-        ALOGI("---------------------------------------------"); \
-    } while (0)
-
-#define dumpOperation(operation)                                \
-    do {                                                        \
-        ALOGI("---------------------------------------------"); \
-        ALOGI("Operation:");                                    \
-        ALOGI("%s", toString(operation).c_str());               \
-        ALOGI("---------------------------------------------"); \
-    } while (0)
-
-#define dumpOperationSupport(operation, support)                    \
-    do {                                                            \
-        ALOGI("---------------------------------------------");     \
-        ALOGI("Operation support: %s", support ? "True" : "False"); \
-        ALOGI("%s", toString(operation).c_str());                   \
-        ALOGI("---------------------------------------------");     \
-    } while (0)
-
-#define dumpOperationParam(operation)             \
-    do {                                          \
-        ALOGI("dumping operation-params");        \
-        ALOGI("%s", toString(operation).c_str()); \
-    } while (0)
-
-#else
-#define VLOG(...)
-#define VLOGDIMS(l, d, header)
-#define dumpOperand(...)
-#define dumpOperation(operation)
-#define dumpOperationSupport(operation, support)
-#define dumpOperationParam(operation)
-#endif
-
-#define WRONG_DIM (-1)
-
-#define nnAssert(v)                                                                            \
-    do {                                                                                       \
-        if (!(v)) {                                                                            \
-            LOG(ERROR) << "nnAssert failed at " << __FILE__ << ":" << __LINE__ << " - '" << #v \
-                       << "'\n";                                                               \
-            abort();                                                                           \
-        }                                                                                      \
-    } while (0)
-
-#define EXPL_PAD_PARAMS_CONV 10
-#define IMPL_PAD_PARAMS_CONV 7
-#define EXPL_PAD_PARAMS_DW_CONV 11
-#define IMPL_PAD_PARAMS_DW_CONV 8
-#define SOFTMAX_INPUT_PARAMS 2
-#define NHWC_DIM_NUM 4
-#define NHWC_CH_IDX 3
-#define NHWC_HT_IDX 1
-#define NHWC_WD_IDX 2
-// operand index as from  1.1/type.hal
-#define OP_INPUT_IDX_CONV 0
-#define OP_FILTER_IDX_CONV 1
-#define OP_BIAS_IDX_CONV 2
-#define OP_PADSCHEME_IDX_CONV 3
-#define OP_PADL_IDX_CONV 3
-#define OP_PADR_IDX_CONV 4
-#define OP_PADH_IDX_CONV 5
-#define OP_PADW_IDX_CONV 6
-#define OP_STRD_WD_IDX_EXPL_CONV 7
-#define OP_STRD_HT_IDX_EXPL_CONV 8
-#define OP_STRD_WD_IDX_IMPL_CONV 4
-#define OP_STRD_HT_IDX_IMPL_CONV 5
-#define OP_ACTV_FUNC_IDX_IMPL_CONV 6
-#define OP_ACTV_FUNC_IDX_EXPL_CONV 9
-#define OP_ACTV_FUNC_IDX_IMPL_DW_CONV 7
-#define OP_ACTV_FUNC_IDX_EXPL_DW_CONV 10
-#define OP_DW_CONV_DPM_IMPL 6  // depth multiplier
-#define OP_DW_CONV_DPM_EXPL 9
-#define OP_ADD_OPR1_IDX 0
-#define OP_ADD_OPR1_IDX 1
-
-// average_pooling_2d as in type.hal
-#define EXPL_PAD_PARAMS_POOL 10
-#define IMPL_PAD_PARAMS_POOL 7
-#define OP_INPUT_IDX_POOL 0
-#define OP_PADL_IDX_POOL 1
-#define OP_PADR_IDX_POOL 2
-#define OP_PADH_IDX_POOL 3
-#define OP_PADW_IDX_POOL 4
-#define OP_STRD_WD_IDX_EXPL_POOL 5
-#define OP_STRD_HT_IDX_EXPL_POOL 6
-#define OP_FLT_WD_IDX_EXPL_POOL 7
-#define OP_FLT_HT_IDX_EXPL_POOL 8
-#define OP_ACTV_FUNC_IDX_EXPL_POOL 9
-
-#define OP_PADSCHEME_IDX_POOL 1
-#define OP_STRD_WD_IDX_IMPL_POOL 2
-#define OP_STRD_HT_IDX_IMPL_POOL 3
-#define OP_FLT_WD_IDX_IMPL_POOL 4
-#define OP_FLT_HT_IDX_IMPL_POOL 5
-#define OP_ACTV_FUNC_IDX_IMPL_POOL 6
-
-// fully_connected as in type.hal
-#define OP_INPUT_IDX_FC 0
-#define OP_WGHT_IDX_FC 1
-#define OP_BIAS_IDX_FC 2
-#define OP_ACTV_IDX_FC 3
-#define FC_INPUT_PARAMS 4
-
-// ADD operation
-#define ADD_INPUT_PARAMS 3
-#define OP_INPUT0_IDX_ADD 0
-#define OP_INPUT1_IDX_ADD 1
-#define OP_ACTV_IDX_ADD 2
-
-#define CHECK_OPERAND_2D(params, idx_x, idx_y)                                                 \
-    do {                                                                                       \
-        VLOG(L1, "As found in %s", __func__);                                                  \
-        if (params.x < 0 || params.y < 0) {                                                    \
-            VLOG(L1, "Invalid Point2D Operands at index [%d ,%d] , aborting!!", idx_x, idx_y); \
-            return false;                                                                      \
-        }                                                                                      \
-    } while (0)
-
 namespace android {
 namespace hardware {
 namespace neuralnetworks {
@@ -186,434 +38,18 @@ using namespace android::nn;
 
 static const Timing kNoTiming = {.timeOnDevice = UINT64_MAX, .timeInDriver = UINT64_MAX};
 
-enum PaddingScheme {
-    kPaddingUnknown = 0,
-    /**
-     * SAME padding.
-     * Padding on both ends are the "same":
-     *     padding_to_beginning =  total_padding / 2
-     *     padding_to_end       = (total_padding + 1)/2.
-     * i.e., for even number of padding, padding to both ends are exactly
-     * the same; for odd number of padding, padding to the ending is bigger
-     * than the padding to the beginning by 1.
-     *
-     * total_padding is a function of input, stride and filter size.
-     * It could be computed as follows:
-     *    out_size = (input + stride - 1) / stride;
-     *    needed_input = (out_size - 1) * stride + filter_size
-     *    total_padding = max(0, needed_input - output_size)
-     *  The computation is the same for the horizontal and vertical directions.
-     */
-    kPaddingSame = 1,
-    /**
-     * VALID padding.
-     * No padding. When the input size is not evenly divisible by
-     * the filter size, the input at the end that could not fill
-     * the whole filter tile will simply be ignored.
-     */
-    kPaddingValid = 2,
-};
-
-void calculateExplicitPadding(int32_t in_size, int32_t stride, int32_t filter_size,
-                              int32_t padding_implicit, int32_t* padding_head,
-                              int32_t* padding_tail) {
-    *padding_head = 0;
-    *padding_tail = 0;
-
-    if (padding_implicit == kPaddingSame) {
-        int32_t out_size = (in_size + stride - 1) / stride;
-        int32_t tmp = (out_size - 1) * stride + filter_size;
-        if (tmp > in_size) {
-            *padding_head = (tmp - in_size) / 2;
-            *padding_tail = (tmp - in_size) - *padding_head;
-        }
-    }
-}
-
-int32_t computeOutSize(int32_t imageSize, int32_t filterSize, int32_t stride, int32_t paddingHead,
-                       int32_t paddingTail) {
-    return (imageSize - filterSize + stride + paddingHead + paddingTail) / stride;
-}
-
-inline size_t sizeOf(const TensorDims& dims) {
-    size_t ret = dims[0];
-    for (int i = 1; i < dims.size(); ++i) ret *= dims[i];
-    return ret;
-}
-
-// shape is nchw, dims depends on layout
-TensorDims dimsToShape(const std::vector<uint32_t>& dims, Layout layout) {
-    VLOG(L3, "layout: %d", static_cast<int>(layout));
-    VLOGDIMS(L3, dims, "dims");
-    TensorDims shape;
-    uint32_t n, c, h, w;
-    // 4-D
-    switch (layout) {
-        case NCHW:
-        case OIHW:
-            n = dims[0];
-            c = dims[1];
-            h = dims[2];
-            w = dims[3];
-            shape = {n, c, h, w};
-            break;
-        case NHWC:
-            n = dims[0];
-            h = dims[1];
-            w = dims[2];
-            c = dims[3];
-            shape = {n, c, h, w};
-            break;
-        case C:
-            n = dims[0];
-            shape = {n};
-            break;
-        case NC:
-            n = dims[0];
-            c = dims[1];
-            shape = {n, c};
-            break;
-        default:
-            VLOG(L1, "unsupported layout %d", layout);
-    }
-
-    VLOGDIMS(L3, shape, "shape");
-    return shape;
-}
-
-// shape is nchw, dims depends on format
-std::vector<uint32_t>& shapeToDims(const TensorDims& shape, Layout layout) {
-    VLOG(L3, "layout: %d", static_cast<int>(layout));
-    VLOGDIMS(L3, shape, "shape");
-    uint32_t n, c, h, w;
-    std::vector<uint32_t> dims;
-    // 1-D
-    if (layout == C) {
-        n = shape[0];
-        dims = {n};
-        return dims;
-    }
-
-    if (layout == NC) {
-        n = shape[0];
-        c = shape[1];
-        dims = {n, c};
-        return dims;
-    }
-
-    // 4-D
-    // vpu accept nchw or oihw.
-    n = shape[0];
-    c = shape[1];
-    h = shape[2];
-    w = shape[3];
-
-    switch (layout) {
-        case NCHW:
-        case OIHW:
-            dims = {n, c, h, w};
-            break;
-        case NHWC:
-            dims = {n, h, w, c};
-            break;
-        default:
-            VLOG(L1, "unsupported layout %d", layout);
-    }
-
-    VLOGDIMS(L3, dims, "dims");
-    return dims;
-}
-
-unsigned short float2half(unsigned f) {
-    unsigned f_exp, f_sig;
-    unsigned short h_sgn, h_exp, h_sig;
-
-    h_sgn = (unsigned short)((f & 0x80000000u) >> 16);
-    f_exp = (f & 0x7f800000u);
-
-    /* Exponent overflow/NaN converts to signed inf/NaN */
-    if (f_exp >= 0x47800000u) {
-        if (f_exp == 0x7f800000u) {
-            /* Inf or NaN */
-            f_sig = (f & 0x007fffffu);
-            if (f_sig != 0) {
-                /* NaN - propagate the flag in the significand... */
-                unsigned short ret = (unsigned short)(0x7c00u + (f_sig >> 13));
-                /* ...but make sure it stays a NaN */
-                if (ret == 0x7c00u) {
-                    ret++;
-                }
-                return h_sgn + ret;
-            } else {
-                /* signed inf */
-                return (unsigned short)(h_sgn + 0x7c00u);
-            }
-        } else {
-            /* overflow to signed inf */
-#if NPY_HALF_GENERATE_OVERFLOW
-            npy_set_floatstatus_overflow();
-#endif
-            return (unsigned short)(h_sgn + 0x7c00u);
-        }
-    }
-
-    /* Exponent underflow converts to a subnormal half or signed zero */
-    if (f_exp <= 0x38000000u) {
-        /*
-         * Signed zeros, subnormal floats, and floats with small
-         * exponents all convert to signed zero halfs.
-         */
-        if (f_exp < 0x33000000u) {
-#if NPY_HALF_GENERATE_UNDERFLOW
-            /* If f != 0, it underflowed to 0 */
-            if ((f & 0x7fffffff) != 0) {
-                npy_set_floatstatus_underflow();
-            }
-#endif
-            return h_sgn;
-        }
-        /* Make the subnormal significand */
-        f_exp >>= 23;
-        f_sig = (0x00800000u + (f & 0x007fffffu));
-#if NPY_HALF_GENERATE_UNDERFLOW
-        /* If it's not exactly represented, it underflowed */
-        if ((f_sig & (((unsigned)1 << (126 - f_exp)) - 1)) != 0) {
-            npy_set_floatstatus_underflow();
-        }
-#endif
-        f_sig >>= (113 - f_exp);
-        /* Handle rounding by adding 1 to the bit beyond half precision */
-#if NPY_HALF_ROUND_TIES_TO_EVEN
-        /*
-         * If the last bit in the half significand is 0 (already even), and
-         * the remaining bit pattern is 1000...0, then we do not add one
-         * to the bit after the half significand.  In all other cases, we do.
-         */
-        if ((f_sig & 0x00003fffu) != 0x00001000u) {
-            f_sig += 0x00001000u;
-        }
-#else
-        f_sig += 0x00001000u;
-#endif
-        h_sig = (unsigned short)(f_sig >> 13);
-        /*
-         * If the rounding causes a bit to spill into h_exp, it will
-         * increment h_exp from zero to one and h_sig will be zero.
-         * This is the correct result.
-         */
-        return (unsigned short)(h_sgn + h_sig);
-    }
-
-    /* Regular case with no overflow or underflow */
-    h_exp = (unsigned short)((f_exp - 0x38000000u) >> 13);
-    /* Handle rounding by adding 1 to the bit beyond half precision */
-    f_sig = (f & 0x007fffffu);
-#if NPY_HALF_ROUND_TIES_TO_EVEN
-    /*
-     * If the last bit in the half significand is 0 (already even), and
-     * the remaining bit pattern is 1000...0, then we do not add one
-     * to the bit after the half significand.  In all other cases, we do.
-     */
-    if ((f_sig & 0x00003fffu) != 0x00001000u) {
-        f_sig += 0x00001000u;
-    }
-#else
-    f_sig += 0x00001000u;
-#endif
-    h_sig = (unsigned short)(f_sig >> 13);
-    /*
-     * If the rounding causes a bit to spill into h_exp, it will
-     * increment h_exp by one and h_sig will be zero.  This is the
-     * correct result.  h_exp may increment to 15, at greatest, in
-     * which case the result overflows to a signed inf.
-     */
-#if NPY_HALF_GENERATE_OVERFLOW
-    h_sig += h_exp;
-    if (h_sig == 0x7c00u) {
-        npy_set_floatstatus_overflow();
-    }
-    return h_sgn + h_sig;
-#else
-    return h_sgn + h_exp + h_sig;
-#endif
-}
-void floattofp16(short* dst, float* src, unsigned nelem) {
-    unsigned i;
-    unsigned short* _dst = (unsigned short*)dst;
-    unsigned* _src = (unsigned*)src;
-
-    for (i = 0; i < nelem; i++) _dst[i] = float2half(_src[i]);
-}
-
-// Function to convert F32 into F16
-// F32: exp_bias:127 SEEEEEEE EMMMMMMM MMMMMMMM MMMMMMMM.
-// F16: exp_bias:15  SEEEEEMM MMMMMMMM
-#define EXP_MASK_F32 0x7F800000U
-#define EXP_MASK_F16 0x7C00U
-
-// small helper function to represent uint32_t value as float32
-float asfloat(uint32_t v) { return *reinterpret_cast<float*>(&v); }
-
-// Function to convert F32 into F16
-float f16tof32(short x) {
-    // this is storage for output result
-    uint32_t u = x;
-
-    // get sign in 32bit format
-    uint32_t s = ((u & 0x8000) << 16);
-
-    // check for NAN and INF
-    if ((u & EXP_MASK_F16) == EXP_MASK_F16) {
-        // keep mantissa only
-        u &= 0x03FF;
-
-        // check if it is NAN and raise 10 bit to be align with intrin
-        if (u) {
-            u |= 0x0200;
-        }
-
-        u <<= (23 - 10);
-        u |= EXP_MASK_F32;
-        u |= s;
-    } else if ((x & EXP_MASK_F16) ==
-               0) {  // check for zero and denormals. both are converted to zero
-        u = s;
-    } else {
-        // abs
-        u = (u & 0x7FFF);
-
-        // shift mantissa and exp from f16 to f32 position
-        u <<= (23 - 10);
-
-        // new bias for exp (f16 bias is 15 and f32 bias is 127)
-        u += ((127 - 15) << 23);
-
-        // add sign
-        u |= s;
-    }
-
-    // finaly represent result as float and return
-    return *reinterpret_cast<float*>(&u);
-}
-
-// This function convert f32 to f16 with rounding to nearest value to minimize error
-// the denormal values are converted to 0.
-short f32tof16(float x) {
-    // create minimal positive normal f16 value in f32 format
-    // exp:-14,mantissa:0 -> 2^-14 * 1.0
-    static float min16 = asfloat((127 - 14) << 23);
-
-    // create maximal positive normal f16 value in f32 and f16 formats
-    // exp:15,mantissa:11111 -> 2^15 * 1.(11111)
-    static float max16 = asfloat(((127 + 15) << 23) | 0x007FE000);
-    static uint32_t max16f16 = ((15 + 15) << 10) | 0x3FF;
-
-    // define and declare variable for intermidiate and output result
-    // the union is used to simplify representation changing
-    union {
-        float f;
-        uint32_t u;
-    } v;
-    v.f = x;
-
-    // get sign in 16bit format
-    uint32_t s = (v.u >> 16) & 0x8000;  // sign 16:  00000000 00000000 10000000 00000000
-
-    // make it abs
-    v.u &= 0x7FFFFFFF;  // abs mask: 01111111 11111111 11111111 11111111
-
-    // check NAN and INF
-    if ((v.u & EXP_MASK_F32) == EXP_MASK_F32) {
-        if (v.u & 0x007FFFFF) {
-            return s | (v.u >> (23 - 10)) | 0x0200;  // return NAN f16
-        } else {
-            return s | (v.u >> (23 - 10));  // return INF f16
-        }
-    }
-
-    // to make f32 round to nearest f16
-    // create halfULP for f16 and add it to origin value
-    float halfULP = asfloat(v.u & EXP_MASK_F32) * asfloat((127 - 11) << 23);
-    v.f += halfULP;
-
-    // if input value is not fit normalized f16 then return 0
-    // denormals are not covered by this code and just converted to 0
-    if (v.f < min16 * 0.5F) {
-        return s;
-    }
-
-    // if input value between min16/2 and min16 then return min16
-    if (v.f < min16) {
-        return s | (1 << 10);
-    }
-
-    // if input value more than maximal allowed value for f16
-    // then return this maximal value
-    if (v.f >= max16) {
-        return max16f16 | s;
-    }
-
-    // change exp bias from 127 to 15
-    v.u -= ((127 - 15) << 23);
-
-    // round to f16
-    v.u >>= (23 - 10);
-
-    return v.u | s;
-}
-
-void f16tof32Arrays(float* dst, const short* src, uint32_t& nelem, float scale = 1,
-                    float bias = 0) {
-    VLOG(L1, "convert f16tof32Arrays...\n");
-    const short* _src = reinterpret_cast<const short*>(src);
-
-    for (uint32_t i = 0; i < nelem; i++) {
-        dst[i] = f16tof32(_src[i]) * scale + bias;
-    }
-}
-
-void f32tof16Arrays(short* dst, const float* src, uint32_t& nelem, float scale = 1,
-                    float bias = 0) {
-    VLOG(L1, "convert f32tof16Arrays...");
-    for (uint32_t i = 0; i < nelem; i++) {
-        dst[i] = f32tof16(src[i] * scale + bias);
-    }
-}
-
-int sizeOfData(OperandType type, std::vector<uint32_t> dims) {
-    int size;
-    switch (type) {
-        case OperandType::FLOAT32:
-            size = 4;
-            break;
-        case OperandType::TENSOR_FLOAT32:
-            size = 4;
-            break;
-        case OperandType::TENSOR_INT32:
-            size = 4;
-            break;
-        case OperandType::TENSOR_QUANT8_ASYMM:
-        case OperandType::INT32:
-            size = 1;
-            break;
-
-        default:
-            size = 0;
-    }
-    for (auto d : dims) size *= d;
-
-    return size;
-}
-
-inline size_t getSizeFromInts(int lower, int higher) {
-    return (uint32_t)(lower) + ((uint64_t)(uint32_t)(higher) << 32);
-}
-
 template <typename T>
 T getScalarData(const RunTimeOperandInfo& info) {
     // TODO: Check buffer is at least as long as size of data.
     T* data = reinterpret_cast<T*>(info.buffer);
     return data[0];
+}
+
+template <typename T>
+size_t product(const vec<T>& dims) {
+    size_t rc = 1;
+    for (auto d : dims) rc *= d;
+    return rc;
 }
 
 // TODO: short term, make share memory mapping and updating a utility function.
@@ -711,67 +147,6 @@ static bool setInfoAndAllocateIfNeeded(RunTimeOperandInfo* info, const Shape& sh
     return true;
 }
 
-uint32_t getNumberOfElements(const vec<uint32_t>& dims) {
-    uint32_t count = 1;
-    for (size_t i = 0; i < dims.size(); i++) {
-        count *= dims[i];
-    }
-    return count;
-}
-
-TensorDims toDims(const vec<uint32_t>& dims) {
-    TensorDims td;
-    for (auto d : dims) td.push_back(d);
-    return td;
-}
-
-template <typename T>
-size_t product(const vec<T>& dims) {
-    size_t rc = 1;
-    for (auto d : dims) rc *= d;
-    return rc;
-}
-
-TensorDims permuteDims(const TensorDims& src, const vec<unsigned int>& order) {
-    TensorDims ret;
-    for (int i = 0; i < src.size(); i++) {
-        ret.push_back(src[order[i]]);
-    }
-    return ret;
-}
-
-// IRBlob::Ptr Permute(IRBlob::Ptr ptr, const vec<unsigned int> &order)
-IRBlob::Ptr Permute(IRBlob::Ptr ptr, const vec<unsigned int>& order) {
-    VLOG(L1, "Permute");
-    auto orig_dims = ptr->getTensorDesc().getDims();
-    auto dims = permuteDims(orig_dims, order);
-    ptr->getTensorDesc().setDims(dims);
-
-    return ptr;
-}
-
-#define PARAM_I32(i) ParseOperationInput<int32_t>(mModel, operation, i)
-#define PARAM_FP(i) ParseOperationInput<float>(mModel, operation, i)
-
-template <typename T>
-struct printHelper {
-    static void print(const T& value, const char* Obj) {}
-};
-
-template <>
-struct printHelper<int32_t> {
-    static void print(const int32_t& value, const char* operand) {
-        VLOG(L1, "Operand: value: %d, %s", value, operand);
-    }
-};
-
-template <>
-struct printHelper<float> {
-    static void print(const float& value, const char* operand) {
-        VLOG(L1, "Operand: value: %f, %s", value, operand);
-    }
-};
-
 template <typename T>
 T PreparedModel::ParseOperationInput(const Model& model, const Operation& operation,
                                      uint32_t index) {
@@ -831,6 +206,13 @@ std::vector<T> PreparedModel::GetConstVecFromBuffer(const uint8_t* buf, uint32_t
     }
 
     return ret;
+}
+
+bool PreparedModel::isOperandDataNull(int index) {
+    uint32_t len = 0;
+    const uint8_t* buf = GetOperandMemory(mModel, index, len);
+    if (buf == nullptr) return true;
+    return false;
 }
 
 const uint8_t* PreparedModel::GetOperandMemory(const Model& model, uint32_t index,
@@ -925,7 +307,7 @@ OutputPort PreparedModel::getPort(int index) {
         // TODO: workaround 3-D
         int dims_size = op.dimensions.size();
 
-        VLOG(L1, "mPorts[%d] %s dims size %d", index, mPorts[index]->name.c_str(), dims_size);
+        VLOG(L1, "mPorts[%d] %s dims size %d", index, mPorts[index]->getName().c_str(), dims_size);
 
         auto dims = permuteDims(toDims(op.dimensions), order);
         // auto dims = toDims(op.dimensions);
@@ -1052,7 +434,7 @@ bool PreparedModel::initialize() {
 
     // Check operation supoorted or not, user may not call getOpertionSupported()
     for (const auto& operation : mModel.operations) {
-        success = isOperationSupported(operation, mModel);
+        success = isOperationSupported(operation, mModel, mTargetDevice);
         dumpOperationSupport(operation, success);
         if (!success) {
             VLOG(L1, "get unsupported operation in initialize()");
@@ -1158,8 +540,8 @@ bool PreparedModel::initialize() {
     mNet.crateDotFile(dot);
     dot.close();
 
-    VLOG(L1, "initialize ExecuteNetwork for device %s",
-         InferenceEngine::TargetDeviceInfo::name(mTargetDevice));
+    //VLOG(L1, "initialize ExecuteNetwork for device %s",
+    //InferenceEngine::TargetDeviceInfo::name(mTargetDevice));
     enginePtr = new ExecuteNetwork(mNet, mTargetDevice);
     enginePtr->prepareInput();
     enginePtr->loadNetwork();
@@ -1273,15 +655,15 @@ void PreparedModel::asyncExecute(const Request& request, MeasureTiming measure,
                     operand, const_cast<uint8_t*>(r.buffer + arg.location.offset),
                     operand.length);  // if not doing memcpy
                 VLOG(L1, "setBlob for mPorts[%d]->name %s", indexes[i],
-                     mPorts[indexes[i]]->name.c_str());
-                enginePtr->setBlob(mPorts[indexes[i]]->name,
+                     mPorts[indexes[i]]->getName().c_str());
+                enginePtr->setBlob(mPorts[indexes[i]]->getName(),
                                    inputBlob);  // setInputBlob(const std::string &,IRBlob::Ptr);
 
             } else {
                 auto outputBlob = GetInOutOperandAsBlob(
                     operand, const_cast<uint8_t*>(r.buffer + arg.location.offset),
                     operand.length);  // if not doing memcpy
-                enginePtr->setBlob(mPorts[indexes[i]]->name, outputBlob);
+                enginePtr->setBlob(mPorts[indexes[i]]->getName(), outputBlob);
             }
         }
     };
@@ -1302,10 +684,10 @@ void PreparedModel::asyncExecute(const Request& request, MeasureTiming measure,
     }
 
     InferenceEngine::TBlob<float>::Ptr outBlob =
-        enginePtr->getBlob(mPorts[mModel.outputIndexes[0]]->name);
+        enginePtr->getBlob(mPorts[mModel.outputIndexes[0]]->getName());
 
     InferenceEngine::TBlob<float>::Ptr inBlob =
-        enginePtr->getBlob(mPorts[mModel.inputIndexes[0]]->name);
+        enginePtr->getBlob(mPorts[mModel.inputIndexes[0]]->getName());
     hidl_vec<OutputShape> outputShapes;
 #ifdef NN_DEBUG
     {
@@ -1379,15 +761,15 @@ void PreparedModel::asyncExecute_1_2(const Request& request, MeasureTiming measu
                     operand, const_cast<uint8_t*>(r.buffer + arg.location.offset),
                     operand.length);  // if not doing memcpy
                 VLOG(L1, "setBlob for mPorts[%d]->name %s", indexes[i],
-                     mPorts[indexes[i]]->name.c_str());
-                enginePtr->setBlob(mPorts[indexes[i]]->name,
+                     mPorts[indexes[i]]->getName().c_str());
+                enginePtr->setBlob(mPorts[indexes[i]]->getName(),
                                    inputBlob);  // setInputBlob(const std::string &,IRBlob::Ptr);
 
             } else {
                 auto outputBlob = GetInOutOperandAsBlob(
                     operand, const_cast<uint8_t*>(r.buffer + arg.location.offset),
                     operand.length);  // if not doing memcpy
-                enginePtr->setBlob(mPorts[indexes[i]]->name, outputBlob);
+                enginePtr->setBlob(mPorts[indexes[i]]->getName(), outputBlob);
             }
         }
     };
@@ -1408,10 +790,10 @@ void PreparedModel::asyncExecute_1_2(const Request& request, MeasureTiming measu
     }
 
     InferenceEngine::TBlob<float>::Ptr outBlob =
-        enginePtr->getBlob(mPorts[mModel.outputIndexes[0]]->name);
+        enginePtr->getBlob(mPorts[mModel.outputIndexes[0]]->getName());
 
     InferenceEngine::TBlob<float>::Ptr inBlob =
-        enginePtr->getBlob(mPorts[mModel.inputIndexes[0]]->name);
+        enginePtr->getBlob(mPorts[mModel.inputIndexes[0]]->getName());
     hidl_vec<OutputShape> outputShapes;
 #ifdef NN_DEBUG
     {
@@ -1551,15 +933,15 @@ Return<void> PreparedModel::executeSynchronously(const Request& request, Measure
                     operand, const_cast<uint8_t*>(r.buffer + arg.location.offset),
                     operand.length);  // if not doing memcpy
                 VLOG(L1, "setBlob for mPorts[%d]->name %s", indexes[i],
-                     mPorts[indexes[i]]->name.c_str());
-                enginePtr->setBlob(mPorts[indexes[i]]->name,
+                     mPorts[indexes[i]]->getName().c_str());
+                enginePtr->setBlob(mPorts[indexes[i]]->getName(),
                                    inputBlob);  // setInputBlob(const std::string &,IRBlob::Ptr);
 
             } else {
                 auto outputBlob = GetInOutOperandAsBlob(
                     operand, const_cast<uint8_t*>(r.buffer + arg.location.offset),
                     operand.length);  // if not doing memcpy
-                enginePtr->setBlob(mPorts[indexes[i]]->name, outputBlob);
+                enginePtr->setBlob(mPorts[indexes[i]]->getName(), outputBlob);
             }
         }
     };
@@ -1580,10 +962,10 @@ Return<void> PreparedModel::executeSynchronously(const Request& request, Measure
     }
 
     InferenceEngine::TBlob<float>::Ptr outBlob =
-        enginePtr->getBlob(mPorts[mModel.outputIndexes[0]]->name);
+        enginePtr->getBlob(mPorts[mModel.outputIndexes[0]]->getName());
 
     InferenceEngine::TBlob<float>::Ptr inBlob =
-        enginePtr->getBlob(mPorts[mModel.inputIndexes[0]]->name);
+        enginePtr->getBlob(mPorts[mModel.inputIndexes[0]]->getName());
     hidl_vec<OutputShape> outputShapes;
 #ifdef NN_DEBUG
     {
@@ -1633,10 +1015,54 @@ T getOperandConstVal(const Model& model, const Operand& operand) {
     return data[0];
 }
 
-bool PreparedModel::isOperationSupported(const Operation& operation, const Model& model) {
+bool PreparedModel::isOperationSupported(const Operation& operation, const Model& model, const std::string& device) {
     VLOG(L1, "Check operation %d", operation.type);
 
 #define VLOG_CHECKFAIL(fail) VLOG(L1, "Check failed: %s", fail)
+
+#ifdef DISABLE_ALL_QUANT
+    for (auto i : operation.inputs) {
+        const auto input = model.operands[i];
+        if (input.type == OperandType::TENSOR_QUANT8_ASYMM) {
+            VLOG_CHECKFAIL("input quant");
+            return false;
+        }
+    }
+    for (auto i : operation.outputs) {
+        const auto output = model.operands[i];
+        if (output.type == OperandType::TENSOR_QUANT8_ASYMM) {
+            VLOG_CHECKFAIL("output quant");
+            return false;
+        }
+    }
+#else
+    for (auto i : operation.inputs) {
+        const auto input = model.operands[i];
+        if (input.type == OperandType::TENSOR_QUANT8_ASYMM && input.zeroPoint != 0) {
+            VLOG_CHECKFAIL("input quant");
+            return false;
+        }
+    }
+    for (auto i : operation.outputs) {
+        const auto output = model.operands[i];
+        if (output.type == OperandType::TENSOR_QUANT8_ASYMM && output.zeroPoint != 0) {
+            VLOG_CHECKFAIL("output quant");
+            return false;
+        }
+    }
+#endif
+
+    if (device.compare("GNA")) {
+        VLOG(L1, "GNA device. Checking operation supported by GNA");
+        switch (operation.type) {
+            case OperationType::LSTM:
+            case OperationType::FULLY_CONNECTED:
+                break;
+            default:
+                VLOG(L1, "OP (%d) not supported", operation.type);
+                return false;
+        }
+    }
 
     switch (operation.type) {
         case OperationType::CONV_2D: {
@@ -1908,7 +1334,6 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
         } break;
         case OperationType::FULLY_CONNECTED: {
             const auto& input0 = model.operands[operation.inputs[OP_INPUT_IDX_FC]];
-
             const auto& input1 = model.operands[operation.inputs[OP_WGHT_IDX_FC]];
             const auto& input2 = model.operands[operation.inputs[OP_BIAS_IDX_FC]];
 
@@ -1919,11 +1344,12 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
                 return false;
             }
 
-            if (input0.lifetime == input1.lifetime) {
+            // NOT NECESSARILY TRUE
+            /*if (input0.lifetime == input1.lifetime) {
                 VLOG(L1, "NNERR: Filter (index %d) as model_input not supported,aborting!!",
                      operation.inputs[OP_FILTER_IDX_CONV]);
                 return false;
-            }
+            }*/
 
             if (input0.dimensions.size() < 2 || input1.dimensions.size() < 2 ||
                 input2.dimensions.size() < 1) {
@@ -2000,6 +1426,10 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
                 return false;
             }
         } break;
+
+        case OperationType::LSTM:
+            break;
+
         default:
             VLOG(L1, "unsupport operation %d", operation.type);
             return false;
@@ -2068,9 +1498,9 @@ bool PreparedModel::operationAdd(const Operation& operation) {
     mPorts[operation.outputs[0]] = handleFusion(out, PARAM_I32(2));
 
     VLOG(L1, "add mPorts[%d]->name %s + mPorts[%d]->name %s  = mPorts[%d]->name %s \n",
-         operation.inputs[0], isIn0Const ? "isIn0Const" : mPorts[operation.inputs[0]]->name.c_str(),
-         operation.inputs[1], isIn1Const ? "isIn1Const" : mPorts[operation.inputs[1]]->name.c_str(),
-         operation.outputs[0], mPorts[operation.outputs[0]]->name.c_str());
+         operation.inputs[0], isIn0Const ? "isIn0Const" : mPorts[operation.inputs[0]]->getName().c_str(),
+         operation.inputs[1], isIn1Const ? "isIn1Const" : mPorts[operation.inputs[1]]->getName().c_str(),
+         operation.outputs[0], mPorts[operation.outputs[0]]->getName().c_str());
 
     return true;
 }
@@ -2855,7 +2285,7 @@ bool PreparedModel::operationFullyConnected(const Operation& operation) {
 
     nnAssert(inputDims.size() >= 2);
     nnAssert(weightsDims.size() == 2);
-    uint32_t numInputElements = sizeOf(inputDims);
+    uint32_t numInputElements = sizeOfTensor(inputDims);
     uint32_t num_units = weightsDims[0];
     uint32_t input_size = weightsDims[1];
     uint32_t batch_size = numInputElements / input_size;
@@ -3049,7 +2479,7 @@ bool PreparedModel::operationReshape(const Operation& operation) {
     // of output elements in the same as the number of input elements.
 
     // auto numInputElements = getNumberOfElements(static_cast<const vec<uint32_t>> (inDims));
-    auto numInputElements = sizeOf(inDims);  // getNumberOfElements
+    auto numInputElements = sizeOfTensor(inDims);  // getNumberOfElements
 
     int strechDim = -1;
     auto numOutputElements = 1;  // shape
@@ -3142,14 +2572,14 @@ void PreparedModel::initializeInput() {
     for (auto i : mModel.inputIndexes) {
         int dims_size = mOperands[i].dimensions.size();
 
-        VLOG(L1, "mPorts[%d] %s dims size %d", i, mPorts[i]->name.c_str(), dims_size);
+        VLOG(L1, "mPorts[%d] %s dims size %d", i, mPorts[i]->getName().c_str(), dims_size);
         VLOGDIMS(L1, mOperands[i].dimensions, "current operand inpu dims:");
         VLOGDIMS(L1, mPorts[i]->getTensorDesc().getDims(), "Real input dims:");
 
         auto inputDims = mPorts[i]->getTensorDesc().getDims();
 
         uint32_t nelem = getNumberOfElements(mOperands[i].dimensions);
-        auto inputElem = sizeOf(inputDims);
+        auto inputElem = sizeOfTensor(inputDims);
         if (nelem != inputElem) {
             VLOG(L1, "set operand input dims to real input dims\n");
             for (auto j = 0; j < inputDims.size(); j++)
@@ -3167,14 +2597,14 @@ bool PreparedModel::finalizeOutput(/*RunTimeOperandInfo* output */) {
         mPorts[i]->setPrecision(InferenceEngine::Precision::FP32);
         mNet.addOutput(mPorts[i]);
 
-        VLOG(L1, "mPorts[%d] %s dims size %d", i, mPorts[i]->name.c_str(), dims_size);
+        VLOG(L1, "mPorts[%d] %s dims size %d", i, mPorts[i]->getName().c_str(), dims_size);
         VLOGDIMS(L1, mOperands[i].dimensions, "current operand Output dims:");
         VLOGDIMS(L1, mPorts[i]->getTensorDesc().getDims(), "Real Output dims:");
 
         auto outputDims = mPorts[i]->getTensorDesc().getDims();
 
         uint32_t nelem = getNumberOfElements(mOperands[i].dimensions);
-        auto outputElem = sizeOf(outputDims);
+        auto outputElem = sizeOfTensor(outputDims);
         if (nelem != outputElem) {
             VLOG(L1, "set correct dims as operand output dims different than real output dims\n");
         }
@@ -4141,8 +3571,11 @@ Blob::Ptr GpuPreparedModel::GetConstWeightsOperandAsTensor(uint32_t index) {
                 std::make_shared<InferenceEngine::TBlob<float>>(td);
             blob->allocate();
             return blob;
-        } else
-            return std::make_shared<InferenceEngine::TBlob<float>>(td, (float*)buf, len);
+        } else {
+            InferenceEngine::TBlob<float>::Ptr blob =
+                std::make_shared<InferenceEngine::TBlob<float>>(td, (float*)buf, len);
+            return blob;
+        }
     } else {
         nnAssert(false);
     }
@@ -4150,266 +3583,6 @@ Blob::Ptr GpuPreparedModel::GetConstWeightsOperandAsTensor(uint32_t index) {
     return nullptr;
 }
 
-IRBlob::Ptr GnaPreparedModel::GetConstWeightsOperandAsTensor(uint32_t index)
-{
-    dumpOperand(index);
-    const auto op = mModel.operands[index];
-    uint32_t len;
-    const uint8_t *buf = GetOperandMemory(mModel, index, len);
-
-    if (op.type == OperandType::TENSOR_FLOAT32 || op.type == OperandType::FLOAT32) {
-        if (buf == nullptr)
-            VLOG(L1, "TENSOR_FLOAT32 buf is NULL !!!!!!!!!!!!!!!");
-
-        vec<unsigned int> order;
-        Layout layout;
-        if (op.dimensions.size() == 4) {
-            order = {3,0,1,2};  //IHWO -> OIHW for depth conv
-            layout = Layout::OIHW; //weights layout
-        }
-        else if (op.dimensions.size() == 2) {
-            order = {0, 1};
-            layout = Layout::NC;
-        }
-        else {
-            order = {0};
-            layout = Layout::C;
-        }
-
-        TensorDims inputDims;
-        if (op.dimensions.size() == 3) {
-            auto channel_size = op.dimensions[1] * op.dimensions[2];
-            uint32_t op_dimensions_size = 2;
-            std::vector<uint32_t> op_dimensions = {op.dimensions[0], channel_size};
-            inputDims = toDims(op_dimensions);
-        }
-        else {
-            inputDims = toDims(op.dimensions);
-        }
-
-        TensorDesc td(InferenceEngine::Precision::FP32, permuteDims(inputDims, order), layout);
-        if (inputDims.size() != 4) {
-            InferenceEngine::TBlob<float>::Ptr blob =
-                                std::make_shared<InferenceEngine::TBlob<float>>(td, (float *)buf, len);
-            blob->allocate();
-            return blob;
-        } else {
-            InferenceEngine::TBlob<float>::Ptr blob =
-                                    std::make_shared<InferenceEngine::TBlob<float>>(td);
-            blob->allocate();
-
-            auto dims_ohwi = inputDims;
-            size_t out_depth = dims_ohwi[0];
-            size_t in_depth = dims_ohwi[3];
-            size_t height = dims_ohwi[1];
-            size_t width = dims_ohwi[2];
-            size_t offset = 0;
-            const float* inputFilter = reinterpret_cast<const float *>(buf);
-
-            //convert OHWI -> OIHW
-            //for depth conv need reorder as IOHW since for tflite O is always 1 and IE expects reorder to
-            //[in_channels, depth_multiplier, filter_height, filter_width]
-            for (size_t i = 0; i < in_depth; i++) {
-                for (size_t o = 0; o < out_depth; o++) {
-                    for (size_t h = 0; h < height; h++) {
-                        for (size_t w = 0; w < width; w++) {
-                            //similar to NHWC memory layout
-                            size_t offset_ohwi = o*height*width*in_depth +
-                                                 h*width*in_depth +
-                                                 w*in_depth + i;
-                            blob->buffer().as<float*>()[offset++] = inputFilter[offset_ohwi];
-                        }
-                    }
-                }
-            }
-            return blob;
-        }
-    } else if (op.type == OperandType::TENSOR_INT32) {
-        if (buf == nullptr)
-            VLOG(L1, "TENSOR_INT32 buf is NULL !!!!!!!!!!!!!!!");
-
-        TensorDesc td(InferenceEngine::Precision::I32, toDims(op.dimensions), Layout::ANY);
-        return std::make_shared<InferenceEngine::TBlob<float>>(td, (float *)buf, len);
-    } else {
-        VLOG(L1, "Do not support const tensors of type ", op.type);
-        nnAssert(false);
-    }
-    return nullptr;
-}
-
-IRBlob::Ptr GnaPreparedModel::GetConstOperandAsTensor(int operand_index, int operation_idx)
-{
-    dumpOperand(operand_index);
-    const auto op = mModel.operands[operand_index];
-    uint32_t len;
-    const uint8_t *buf = GetOperandMemory(mModel, operand_index, len);
-
-    if (op.type == OperandType::TENSOR_FLOAT32 || op.type == OperandType::FLOAT32) {
-        vec<unsigned int> order;
-        Layout layout;
-        if (op.dimensions.size() == 4) {
-            order = {0,3,1,2};  //nhwc -> nchw
-            layout = Layout::OIHW; //weights layout
-        } else if (op.dimensions.size() == 2 || op.dimensions.size() == 3) {
-            order = {0, 1};
-            layout = Layout::NC;
-        } else {
-            order = {0};
-            layout = Layout::C;
-        }
-
-        TensorDims inputDims;
-        if (op.dimensions.size() == 3) {
-            auto channel_size = op.dimensions[1] * op.dimensions[2];
-            uint32_t op_dimensions_size = 2;
-            std::vector<uint32_t> op_dimensions = {op.dimensions[0], channel_size};
-            inputDims = toDims(op_dimensions);
-        } else {
-            inputDims = toDims(op.dimensions);
-        }
-
-        TensorDesc td(InferenceEngine::Precision::FP32, permuteDims(inputDims, order), layout);
-        if (buf == nullptr) {
-            VLOG(L1, "TENSOR_FLOAT32 buf is NULL !!!!!!!!!!!!!!!");
-            InferenceEngine::TBlob<float>::Ptr blob =
-                                            std::make_shared<InferenceEngine::TBlob<float>>(td);
-            blob->allocate();
-            return blob;
-        } else {
-            if (inputDims.size() != 4) {
-                InferenceEngine::TBlob<float>::Ptr blob =
-                            std::make_shared<InferenceEngine::TBlob<float>>(td, (float *)buf, len);
-                return blob;
-            } else {
-                InferenceEngine::TBlob<float>::Ptr blob =
-                                    std::make_shared<InferenceEngine::TBlob<float>>(td);
-                blob->allocate();
-
-                auto dims_ohwi = inputDims;
-                size_t out_depth = dims_ohwi[0];
-                size_t in_depth = dims_ohwi[3];
-                size_t height = dims_ohwi[1];
-                size_t width = dims_ohwi[2];
-                size_t offset = 0;
-                const float* inputFilter = reinterpret_cast<const float *>(buf); //OHWI memory layout
-
-                for (size_t o = 0; o < out_depth; o++) {
-                    for (size_t i = 0; i < in_depth; i++) {
-                        for (size_t h = 0; h < height; h++) {
-                            for (size_t w = 0; w < width; w++) {
-                                //similar to NHWC memory layout
-                                size_t offset_ohwi = o*height*width*in_depth +
-                                                     h*width*in_depth +
-                                                     w*in_depth + i;
-                                blob->buffer().as<float*>()[offset++] = inputFilter[offset_ohwi];
-                            }
-                        }
-                    }
-                }
-                return blob;
-            }
-        }
-    } else if (op.type == OperandType::TENSOR_INT32) {
-        if (buf == nullptr)
-            VLOG(L1, "TENSOR_INT32 buf is NULL !!!!!!!!!!!!!!!");
-
-        TensorDesc td(InferenceEngine::Precision::I32, toDims(op.dimensions), Layout::ANY);
-        return std::make_shared<InferenceEngine::TBlob<float>>(td, (float *)buf, len);
-    } else {
-        VLOG(L1, "Do not support const tensors of type ", op.type);
-        nnAssert(false);
-    }
-    return nullptr;
-}
-
-Blob::Ptr GnaPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const uint8_t *buf, uint32_t& len)
-{
-    if (op.type == OperandType::TENSOR_FLOAT32 || op.type == OperandType::FLOAT32) {
-        if (op.lifetime == OperandLifeTime::MODEL_INPUT) {
-            if (buf == nullptr)
-                VLOG(L1, "MODEL_INPUT buf is NULL !!!!!!!!!!!!!!!");
-
-            vec<unsigned int> order;
-            Layout layout;
-            if (op.dimensions.size() == 4) {
-                order = {0,3,1,2};  //nhwc -> nchw
-                layout = Layout::NCHW;
-            }
-            else if (op.dimensions.size() == 2) {
-                order = {0, 1};
-                layout = Layout::NC;
-            }
-            else {
-                order = {0}; //(op.dimensions.size() < 2)
-                layout = Layout::C;
-            }
-
-            auto inputDims = toDims(op.dimensions);
-            TensorDesc td(InferenceEngine::Precision::FP32, permuteDims(inputDims, order), layout);
-            if (inputDims.size() != 4) {
-                VLOG(L1, "buf data %f", *((float*)buf));
-                VLOG(L1, "buf data %f", *((float*)buf + 1));
-                InferenceEngine::TBlob<float>::Ptr blob =
-                                std::make_shared<InferenceEngine::TBlob<float>>(td, (float *)buf, len);
-                blob->allocate();
-                return blob;
-            } else {
-                InferenceEngine::TBlob<float>::Ptr blob =
-                                            std::make_shared<InferenceEngine::TBlob<float>>(td);
-                blob->allocate();
-
-                auto dims_nhwc = inputDims; //toDims(op.dimensions);
-                size_t batch = dims_nhwc[0];
-                size_t in_depth = dims_nhwc[3]; //channels
-                size_t height = dims_nhwc[1];
-                size_t width = dims_nhwc[2];
-                size_t offset = 0;
-                const float* input = reinterpret_cast<const float *>(buf); //OHWI memory layout
-
-                //convert NHWC -> NCHW
-                for (size_t b = 0; b < batch; b++) {
-                    for (size_t i = 0; i < in_depth; i++) {
-                        for (size_t h = 0; h < height; h++) {
-                            for (size_t w = 0; w < width; w++) {
-                                //similar to NHWC memory layout
-                                size_t offset_nhwc = b*height*width*in_depth +
-                                                     h*width*in_depth +
-                                                     w*in_depth + i;
-                                blob->buffer().as<float*>()[offset++] = input[offset_nhwc];
-                            }
-                        }
-                    }
-                }
-                return blob;
-            }
-        } else if (op.lifetime == OperandLifeTime::MODEL_OUTPUT) {
-            if (buf == nullptr)
-                VLOG(L1, "MODEL_OUTPUT buf is NULL !!!!!!!!!!!!!!!");
-
-            vec<unsigned int> order;
-            Layout layout;
-            if (op.dimensions.size() == 4) {
-                layout = Layout::NHWC;
-            } else if (op.dimensions.size() == 2) {
-                layout = Layout::NC;
-            } else {
-                layout = Layout::C;
-            }
-
-            TensorDesc td(InferenceEngine::Precision::FP32, toDims(op.dimensions), layout); //nhwc
-            InferenceEngine::TBlob<float>::Ptr blob =
-                            InferenceEngine::make_shared_blob<float>(td, (float *)buf, len);
-            return blob;
-        }
-    } else if (op.type == OperandType::TENSOR_INT32) {
-        TensorDesc td(InferenceEngine::Precision::I32, toDims(op.dimensions), Layout::ANY);
-        return std::make_shared<InferenceEngine::TBlob<int32_t>>(td, (int32_t *)buf, len);
-    } else {
-        VLOG(L1, "not supporting const tensors of type ", op.type);
-        nnAssert(false);
-    }
-    return nullptr;
-}
 }  // namespace nnhal
 }  // namespace neuralnetworks
 }  // namespace hardware

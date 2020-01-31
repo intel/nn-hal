@@ -28,7 +28,6 @@
 #include "IENetwork.h"
 
 using ::android::hidl::memory::V1_0::IMemory;
-using namespace IRBuilder;
 using namespace InferenceEngine;
 
 namespace android {
@@ -101,20 +100,21 @@ bool setRunTimePoolInfosFromHidlMemories(std::vector<RunTimePoolInfo>* poolInfos
 
 // This class is used to execute a model
 class Executor {
+    namespace nnhalNamespace = android::hardware::neuralnetworks::nnhal;
 public:
     Executor() : mTargetDevice(TargetDevice::eMYRIAD), mNet("nnNet"), enginePtr(nullptr) {
-        IRBuilder::g_layer_precision = InferenceEngine::Precision::FP16;
+        nnhalNamespace::g_layer_precision = InferenceEngine::Precision::FP16;
     }
 
     Executor(const TargetDevice device) : mTargetDevice(device), mNet("nnNet"), enginePtr(nullptr) {
         if (mTargetDevice == TargetDevice::eCPU)
-            IRBuilder::g_layer_precision = InferenceEngine::Precision::FP32;
+            nnhalNamespace::g_layer_precision = InferenceEngine::Precision::FP32;
         else if (mTargetDevice == TargetDevice::eMYRIAD)
-            IRBuilder::g_layer_precision = InferenceEngine::Precision::FP16;
+            nnhalNamespace::g_layer_precision = InferenceEngine::Precision::FP16;
         else if (mTargetDevice == TargetDevice::eGNA)
-           IRBuilder::g_layer_precision = InferenceEngine::Precision::FP32;
+           nnhalNamespace::g_layer_precision = InferenceEngine::Precision::FP32;
         else
-            IRBuilder::g_layer_precision = InferenceEngine::Precision::UNSPECIFIED;
+            nnhalNamespace::g_layer_precision = InferenceEngine::Precision::UNSPECIFIED;
     }
 
     ~Executor() { deinitialize(); }

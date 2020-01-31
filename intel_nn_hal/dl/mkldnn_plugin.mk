@@ -1,4 +1,4 @@
-LOCAL_PATH := $(call my-dir)/../../../dldt
+LOCAL_PATH := $(call my-dir)/../../../dldt-internal
 
 include $(CLEAR_VARS)
 
@@ -61,7 +61,7 @@ LOCAL_STATIC_LIBRARIES := libomp
 LOCAL_SHARED_LIBRARIES := liblog libinference_engine libmkldnn
 
 LOCAL_SRC_FILES += \
-	inference-engine/src/mkldnn_plugin/mkldnn/os/lin/lin_omp_manager.cpp
+	inference-engine/src/mkldnn_plugin/mkldnn/os/lin/lin_system_conf.cpp
 
 LOCAL_SRC_FILES += \
 inference-engine/src/mkldnn_plugin/mkldnn_memory.cpp \
@@ -106,7 +106,6 @@ inference-engine/src/mkldnn_plugin/nodes/mkldnn_softmax_node.cpp \
 inference-engine/src/mkldnn_plugin/nodes/mkldnn_tile_node.cpp \
 inference-engine/src/mkldnn_plugin/utils/blob_dump.cpp \
 inference-engine/src/mkldnn_plugin/mkldnn/iml_type_mapper.cpp \
-inference-engine/src/mkldnn_plugin/mkldnn/omp_manager.cpp \
 inference-engine/src/mkldnn_plugin/nodes/mkldnn_bin_conv_node.cpp \
 inference-engine/src/mkldnn_plugin/nodes/mkldnn_quantize_node.cpp
 

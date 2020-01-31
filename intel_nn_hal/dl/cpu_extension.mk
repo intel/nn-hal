@@ -1,4 +1,4 @@
-LOCAL_PATH := $(call my-dir)/../../../dldt
+LOCAL_PATH := $(call my-dir)/../../../dldt-internal
 
 include $(CLEAR_VARS)
 
@@ -52,7 +52,6 @@ LOCAL_SHARED_LIBRARIES := libinference_engine
 
 
 LOCAL_SRC_FILES += \
-	inference-engine/src/extension/ext_proposal_onnx.cpp \
 	inference-engine/src/extension/ext_expand.cpp \
 	inference-engine/src/extension/ext_mvn.cpp \
 	inference-engine/src/extension/ext_psroi.cpp \

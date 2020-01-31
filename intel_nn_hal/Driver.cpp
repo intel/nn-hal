@@ -16,11 +16,13 @@
 
 #define LOG_TAG "Driver"
 
-#include "Driver.h"
 #include <android-base/logging.h>
 #include <thread>
+
+#include "Driver.h"
 #include "PreparedModel.h"
 #include "ValidateHal.h"
+#include "GnaPreparedModel.h"
 
 namespace android {
 namespace hardware {
@@ -28,6 +30,7 @@ namespace neuralnetworks {
 namespace nnhal {
 
 using namespace android::nn;
+
 hidl_vec<Capabilities::OperandPerformance> nonExtensionOperandPerformance(PerformanceInfo perf) {
     using OpPerf = Capabilities::OperandPerformance;
 
@@ -45,6 +48,7 @@ hidl_vec<Capabilities::OperandPerformance> nonExtensionOperandPerformance(Perfor
 
     return ret;
 }
+
 static sp<PreparedModel> ModelFactory(const char* name, const Model& model) {
     sp<PreparedModel> preparedModel = NULL;
 
@@ -230,7 +234,7 @@ Return<void> Driver::getSupportedOperations_1_2(const Model& model,
 
     for (int i = 0; i < count; i++) {
         const auto& operation = model.operations[i];
-        supported[i] = PreparedModel::isOperationSupported(operation, model);
+        supported[i] = PreparedModel::isOperationSupported(operation, model, mName);
     }
     cb(ErrorStatus::NONE, supported);
     return Void();
