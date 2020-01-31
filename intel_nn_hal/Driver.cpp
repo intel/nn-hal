@@ -54,6 +54,8 @@ static sp<PreparedModel> ModelFactory(const char* name, const Model& model) {
         preparedModel = new VpuPreparedModel(model);
     else if (strcmp(name, "GPU") == 0)
         preparedModel = new GpuPreparedModel(model);
+    else if (strcmp(name, "GNA") == 0)
+        preparedModel = new GnaPreparedModel(model);
 
     return preparedModel;
 }
@@ -177,8 +179,17 @@ Return<void> Driver::getCapabilities_1_2(getCapabilities_1_2_cb cb) {
         ALOGI("GPU clDNN driver Capabilities .execTime = 0.95f, .powerUsage = 0.85f");
         cb(ErrorStatus::NONE, capabilities);
     }
-    // mName.compare("VPU") == 0
-    else {
+    else if (mName.compare("GNA") == 0){
+       ALOGI("GNA driver getCapabilities()");
+       Capabilities capabilities = {
+            .relaxedFloat32toFloat16PerformanceScalar = {.execTime = 0.8f, .powerUsage = 0.8f},
+            .relaxedFloat32toFloat16PerformanceTensor = {.execTime = 0.8f, .powerUsage = 0.8f},
+            .operandPerformance = nonExtensionOperandPerformance({0.8f, 0.8f})};
+
+       ALOGI("GNA driver Capabilities .execTime = 0.8f, .powerUsage = 0.8f");
+       cb(ErrorStatus::NONE, capabilities);
+    } else {
+        // mName.compare("VPU") == 0
         ALOGI("Myriad driver getCapabilities()");
         Capabilities capabilities = {
             .relaxedFloat32toFloat16PerformanceScalar = {.execTime = 1.1f, .powerUsage = 1.1f},

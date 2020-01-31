@@ -40,6 +40,7 @@
 #ifdef ENABLE_MYRIAD
 #include "vpu_plugin_config.hpp"
 #endif
+#include "gna_config.hpp"
 using namespace InferenceEngine::details;
 using namespace InferenceEngine;
 
@@ -118,6 +119,7 @@ class ExecuteNetwork {
     IInferRequest::Ptr req;
     InferRequest inferRequest;
     ResponseDesc resp;
+    TargetDevice targetDevice;
 
 public:
     ExecuteNetwork() : network(nullptr) {}
@@ -133,6 +135,7 @@ public:
         // size_t batch = 1;
         // network->setBatchSize(batch);
 
+        targetDevice = target;
 #ifdef NNLOG
         ALOGI("%s Plugin loaded", InferenceEngine::TargetDeviceInfo::name(target));
 #endif
@@ -146,17 +149,54 @@ public:
 
     //~ExecuteNetwork(){ }
     void loadNetwork() {
-        std::map<std::string, std::string> networkConfig;
-        setConfig(networkConfig);
+    ALOGI("IENetwork.h void loadNetwork()");
 
-        InferencePlugin plugin(enginePtr);
-        executable_network = plugin.LoadNetwork(*network, networkConfig);
-        // std::cout << "Network loaded" << std::endl;
-        ALOGI("Network loaded");
+    InferencePlugin plugin(enginePtr);
+    switch (targetDevice) {
+        case TargetDevice::eGNA:
+        {
+          ALOGI("IENetwork.h TargetDevice eGNA");
+          std::map<std::string, std::string> config;
+	    //config[CONFIG_KEY(LOG_LEVEL)] = CONFIG_VALUE(LOG_INFO);
+          std::map<std::string, std::string> gnaPluginConfig;
+          gnaPluginConfig[GNAConfigParams::KEY_GNA_DEVICE_MODE] = "GNA_HW";
+          gnaPluginConfig[GNAConfigParams::KEY_GNA_PRECISION] = "I16";
+          std::string scaleFactorConfigKey_1 = GNA_CONFIG_KEY(SCALE_FACTOR) + std::string("_") + std::to_string(1);
+          std::string scaleFactorConfigKey_2 = GNA_CONFIG_KEY(SCALE_FACTOR) + std::string("_") + std::to_string(2);
+          gnaPluginConfig[scaleFactorConfigKey_1] = std::to_string(2048);
+          gnaPluginConfig[scaleFactorConfigKey_2] = std::to_string(2048);
+          gnaPluginConfig[GNA_CONFIG_KEY(COMPACT_MODE)] = CONFIG_VALUE(NO);
+          config.insert(std::begin(gnaPluginConfig), std::end(gnaPluginConfig));
+          ALOGI("IENetwork.h Create plugin");
+          CNNNetReader netBuilder;
+          ALOGI("IENetwork.h CNNNetReader netBuilder");
+          netBuilder.ReadNetwork("/data/local/graphfile.xml");
+          ALOGI("IENetwork.h CNNNetReader netBuilder Done Read N/W");
+          /* Extract model name and load weights **/
+          netBuilder.ReadWeights("/data/local/graphfile.bin");
+          int batchSize = 1;
+          // ----------------------------------------------------------------------------------------------
+          ALOGI("IENetwork.h main.cpp inputInfo");
+          // --------------------------- Set batch size ---------------------------------------------------
+          /** Set batch size.  Unlike in imaging, batching in time (rather than space) is done for speech recognition. **/
+          netBuilder.getNetwork().setBatchSize(batchSize);
+          InferenceEngine::CNNNetwork cnnnetwork = netBuilder.getNetwork();
+          InferenceEngine::ICNNNetwork &icnnnetwork = cnnnetwork;
+          executable_network = plugin.LoadNetwork(icnnnetwork, config);
+          break;
+        }
+        default:
+          ALOGI("IENetwork.h default");
+          std::map<std::string, std::string> networkConfig;
+          setConfig(networkConfig);
+          executable_network = plugin.LoadNetwork(*network, networkConfig);
+          //std::cout << "Network loaded" << std::endl;
+          break;
+	}
 
-        inferRequest = executable_network.CreateInferRequest();
-        // std::cout << "infer request created" << std::endl;
-    }
+    inferRequest = executable_network.CreateInferRequest();
+    ALOGI("IENetwork.h inferRequest");
+  }
 
     void prepareInput() {
 #ifdef NNLOG

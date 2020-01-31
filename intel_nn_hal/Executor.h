@@ -111,6 +111,8 @@ public:
             IRBuilder::g_layer_precision = InferenceEngine::Precision::FP32;
         else if (mTargetDevice == TargetDevice::eMYRIAD)
             IRBuilder::g_layer_precision = InferenceEngine::Precision::FP16;
+        else if (mTargetDevice == TargetDevice::eGNA)
+           IRBuilder::g_layer_precision = InferenceEngine::Precision::FP32;
         else
             IRBuilder::g_layer_precision = InferenceEngine::Precision::UNSPECIFIED;
     }
@@ -205,6 +207,17 @@ public:
     virtual Blob::Ptr GetConstOperandAsTensor(uint32_t index) override;
     virtual Blob::Ptr GetInOutOperandAsBlob(RunTimeOperandInfo& op, const uint8_t* buf,
                                             uint32_t& len) override;
+    virtual Blob::Ptr GetConstWeightsOperandAsTensor(uint32_t index) override;
+};
+
+class GnaExecutor : public Executor {
+public:
+    GnaExecutor()
+          :Executor(TargetDevice::eGNA) {
+    }
+
+    virtual Blob::Ptr GetConstOperandAsTensor(uint32_t index) override;
+    virtual Blob::Ptr GetInOutOperandAsBlob(RunTimeOperandInfo& op, const uint8_t *buf, uint32_t& len) override;
     virtual Blob::Ptr GetConstWeightsOperandAsTensor(uint32_t index) override;
 };
 

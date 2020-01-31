@@ -190,12 +190,14 @@ LOCAL_C_INCLUDES += \
 	$(LOCAL_PATH)/inference-engine/thirdparty/fluid/modules/gapi/src/compiler \
 	$(LOCAL_PATH)/inference-engine/thirdparty/fluid/modules/gapi/src/compiler/passes \
 	$(LOCAL_PATH)/inference-engine/thirdparty/fluid/modules/gapi/src/executor \
+	$(LOCAL_PATH)/inference-engine/temp/gna/linux/include
 
 
 LOCAL_CFLAGS += -DIE_THREAD=IE_THREAD_OMP -DIMPLEMENT_INFERENCE_ENGINE_API -DGAPI_STANDALONE -DCI_BUILD_NUMBER='""' -DIE_BUILD_POSTFIX='""' 	-std=c++11  -Wall -Wno-unknown-pragmas -Wno-strict-overflow -fPIC -Wformat -Wformat-security -fstack-protector-all -msse4.2
 LOCAL_CFLAGS += -Wno-unused-variable -Wno-unused-parameter -Wno-non-virtual-dtor -Wno-missing-field-initializers -fno-rtti -fexceptions -frtti -Wno-error
 LOCAL_CFLAGS += -DENABLE_MKL_DNN -DENABLE_MYRIAD -DENABLE_VPU -D__ANDROID__ -DNDEBUG -DIMPLEMENT_INFERENCE_ENGINE_API -fvisibility=default -std=gnu++11 -D_FORTIFY_SOURCE=2 -fPIE -DUSE_STATIC_IE
 #LOCAL_CFLAGS += -DNNLOG
+LOCAL_CFLAGS += -DENABLE_GNA
 
 
 
@@ -229,6 +231,7 @@ LOCAL_C_INCLUDES += \
 LOCAL_CFLAGS += -std=c++11  -Wall -Wno-unknown-pragmas -Wno-strict-overflow -fPIC -Wformat -Wformat-security -fstack-protector-all
 LOCAL_CFLAGS += -Wno-unused-variable -Wno-unused-parameter -Wno-non-virtual-dtor -Wno-missing-field-initializers  -fexceptions -frtti -Wno-error
 LOCAL_CFLAGS += -DNDEBUG -D__ANDROID__
+LOCAL_CFLAGS += -DENABLE_GNA
 
 LOCAL_SHARED_LIBRARIES :=
 LOCAL_STATIC_LIBRARIES :=

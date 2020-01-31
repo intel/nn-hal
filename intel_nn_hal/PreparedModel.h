@@ -140,6 +140,8 @@ public:
             g_layer_precision = InferenceEngine::Precision::FP32;
         else if (mTargetDevice == TargetDevice::eMYRIAD)
             g_layer_precision = InferenceEngine::Precision::FP16;
+        else if (mTargetDevice == TargetDevice::eGNA)
+            g_layer_precision = InferenceEngine::Precision::FP32;
         else
             g_layer_precision = InferenceEngine::Precision::UNSPECIFIED;
     }
@@ -255,6 +257,17 @@ public:
     virtual Blob::Ptr GetConstOperandAsTensor(int operand_index, int operation_idx) override;
     virtual Blob::Ptr GetInOutOperandAsBlob(RunTimeOperandInfo& op, const uint8_t* buf,
                                             uint32_t& len) override;
+    virtual Blob::Ptr GetConstWeightsOperandAsTensor(uint32_t index) override;
+};
+
+class GnaPreparedModel : public PreparedModel {
+public:
+    GnaPreparedModel(const Model& model)
+          :PreparedModel(TargetDevice::eGNA, model) {
+    }
+
+    virtual Blob::Ptr GetConstOperandAsTensor(int operand_index, int operation_idx) override;
+    virtual Blob::Ptr GetInOutOperandAsBlob(RunTimeOperandInfo& op, const uint8_t *buf, uint32_t& len) override;
     virtual Blob::Ptr GetConstWeightsOperandAsTensor(uint32_t index) override;
 };
 

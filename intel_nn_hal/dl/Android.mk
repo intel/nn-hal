@@ -18,3 +18,4 @@ include $(MY_LOCAL_PATH)/cpu_extension.mk
 #include $(MY_LOCAL_PATH)/cldnn_plugin.mk
 
 #include $(MY_LOCAL_PATH)/cldnn.mk
+include $(MY_LOCAL_PATH)/gna_plugin.mk
