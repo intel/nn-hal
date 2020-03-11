@@ -49,7 +49,13 @@ LOCAL_CFLAGS += \
 	-Wno-error \
 	-D_FORTIFY_SOURCE=2 \
 	-fvisibility=default \
-	-fexceptions
+	-fexceptions \
+	-fwrapv \
+    -fstack-protector-strong \
+    -Wno-conversion-null \
+    -Wnull-dereference \
+    -Warray-bounds \
+	-O0
 
 LOCAL_CFLAGS += \
 	-DIMPLEMENT_INFERENCE_ENGINE_API \
