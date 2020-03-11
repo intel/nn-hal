@@ -20,13 +20,14 @@
 #include <hidl/LegacySupport.h>
 
 #include "Driver.h"
+#define MAX_LENGTH (255)
 
 using android::hardware::configureRpcThreadpool;
 using android::hardware::joinRpcThreadpool;
 using android::hardware::neuralnetworks::nnhal::Driver;
 
 int main(int argc, char* argv[]) {
-    if (argc > 2 && strlen(argv[2]) > 0) {
+    if (argc > 2 && argv[2] != NULL && strnlen(argv[2], MAX_LENGTH) > 0) {
         if (strcmp(argv[1], "-D") != 0) return 0;
         const char* deviceType = argv[2];
         android::sp<Driver> device = new Driver(deviceType);
