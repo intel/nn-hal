@@ -1166,15 +1166,16 @@ void Executor::deinitialize() {
 #ifdef NN_DEBUG
 template <typename T>
 void printBuffer(int level, T* buf, int num, int items, const char* format) {
-    char str[1024];
+    const size_t maxlen = 1024;
+    char str[maxlen];
     int start = 0;
     int n = 0;
     while (n < num) {
         int offset = 0;
         n = (n + items) > num ? num : n + items;
-        offset = sprintf(str, "[%d->%d]:\t", start, n);
+        offset = snprintf(str, sizeof(str) - strnlen(str, maxlen), "[%d->%d]:\t", start, n);
         for (int i = start; i < n; i++) {
-            offset += sprintf(str + offset, format, buf[i]);
+            offset += snprintf(str + offset, sizeof(str) - strnlen(str, maxlen), format, buf[i]);
         }
         start = n;
         VLOG(level, "%s", str);
