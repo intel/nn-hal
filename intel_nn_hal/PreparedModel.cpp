@@ -1174,7 +1174,7 @@ void PreparedModel::deinitialize() {
 template <typename T>
 void printBuffer(int level, T* buf, int num, int items, const char* format, uint32_t buf_len) {
     const size_t maxlen = 1024;
-    char str[maxlen];
+    char str[maxlen] = {0};
     int start = 0;
     int n = 0;
     while (n < num) {
