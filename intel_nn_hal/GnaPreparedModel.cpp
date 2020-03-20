@@ -8,6 +8,7 @@
 #include <thread>
 #include "ValidateHal.h"
 #include "Utils.h"
+
 //#include "ExecutionBurstServer.h"
 //#include "OperationsUtils.h"
 
@@ -38,6 +39,8 @@ static Return<void> notify(const sp<V1_2::IExecutionCallback>& callback, const E
 
 void GnaPreparedModel::initializeInput() {
     VLOG(L1, "initialize Input");
+
+#if 0
     for (auto i : mModel.inputIndexes) {
         int dims_size = mOperands[i].dimensions.size();
 
@@ -54,6 +57,7 @@ void GnaPreparedModel::initializeInput() {
             mOperands[i].length = sizeOfData(mOperands[i].type, mOperands[i].dimensions);
         } */
     }
+#endif
 }
 
 
@@ -462,10 +466,6 @@ Return<void> GnaPreparedModel::executeSynchronously(const Request& request, Meas
                     }
                 }
             } else {
-                /*if(i == 4) {
-                    getBlob = GetInOutOperandAsBlob(operand, const_cast<uint8_t*>(r.buffer + arg.location.offset),operand.length);  // if not doing memcpy
-                }*/
-
                 if(indexes.size() < 6 && i == 4) {
                     getBlob = GetInOutOperandAsBlob(operand, const_cast<uint8_t*>(r.buffer + arg.location.offset),operand.length);  // if not doing memcpy
                 }
@@ -490,13 +490,8 @@ Return<void> GnaPreparedModel::executeSynchronously(const Request& request, Meas
 
     if (gnaPluginPtr == nullptr) {
         auto network = mBuilderModel->convertBuilder();
-        //VLOG(L1, "initialize ExecuteNetwork for device %s",
-                // InferenceEngine::TargetDeviceInfo::name(mTargetDevice)); // TODO: Fix this line
         gnaPluginPtr = new GnaNetwork(network, "GNA");
-        //gnaPluginPtr->prepareInput();
         InferenceEngine::CNNNetwork passed_network({network});
-
-        //CNNNetwork network1((ICNNNetwork*)&(*network));
         gnaPluginPtr->loadNetwork(passed_network);
     }
 
@@ -505,11 +500,8 @@ Return<void> GnaPreparedModel::executeSynchronously(const Request& request, Meas
     //std::string input_name = network.getInputsInfo().begin()->first;
     std::vector<Blob::Ptr> ptrInputBlobs;
 
-    std::cout << "Entering the for loop - raviraj" << std::endl;
     for (auto& input : gnaPluginPtr->inputInfo) {
         //VLOG(L1,"%p", (void*)enginePtr->inferRequest.GetBlob(input.first));
-        std::cout << "pointer pushing to input blobs: " << 
-                    gnaPluginPtr->getInferRequest().GetBlob(input.first) << std::endl;
         ptrInputBlobs.push_back(gnaPluginPtr->getInferRequest().GetBlob(input.first));
     }
 
@@ -525,20 +517,16 @@ Return<void> GnaPreparedModel::executeSynchronously(const Request& request, Meas
     //VLOG(L1,"input_0 = %s\n", inputInfoItem->getName().c_str());
     //enginePtr->setBlob(inputInfoItem->getName(), getInputBlob);
 
-    std::cout << "Accessing the output Blob" << std::endl;
     auto outputBlob = gnaPluginPtr->getInferRequest().GetBlob(gnaPluginPtr->outputInfo.begin()->first);
     auto outputDimensions = gnaPluginPtr->outputInfo.begin()->second->getDims();
 
+    // TODO: Change this code once we get more than one output from model
     hidl_vec<uint32_t> dimensions;
     for (auto i =0; i < outputDimensions.size(); i++) {
         dimensions[i] = outputDimensions[i]; 
-        std::cout << "printing dimensions : " << outputDimensions[i];
     }
     outputShapes[0].dimensions = dimensions;
     outputShapes[0].isSufficient = true;
-
-    std::cout << "Done adding outputshapes" << std::endl;
-
 
     //enginePtr->setBlob(outputInfoItem->getName(), getOutputBlob);
     VLOG(L1, "Run");
@@ -653,12 +641,15 @@ bool GnaPreparedModel::operationFullyConnected(const Operation& operation) {
         return blob;
     };
 
-    for (auto i=0; i < operation.inputs.size(); i++) {
-        auto idx = operation.inputs[i];
-        const auto op = mModel.operands[idx];
-        VLOG(L1, "idx=%d lifetime=%d", idx, op.lifetime);
-    }
+    // for (auto i=0; i < operation.inputs.size(); i++) {
+    //     auto idx = operation.inputs[i];
+    //     const auto op = mModel.operands[idx];
+    //     VLOG(L1, "idx=%d lifetime=%d", idx, op.lifetime);
+    // }
 
+    // for (auto i=0; i < operation.outputs.size(); i++) {
+    //     VLOG(L1, "output index = %d", operation.outputs[i]);
+    // }
 
     IRBuilder::BuilderFCLayer::FCParams params;
     auto input = getIRBlobFromOperand(operation.inputs[0], 0);
@@ -759,12 +750,12 @@ Inputs:
     17:The projection bias ( $b_{proj}$). Optional. A 1-D tensor of shape [output_size].
     18:The output state (in) ( $h_{t-1}$). A 2-D tensor of shape [batch_size, output_size].
     19:The cell state (in) ( $C_{t-1}$). A 2-D tensor of shape [batch_size, num_units].
-        20:The activation function ( $g$). A value indicating the activation function:
-            0: None;
-            1: Relu;
-            3: Relu6;
-            4: Tanh;
-            6: Sigmoid.
+    20:The activation function ( $g$). A value indicating the activation function:
+        0: None;
+        1: Relu;
+        3: Relu6;
+        4: Tanh;
+        6: Sigmoid.
     21:The clipping threshold ( $t_{cell}$) for the cell state, such that values are bound within [-cell_clip, cell_clip]. If set to 0.0 then clipping is disabled. Until API level 29 this scalar must be of type ANEURALNETWORKS_FLOAT32. Since API level 29, if all the input tensors have type ANEURALNETWORKS_TENSOR_FLOAT32, this scalar must be of the type ANEURALNETWORKS_FLOAT32, otherwise if all the input tensors have the type ANEURALNETWORKS_TENSOR_FLOAT16, this scalar must be of type ANEURALNETWORKS_FLOAT16.
     22:The clipping threshold ( $t_{proj}$) for the output from the projection layer, such that values are bound within [-proj_clip, proj_clip]. If set to 0.0 then clipping is disabled. Until API level 29 this scalar must be of type ANEURALNETWORKS_FLOAT32. Since API level 29, if all the input tensors have type ANEURALNETWORKS_TENSOR_FLOAT32, this scalar must be of the type ANEURALNETWORKS_FLOAT32, otherwise if all the input tensors have the type ANEURALNETWORKS_TENSOR_FLOAT16, this scalar must be of type ANEURALNETWORKS_FLOAT16. Since API level 29 there are additional inputs to this op:
     23:The input layer normalization weights. A 1-D tensor of shape [num_units]. Used to rescale normalized inputs to activation at input gate.
@@ -806,21 +797,13 @@ bool GnaPreparedModel::operationLSTM(const Operation& operation)
         return blob;
     };
 
-    for (auto i=0; i < operation.inputs.size(); i++) {
-        auto idx = operation.inputs[i];
-        const auto op = mModel.operands[idx];
-        VLOG(L1, "idx=%d lifetime=%d", idx, op.lifetime);
-    }
+    // for (auto i=0; i < operation.outputs.size(); i++) {
+    //     VLOG(L1, "output index = %d", operation.outputs[i]);
+    // }
 
-#if 0
-    auto input          = GetConstOperandAsTensor(operation.inputs[0], 0);
-    auto cellStateIn    = GetConstOperandAsTensor(operation.inputs[19], 19);
-    auto outputStateIn  = GetConstOperandAsTensor(operation.inputs[18], 18);
-#else
     auto input          = getIRBlobFromOperand(operation.inputs[0], 0);
     auto outputStateIn  = getIRBlobFromOperand(operation.inputs[18], 18);
     auto cellStateIn    = getIRBlobFromOperand(operation.inputs[19], 19);
-#endif
 
     params.input2inputWeights.data     = getIRBlobFromOperand(operation.inputs[1], 1);
     params.input2inputWeights.lifeTime = getOperandLifeTime(operation.inputs[1]);
@@ -873,39 +856,63 @@ bool GnaPreparedModel::operationLSTM(const Operation& operation)
     params.projectionBias.data    = getIRBlobFromOperand(operation.inputs[17], 17);
     params.projectionBias.lifeTime    = getOperandLifeTime(operation.inputs[17]);
 
-    //params.inputLayerNormWeights      = GetConstOperandAsTensor(operation.inputs[23]);
-    //params.forgetLayerNormWeights     = GetConstOperandAsTensor(operation.inputs[24]);
-    //params.cellLayerNormWeights       = GetConstOperandAsTensor(operation.inputs[25]);
-    //params.outputLayerNormWeights     = GetConstOperandAsTensor(operation.inputs[26]);
+    if (operation.inputs.size() > 23) {
+        params.inputLayerNormWeights.data      = GetConstOperandAsTensor(operation.inputs[23], 23);
+        params.inputLayerNormWeights.lifeTime = getOperandLifeTime(operation.inputs[23]);
+
+        params.forgetLayerNormWeights.data     = GetConstOperandAsTensor(operation.inputs[24], 24);
+        params.forgetLayerNormWeights.lifeTime = getOperandLifeTime(operation.inputs[24]);
+
+        params.cellLayerNormWeights.data       = GetConstOperandAsTensor(operation.inputs[25], 25);
+        params.cellLayerNormWeights.lifeTime = getOperandLifeTime(operation.inputs[25]);
+
+        params.outputLayerNormWeights.data     = GetConstOperandAsTensor(operation.inputs[26], 26);
+        params.outputLayerNormWeights.lifeTime = getOperandLifeTime(operation.inputs[26]);
+    }
 
     params.activationFunction               = PARAM_I32(20);
 
     IRBuilder::LstmLayer::LstmCellDescription lstmDesc;
 
     lstmDesc.clippingThresholdCellState     = PARAM_FP(21);
-    lstmDesc.clippingThresholdProjState    = PARAM_FP(22);
-    lstmDesc.lstmImplementation = 0;
+    lstmDesc.clippingThresholdProjState     = PARAM_FP(22);
+    lstmDesc.cifgEnabled                    = false;
+    lstmDesc.projectionLayerEnabled         = false;
+    lstmDesc.peepholeEnabled                = false;
 
-    if (isOperandDataNull(1) ||
-        isOperandDataNull(5) ||
-        isOperandDataNull(12))
-    {
-        VLOG(L1, "Lstm CIFG");
-        lstmDesc.lstmImplementation |= static_cast<int>(IRBuilder::LstmLayer::LstmImpl::CIFG); // TODO: un necessarily complex
+    std::string lstmDescription;
+    if (isOperandDataNull(operation.inputs[1]) ||
+        isOperandDataNull(operation.inputs[5]) ||
+        isOperandDataNull(operation.inputs[12])) {
+        lstmDescription.append("Cifg");
+        lstmDesc.cifgEnabled = true;
+    } else {
+        lstmDescription.append("noCifg");
     }
 
-    if (!isOperandDataNull(16))
+    if (!isOperandDataNull(operation.inputs[16]))
     {
-        VLOG(L1, "Lstm Projection");
-        lstmDesc.lstmImplementation |= static_cast<int>(IRBuilder::LstmLayer::LstmImpl::PROJECTION);
+        lstmDescription.append("Projection");
+        lstmDesc.projectionLayerEnabled = true;
     }
 
-    if (!isOperandDataNull(10) ||
-        !isOperandDataNull(11))
+    if (!isOperandDataNull(operation.inputs[9]) ||
+        !isOperandDataNull(operation.inputs[10]) ||
+        !isOperandDataNull(operation.inputs[11]))
     {
-        VLOG(L1, "Lstm peephole");
-        lstmDesc.lstmImplementation |= static_cast<int>(IRBuilder::LstmLayer::LstmImpl::PEEPHOLE);
+        lstmDescription.append("Peephole");
+        lstmDesc.peepholeEnabled = true;
     }
+
+    if (operation.inputs.size() > 23) {
+        if (!isOperandDataNull(operation.inputs[24]) &&
+            !isOperandDataNull(operation.inputs[25]) &&
+            !isOperandDataNull(operation.inputs[26])) {
+            VLOG(L1, "Normalization weights are present.. Not supported yet.");
+            return false;
+        }
+    }
+    VLOG(L1, "Lstm cell description %s", lstmDescription.c_str());
 
     mPorts[operation.outputs[3]] = mBuilderModel->createFullLstm(params, lstmDesc, input, cellStateIn, outputStateIn);
 
@@ -1035,6 +1042,7 @@ IRBlob::Ptr GnaPreparedModel::GetConstOperandAsTensor(int operand_index, int ope
     const auto op = mModel.operands[operand_index];
     uint32_t len;
     const uint8_t *buf = GetOperandMemory(mModel, operand_index, len);
+
     VLOG(L1, "GnaPreparedModel:: Operand: index: %d, len: %d, buf: %p", operand_index, len, buf);
     if (op.type == OperandType::TENSOR_FLOAT32 || op.type == OperandType::FLOAT32) {
         vec<unsigned int> order;

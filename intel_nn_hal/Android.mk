@@ -59,8 +59,7 @@ LOCAL_CFLAGS += \
 	-Wno-array-bounds \
 	-D_FORTIFY_SOURCE=2 \
 	-fvisibility=default \
-	-fexceptions \
-	-fno-rtti
+	-fexceptions
 
 LOCAL_CFLAGS += \
 	-DIMPLEMENT_INFERENCE_ENGINE_API \
@@ -127,5 +126,6 @@ ZPATH := $(LOCAL_PATH)
 include $(CLEAR_VARS)
 
 include $(ZPATH)/graphAPI/graphAPI.mk
+#include $(ZPATH)/graphTests/graphTests.mk
 include $(ZPATH)/dl/Android.mk
 #include $(ZPATH)/ncsdk2/api/src/Android.mk

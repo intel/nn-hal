@@ -79,27 +79,6 @@ void GnaNetwork::loadNetwork(InferenceEngine::CNNNetwork& passed_network)
     // }
     outputInfo = passed_network.getOutputsInfo();
     inferRequest = executable_network.CreateInferRequest();
-
-    std::cout << "Size of inputinfo: " << inputInfo.size() << std::endl;
-
-    // TODO: What is this function doing?
-    // for (const auto & item : inputInfo) {
-    //   /** Creating input blob **/
-    //   DataPtr data_input = item.second->getInputData();
-    //   std::cout << "input data = " << data_input->getName();
-
-    //   Blob::Ptr input = inferRequest.GetBlob(item.first);
-    // }
-
-    // // TODO: What is this function doing?
-    // for (const auto & item : outputInfo) {
-    //   /** Creating input blob **/
-    //   //DataPtr data_output = item.second->getInputData();
-    //   std::cout << "output data = " << item.second->getName();
-
-    //   //Blob::Ptr output = inferRequest.GetBlob(item.first);
-    // }
-    // ALOGI("IENetwork.h inferRequest");
 }
 
 void GnaNetwork::prepareInput()

@@ -209,9 +209,12 @@ std::vector<T> PreparedModel::GetConstVecFromBuffer(const uint8_t* buf, uint32_t
 }
 
 bool PreparedModel::isOperandDataNull(int index) {
-    uint32_t len = 0;
-    const uint8_t* buf = GetOperandMemory(mModel, index, len);
-    if (buf == nullptr) return true;
+    const auto op = mModel.operands[index];
+    if (op.lifetime == OperandLifeTime::NO_VALUE) {
+        VLOG(L1, "index %d has life time NO_VALUE", index);
+        return true;
+    }
+
     return false;
 }
 
@@ -1054,8 +1057,39 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
 
     if (device.compare("GNA")) {
         VLOG(L1, "GNA device. Checking operation supported by GNA");
+
+        auto isOperandDataNull = [&] (int index) {
+            const auto op = model.operands[index];
+            if (op.lifetime == OperandLifeTime::NO_VALUE) {
+                VLOG(L1, "index %d has life time NO_VALUE", index);
+                return true;
+            }
+            return false;
+        };
+
         switch (operation.type) {
             case OperationType::LSTM:
+                // Check for normalization weights
+                // If no normalization weights are given, the inputs size is 23
+                if (operation.inputs.size() > 23) {
+                    if (!isOperandDataNull(operation.inputs[24]) &&
+                        !isOperandDataNull(operation.inputs[25]) &&
+                        !isOperandDataNull(operation.inputs[26])) {
+                        VLOG(L1, "Normalization weights are present.. Not supported yet.");
+                        return false;
+                    }
+                }
+
+                // yet to add support for CIFG
+                if (isOperandDataNull(operation.inputs[1]) ||
+                    isOperandDataNull(operation.inputs[5]) ||
+                    isOperandDataNull(operation.inputs[12]))
+                {
+                    VLOG(L1, "Lstm CIFG implementation not ready yet");
+                    return false;
+                }
+
+                break;
             case OperationType::FULLY_CONNECTED:
                 break;
             default:

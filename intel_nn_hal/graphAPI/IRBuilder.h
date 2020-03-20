@@ -25,12 +25,6 @@ namespace BuilderFCLayer
 
 namespace LstmLayer 
 {
-    enum class LstmImpl : char {
-        PROJECTION = 1,
-        PEEPHOLE = 2,
-        CIFG = 4
-    };
-
     enum class LstmActivationFn: char {
         NONE = 0,
         RELU = 1,
@@ -42,7 +36,9 @@ namespace LstmLayer
     struct LstmCellDescription {
         int clippingThresholdCellState;
         int clippingThresholdProjState;
-        int lstmImplementation;
+        bool projectionLayerEnabled;
+        bool cifgEnabled;
+        bool peepholeEnabled;
     };
 
     struct LstmCellData {
