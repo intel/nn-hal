@@ -166,9 +166,9 @@ bool testAlexNet() {
         */
         printf("aks initialize ExecuteNetwork\n");
 #ifdef ENABLE_MYRIAD
-        ExecuteNetwork executeNet(doc, TargetDevice::eMYRIAD);
+        ExecuteNetwork executeNet(doc, "MYRIAD");
 #elif ENABLE_MKLDNN
-        ExecuteNetwork executeNet(doc, TargetDevice::eCPU);
+        ExecuteNetwork executeNet(doc, "CPU");
 #endif
         executeNet.prepareInput();
         executeNet.prepareOutput();
@@ -217,6 +217,7 @@ bool testAffineLayer() {
 
         std::vector<float> wdata = {2.0f, 4.0f, 0.5f, 0.25f, 1.0f};
         float *buf = wdata.data();
+        auto wdataByteSize = sizeof(float) * wdata.size();
 
         vec<uint32_t> wdims = {1, 5};
         // vec<uint32_t> wdims = { 5, 1 };
@@ -241,8 +242,8 @@ bool testAffineLayer() {
         TensorDesc td(InferenceEngine::Precision::FP32, toDims(wdims), Layout::NC);
 
         InferenceEngine::TBlob<float>::Ptr weightsBlob =
-            std::make_shared<InferenceEngine::TBlob<float>>(td);
-        weightsBlob->set(wdata);
+                                std::make_shared<InferenceEngine::TBlob<float>>(td, wdata.data(), wdataByteSize);
+        //weightsBlob->set(wdata);
 #endif
 
         // auto weights = make_shared_blob<short>(Precision::FP32, Layout::C,
@@ -253,6 +254,7 @@ bool testAffineLayer() {
         std::vector<float> bData = {1.0f};
 
         float *buf1 = bData.data();
+        auto buf1ByteSize = sizeof(float) * bData.size();
 
         vec<uint32_t> bdims = {1};
 #ifdef ENABLE_MYRIAD
@@ -275,8 +277,7 @@ bool testAffineLayer() {
         TensorDesc td1(InferenceEngine::Precision::FP32, toDims(bdims), /*Layout::ANY*/ Layout::C);
 
         InferenceEngine::TBlob<float>::Ptr biasBlob =
-            std::make_shared<InferenceEngine::TBlob<float>>(td1);
-        biasBlob->set(bData);
+            std::make_shared<InferenceEngine::TBlob<float>>(td1, buf1, buf1ByteSize);
 #endif
 
         // auto bias = make_shared_blob<short>(Precision::FP32, Layout::C, std::vector<float>({
@@ -284,7 +285,7 @@ bool testAffineLayer() {
         // std::vector<short>({ 1 }));
 
         printf("addOutput\n");
-        auto indim = input->getDims();
+        auto indim = input->getTensorDesc().getDims();
         std::cout << "input indim[0] " << indim[0] << " indim[1] " << indim[1] << std::endl;
         auto inputdata = input->getInputData();
         auto indatadim = inputdata->getDims();
@@ -324,17 +325,18 @@ bool testAffineLayer() {
         // auto inData = make_shared_blob<float>(Precision::FP32, Layout::NC, std::vector<float>({
         // 0.1f,0.2f,0.3f,0.4f,0.5f }));
 
+        InferenceEngine::ResponseDesc rspDesc;
         auto network = doc.getNetwork();
-        network->setBatchSize(batch);
+        network->setBatchSize(batch, &rspDesc);
         char networkName1[1024] = {};
         network->getName(networkName1, sizeof(networkName1));  // aks
         std::cout << "graphtest network name " << networkName1 << std::endl;
 
         printf("aks initialize ExecuteNetwork\n");
 #ifdef ENABLE_MYRIAD
-        ExecuteNetwork executeNet(doc, TargetDevice::eMYRIAD);
+        ExecuteNetwork executeNet(doc, "MYRIAD");
 #elif ENABLE_MKLDNN
-        ExecuteNetwork executeNet(doc, TargetDevice::eCPU);
+        ExecuteNetwork executeNet(doc, "CPU");
 #endif
         executeNet.prepareInput();
         executeNet.prepareOutput();
@@ -430,7 +432,7 @@ bool testMKLBug() {
                         auto ob = eng.Load(doc).Infer(in);
         */
         printf("aks initialize ExecuteNetwork\n");
-        ExecuteNetwork executeNet(doc, TargetDevice::eMYRIAD);
+        ExecuteNetwork executeNet(doc, "MYRIAD");
         executeNet.prepareInput();
         printf("load network\n");
         executeNet.loadNetwork();

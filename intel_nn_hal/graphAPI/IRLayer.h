@@ -112,8 +112,9 @@ IRBlob::Ptr readBlobFromFile(const std::string &file) {
     InferenceEngine::Precision precision = sizeof(T) == sizeof(short)
                                                ? InferenceEngine::Precision::FP16
                                                : InferenceEngine::Precision::FP32;
-    auto ret = typename InferenceEngine::TBlob<T>::Ptr(new InferenceEngine::TBlob<T>(
-        precision, InferenceEngine::C, {static_cast<size_t>(fs / sizeof(T))}));
+    InferenceEngine::TensorDesc td(precision, {static_cast<size_t>(fs / sizeof(T))},
+                                    InferenceEngine::C);
+    auto ret = typename InferenceEngine::TBlob<T>::Ptr(new InferenceEngine::TBlob<T>(td));
     ret->allocate();
     FileUtils::readAllFile(file, ret->data(), fs);
     return ret;
@@ -123,8 +124,15 @@ template <typename T>
 IRBlob::Ptr readBlobFromFile(const std::string &file, const TensorDims &dims,
                              InferenceEngine::Layout l) {
     auto data = readBlobFromFile<T>(file);
-    data->Reshape(dims, l);
-    return data;
+    auto oldTensorDesc = data->getTensorDesc();
+    auto newTensorDesc = InferenceEngine::TensorDesc(oldTensorDesc.getPrecision(),
+                                                    dims, l);
+
+    auto ret = typename InferenceEngine::TBlob<T>::Ptr( 
+                    new InferenceEngine::TBlob<T>(newTensorDesc, 
+                                                    data->buffer(), 
+                                                    data->byteSize()));
+    return ret;
 }
 
 }  // namespace nnhal

@@ -20,23 +20,23 @@ LOCAL_C_INCLUDES += \
 	$(LOCAL_PATH)/graphAPI
 
 LOCAL_C_INCLUDES += \
-	$(LOCAL_PATH)/../../dldt-gna-2/dldt/inference-engine/thirdparty/pugixml/src \
-	$(LOCAL_PATH)/../../dldt-gna-2/dldt/inference-engine/include \
-	$(LOCAL_PATH)/../../dldt-gna-2/dldt/inference-engine/include/cpp \
-	$(LOCAL_PATH)/../../dldt-gna-2/dldt/inference-engine/include/details \
-	$(LOCAL_PATH)/../../dldt-gna-2/dldt/inference-engine/include/details/os \
-	$(LOCAL_PATH)/../../dldt-gna-2/dldt/inference-engine/include/cldnn \
-	$(LOCAL_PATH)/../../dldt-gna-2/dldt/inference-engine/include/gna \
-	$(LOCAL_PATH)/../../dldt-gna-2/dldt/inference-engine/include/hetero \
-	$(LOCAL_PATH)/../../dldt-gna-2/dldt/inference-engine/include/mkldnn \
-	$(LOCAL_PATH)/../../dldt-gna-2/dldt/inference-engine/include/openvx \
-	$(LOCAL_PATH)/../../dldt-gna-2/dldt/inference-engine/include/vpu \
-	$(LOCAL_PATH)/../../dldt-gna-2/dldt/inference-engine/src/inference_engine \
-	$(LOCAL_PATH)/../../dldt-gna-2/dldt/inference-engine/src/dumper \
-	$(LOCAL_PATH)/../../dldt-gna-2/dldt/inference-engine/src/inference_engine/cpp_interfaces \
-	$(LOCAL_PATH)/../../dldt-gna-2/dldt/inference-engine/src/inference_engine/cpp_interfaces/base \
-	$(LOCAL_PATH)/../../dldt-gna-2/dldt/inference-engine/src/inference_engine/cpp_interfaces/impl \
-	$(LOCAL_PATH)/../../dldt-gna-2/dldt/inference-engine/src/inference_engine/cpp_interfaces/interface \
+	$(LOCAL_PATH)/../../dldt/inference-engine/thirdparty/pugixml/src \
+	$(LOCAL_PATH)/../../dldt/inference-engine/include \
+	$(LOCAL_PATH)/../../dldt/inference-engine/include/cpp \
+	$(LOCAL_PATH)/../../dldt/inference-engine/include/details \
+	$(LOCAL_PATH)/../../dldt/inference-engine/include/details/os \
+	$(LOCAL_PATH)/../../dldt/inference-engine/include/cldnn \
+	$(LOCAL_PATH)/../../dldt/inference-engine/include/gna \
+	$(LOCAL_PATH)/../../dldt/inference-engine/include/hetero \
+	$(LOCAL_PATH)/../../dldt/inference-engine/include/mkldnn \
+	$(LOCAL_PATH)/../../dldt/inference-engine/include/openvx \
+	$(LOCAL_PATH)/../../dldt/inference-engine/include/vpu \
+	$(LOCAL_PATH)/../../dldt/inference-engine/src/inference_engine \
+	$(LOCAL_PATH)/../../dldt/inference-engine/src/dumper \
+	$(LOCAL_PATH)/../../dldt/inference-engine/src/inference_engine/cpp_interfaces \
+	$(LOCAL_PATH)/../../dldt/inference-engine/src/inference_engine/cpp_interfaces/base \
+	$(LOCAL_PATH)/../../dldt/inference-engine/src/inference_engine/cpp_interfaces/impl \
+	$(LOCAL_PATH)/../../dldt/inference-engine/src/inference_engine/cpp_interfaces/interface \
 	frameworks/ml/nn/common/include \
 	frameworks/ml/nn/runtime/include
 
@@ -126,6 +126,6 @@ ZPATH := $(LOCAL_PATH)
 include $(CLEAR_VARS)
 
 include $(ZPATH)/graphAPI/graphAPI.mk
-#include $(ZPATH)/graphTests/graphTests.mk
+include $(ZPATH)/graphTests/graphTests.mk
 include $(ZPATH)/dl/Android.mk
 #include $(ZPATH)/ncsdk2/api/src/Android.mk

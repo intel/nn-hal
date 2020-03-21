@@ -1,4 +1,4 @@
-LOCAL_PATH := $(call my-dir)/../../../dldt-gna-2/dldt
+LOCAL_PATH := $(call my-dir)/../../../dldt
 #LOCAL_PATH := $(call my-dir)
 
 include $(CLEAR_VARS)

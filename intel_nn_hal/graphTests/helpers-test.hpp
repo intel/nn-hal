@@ -236,7 +236,6 @@ void dumpBlob(const /*std::string*/ char *prefix, size_t len, Blob::Ptr blob) {
 }
 
 class ExecuteNetwork {
-    InferenceEnginePluginPtr enginePtr;
     ICNNNetwork *network;
     // IExecutableNetwork::Ptr pExeNet;
     ExecutableNetwork executable_network;
@@ -245,17 +244,15 @@ class ExecuteNetwork {
     IInferRequest::Ptr req;
     InferRequest inferRequest;
     ResponseDesc resp = {};
+    std::string mTarget;
 
 public:
-    ExecuteNetwork() : network(nullptr), enginePtr(nullptr) {}
-    ExecuteNetwork(IRDocument &doc, TargetDevice target = TargetDevice::eCPU)
+    ExecuteNetwork() : network(nullptr) {}
+    ExecuteNetwork(IRDocument &doc, std::string target = "CPU")
         : network(nullptr), executable_network(), req(nullptr), inferRequest() {
-        InferenceEngine::PluginDispatcher dispatcher(
-            {"/vendor/lib64", "/vendor/lib", "/system/lib64", "/system/lib", "", "./"});
-        enginePtr = dispatcher.getSuitablePlugin(target);
+        mTarget = target;
 
         network = doc.getNetwork();
-        network->setTargetDevice(target);
         network->getInputsInfo(inputInfo);
         network->getOutputsInfo(outputInfo);
         printf("aks Execute Network intialized\n");
@@ -271,11 +268,21 @@ public:
     void loadNetwork() {
         std::map<std::string, std::string> networkConfig;
         setConfig(networkConfig);
+        InferenceEngine::CNNNetwork* cnnNetwork = 
+            dynamic_cast<InferenceEngine::CNNNetwork*>(network);
+
+        if (!cnnNetwork) {
+            printf("Failed to cast the pointer");
+            return;
+        }
 
         printf("Create plugin\n");
-        InferencePlugin plugin(enginePtr);
+        //InferencePlugin plugin(enginePtr);
+        InferenceEngine::Core ie;
         printf("Plugin load network\n");
-        executable_network = plugin.LoadNetwork(*network, networkConfig);
+        //executable_network = plugin.LoadNetwork(*network, networkConfig);
+        executable_network = ie.LoadNetwork(*cnnNetwork, mTarget, networkConfig);
+
         printf("Plugin loaded network\n");
         std::cout << "Network loaded" << std::endl;
 
@@ -296,7 +303,7 @@ public:
         outputInfo.begin()->second->setPrecision(inputPrecision);
         // outputInfo.begin()->second->setLayout(Layout::NC);
 
-        auto dims = inputInfo.begin()->second->getDims();
+        auto dims = inputInfo.begin()->second->getTensorDesc().getDims();
         printf("input dims size = %d\n", dims.size());
         // outputInfo.begin()->second->setDims(dims);
         auto outputDims = outputInfo.begin()->second->getDims();
@@ -335,10 +342,10 @@ public:
 
         printf("aks prepare output blob\n");
         const std::string firstOutName = outputInfo.begin()->first;
+        
         InferenceEngine::TBlob<PrecisionTrait<Precision::FP32>::value_type>::Ptr outputBlob;
-        outputBlob = InferenceEngine::make_shared_blob<PrecisionTrait<Precision::FP32>::value_type,
-                                                       InferenceEngine::SizeVector>(
-            Precision::FP32, outputInfo.begin()->second->getDims());
+        InferenceEngine::TensorDesc td(outputInfo.begin()->second->getTensorDesc());
+        outputBlob = std::make_shared<InferenceEngine::TBlob<float>>(td);
         outputBlob->allocate();
 
         printf("set output blob\n");
