@@ -3,9 +3,9 @@ LOCAL_PATH:= $(call my-dir)
 MY_LOCAL_PATH := $(LOCAL_PATH)
 include $(LOCAL_PATH)/ie.mk
 
-#include $(MY_LOCAL_PATH)/graph-trans.mk
+include $(MY_LOCAL_PATH)/graph-trans.mk
 #include $(MY_LOCAL_PATH)/myriad_plugin.mk
-#include $(MY_LOCAL_PATH)/mvnc.mk
+include $(MY_LOCAL_PATH)/mvnc.mk
 
 #include $(MY_LOCAL_PATH)/mkldnn_plugin.mk
 #include $(MY_LOCAL_PATH)/mkldnn.mk

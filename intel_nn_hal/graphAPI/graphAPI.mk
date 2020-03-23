@@ -10,7 +10,6 @@ LOCAL_MULTILIB := 64
 LOCAL_SRC_FILES := \
 	IRDocument.cpp \
 	IRLayer.cpp \
-	IENetwork.cpp \
     IRBuilder.cpp \
 	GnaNetwork.cpp
 

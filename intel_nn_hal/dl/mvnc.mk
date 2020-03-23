@@ -14,7 +14,8 @@ LOCAL_MODULE_OWNER := intel
 
 LOCAL_SRC_FILES := \
 	inference-engine/thirdparty/movidius/mvnc/src/mvnc_api.c \
-	inference-engine/thirdparty/movidius/watchdog/watchdog.cpp \
+	inference-engine/thirdparty/movidius/mvnc/src/mvnc_data.c \
+	inference-engine/thirdparty/movidius/mvnc/src/watchdog/watchdog.cpp \
 	# inference-engine/thirdparty/movidius/USB_WIN/gettime.c \
 	# inference-engine/thirdparty/movidius/USB_WIN/usb_winusb.c \
 	# inference-engine/thirdparty/movidius/WinPthread/win_pthread.c \
@@ -23,12 +24,15 @@ LOCAL_SRC_FILES := \
 LOCAL_C_INCLUDES += \
 	$(LOCAL_PATH)/inference-engine/thirdparty/movidius/mvnc \
 	$(LOCAL_PATH)/inference-engine/thirdparty/movidius/mvnc/include \
+	$(LOCAL_PATH)/inference-engine/thirdparty/movidius/mvnc/include/watchdog \
 	$(LOCAL_PATH)/inference-engine/thirdparty/movidius/shared \
 	$(LOCAL_PATH)/inference-engine/thirdparty/movidius/shared/include \
 	$(LOCAL_PATH)/inference-engine/thirdparty/movidius/watchdog \
 	$(LOCAL_PATH)/inference-engine/thirdparty/movidius/XLink \
 	$(LOCAL_PATH)/inference-engine/thirdparty/movidius/XLink/pc \
 	$(LOCAL_PATH)/inference-engine/thirdparty/movidius/XLink/shared \
+	$(LOCAL_PATH)/inference-engine/thirdparty/movidius/XLink/shared/include \
+	$(LOCAL_PATH)/inference-engine/src/vpu/common/include/vpu \
 	$(LIBUSB_HEADER) \
 	$(LOCAL_PATH)/../../../../../external/libusb \
 	$(LOCAL_PATH)/../../../../../external/libusb/libusb \
@@ -86,18 +90,29 @@ LOCAL_MODULE_OWNER := intel
 
 
 LOCAL_SRC_FILES := \
-	inference-engine/thirdparty/movidius/XLink/pc/pcie_host.c \
-	inference-engine/thirdparty/movidius/XLink/pc/usb_boot.c \
-	inference-engine/thirdparty/movidius/XLink/pc/XLinkPlatform.c \
-	inference-engine/thirdparty/movidius/XLink/shared/XLink.c \
-	inference-engine/thirdparty/movidius/XLink/shared/XLinkDispatcher.c \
+	inference-engine/thirdparty/movidius/XLink/pc/protocols/pcie_host.c \
+	inference-engine/thirdparty/movidius/XLink/pc/protocols/usb_boot.c \
+	inference-engine/thirdparty/movidius/XLink/pc/PlatformDeviceControl.c \
+	inference-engine/thirdparty/movidius/XLink/pc/PlatformDeviceSearch.c \
+	inference-engine/thirdparty/movidius/XLink/pc/PlatformData.c \
+	inference-engine/thirdparty/movidius/XLink/shared/src/XLinkPrivateFields.c \
+	inference-engine/thirdparty/movidius/XLink/shared/src/XLinkDispatcherImpl.c \
+	inference-engine/thirdparty/movidius/XLink/shared/src/XLinkDevice.c \
+	inference-engine/thirdparty/movidius/XLink/shared/src/XLinkData.c \
+	inference-engine/thirdparty/movidius/XLink/shared/src/XLinkStringUtils.c \
+	inference-engine/thirdparty/movidius/XLink/shared/src/XLinkPrivateDefines.c \
+	inference-engine/thirdparty/movidius/XLink/shared/src/XLinkDeprecated.c \
+	inference-engine/thirdparty/movidius/XLink/shared/src/XLinkStream.c \
+	inference-engine/thirdparty/movidius/XLink/shared/src/XLinkDispatcher.c \
 
 LOCAL_C_INCLUDES += \
 	$(LOCAL_PATH)/inference-engine/include \
 	$(LOCAL_PATH)/inference-engine/src/inference_engine \
 	$(LOCAL_PATH)/inference-engine/thirdparty/movidius/XLink \
 	$(LOCAL_PATH)/inference-engine/thirdparty/movidius/XLink/pc \
+	$(LOCAL_PATH)/inference-engine/thirdparty/movidius/XLink/pc/protocols \
 	$(LOCAL_PATH)/inference-engine/thirdparty/movidius/XLink/shared \
+	$(LOCAL_PATH)/inference-engine/thirdparty/movidius/XLink/shared/include \
 	$(LOCAL_PATH)/inference-engine/thirdparty/movidius/shared \
 	$(LOCAL_PATH)/inference-engine/thirdparty/movidius/shared/include \
 	$(LIBUSB_HEADER) \
