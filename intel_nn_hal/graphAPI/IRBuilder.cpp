@@ -166,6 +166,7 @@ OutputPort ModelBuilder::createFullLstm(LstmLayer::LstmParams& params, LstmLayer
         IRBlob::Ptr cellStateIn, IRBlob::Ptr outputStateIn) {
     auto outputDims = outputStateIn->getTensorDesc().getDims();
     auto cellStateDims = cellStateIn->getTensorDesc().getDims();
+    std::string finalLayerName;
 
     // Creates a port object with data set to it
     const auto createPort = [&](InferenceEngine::SizeVector dims, IRBlob::Ptr dataPtr) -> Port {
@@ -265,7 +266,7 @@ OutputPort ModelBuilder::createFullLstm(LstmLayer::LstmParams& params, LstmLayer
     // i2f = W_{xf}x_t + b_f
     idx_t i2fLayerId = createFullyConnectedLayer(inputLayerId, params.input2ForgetWeights, params.forgetGateBias, cellStateDims[1]);
 
-    // i2c = W_{xc}x_t + b_c:q
+    // i2c = W_{xc}x_t + b_c
     idx_t i2cLayerId = createFullyConnectedLayer(inputLayerId, params.input2CellWeights, params.cellBias, cellStateDims[1]);
 
     // i2o = W_{xo}x_t+b_o
@@ -306,6 +307,39 @@ OutputPort ModelBuilder::createFullLstm(LstmLayer::LstmParams& params, LstmLayer
     idx_t r2oLayerId = getBuilderNetwork()->getBuilder()->addLayer({{h_t_1Id}, {weightsId}}, \
                                         FCLayer(getLayerName("affinetransform")) \
                                         .setOutputNum(cellStateDims[1]));
+
+    idx_t c2iLayerId, c2fLayerId, cellstateToInputGateAddLayerId, cellStateToForgetGateAddLayerId, cellStateToOutputGateAddLayerId;
+    if (lstmDesc.peepholeEnabled) {
+        //c2i = W_{ci}C_{t-1}
+        weightsId =  getBuilderNetwork()->getBuilder()->addLayer(CONSTLayer("weights").setData(params.cell2InputWeights.data));
+        if (params.recurrant2OutputWeights.lifeTime == (int)OperandLifeTime::MODEL_INPUT) {
+            mBlob2LayerIdxMap[params.cell2InputWeights.data] = weightsId;
+        }
+        idx_t c2iLayerId = getBuilderNetwork()->getBuilder()->addLayer({{c_t_1Id}, {weightsId}}, \
+                                            FCLayer(getLayerName("affinetransform")) \
+                                            .setOutputNum(cellStateDims[1]));
+
+        //c2f = W_{cf}C_{t-1}
+        weightsId =  getBuilderNetwork()->getBuilder()->addLayer(CONSTLayer("weights").setData(params.cell2ForgetWeights.data));
+        if (params.cell2ForgetWeights.lifeTime == (int)OperandLifeTime::MODEL_INPUT) {
+            mBlob2LayerIdxMap[params.cell2ForgetWeights.data] = weightsId;
+        }
+        idx_t c2fLayerId = getBuilderNetwork()->getBuilder()->addLayer({{c_t_1Id}, {weightsId}}, \
+                                            FCLayer(getLayerName("affinetransform")) \
+                                            .setOutputNum(cellStateDims[1]));
+
+        ELTWISELayer c2iGateSumLayer = ELTWISELayer(getLayerName("add"));
+        c2iGateSumLayer.setEltwiseType(ELTWISELayer::SUM);
+        idx_t cellstateToInputGateAddLayerId = getBuilderNetwork()->getBuilder()->addLayer(c2iGateSumLayer);
+
+        ELTWISELayer c2fGateSumLayer = ELTWISELayer(getLayerName("add"));
+        c2fGateSumLayer.setEltwiseType(ELTWISELayer::SUM);
+        idx_t cellStateToForgetGateAddLayerId = getBuilderNetwork()->getBuilder()->addLayer(c2fGateSumLayer);
+
+        ELTWISELayer c2oGateSumLayer = ELTWISELayer(getLayerName("add"));
+        c2oGateSumLayer.setEltwiseType(ELTWISELayer::SUM);
+        idx_t cellStateToOutputGateAddLayerId = getBuilderNetwork()->getBuilder()->addLayer(c2oGateSumLayer);
+    }
 
     // Eltwise sum layer
     ELTWISELayer inputGateSumLayer = ELTWISELayer(getLayerName("add"));
@@ -353,24 +387,9 @@ OutputPort ModelBuilder::createFullLstm(LstmLayer::LstmParams& params, LstmLayer
     ELTWISELayer newOutputMulLayer = ELTWISELayer(getLayerName("mul"));
     newOutputMulLayer.setEltwiseType(ELTWISELayer::MUL);
     idx_t newOutputMulLayerId = getBuilderNetwork()->getBuilder()->addLayer(newOutputMulLayer);
-
-    // W_{proj}(o_t \odot g(C_t))+b_{proj}
-    idx_t projWeightsLayerId =  getBuilderNetwork()->getBuilder()->addLayer(CONSTLayer("weights").setData(params.projectionWeights.data));
-    if (params.projectionWeights.lifeTime == (int)OperandLifeTime::MODEL_INPUT) {
-            mBlob2LayerIdxMap[params.projectionWeights.data] = projWeightsLayerId;
-    }
-
-    idx_t projBiasLayerId =  getBuilderNetwork()->getBuilder()->addLayer(CONSTLayer("bias").setData(params.projectionBias.data));
-    if (params.projectionBias.lifeTime == (int)OperandLifeTime::MODEL_INPUT) {
-            mBlob2LayerIdxMap[params.projectionBias.data] = projBiasLayerId;
-    }
-    std::string finalLayerName = getLayerName("affinetransform");
-    idx_t projectionLayerId = getBuilderNetwork()->getBuilder()->addLayer({{newOutputMulLayerId}, {projWeightsLayerId}, {projBiasLayerId}}, \
-                                                    FCLayer(finalLayerName) \
-                                                    .setOutputNum(outputDims[1]));
-
-    // clamp
-    idx_t cellStateClampLayerId; 
+    
+    // clamp layers
+    idx_t cellStateClampLayerId, projectionLayerClampId;
     if (lstmDesc.clippingThresholdCellState) {
         cellStateClampLayerId = getBuilderNetwork()->getBuilder()->addLayer(CLAMPLayer(getLayerName("clamp")) \
                                 .setPort(Port(cellStateDims)) \
@@ -378,21 +397,32 @@ OutputPort ModelBuilder::createFullLstm(LstmLayer::LstmParams& params, LstmLayer
                                 .setMaxValue(lstmDesc.clippingThresholdCellState));
     }
 
-    idx_t projectionLayerClampId; 
     if (lstmDesc.clippingThresholdProjState) {
         finalLayerName = getLayerName("clamp");
-        idx_t projectionLayerClampId = getBuilderNetwork()->getBuilder()->addLayer(CLAMPLayer(finalLayerName) \
+        projectionLayerClampId = getBuilderNetwork()->getBuilder()->addLayer(CLAMPLayer(finalLayerName) \
                             .setPort(Port(outputDims)) \
                             .setMinValue(-lstmDesc.clippingThresholdProjState) \
                             .setMinValue(lstmDesc.clippingThresholdProjState));
     }
 
     // input gate connections
-    // i_t = sigma(W_{xi}x_t+W_{hi}h_{t-1}+W_{ci}C_{t-1}+b_i)
-    getBuilderNetwork()->getBuilder()->connect({i2iLayerId}, {inputGateAddLayerId, 0});
-    getBuilderNetwork()->getBuilder()->connect({r2iLayerId}, {inputGateAddLayerId, 1});
-    getBuilderNetwork()->getBuilder()->connect({inputGateAddLayerId}, {inputGateActivationFn});
-    getBuilderNetwork()->getBuilder()->connect({inputGateActivationFn}, {newCellStateMulLayerId, 0});
+    if (!lstmDesc.peepholeEnabled) {
+        // i_t = sigma(W_{xi}x_t+W_{hi}h_{t-1}+b_i)
+        getBuilderNetwork()->getBuilder()->connect({i2iLayerId}, {inputGateAddLayerId, 0});
+        getBuilderNetwork()->getBuilder()->connect({r2iLayerId}, {inputGateAddLayerId, 1});
+        getBuilderNetwork()->getBuilder()->connect({inputGateAddLayerId}, {inputGateActivationFn});
+        getBuilderNetwork()->getBuilder()->connect({inputGateActivationFn}, {newCellStateMulLayerId, 0});
+    } else {
+        //W_{xi}x_t+W_{hi}h_{t-1}+b_i
+        getBuilderNetwork()->getBuilder()->connect({i2iLayerId}, {inputGateAddLayerId, 0});
+        getBuilderNetwork()->getBuilder()->connect({r2iLayerId}, {inputGateAddLayerId, 1});
+        //W_{xi}x_t+W_{hi}h_{t-1}+W_{ci}C_{t-1}
+        getBuilderNetwork()->getBuilder()->connect({c2iLayerId}, {cellstateToInputGateAddLayerId, 0});
+        getBuilderNetwork()->getBuilder()->connect({inputGateAddLayerId}, {cellstateToInputGateAddLayerId, 1});
+        // i_t = sigma(W_{xi}x_t+W_{hi}h_{t-1}+W_{ci}C_{t-1}+b_i)
+        getBuilderNetwork()->getBuilder()->connect({cellstateToInputGateAddLayerId}, {inputGateActivationFn});
+        getBuilderNetwork()->getBuilder()->connect({inputGateActivationFn}, {newCellStateMulLayerId, 0});
+    }
 
     // cell gate
     // g(W_{xc}x_t+W_{hc}h_{t-1}+b_c)
@@ -405,50 +435,118 @@ OutputPort ModelBuilder::createFullLstm(LstmLayer::LstmParams& params, LstmLayer
     getBuilderNetwork()->getBuilder()->connect({newCellStateMulLayerId}, {updateCellSumLayerId, 0});
 
     // Forget gate
-    getBuilderNetwork()->getBuilder()->connect({i2fLayerId}, {forgetGateAddLayerId, 0});
-    getBuilderNetwork()->getBuilder()->connect({r2fLayerId}, {forgetGateAddLayerId, 1});
-    getBuilderNetwork()->getBuilder()->connect({forgetGateAddLayerId}, {forgetGateActivationFn});
-    getBuilderNetwork()->getBuilder()->connect({c_t_1Id}, {oldCellStateMulLayerId, 0});
-    getBuilderNetwork()->getBuilder()->connect({forgetGateActivationFn}, {oldCellStateMulLayerId, 1});
+    if (!lstmDesc.peepholeEnabled) {
+        // f_t = sigma(W_{xf}x_t+W_{hf}h_{t-1}+b_f)
+        getBuilderNetwork()->getBuilder()->connect({i2fLayerId}, {forgetGateAddLayerId, 0});
+        getBuilderNetwork()->getBuilder()->connect({r2fLayerId}, {forgetGateAddLayerId, 1});
+        getBuilderNetwork()->getBuilder()->connect({forgetGateAddLayerId}, {forgetGateActivationFn});
+        getBuilderNetwork()->getBuilder()->connect({c_t_1Id}, {oldCellStateMulLayerId, 0});
+        getBuilderNetwork()->getBuilder()->connect({forgetGateActivationFn}, {oldCellStateMulLayerId, 1});
+    } else {
+        // W_{xf}x_t+W_{hf}h_{t-1}+b_f
+        getBuilderNetwork()->getBuilder()->connect({i2fLayerId}, {forgetGateAddLayerId, 0});
+        getBuilderNetwork()->getBuilder()->connect({r2fLayerId}, {forgetGateAddLayerId, 1});
+        // W_{xf}x_t+W_{hf}h_{t-1}+W_{cf}C_{t-1}+b_f
+        getBuilderNetwork()->getBuilder()->connect({c2fLayerId}, {cellStateToForgetGateAddLayerId, 0});
+        getBuilderNetwork()->getBuilder()->connect({forgetGateAddLayerId}, {cellStateToForgetGateAddLayerId, 1});
+        // f_t = sigma(W_{xi}x_t+W_{hi}h_{t-1}+W_{ci}C_{t-1}+b_i)
+        getBuilderNetwork()->getBuilder()->connect({cellStateToForgetGateAddLayerId}, {forgetGateActivationFn});
+        getBuilderNetwork()->getBuilder()->connect({forgetGateActivationFn}, {oldCellStateMulLayerId, 0});
+    }
 
-    // C_t = clip(f_t (dot) C_{t-1} + i_t (dot) g(W_{xc}x_t+W_{hc}h_{t-1}+b_c), t_{cell})
+    // f_t (dot) C_{t-1} + i_t (dot) g(W_{xc}x_t+W_{hc}h_{t-1}+b_c)
     getBuilderNetwork()->getBuilder()->connect({oldCellStateMulLayerId}, {updateCellSumLayerId, 1});
-
     if (lstmDesc.clippingThresholdCellState) {
+        // C_t = clip(f_t (dot) C_{t-1} + i_t (dot) g(W_{xc}x_t+W_{hc}h_{t-1}+b_c), t_{cell})
         getBuilderNetwork()->getBuilder()->connect({updateCellSumLayerId}, {cellStateClampLayerId});
         getBuilderNetwork()->getBuilder()->connect({cellStateClampLayerId}, {c_tId});
+
+        // g(C_t)
+        getBuilderNetwork()->getBuilder()->connect({cellStateClampLayerId}, {outputGateTanhFn});
     } else {
+        // C_t = f_t (dot) C_{t-1} + i_t (dot) g(W_{xc}x_t+W_{hc}h_{t-1}+b_c)
         getBuilderNetwork()->getBuilder()->connect({updateCellSumLayerId}, {c_tId});
+
+        // g(C_t)
+        getBuilderNetwork()->getBuilder()->connect({updateCellSumLayerId}, {outputGateTanhFn});
     }
 
-    // Output Gate
-    // o_t = sigma(W_{xo}x_t+W_{ho}h_{t-1}+W_{co}C_t+b_o)
-    getBuilderNetwork()->getBuilder()->connect({i2oLayerId}, {outputGateAddLayerId, 0});
-    getBuilderNetwork()->getBuilder()->connect({r2oLayerId}, {outputGateAddLayerId, 1});
-    getBuilderNetwork()->getBuilder()->connect({outputGateAddLayerId}, {outputGateActivationFn}); // o_t
-
-    if (lstmDesc.clippingThresholdCellState) {
-        getBuilderNetwork()->getBuilder()->connect({cellStateClampLayerId}, {outputGateTanhFn}); // g(C_t)
+    // Output Gate (o_t)
+    if (!lstmDesc.peepholeEnabled) {
+        // o_t = sigma(W_{xo}x_t+W_{ho}h_{t-1}+W_{co}C_t+b_o)
+        getBuilderNetwork()->getBuilder()->connect({i2oLayerId}, {outputGateAddLayerId, 0});
+        getBuilderNetwork()->getBuilder()->connect({r2oLayerId}, {outputGateAddLayerId, 1});
+        getBuilderNetwork()->getBuilder()->connect({outputGateAddLayerId}, {outputGateActivationFn}); // o_t
     } else {
-        getBuilderNetwork()->getBuilder()->connect({updateCellSumLayerId}, {outputGateTanhFn}); // g(C_t)
+        // o_t = sigma(W_{xo}x_t+W_{ho}h_{t-1}+W_{co}C_t+b_o)
+        // W_{xo}x_t+W_{ho}h_{t-1}
+        getBuilderNetwork()->getBuilder()->connect({i2oLayerId}, {outputGateAddLayerId, 0});
+        getBuilderNetwork()->getBuilder()->connect({r2oLayerId}, {outputGateAddLayerId, 1});
+
+        //c2o = W_{co}C_{t}
+        weightsId =  getBuilderNetwork()->getBuilder()->addLayer(CONSTLayer("weights").setData(params.cell2OutputWeights.data));
+        if (params.cell2OutputWeights.lifeTime == (int)OperandLifeTime::MODEL_INPUT) {
+            mBlob2LayerIdxMap[params.cell2OutputWeights.data] = weightsId;
+        }
+        idx_t c2oLayerId = getBuilderNetwork()->getBuilder()->addLayer({{c_tId}, {weightsId}}, \
+                                            FCLayer(getLayerName("affinetransform")) \
+                                            .setOutputNum(cellStateDims[1]));
+
+        //c2o GateSumLayer
+        // W_{xf}x_t+W_{hf}h_{t-1}+W_{cf}C_{t-1}+b_f
+        getBuilderNetwork()->getBuilder()->connect({c2oLayerId}, {cellStateToOutputGateAddLayerId, 0});
+        getBuilderNetwork()->getBuilder()->connect({outputGateAddLayerId}, {cellStateToOutputGateAddLayerId, 1});
+        //o_t = sigma(W_{xo}x_t+W_{ho}h_{t-1}+W_{co}C_t+b_o)
+        getBuilderNetwork()->getBuilder()->connect({cellStateToOutputGateAddLayerId}, {outputGateActivationFn}); // o_t
     }
+
+    // h_t = o_t dot g(C_t)
     getBuilderNetwork()->getBuilder()->connect({outputGateActivationFn}, {newOutputMulLayerId, 0});
-    getBuilderNetwork()->getBuilder()->connect({outputGateTanhFn}, {newOutputMulLayerId, 1}); // o_t dot g(C_t)
+    getBuilderNetwork()->getBuilder()->connect({outputGateTanhFn}, {newOutputMulLayerId, 1});
 
-    // clip(W_{proj}(o_t (dot) g(C_t))+b_{proj}, t_{proj})
-    if (lstmDesc.clippingThresholdProjState) {
-        getBuilderNetwork()->getBuilder()->connect({projectionLayerId}, {projectionLayerClampId});
-        getBuilderNetwork()->getBuilder()->connect({projectionLayerClampId}, {h_tId});
+    idx_t projectionLayerId;
+    if (lstmDesc.projectionLayerEnabled) {
+        finalLayerName = getLayerName("affinetransform"); // ??
+
+        // W_{proj}(o_t \odot g(C_t))+b_{proj}
+        idx_t projWeightsLayerId =  getBuilderNetwork()->getBuilder()->addLayer(CONSTLayer("weights").setData(params.projectionWeights.data));
+        if (params.projectionWeights.lifeTime == (int)OperandLifeTime::MODEL_INPUT) {
+                mBlob2LayerIdxMap[params.projectionWeights.data] = projWeightsLayerId;
+        }
+
+        idx_t projBiasLayerId =  getBuilderNetwork()->getBuilder()->addLayer(CONSTLayer("bias").setData(params.projectionBias.data));
+        if (params.projectionBias.lifeTime == (int)OperandLifeTime::MODEL_INPUT) {
+                mBlob2LayerIdxMap[params.projectionBias.data] = projBiasLayerId;
+        }
+
+        projectionLayerId = getBuilderNetwork()->getBuilder()->addLayer({{newOutputMulLayerId}, {projWeightsLayerId}, {projBiasLayerId}}, \
+                                                    FCLayer(finalLayerName) \
+                                                    .setOutputNum(outputDims[1]));
+
+        // h_t = clip(W_{proj}(o_t (dot) g(C_t))+b_{proj}, t_{proj})
+        if (lstmDesc.clippingThresholdProjState) {
+            getBuilderNetwork()->getBuilder()->connect({projectionLayerId}, {projectionLayerClampId});
+            getBuilderNetwork()->getBuilder()->connect({projectionLayerClampId}, {h_tId});
+        } else {
+            getBuilderNetwork()->getBuilder()->connect({projectionLayerId}, {h_tId});
+        }
     } else {
-        getBuilderNetwork()->getBuilder()->connect({projectionLayerId}, {h_tId});
+        // h_t = o_t (dot) g(C_t)
+        getBuilderNetwork()->getBuilder()->connect({newOutputMulLayerId}, {h_tId});
     }
 
     finalLayerName = getLayerName("clamp_final");
+    int thresholdState = 100;
     idx_t finalLayerClampId = getBuilderNetwork()->getBuilder()->addLayer(CLAMPLayer(finalLayerName) \
-                        .setPort(Port(outputDims)) \
-                        .setMinValue(-lstmDesc.clippingThresholdProjState) \
-                        .setMinValue(lstmDesc.clippingThresholdProjState));
-    getBuilderNetwork()->getBuilder()->connect({projectionLayerId}, {finalLayerClampId});
+                                            .setPort(Port(outputDims)) \
+                                            .setMinValue(-thresholdState) \
+                                            .setMinValue(thresholdState));
+    if (lstmDesc.projectionLayerEnabled) {
+        getBuilderNetwork()->getBuilder()->connect({projectionLayerId}, {finalLayerClampId});
+    } else {
+        getBuilderNetwork()->getBuilder()->connect({newOutputMulLayerId}, {finalLayerClampId});
+    }
+
     getBuilderNetwork()->finalMemLayerId = finalLayerClampId;
     getBuilderNetwork()->mConnections.push_back(finalLayerClampId);
 

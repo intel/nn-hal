@@ -408,7 +408,7 @@ Return<void> GnaPreparedModel::executeSynchronously(const Request& request, Meas
     // TODO: We need to change this to add more outputs
     // We are filling outputdata for only 1 output buffer for decoder
     //hidl_vec<OutputShape> outputShapes(request.outputs.size());
-    hidl_vec<OutputShape> outputShapes(1);
+    hidl_vec<OutputShape> outputShapes(request.outputs.size());
 
     auto inOutData = [this, &requestPoolInfos](const std::vector<uint32_t>& indexes,
                                             const hidl_vec<RequestArgument>& arguments,
@@ -520,13 +520,19 @@ Return<void> GnaPreparedModel::executeSynchronously(const Request& request, Meas
     auto outputBlob = gnaPluginPtr->getInferRequest().GetBlob(gnaPluginPtr->outputInfo.begin()->first);
     auto outputDimensions = gnaPluginPtr->outputInfo.begin()->second->getDims();
 
+    // Need to fill the outputshapes here
+    for (auto i=0; i < 4; i++) {
+        outputShapes[i].dimensions = {};
+        outputShapes[i].isSufficient = true;
+    }
+
     // TODO: Change this code once we get more than one output from model
     hidl_vec<uint32_t> dimensions;
     for (auto i =0; i < outputDimensions.size(); i++) {
         dimensions[i] = outputDimensions[i]; 
     }
-    outputShapes[0].dimensions = dimensions;
-    outputShapes[0].isSufficient = true;
+    outputShapes[4].dimensions = dimensions;
+    outputShapes[4].isSufficient = true;
 
     //enginePtr->setBlob(outputInfoItem->getName(), getOutputBlob);
     VLOG(L1, "Run");
@@ -774,7 +780,6 @@ Outputs:
 */
 bool GnaPreparedModel::operationLSTM(const Operation& operation)
 {
-    VLOG(L1, "operation type LSTM is supported.");
     //[23]{30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52}
     IRBuilder::LstmLayer::LstmParams  params;
 
@@ -797,13 +802,67 @@ bool GnaPreparedModel::operationLSTM(const Operation& operation)
         return blob;
     };
 
-    // for (auto i=0; i < operation.outputs.size(); i++) {
-    //     VLOG(L1, "output index = %d", operation.outputs[i]);
+    // for (auto i=0; i < operation.inputs.size(); i++) {
+    //      VLOG(L1, "input index = %d lifetime = %d", operation.inputs[i],
+    //                                                 getOperandLifeTime(i));
     // }
+
+    // for (auto i=0; i < operation.outputs.size(); i++) {
+    //      VLOG(L1, "input index = %d lifetime = %d", operation.outputs[i],
+    //                                                 getOperandLifeTime(i));
+    // }
+
+    IRBuilder::LstmLayer::LstmCellDescription lstmDesc;
+
+    lstmDesc.clippingThresholdCellState     = PARAM_FP(21);
+    lstmDesc.clippingThresholdProjState     = PARAM_FP(22);
+    lstmDesc.cifgEnabled                    = false;
+    lstmDesc.projectionLayerEnabled         = false;
+    lstmDesc.peepholeEnabled                = false;
+
+    std::string lstmDescription;
+    if (isOperandDataNull(operation.inputs[1]) ||
+        isOperandDataNull(operation.inputs[5]) ||
+        isOperandDataNull(operation.inputs[12])) {
+        lstmDescription.append("Cifg");
+        lstmDesc.cifgEnabled = true;
+    } else {
+        lstmDescription.append("noCifg");
+    }
+
+    if (!isOperandDataNull(operation.inputs[16]))
+    {
+        lstmDescription.append("Projection");
+        lstmDesc.projectionLayerEnabled = true;
+    } else {
+        lstmDescription.append("noProjection");
+    }
+
+    if (!isOperandDataNull(operation.inputs[9]) ||
+        !isOperandDataNull(operation.inputs[10]) ||
+        !isOperandDataNull(operation.inputs[11]))
+    {
+        lstmDescription.append("Peephole");
+        lstmDesc.peepholeEnabled = true;
+    } else {
+        lstmDescription.append("noPeephole");
+    }
+
+    if (operation.inputs.size() > 23) {
+        if (!isOperandDataNull(operation.inputs[24]) &&
+            !isOperandDataNull(operation.inputs[25]) &&
+            !isOperandDataNull(operation.inputs[26])) {
+            VLOG(L1, "Normalization weights are present.. Not supported yet.");
+            return false;
+        }
+    }
+    VLOG(L1, "Lstm cell description %s", lstmDescription.c_str());
 
     auto input          = getIRBlobFromOperand(operation.inputs[0], 0);
     auto outputStateIn  = getIRBlobFromOperand(operation.inputs[18], 18);
     auto cellStateIn    = getIRBlobFromOperand(operation.inputs[19], 19);
+
+    VLOG(L1, "check point 2");
 
     params.input2inputWeights.data     = getIRBlobFromOperand(operation.inputs[1], 1);
     params.input2inputWeights.lifeTime = getOperandLifeTime(operation.inputs[1]);
@@ -850,11 +909,13 @@ bool GnaPreparedModel::operationLSTM(const Operation& operation)
     params.outputGateBias.data    = getIRBlobFromOperand(operation.inputs[15], 15);
     params.outputGateBias.lifeTime    = getOperandLifeTime(operation.inputs[15]);
 
-    params.projectionWeights.data       = getIRBlobFromOperand(operation.inputs[16], 16);
-    params.projectionWeights.lifeTime       = getOperandLifeTime(operation.inputs[16]);
+    if (lstmDesc.projectionLayerEnabled) {
+        params.projectionWeights.data       = getIRBlobFromOperand(operation.inputs[16], 16);
+        params.projectionWeights.lifeTime       = getOperandLifeTime(operation.inputs[16]);
 
-    params.projectionBias.data    = getIRBlobFromOperand(operation.inputs[17], 17);
-    params.projectionBias.lifeTime    = getOperandLifeTime(operation.inputs[17]);
+        params.projectionBias.data    = getIRBlobFromOperand(operation.inputs[17], 17);
+        params.projectionBias.lifeTime    = getOperandLifeTime(operation.inputs[17]);
+    }
 
     if (operation.inputs.size() > 23) {
         params.inputLayerNormWeights.data      = GetConstOperandAsTensor(operation.inputs[23], 23);
@@ -872,79 +933,7 @@ bool GnaPreparedModel::operationLSTM(const Operation& operation)
 
     params.activationFunction               = PARAM_I32(20);
 
-    IRBuilder::LstmLayer::LstmCellDescription lstmDesc;
-
-    lstmDesc.clippingThresholdCellState     = PARAM_FP(21);
-    lstmDesc.clippingThresholdProjState     = PARAM_FP(22);
-    lstmDesc.cifgEnabled                    = false;
-    lstmDesc.projectionLayerEnabled         = false;
-    lstmDesc.peepholeEnabled                = false;
-
-    std::string lstmDescription;
-    if (isOperandDataNull(operation.inputs[1]) ||
-        isOperandDataNull(operation.inputs[5]) ||
-        isOperandDataNull(operation.inputs[12])) {
-        lstmDescription.append("Cifg");
-        lstmDesc.cifgEnabled = true;
-    } else {
-        lstmDescription.append("noCifg");
-    }
-
-    if (!isOperandDataNull(operation.inputs[16]))
-    {
-        lstmDescription.append("Projection");
-        lstmDesc.projectionLayerEnabled = true;
-    }
-
-    if (!isOperandDataNull(operation.inputs[9]) ||
-        !isOperandDataNull(operation.inputs[10]) ||
-        !isOperandDataNull(operation.inputs[11]))
-    {
-        lstmDescription.append("Peephole");
-        lstmDesc.peepholeEnabled = true;
-    }
-
-    if (operation.inputs.size() > 23) {
-        if (!isOperandDataNull(operation.inputs[24]) &&
-            !isOperandDataNull(operation.inputs[25]) &&
-            !isOperandDataNull(operation.inputs[26])) {
-            VLOG(L1, "Normalization weights are present.. Not supported yet.");
-            return false;
-        }
-    }
-    VLOG(L1, "Lstm cell description %s", lstmDescription.c_str());
-
     mPorts[operation.outputs[3]] = mBuilderModel->createFullLstm(params, lstmDesc, input, cellStateIn, outputStateIn);
-
-
-    // network needs an input info pointer to mark as input
-    // usually done in getPort.
-    // getPort does the following things
-    //         call createInput()
-    //              created TensorDesc
-    //              create DataPtr
-    //              from above two create a InputInfo
-    //              sets the inputinfo to network
-    //         mPorts[index] = gets the InputInfo::DataPtr
-    //         sets the layout.
-
-    // call create()
-    //              create IELayer
-    //              add the above InputInfo to IELayer as input
-    //              create an output port
-    //              add layer info to the output port
-    //              add the outputport mports
-
-    // finalizeOutput
-    //              iterate through the output ports
-    //              add them to the output index...
-
-
-    // It is not yet clear how this is going to work.
-    // But here goes the implementation....
-    //mNet.copyLayers(cnnNetwork);
-
-    // An alternate implementation
 
     return true;
 }
