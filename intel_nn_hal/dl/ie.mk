@@ -132,7 +132,7 @@ LOCAL_C_INCLUDES += \
 	$(LOCAL_PATH)/inference-engine/src/inference_engine/shape_infer/built-in \
 	$(LOCAL_PATH)/inference-engine/thirdparty/pugixml/src \
 	$(LOCAL_PATH)/../../ade/sources/ade/include \
-	$(LOCAL_PATH)/inference-engine/temp/gna/linux/include\
+	$(LOCAL_PATH)/inference-engine/binary/gna/linux/include\
 	$(LOCAL_PATH)/inference-engine/thirdparty/mkl-dnn/src/cpu/xbyak \
 	$(LOCAL_PATH)/inference-engine/thirdparty/fluid/modules/gapi/include
 

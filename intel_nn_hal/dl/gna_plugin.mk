@@ -55,8 +55,8 @@ LOCAL_C_INCLUDES += \
 	$(LOCAL_PATH)/inference-engine/src/inference_engine/cpu_x86_sse42 \
     $(LOCAL_PATH)/inference-engine/src/inference_engine/shape_infer \
     $(LOCAL_PATH)/inference-engine/src/inference_engine/shape_infer/built-in \
-    $(LOCAL_PATH)/inference-engine/temp/gna/linux/include \
-    $(LOCAL_PATH)/inference-engine/temp/gna/linux/include/sys \
+    $(LOCAL_PATH)/inference-engine/binary/gna/linux/include \
+    $(LOCAL_PATH)/inference-engine/binary/gna/linux/include/sys \
     $(LOCAL_PATH)/inference-engine/include/cldnn \
     $(LOCAL_PATH)/inference-engine/include/details \
     $(LOCAL_PATH)/inference-engine/include/details/os \

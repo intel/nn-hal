@@ -166,7 +166,7 @@ $(info LOCAL_PATH =$(LOCAL_PATH))
 include $(CLEAR_VARS)
 
 LOCAL_MODULE := MvNCAPI-ma2450.mvcmd
-LOCAL_SRC_FILES := inference-engine/temp/vpu/firmware/ma2450/mvnc/MvNCAPI-ma2450.mvcmd
+LOCAL_SRC_FILES := inference-engine/binary/vpu/firmware/ma2450/mvnc/MvNCAPI-ma2450.mvcmd
 LOCAL_PROPRIETARY_MODULE := true
 LOCAL_MODULE_OWNER := intel
 LOCAL_MODULE_CLASS := ETC
@@ -179,7 +179,7 @@ $(info LOCAL_PATH =$(LOCAL_PATH))
 include $(CLEAR_VARS)
 
 LOCAL_MODULE := MvNCAPI-ma2480.mvcmd
-LOCAL_SRC_FILES := inference-engine/temp/vpu/firmware/ma2480/mvnc/MvNCAPI-ma2480.mvcmd
+LOCAL_SRC_FILES := inference-engine/binary/vpu/firmware/ma2480/mvnc/MvNCAPI-ma2480.mvcmd
 LOCAL_PROPRIETARY_MODULE := true
 LOCAL_MODULE_OWNER := intel
 LOCAL_MODULE_CLASS := ETC
