@@ -61,7 +61,7 @@ auto microsecondsDuration(decltype(now()) end, decltype(now()) start) {
 //
 // Since these drivers simulate hardware, they must run the computations
 // on the CPU.  An actual driver would not do that.
-class PreparedModel : public V1_2::IPreparedModel {
+class PreparedModel : public V1_0::IPreparedModel {
 public:
     PreparedModel(const Model& model)
         : mTargetDevice("MYRIAD"),
@@ -92,15 +92,6 @@ public:
     virtual bool initialize();
     virtual Return<ErrorStatus> execute(const Request& request,
                                 const sp<V1_0::IExecutionCallback>& callback) override;
-    virtual Return<ErrorStatus> execute_1_2(const Request& request, MeasureTiming measure,
-                                    const sp<V1_2::IExecutionCallback>& callback) override;
-    virtual Return<void> executeSynchronously(const Request& request, MeasureTiming measure,
-                                      executeSynchronously_cb cb) override;
-    Return<void> configureExecutionBurst(
-        const sp<V1_2::IBurstCallback>& callback,
-        const MQDescriptorSync<V1_2::FmqRequestDatum>& requestChannel,
-        const MQDescriptorSync<V1_2::FmqResultDatum>& resultChannel,
-        configureExecutionBurst_cb cb) override;
 
     // Return<ErrorStatus> executeBase(const Request& request, MeasureTiming measure,
     //                             const sp<T_IExecutionCallback>& callback);
@@ -111,12 +102,10 @@ protected:
     bool initializeRunTimeOperandInfo();
     virtual Return<ErrorStatus> executeBase(const Request& request, MeasureTiming measure,
                                     const sp<V1_0::IExecutionCallback>& callback);
-    virtual Return<ErrorStatus> executeBase_1_2(const Request& request, MeasureTiming measure,
-                                        const sp<V1_2::IExecutionCallback>& callback);
+
     void asyncExecute(const Request& request, MeasureTiming measure, time_point driverStart,
                       const sp<V1_0::IExecutionCallback>& callback);
-    void asyncExecute_1_2(const Request& request, MeasureTiming measure, time_point driverStart,
-                          const sp<V1_2::IExecutionCallback>& callback);
+
     bool operationAdd(const Operation& operation);
     bool operationAveragePool2D(const Operation& operation);
     bool operationConCat(const Operation& operation);

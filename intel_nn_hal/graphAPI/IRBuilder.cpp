@@ -21,6 +21,7 @@ using INLayer = InferenceEngine::Builder::InputLayer;
 using CONSTLayer = InferenceEngine::Builder::ConstLayer;
 using ELTWISELayer = InferenceEngine::Builder::EltwiseLayer;
 using SIGMOIDLayer = InferenceEngine::Builder::SigmoidLayer;
+using RELUlayer = InferenceEngine::Builder::ReLULayer;
 //using LOGLayer = InferenceEngine::Builder::LogLayer;
 //using DIVBYNLayer = InferenceEngine::Builder::DivByNLayer;
 using TANHLayer = InferenceEngine::Builder::TanHLayer;
@@ -402,7 +403,7 @@ OutputPort ModelBuilder::createFullLstm(LstmLayer::LstmParams& params, LstmLayer
         projectionLayerClampId = getBuilderNetwork()->getBuilder()->addLayer(CLAMPLayer(finalLayerName) \
                             .setPort(Port(outputDims)) \
                             .setMinValue(-lstmDesc.clippingThresholdProjState) \
-                            .setMinValue(lstmDesc.clippingThresholdProjState));
+                            .setMaxValue(lstmDesc.clippingThresholdProjState));
     }
 
     // input gate connections
@@ -539,8 +540,8 @@ OutputPort ModelBuilder::createFullLstm(LstmLayer::LstmParams& params, LstmLayer
     int thresholdState = 100;
     idx_t finalLayerClampId = getBuilderNetwork()->getBuilder()->addLayer(CLAMPLayer(finalLayerName) \
                                             .setPort(Port(outputDims)) \
-                                            .setMinValue(-thresholdState) \
-                                            .setMinValue(thresholdState));
+                                            .setMinValue(-thresholdState));
+                                            //.setMaxValue(thresholdState));
     if (lstmDesc.projectionLayerEnabled) {
         getBuilderNetwork()->getBuilder()->connect({projectionLayerId}, {finalLayerClampId});
     } else {

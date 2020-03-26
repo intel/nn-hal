@@ -32,6 +32,11 @@ static Return<void> notify(const sp<V1_0::IExecutionCallback>& callback, const E
     return callback->notify(status);
 }
 
+static Return<void> notify(const sp<V1_2::IExecutionCallback>& callback, const ErrorStatus& status,
+                           const hidl_vec<OutputShape>& outputShapes, Timing timing) {
+    return callback->notify_1_2(status, outputShapes, timing);
+}
+
 void GnaPreparedModel::initializeInput() {
     VLOG(L1, "initialize Input");
 
@@ -172,22 +177,232 @@ void GnaPreparedModel::deinitialize() {
     VLOG(L1, "free engine");
 }
 
-void GnaPreparedModel::asyncExecute(const Request& request, MeasureTiming measure, time_point driverStart,
-                          const sp<V1_0::IExecutionCallback>& cb) {
+void GnaPreparedModel::asyncExecute_lstm(const Request& request, MeasureTiming measure, time_point driverStart,
+                          const sp<V1_2::IExecutionCallback>& callback) {
+    VLOG(L1, "Begin asyncExecute_lstm");
+
+    std::vector<RunTimePoolInfo> requestPoolInfos;
+    if (!setRunTimePoolInfosFromHidlMemories(&requestPoolInfos, request.pools)) {
+        notify(callback, ErrorStatus::GENERAL_FAILURE, {}, kNoTiming);
+        return;
+    }
+
+    time_point driverEnd, deviceStart, deviceEnd;
+    if (measure == MeasureTiming::YES) deviceStart = now();
+
+        auto inOutData = [this, &requestPoolInfos](const std::vector<uint32_t>& indexes,
+                                               const hidl_vec<RequestArgument>& arguments,
+                                               bool inputFromRequest, Blob::Ptr& getBlob,
+                                               std::vector<OutputPort> mPorts) {
+        // do memcpy for input data
+        for (size_t i = 0; i < indexes.size(); i++) {
+
+            RunTimeOperandInfo& operand = mOperands[indexes[i]];
+            const RequestArgument& arg = arguments[i];
+            auto poolIndex = arg.location.poolIndex;
+            nnAssert(poolIndex < requestPoolInfos.size());
+            auto& r = requestPoolInfos[poolIndex];
+            if (arg.dimensions.size() > 0) {
+                // It's the responsibility of the caller to validate that
+                // from.dimensions only modifies the dimensions that were
+                // unspecified in the model.  That's the case in SampleDriver.cpp
+                // with the call to validateRequest().
+                operand.dimensions = arg.dimensions;
+            }
+            operand.buffer = r.buffer + arg.location.offset;
+            operand.length = arg.location.length;
+
+            if (inputFromRequest) {
+                // model/request oputput pointer pass to inference engine input
+                // memcpy(operand.buffer, r.buffer + arg.location.offset, operand.length)
+                if (i == 0) {
+                    // VLOG(L1, "setBlob for mPorts[%d]\n", indexes[i]);
+                    getBlob  = GetInOutOperandAsBlob(
+                                        operand, const_cast<uint8_t*>(r.buffer + arg.location.offset),
+                                        operand.length);  // if not doing memcpy
+
+                } else {
+                    if (gnaPluginPtr == nullptr) {
+                        auto inputBlob = GetInOutOperandAsBlob(
+                                            operand,
+                                            const_cast<uint8_t*>(r.buffer + arg.location.offset),
+                                            operand.length);  // if not doing memcpy
+
+                        for (auto iter : mOpIndex2BlobMap) {
+                            if (iter.first == indexes[i]) {
+                                std::cout << "found index id=" << indexes[i]
+                                            << "to be waiting for memcpy ptr=" << iter.second.get();
+                                int layer_id = mBuilderModel->check4LayerData(iter.second);
+                                if( layer_id != -1) {
+                                    //VLOG(L1, "also found memcpy blob for id=%d", layer_id);
+                                    std::cout << "calling setLayerData" << std::endl;
+                                    mBuilderModel->setLayerData(inputBlob, layer_id, iter.second);
+                                }
+                                else
+                                    VLOG(L1, "failed to found memcpy blob for id=%d", layer_id);
+
+                            }
+                        }
+                    }
+                }
+            } else {
+                if(i == 4) {
+                    getBlob = GetInOutOperandAsBlob(operand, 
+                                                    const_cast<uint8_t*>(r.buffer + arg.location.offset),
+                                                    operand.length);  // if not doing memcpy
+                }
+            }
+        }
+    };
+    VLOG(L1, "pass request inputs/outputs buffer to network/model respectively");
+
+
+    Blob::Ptr getInputBlob, getOutputBlob;
+    inOutData(mModel.inputIndexes, request.inputs, true, getInputBlob, mPorts);
+    inOutData(mModel.outputIndexes, request.outputs, false, getOutputBlob, mPorts);
+
+    for (int i = 0; i < getInputBlob->byteSize()/4 ; i++) {
+        float *src = getInputBlob->buffer().as<float*>();
+        if ( *(src + i) == 1.0) {
+            // VLOG(L1, "inBlob elements %d = %f", i, *(src +i));
+            std::cout << "inBlob elements " << i << " = " <<  *(src +i) << std::endl;
+        }
+    }
+
+    if (gnaPluginPtr == nullptr) {
+        auto network = mBuilderModel->convertBuilder();
+        //VLOG(L1, "initialize ExecuteNetwork for device %s",
+                // InferenceEngine::TargetDeviceInfo::name(mTargetDevice)); // TODO: Fix this line
+        gnaPluginPtr = new GnaNetwork(network, "GNA");
+        //gnaPluginPtr->prepareInput();
+        InferenceEngine::CNNNetwork passed_network({network});
+
+        //CNNNetwork network1((ICNNNetwork*)&(*network));
+        gnaPluginPtr->loadNetwork(passed_network);
+    }
+
+    std::cout << "setting input blobs" << std::endl;
+    auto inputInfoItem = gnaPluginPtr->inputInfo.begin()->second->getInputData();
+    //InferenceEngine::InputInfo::Ptr input_info = network.getInputsInfo().begin()->second;
+    //std::string input_name = network.getInputsInfo().begin()->first;
+    std::vector<Blob::Ptr> ptrInputBlobs;
+    for (auto& input : gnaPluginPtr->inputInfo) {
+        //VLOG(L1,"%p", (void*)enginePtr->inferRequest.GetBlob(input.first));
+        ptrInputBlobs.push_back(gnaPluginPtr->getInferRequest().GetBlob(input.first));
+    }
+    float* source = getInputBlob->buffer().as<float*>();
+    float* dest = ptrInputBlobs[0]->buffer().as<float*>();
+
+    //std::cout << "In gate blob address is = " << mBuilderModel->mInGateBlob << "size = " << mBuilderModel->mInGateBlob->size() << "\n";
+
+    for (int i = 0; i < getInputBlob->byteSize()/4; i++) {
+       *(dest + i) = *(source + i);
+    }
+    VLOG(L1,"input_0 = %s\n", inputInfoItem->getName().c_str());
+    //enginePtr->setBlob(inputInfoItem->getName(), getInputBlob);
+
+    auto outputBlob = gnaPluginPtr->getInferRequest().GetBlob(gnaPluginPtr->outputInfo.begin()->first);
+    //enginePtr->setBlob(outputInfoItem->getName(), getOutputBlob);
+    VLOG(L1, "Run");
+
+    // auto output = execute.Infer(input).wait();
+    gnaPluginPtr->Infer();
+    source = outputBlob->buffer().as<float*>();
+    dest = getOutputBlob->buffer().as<float*>();
+
+    for (int i = 0; i < outputBlob->byteSize()/4; i++) {
+       *(dest + i) = *(source + i);
+        VLOG(L1, "output = %f addr = %p\n ",*(dest + i), outputBlob.get());
+    }
+
+/*
+    std::cout << "After loadNetwork" << std::endl;
+    // TODO: Change the logic here
+	auto inputInfoItem = gnaPluginPtr->inputInfo.begin()->second->getInputData();
+    gnaPluginPtr->setBlob(inputInfoItem->getName(), getInputBlob);
+
+    std::cout << "setblob for output" << std::endl;
+    auto outputInfoItem = gnaPluginPtr->outputInfo.begin()->second;
+    gnaPluginPtr->setBlob(outputInfoItem->getName(), getOutputBlob);
+
+    std::cout << "infer()" << std::endl;
+    gnaPluginPtr->Infer();
+
+    if (measure == MeasureTiming::YES) deviceEnd = now();
+*/
+
+    VLOG(L1, "update shared memories");
+    for (auto runtimeInfo : requestPoolInfos) {
+        runtimeInfo.update();
+    }
+
+    Return<void> returned = callback->notify(ErrorStatus::NONE);
+    if (!returned.isOk()) {
+        ALOGE("hidl callback failed to return properly: %s", returned.description().c_str());
+    }
+
+    hidl_vec<OutputShape> outputShapes; // TODO: ??
+    if (measure == MeasureTiming::YES) {
+        driverEnd = now();
+        Timing timing = {.timeOnDevice = uint64_t(microsecondsDuration(deviceEnd, deviceStart)),
+                         .timeInDriver = uint64_t(microsecondsDuration(driverEnd, driverStart))};
+        ALOGE("Driver::asyncExecute_lstm timing = %s", toString(timing).c_str());
+        returned = notify(callback, ErrorStatus::NONE, outputShapes, timing);
+    } else {
+        returned = notify(callback, ErrorStatus::NONE, outputShapes, kNoTiming);
+    }
+    if (!returned.isOk()) {
+        ALOGE("hidl callback failed to return properly: %s", returned.description().c_str());
+    }
+}
+
+// TODO: call the same asyncExecute function as above
+Return<ErrorStatus> GnaPreparedModel::executeBase(const Request& request, MeasureTiming measure,
+                                               const sp<V1_0::IExecutionCallback>& callback) {
+    return PreparedModel::executeBase(request, measure, callback);
+}
+
+Return<ErrorStatus> GnaPreparedModel::executeBase_1_2(const Request& request, MeasureTiming measure,
+                                                   const sp<V1_2::IExecutionCallback>& callback) {
+    VLOG(L1, "executebase");
+
+    time_point driverStart;
+    if (measure == MeasureTiming::YES) driverStart = now();
+
+    if (callback.get() == nullptr) {
+        ALOGE("invalid callback passed to execute");
+        return ErrorStatus::INVALID_ARGUMENT;
+    }
+    if (!validateRequest(request, mModel)) {
+        notify(callback, ErrorStatus::INVALID_ARGUMENT, {}, kNoTiming);
+        return ErrorStatus::INVALID_ARGUMENT;
+    }
+
+    // This thread is intentionally detached because the driver service
+    // is expected to live forever.
+    std::thread([this, request, measure, driverStart, callback] {
+        asyncExecute_lstm(request, measure, driverStart, callback);
+    }).detach();
+
+    return ErrorStatus::NONE;
+}
+
+Return<void> GnaPreparedModel::executeSynchronously(const Request& request, MeasureTiming measure,
+                                                 executeSynchronously_cb cb) {
     VLOG(L1, "Begin to executeSynchronously");
 
     time_point driverEnd, deviceStart, deviceEnd;
     if (measure == MeasureTiming::YES) deviceStart = now();
 
     if (!validateRequest(request, mModel)) {
-        cb->notify(ErrorStatus::INVALID_ARGUMENT);
-        return;
+        cb(ErrorStatus::INVALID_ARGUMENT, {}, kNoTiming);
+        return Void();
     }
 
     std::vector<RunTimePoolInfo> requestPoolInfos;
     if (!setRunTimePoolInfosFromHidlMemories(&requestPoolInfos, request.pools)) {
-        cb->notify(ErrorStatus::GENERAL_FAILURE);
-        return;
+        cb(ErrorStatus::GENERAL_FAILURE, {}, kNoTiming);
+        return Void();
     }
 
     // TODO: We need to change this to add more outputs
@@ -235,10 +450,12 @@ void GnaPreparedModel::asyncExecute(const Request& request, MeasureTiming measur
                         for (auto iter : mOpIndex2BlobMap) {
                             if (iter.first == indexes[i]) {
                                 // VLOG(L1, "found index id=%d to be waiting for memcpy ptr=%p", indexes[i], iter.second.get());
-                                VLOG(L1, "found index id=%d to be waiting for memcpy ptr=%d", indexes[i], iter.second.get());
+                                std::cout << "found index id=" << indexes[i]
+                                            << "to be waiting for memcpy ptr=" << iter.second.get();
                                 int layer_id = mBuilderModel->check4LayerData(iter.second);
                                 if( layer_id != -1) {
                                     //VLOG(L1, "also found memcpy blob for id=%d", layer_id);
+                                    std::cout << "calling setLayerData" << std::endl;
                                     mBuilderModel->setLayerData(inputBlob, layer_id, iter.second);
                                 }
                                 else
@@ -263,6 +480,14 @@ void GnaPreparedModel::asyncExecute(const Request& request, MeasureTiming measur
     inOutData(mModel.inputIndexes, request.inputs, true, getInputBlob, mPorts);
     inOutData(mModel.outputIndexes, request.outputs, false, getOutputBlob, mPorts);
 
+    // for (int i = 0; i < getInputBlob->byteSize()/4 ; i++) {
+    //     float *src = getInputBlob->buffer().as<float*>();
+    //     if ( *(src + i) == 1.0) {
+    //         // VLOG(L1, "inBlob elements %d = %f", i, *(src +i));
+    //         std::cout << "inBlob elements " << i << " = " <<  *(src +i) << std::endl;
+    //     }
+    // }
+
     if (gnaPluginPtr == nullptr) {
         auto network = mBuilderModel->convertBuilder();
         gnaPluginPtr = new GnaNetwork(network, "GNA");
@@ -270,6 +495,9 @@ void GnaPreparedModel::asyncExecute(const Request& request, MeasureTiming measur
         gnaPluginPtr->loadNetwork(passed_network);
     }
 
+    //auto inputInfoItem = gnaPluginPtr->inputInfo.begin()->second->getInputData();
+    //InferenceEngine::InputInfo::Ptr input_info = network.getInputsInfo().begin()->second;
+    //std::string input_name = network.getInputsInfo().begin()->first;
     std::vector<Blob::Ptr> ptrInputBlobs;
 
     for (auto& input : gnaPluginPtr->inputInfo) {
@@ -281,25 +509,59 @@ void GnaPreparedModel::asyncExecute(const Request& request, MeasureTiming measur
     float* source = getInputBlob->buffer().as<float*>();
     float* dest = ptrInputBlobs[0]->buffer().as<float*>();
 
+    //std::cout << "In gate blob address is = " << mBuilderModel->mInGateBlob << "size = " << mBuilderModel->mInGateBlob->size() << "\n";
+
     for (int i = 0; i < getInputBlob->byteSize()/4; i++) {
        *(dest + i) = *(source + i);
     }
+    //VLOG(L1,"input_0 = %s\n", inputInfoItem->getName().c_str());
+    //enginePtr->setBlob(inputInfoItem->getName(), getInputBlob);
 
     auto outputBlob = gnaPluginPtr->getInferRequest().GetBlob(gnaPluginPtr->outputInfo.begin()->first);
     auto outputDimensions = gnaPluginPtr->outputInfo.begin()->second->getDims();
 
+    // Need to fill the outputshapes here
+    for (auto i=0; i < 4; i++) {
+        outputShapes[i].dimensions = {};
+        outputShapes[i].isSufficient = true;
+    }
 
+    // TODO: Change this code once we get more than one output from model
+    hidl_vec<uint32_t> dimensions;
+    for (auto i =0; i < outputDimensions.size(); i++) {
+        dimensions[i] = outputDimensions[i]; 
+    }
+    outputShapes[4].dimensions = dimensions;
+    outputShapes[4].isSufficient = true;
+
+    //enginePtr->setBlob(outputInfoItem->getName(), getOutputBlob);
     VLOG(L1, "Run");
 
     // auto output = execute.Infer(input).wait();
     gnaPluginPtr->Infer();
-
     source = outputBlob->buffer().as<float*>();
     dest = getOutputBlob->buffer().as<float*>();
+
     for (int i = 0; i < outputBlob->byteSize()/4; i++) {
        *(dest + i) = *(source + i);
         //VLOG(L1, "output = %f addr = %p\n ",*(dest + i), outputBlob.get());
     }
+
+/*
+    std::cout << "After loadNetwork" << std::endl;
+    // TODO: Change the logic here
+	auto inputInfoItem = gnaPluginPtr->inputInfo.begin()->second->getInputData();
+    gnaPluginPtr->setBlob(inputInfoItem->getName(), getInputBlob);
+
+    std::cout << "setblob for output" << std::endl;
+    auto outputInfoItem = gnaPluginPtr->outputInfo.begin()->second;
+    gnaPluginPtr->setBlob(outputInfoItem->getName(), getOutputBlob);
+
+    std::cout << "infer()" << std::endl;
+    gnaPluginPtr->Infer();
+
+    if (measure == MeasureTiming::YES) deviceEnd = now();
+*/
 
     VLOG(L1, "update shared memories");
     for (auto runtimeInfo : requestPoolInfos) {
@@ -310,41 +572,16 @@ void GnaPreparedModel::asyncExecute(const Request& request, MeasureTiming measur
         driverEnd = now();
         Timing timing = {.timeOnDevice = uint64_t(microsecondsDuration(deviceEnd, deviceStart)),
                          .timeInDriver = uint64_t(microsecondsDuration(deviceEnd, deviceStart))};
-        ALOGE("Driver::asyncExecute timing = %s", toString(timing).c_str());
-        cb->notify(ErrorStatus::NONE);
+        ALOGE("Driver::asyncExecute_lstm timing = %s", toString(timing).c_str());
+        cb(ErrorStatus::NONE, outputShapes, timing);
     } else {
         VLOG(L1, "MeasureTiming - No. Returning with no error");
-        cb->notify(ErrorStatus::NONE);
+        cb(ErrorStatus::NONE, outputShapes, kNoTiming);
     }
+
+    return Void();
 }
 
-// TODO: call the same asyncExecute function as above
-Return<ErrorStatus> GnaPreparedModel::executeBase(const Request& request, MeasureTiming measure,
-                                               const sp<V1_0::IExecutionCallback>& callback) {
-    VLOG(L1, "executebase");
-
-    time_point driverStart;
-    if (measure == MeasureTiming::YES) driverStart = now();
-
-    if (callback.get() == nullptr) {
-        ALOGE("invalid callback passed to execute");
-        return ErrorStatus::INVALID_ARGUMENT;
-    }
-
-    if (!validateRequest(request, mModel)) {
-        notify(callback, ErrorStatus::INVALID_ARGUMENT, {}, kNoTiming);
-        return ErrorStatus::INVALID_ARGUMENT;
-    }
-
-    // This thread is intentionally detached because the driver service
-    // is expected to live forever.
-    // std::thread([this, request, measure, driverStart, callback] {
-    //     asyncExecute(request, measure, driverStart, callback);
-    // }).detach();
-    asyncExecute(request, measure, driverStart, callback);
-
-    return ErrorStatus::NONE;
-}
 
 bool GnaPreparedModel::operationFullyConnected(const Operation& operation) {
     VLOG(L1, "OperationType::FULLY_CONNECTED");
@@ -624,6 +861,8 @@ bool GnaPreparedModel::operationLSTM(const Operation& operation)
     auto input          = getIRBlobFromOperand(operation.inputs[0], 0);
     auto outputStateIn  = getIRBlobFromOperand(operation.inputs[18], 18);
     auto cellStateIn    = getIRBlobFromOperand(operation.inputs[19], 19);
+
+    VLOG(L1, "check point 2");
 
     params.input2inputWeights.data     = getIRBlobFromOperand(operation.inputs[1], 1);
     params.input2inputWeights.lifeTime = getOperandLifeTime(operation.inputs[1]);

@@ -45,6 +45,14 @@ public:
         return executeBase(request, MeasureTiming::NO, callback);
     }
 
+    virtual Return<ErrorStatus> execute_1_2(const Request& request, MeasureTiming measure,
+                                    const sp<V1_2::IExecutionCallback>& callback) override {
+        return executeBase_1_2(request, measure, callback);
+    }
+
+    virtual Return<void> executeSynchronously(const Request& request, MeasureTiming measure,
+                                                 executeSynchronously_cb cb) override;
+
     virtual void initializeInput() override;
     virtual bool finalizeOutput() override;
 
@@ -54,10 +62,10 @@ protected:
     void deinitialize();
     virtual Return<ErrorStatus> executeBase(const Request& request, MeasureTiming measure,
                                     const sp<V1_0::IExecutionCallback>& callback) override;
-
-    void asyncExecute(const Request& request, MeasureTiming measure, time_point driverStart,
-                      const sp<V1_0::IExecutionCallback>& callback);
-
+    virtual Return<ErrorStatus> executeBase_1_2(const Request& request, MeasureTiming measure,
+                                        const sp<V1_2::IExecutionCallback>& callback) override;
+    void asyncExecute_lstm(const Request& request, MeasureTiming measure, time_point driverStart,
+                          const sp<V1_2::IExecutionCallback>& callback);
 };
 
 }  // namespace nnhal
