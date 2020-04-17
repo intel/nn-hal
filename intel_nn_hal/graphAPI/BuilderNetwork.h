@@ -16,21 +16,23 @@ namespace IRBuilder {
 
 class BuilderNetwork {
     public:
-    InferenceEngine::Builder::Network* getBuilder() {
-        return mBuilder;
-    }
+        InferenceEngine::Builder::Network* getBuilder() {
+            return mBuilder;
+        }
 
-    BuilderNetwork(std::string network_name) {
-        InferenceEngine::Context ctx;
-        mBuilder = new IEBuilder::Network(ctx, "graph-builder");
-    }
-    
-    std::vector<InferenceEngine::idx_t> mConnections;
-    int memory_layer_cnt = 0;
-    InferenceEngine::idx_t finalMemLayerId;
+        BuilderNetwork(std::string network_name) {
+            InferenceEngine::Context ctx;
+            mBuilder = new IEBuilder::Network(ctx, "graph-builder");
+        }
+
+        int memory_layer_cnt = 0;
+
+        std::vector<InferenceEngine::idx_t> mConnections;
+        InferenceEngine::idx_t finalMemLayerId;
+        std::vector<InferenceEngine::idx_t> mOutputIds;
     
     private:
-        IEBuilder::Network* mBuilder;    
+        IEBuilder::Network* mBuilder;
 };
 
 }

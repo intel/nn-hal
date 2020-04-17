@@ -94,8 +94,10 @@ class ModelBuilder {
         IRBlob::Ptr generateBlobwithData(InferenceEngine::SizeVector dims, 
                                             InferenceEngine::Layout layout, 
                                             std::vector<std::vector<float>> data_to_set);
-        OutputPort createFullLstm(LstmLayer::LstmParams& params, LstmLayer::LstmCellDescription& lstmDesc, 
-                                    IRBlob::Ptr input, IRBlob::Ptr cellStateIn, IRBlob::Ptr outputStateIn);
+        std::vector<std::string> createFullLstm(LstmLayer::LstmParams& params,
+                                                LstmLayer::LstmCellDescription& lstmDesc,
+                                                IRBlob::Ptr input, IRBlob::Ptr cellStateIn,
+                                                IRBlob::Ptr outputStateIn);
         std::shared_ptr<InferenceEngine::ICNNNetwork> convertBuilder();
         
         void addToBlobLayerMap(IRBlob::Ptr blob, int index) {

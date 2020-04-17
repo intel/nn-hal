@@ -127,7 +127,6 @@ bool GnaPreparedModel::initialize() {
         }
     }
 
-    mBuilderModel->addOutputLayer();
     initializeInput();
     finalizeOutput();
 
@@ -219,11 +218,11 @@ void GnaPreparedModel::asyncExecute(const Request& request, MeasureTiming measur
             if (inputFromRequest) {
                 // model/request oputput pointer pass to inference engine input
                 // memcpy(operand.buffer, r.buffer + arg.location.offset, operand.length)
+
                 if (i == 0) {
-                    // VLOG(L1, "setBlob for mPorts[%d]\n", indexes[i]);
                     getBlob  = GetInOutOperandAsBlob(
                                         operand, const_cast<uint8_t*>(r.buffer + arg.location.offset),
-                                        operand.length);  // if not doing memcpy
+                                        operand.length);
 
                 } else {
                     if (gnaPluginPtr == nullptr) {
@@ -232,10 +231,15 @@ void GnaPreparedModel::asyncExecute(const Request& request, MeasureTiming measur
                                             const_cast<uint8_t*>(r.buffer + arg.location.offset),
                                             operand.length);  // if not doing memcpy
 
+                        /*auto ipBlobPtr = inputBlob->buffer().as<float*>();
+                        for (auto i =0; i < inputBlob->byteSize()/4; i++) {
+                            VLOG(L1, "%.6f", *(ipBlobPtr + i));
+                        }*/
+
                         for (auto iter : mOpIndex2BlobMap) {
                             if (iter.first == indexes[i]) {
                                 // VLOG(L1, "found index id=%d to be waiting for memcpy ptr=%p", indexes[i], iter.second.get());
-                                VLOG(L1, "found index id=%d to be waiting for memcpy ptr=%d", indexes[i], iter.second.get());
+                                // VLOG(L1, "found index id=%d to be waiting for memcpy ptr=%d", indexes[i], iter.second.get());
                                 int layer_id = mBuilderModel->check4LayerData(iter.second);
                                 if( layer_id != -1) {
                                     //VLOG(L1, "also found memcpy blob for id=%d", layer_id);
@@ -248,20 +252,12 @@ void GnaPreparedModel::asyncExecute(const Request& request, MeasureTiming measur
                         }
                     }
                 }
-            } else {
-                if(indexes.size() < 6 && i == 4) {
-                    getBlob = GetInOutOperandAsBlob(operand, const_cast<uint8_t*>(r.buffer + arg.location.offset),operand.length);  // if not doing memcpy
-                }
-                else if(indexes.size() > 6 && i == 12) {
-                    getBlob = GetInOutOperandAsBlob(operand, const_cast<uint8_t*>(r.buffer + arg.location.offset),operand.length);
-                }
             }
         }
     };
 
     Blob::Ptr getInputBlob, getOutputBlob;
     inOutData(mModel.inputIndexes, request.inputs, true, getInputBlob, mPorts);
-    inOutData(mModel.outputIndexes, request.outputs, false, getOutputBlob, mPorts);
 
     if (gnaPluginPtr == nullptr) {
         auto network = mBuilderModel->convertBuilder();
@@ -285,8 +281,11 @@ void GnaPreparedModel::asyncExecute(const Request& request, MeasureTiming measur
        *(dest + i) = *(source + i);
     }
 
-    auto outputBlob = gnaPluginPtr->getInferRequest().GetBlob(gnaPluginPtr->outputInfo.begin()->first);
-    auto outputDimensions = gnaPluginPtr->outputInfo.begin()->second->getDims();
+    std::vector<Blob::Ptr> ptrOutputBlobs;
+    for (auto& iter : gnaPluginPtr->outputInfo) {
+        auto blob = gnaPluginPtr->getInferRequest().GetBlob(iter.first);
+        ptrOutputBlobs.push_back(blob);
+    }
 
 
     VLOG(L1, "Run");
@@ -294,11 +293,33 @@ void GnaPreparedModel::asyncExecute(const Request& request, MeasureTiming measur
     // auto output = execute.Infer(input).wait();
     gnaPluginPtr->Infer();
 
-    source = outputBlob->buffer().as<float*>();
-    dest = getOutputBlob->buffer().as<float*>();
-    for (int i = 0; i < outputBlob->byteSize()/4; i++) {
-       *(dest + i) = *(source + i);
-        //VLOG(L1, "output = %f addr = %p\n ",*(dest + i), outputBlob.get());
+    auto reqOutputs = request.outputs;
+    for (auto i =0; i < mModel.outputIndexes.size(); i++) {
+        auto index = mModel.outputIndexes[i];
+        const RequestArgument& arg = reqOutputs[i];
+        auto poolIndex = arg.location.poolIndex;
+        nnAssert(poolIndex < requestPoolInfos.size());
+        auto& r = requestPoolInfos[poolIndex];
+
+        uint8_t* destPtr = const_cast<uint8_t*>(r.buffer + arg.location.offset);
+
+        // Get the name of the layer from which we want to copy the data
+        auto elementIdx = mOutputToLayerMap.find(index);
+        if (elementIdx != mOutputToLayerMap.end()) {
+            auto layerName = elementIdx->second;
+
+            // Check if the layername is present in the output map
+            auto element = gnaPluginPtr->outputInfo.find(layerName);
+            if (element != gnaPluginPtr->outputInfo.end()) {
+                Blob::Ptr outputBlob = gnaPluginPtr->getInferRequest().GetBlob(layerName);
+                uint8_t* srcPtr = outputBlob->buffer().as<uint8_t*>();
+                std::memcpy(destPtr, srcPtr, outputBlob->byteSize());
+            } else {
+                VLOG(L1, "could not find layer:%s in index layer map", layerName.c_str());
+            }
+        } else {
+            VLOG(L1, "could not find index:%d in output map", index);
+        }
     }
 
     VLOG(L1, "update shared memories");
@@ -576,12 +597,14 @@ bool GnaPreparedModel::operationLSTM(const Operation& operation)
     // }
 
     IRBuilder::LstmLayer::LstmCellDescription lstmDesc;
-
-    lstmDesc.clippingThresholdCellState     = PARAM_FP(21);
-    lstmDesc.clippingThresholdProjState     = PARAM_FP(22);
+	lstmDesc.clippingThresholdCellState     = 0;
+    lstmDesc.clippingThresholdProjState     = 0;
     lstmDesc.cifgEnabled                    = false;
     lstmDesc.projectionLayerEnabled         = false;
     lstmDesc.peepholeEnabled                = false;
+
+    lstmDesc.clippingThresholdCellState     = PARAM_FP(21);
+    lstmDesc.clippingThresholdProjState     = PARAM_FP(22);
 
     std::string lstmDescription;
     if (isOperandDataNull(operation.inputs[1]) ||
@@ -694,7 +717,11 @@ bool GnaPreparedModel::operationLSTM(const Operation& operation)
 
     params.activationFunction               = PARAM_I32(20);
 
-    mPorts[operation.outputs[3]] = mBuilderModel->createFullLstm(params, lstmDesc, input, cellStateIn, outputStateIn);
+    auto outputLayerNames = mBuilderModel->createFullLstm(params, lstmDesc, input, cellStateIn, outputStateIn);
+
+    mOutputToLayerMap[operation.outputs[1]] = outputLayerNames[0];
+    mOutputToLayerMap[operation.outputs[2]] = outputLayerNames[1];
+    mOutputToLayerMap[operation.outputs[3]] = outputLayerNames[0];
 
     return true;
 }

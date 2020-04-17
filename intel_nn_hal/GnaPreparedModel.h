@@ -28,6 +28,7 @@ namespace nnhal {
 class GnaPreparedModel : public PreparedModel {
     IRBuilder::ModelBuilder* mBuilderModel;
     GnaNetwork* gnaPluginPtr;
+    std::map<uint32_t, std::string> mOutputToLayerMap;
 
 public:
     GnaPreparedModel(const Model& model) : PreparedModel("GNA", model) {}

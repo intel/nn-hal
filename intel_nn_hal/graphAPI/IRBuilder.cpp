@@ -86,19 +86,6 @@ std::shared_ptr<InferenceEngine::ICNNNetwork> ModelBuilder::convertBuilder() {
     return cnnNetwork;   
 }
 
-void ModelBuilder::addOutputLayer() {                                                                         
-    namespace IEBuilder = InferenceEngine::Builder;
-                                                                                                
-    if(!getBuilderNetwork()->mConnections.empty()) {                                  
-        auto prev_layerID = getBuilderNetwork()->mConnections.back();     
-        getBuilderNetwork()->getBuilder()->addLayer(
-                                {InferenceEngine::PortInfo(getBuilderNetwork()->finalMemLayerId)}, 
-                                    InferenceEngine::Builder::OutputLayer("lstm_out"));
-    }                                                                                          
-    return;                                                                                    
-}
-    
-
 OutputPort ModelBuilder::createFC(BuilderFCLayer::FCParams& params, IRBlob::Ptr input) {
     auto inputDims = input->getTensorDesc().getDims();
     auto weightDims = params.weights.data->getTensorDesc().getDims();
@@ -163,11 +150,12 @@ IRBlob::Ptr ModelBuilder::generateBlobwithData(InferenceEngine::SizeVector dims,
     return blob;
 }
 
-OutputPort ModelBuilder::createFullLstm(LstmLayer::LstmParams& params, LstmLayer::LstmCellDescription& lstmDesc, IRBlob::Ptr input,
-        IRBlob::Ptr cellStateIn, IRBlob::Ptr outputStateIn) {
+std::vector<std::string> ModelBuilder::createFullLstm(LstmLayer::LstmParams& params, LstmLayer::LstmCellDescription& lstmDesc,
+                                                        IRBlob::Ptr input, IRBlob::Ptr cellStateIn, IRBlob::Ptr outputStateIn) {
     auto outputDims = outputStateIn->getTensorDesc().getDims();
     auto cellStateDims = cellStateIn->getTensorDesc().getDims();
     std::string finalLayerName;
+    std::vector<std::string> outputLayerNames;
 
     // Creates a port object with data set to it
     const auto createPort = [&](InferenceEngine::SizeVector dims, IRBlob::Ptr dataPtr) -> Port {
@@ -185,34 +173,63 @@ OutputPort ModelBuilder::createFullLstm(LstmLayer::LstmParams& params, LstmLayer
         return strName;
     };
 
+    auto createFullyConnectedLayer = [&](idx_t inputLayerId, const LstmLayer::LstmCellData& weights,
+                                        const LstmLayer::LstmCellData& bias, int outputSize)
+    {
+        idx_t weightsId =  getBuilderNetwork()->getBuilder()->addLayer(CONSTLayer("weights") \
+                                                                        .setData(weights.data));
+        if (weights.lifeTime == (int)OperandLifeTime::MODEL_INPUT) {
+            mBlob2LayerIdxMap[weights.data] = weightsId;
+        }
+
+        idx_t biasId =  getBuilderNetwork()->getBuilder()->addLayer(CONSTLayer("bias") \
+                                                                        .setData(bias.data));
+        if (bias.lifeTime == (int)OperandLifeTime::MODEL_INPUT) {
+            mBlob2LayerIdxMap[bias.data] = biasId;
+        }
+
+        idx_t i2iLayerId = getBuilderNetwork()->getBuilder()->addLayer({{inputLayerId}, {weightsId}, {biasId}}, \
+                                                                        FCLayer(getLayerName("affinetransform")) \
+                                                                        .setOutputNum(outputSize));
+        return i2iLayerId;
+    };
+
+    auto addOutputLayer = [&] (auto srcLayerId,
+                                std::string& srcLayerName,
+                                std::string&& outputName,
+                                auto dimensions) {
+        auto outputLayerStr = getLayerName(outputName);
+        getBuilderNetwork()->getBuilder()->addLayer({srcLayerId},
+                                                    InferenceEngine::Builder::OutputLayer(outputLayerStr));
+        outputLayerNames.push_back(srcLayerName);
+    };
+
     // input layer
     auto inputDims = input->getTensorDesc().getDims();
 
-    //dumpDimensions("Lstm-inputDims", inputDims);
-    //dumpDimensions("Lstm-outputDims", outputDims);
-    //dumpDimensions("Lstm-cellStateDims", cellStateDims);
-
     // Memory layer pair 1
-    auto h_t_1 = IEBuilder::MemoryLayer(getLayerName("Memory")).setId(std::to_string(getBuilderNetwork()->memory_layer_cnt));
+    auto outputMemLayerName = getLayerName("h_{t-1}");
+    auto h_t_1 = IEBuilder::MemoryLayer(outputMemLayerName).setId(std::to_string(getBuilderNetwork()->memory_layer_cnt));
     auto port2 = createPort(outputDims, outputStateIn);
     h_t_1.setOutputPort(port2);
     idx_t h_t_1Id = getBuilderNetwork()->getBuilder()->addLayer(h_t_1);
     mBlob2LayerIdxMap[outputStateIn] = h_t_1Id;
 
-    auto h_t = IEBuilder::MemoryLayer(getLayerName("Memory")).setId(std::to_string(getBuilderNetwork()->memory_layer_cnt));
+    auto h_t = IEBuilder::MemoryLayer(getLayerName("h_t")).setId(std::to_string(getBuilderNetwork()->memory_layer_cnt));
     h_t.setInputPort(Port(outputDims));
     idx_t h_tId = getBuilderNetwork()->getBuilder()->addLayer(h_t);
 
     getBuilderNetwork()->memory_layer_cnt++;
 
     // Memory layer pair 2
-    auto c_t_1 = IEBuilder::MemoryLayer(getLayerName("Memory")).setId(std::to_string(getBuilderNetwork()->memory_layer_cnt));
+    auto cellStateMemoryLayerName = getLayerName("c_{t-1}");
+    auto c_t_1 = IEBuilder::MemoryLayer(cellStateMemoryLayerName).setId(std::to_string(getBuilderNetwork()->memory_layer_cnt));
     auto port4 = createPort(cellStateDims, cellStateIn);
     c_t_1.setOutputPort(port4);
     idx_t c_t_1Id = getBuilderNetwork()->getBuilder()->addLayer(c_t_1);
     mBlob2LayerIdxMap[cellStateIn] = c_t_1Id;
 
-    auto c_t = IEBuilder::MemoryLayer(getLayerName("Memory")).setId(std::to_string(getBuilderNetwork()->memory_layer_cnt));
+    auto c_t = IEBuilder::MemoryLayer(getLayerName("c_t")).setId(std::to_string(getBuilderNetwork()->memory_layer_cnt));
     c_t.setInputPort(Port(cellStateDims));
     idx_t c_tId = getBuilderNetwork()->getBuilder()->addLayer(c_t);
 
@@ -239,27 +256,6 @@ OutputPort ModelBuilder::createFullLstm(LstmLayer::LstmParams& params, LstmLayer
         inputLayerId = getBuilderNetwork()->getBuilder()->addLayer(INLayer(getLayerName("input")) \
                                             .setPort(Port(inputDims)));
     }
-
-    auto createFullyConnectedLayer = [&](idx_t inputLayerId, const LstmLayer::LstmCellData& weights, const LstmLayer::LstmCellData& bias,
-                                        int outputSize)
-    {
-        idx_t weightsId =  getBuilderNetwork()->getBuilder()->addLayer(CONSTLayer("weights") \
-                                                                        .setData(weights.data));
-        if (weights.lifeTime == (int)OperandLifeTime::MODEL_INPUT) {
-            mBlob2LayerIdxMap[weights.data] = weightsId;
-        }
-
-        idx_t biasId =  getBuilderNetwork()->getBuilder()->addLayer(CONSTLayer("bias") \
-                                                                        .setData(bias.data));
-        if (bias.lifeTime == (int)OperandLifeTime::MODEL_INPUT) {
-            mBlob2LayerIdxMap[bias.data] = biasId;
-        }
-
-        idx_t i2iLayerId = getBuilderNetwork()->getBuilder()->addLayer({{inputLayerId}, {weightsId}, {biasId}}, \
-                                                                        FCLayer(getLayerName("affinetransform")) \
-                                                                        .setOutputNum(outputSize));
-        return i2iLayerId;
-    };
 
     // i2i = W_{xi}x_t + b_i
     idx_t i2iLayerId = createFullyConnectedLayer(inputLayerId, params.input2inputWeights, params.inputGateBias, cellStateDims[1]);
@@ -378,7 +374,8 @@ OutputPort ModelBuilder::createFullLstm(LstmLayer::LstmParams& params, LstmLayer
     oldCellStateMulLayer.setEltwiseType(ELTWISELayer::MUL);
     idx_t oldCellStateMulLayerId = getBuilderNetwork()->getBuilder()->addLayer(oldCellStateMulLayer);
 
-    ELTWISELayer updateCellSumLayer = ELTWISELayer(getLayerName("sum"));
+    auto updateCellSumLayerName = getLayerName("sum");
+    ELTWISELayer updateCellSumLayer = ELTWISELayer(updateCellSumLayerName);
     updateCellSumLayer.setEltwiseType(ELTWISELayer::SUM);
     idx_t updateCellSumLayerId = getBuilderNetwork()->getBuilder()->addLayer(updateCellSumLayer);
 
@@ -528,35 +525,27 @@ OutputPort ModelBuilder::createFullLstm(LstmLayer::LstmParams& params, LstmLayer
         if (lstmDesc.clippingThresholdProjState) {
             getBuilderNetwork()->getBuilder()->connect({projectionLayerId}, {projectionLayerClampId});
             getBuilderNetwork()->getBuilder()->connect({projectionLayerClampId}, {h_tId});
+
+            getBuilderNetwork()->mConnections.push_back(projectionLayerClampId);
+            getBuilderNetwork()->finalMemLayerId = projectionLayerClampId;
         } else {
             getBuilderNetwork()->getBuilder()->connect({projectionLayerId}, {h_tId});
+
+            getBuilderNetwork()->mConnections.push_back(projectionLayerId);
+            getBuilderNetwork()->finalMemLayerId = projectionLayerId;
         }
     } else {
         // h_t = o_t (dot) g(C_t)
         getBuilderNetwork()->getBuilder()->connect({newOutputMulLayerId}, {h_tId});
+
+        getBuilderNetwork()->mConnections.push_back(newOutputMulLayerId);
+        getBuilderNetwork()->finalMemLayerId = newOutputMulLayerId;
     }
 
-    finalLayerName = getLayerName("clamp_final");
-    int thresholdState = 100;
-    idx_t finalLayerClampId = getBuilderNetwork()->getBuilder()->addLayer(CLAMPLayer(finalLayerName) \
-                                            .setPort(Port(outputDims)) \
-                                            .setMinValue(-thresholdState));
-                                            //.setMaxValue(thresholdState));
-    if (lstmDesc.projectionLayerEnabled) {
-        getBuilderNetwork()->getBuilder()->connect({projectionLayerId}, {finalLayerClampId});
-    } else {
-        getBuilderNetwork()->getBuilder()->connect({newOutputMulLayerId}, {finalLayerClampId});
-    }
+    addOutputLayer(h_t_1Id, outputMemLayerName, "output", outputDims);
+    addOutputLayer(c_t_1Id, cellStateMemoryLayerName, "cellstate",cellStateDims);
 
-    getBuilderNetwork()->finalMemLayerId = finalLayerClampId;
-    getBuilderNetwork()->mConnections.push_back(finalLayerClampId);
-
-    OutputPort data;
-    InferenceEngine::SizeVector dims = {outputDims};
-    InferenceEngine::TensorDesc td(g_layer_precision, dims, InferenceEngine::Layout::NC);
-    data = std::make_shared<InferenceEngine::Data>(finalLayerName, td);
-
-    return data;
+    return outputLayerNames;
 }
 
 }
