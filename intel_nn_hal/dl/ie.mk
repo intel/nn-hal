@@ -13,10 +13,9 @@ inference-engine/src/inference_engine/ie_parameter.cpp \
 inference-engine/src/inference_engine/precision_utils.cpp \
 inference-engine/src/inference_engine/shape_infer/const_infer/ie_const_infer_holder.cpp \
 inference-engine/src/inference_engine/shape_infer/const_infer/ie_const_infer_impl.cpp \
-inference-engine/src/inference_engine/ie_blob.cpp \
+inference-engine/src/inference_engine/ie_rtti.cpp \
 inference-engine/src/inference_engine/ie_blob_common.cpp \
 inference-engine/src/inference_engine/network_serializer.cpp \
-inference-engine/src/inference_engine/ie_layers.cpp \
 inference-engine/src/inference_engine/ie_network.cpp \
 inference-engine/src/inference_engine/ie_util_internal.cpp \
 inference-engine/src/inference_engine/cnn_network_stats_impl.cpp \
