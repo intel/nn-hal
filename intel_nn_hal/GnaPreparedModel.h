@@ -26,13 +26,24 @@ namespace neuralnetworks {
 namespace nnhal {
 
 class GnaPreparedModel : public PreparedModel {
+
+    struct LayerInfo {
+        std::string layerName;
+        bool memoryLayer;
+
+        LayerInfo(std::string layer, bool memory):layerName(layer),memoryLayer(memory){}
+    };
+
+    std::map<uint32_t, LayerInfo> mInputPorts;
+    std::map<uint32_t, std::string> mOutputToLayerMap;
+    std::vector<uint32_t> mlayerInputIndices; /* to be filled during the infer call. Need to optimize */
+
     IRBuilder::ModelBuilder* mBuilderModel;
     GnaNetwork* gnaPluginPtr;
-    std::map<uint32_t, std::string> mOutputToLayerMap;
 
 public:
     GnaPreparedModel(const Model& model) : PreparedModel("GNA", model) {}
-    ~GnaPreparedModel() override {  deinitialize(); }
+    ~GnaPreparedModel()  {  deinitialize(); }
 
     virtual bool initialize() override;
     virtual bool operationFullyConnected(const Operation& operation) override;

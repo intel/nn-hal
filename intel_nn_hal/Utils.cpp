@@ -4,6 +4,9 @@
 #include "IENetwork.h"
 #include "BuilderNetwork.h"
 
+#include <fstream>
+#include <sys/stat.h>
+
 unsigned int debugMask = ((1 << (L1 + 1)) - 1);
 
 namespace android {
@@ -475,6 +478,36 @@ struct printHelper<float> {
         VLOG(L1, "Operand: value: %f, %s", value, operand);
     }
 }; */
+
+void createDirs(std::string path) {
+    char delim = '/';
+    int start = 0;
+
+    auto pos = path.find(delim);
+    while (pos != std::string::npos) {
+		auto dir = path.substr(start, pos - start+1);
+
+        struct stat sb;
+        if (!((stat(dir.c_str(), &sb) == 0) && (S_ISDIR(sb.st_mode)))) {
+            if (mkdir(dir.c_str(), 0777) != 0)
+                std::cout << "failed to create folder: " << dir << std::endl;
+		}
+		pos = path.find(delim, pos+1);
+	}
+}
+
+void writeBufferToFile(std::string filename,
+                        const float* buf,
+                        size_t length) {
+	createDirs(filename);
+
+    std::ofstream ofs;
+    ofs.open(filename.c_str(), std::ofstream::out | std::ofstream::trunc);
+    for (auto i =0; i < length; i++) {
+        ofs << buf[i] << "\n";
+    }
+    ofs.close();
+}
 
 }
 }

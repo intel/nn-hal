@@ -30,6 +30,8 @@
 #include "ie_infer_request.hpp"
 #include "ie_plugin_cpp.hpp"
 #include "ie_exception_conversion.hpp"
+#include "impl/ie_memory_state_internal.hpp"
+#include "ie_memory_state.hpp"
 //#include "debug.h"
 #include <fstream>
 
@@ -37,6 +39,9 @@
 #include <log/log.h>
 #include "IRDocument.h"
 #include "IRLayers.h"
+
+#include <fstream>
+#include <sys/stat.h>
 
 #ifdef ENABLE_MYRIAD
 #include "vpu_plugin_config.hpp"
@@ -57,13 +62,14 @@ inline std::ostream & operator << (std::ostream &out, const std::vector<T> &vec)
 
 class GnaNetwork
 {
-    InferenceEnginePluginPtr enginePtr;
+    //InferenceEnginePluginPtr enginePtr;
     std::shared_ptr<ICNNNetwork> network;
     //IExecutableNetwork::Ptr pExeNet;
     ExecutableNetwork executable_network;
     IInferRequest::Ptr req;
     InferRequest inferRequest;
     ResponseDesc resp;
+    std::vector<InferenceEngine::MemoryState> memoryStates;
 
 public:
     InputsDataMap inputInfo = {};
@@ -89,7 +95,6 @@ public:
 	    ALOGI("infer request created");
     }
 
-    //~GnaNetwork(){ }
     void loadNetwork(InferenceEngine::CNNNetwork& passed_network);
 
     void prepareInput();
@@ -103,6 +108,25 @@ public:
 
     InferRequest getInferRequest() {
         return inferRequest;
+    }
+
+    void queryState() {
+        memoryStates = executable_network.QueryState();
+    }
+
+    void setMemoryState(std::string index, InferenceEngine::Blob::Ptr blob) {
+        for (auto&& state: memoryStates) {
+            if (state.GetName() == index) {
+                state.SetState(blob);
+                break;
+            }
+        }
+    }
+
+    void reset() {
+        for (auto&& memState: memoryStates) {
+            memState.Reset();
+        }
     }
 
     void Infer();

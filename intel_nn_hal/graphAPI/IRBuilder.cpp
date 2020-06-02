@@ -86,7 +86,8 @@ std::shared_ptr<InferenceEngine::ICNNNetwork> ModelBuilder::convertBuilder() {
     return cnnNetwork;   
 }
 
-OutputPort ModelBuilder::createFC(BuilderFCLayer::FCParams& params, IRBlob::Ptr input) {
+OutputPort ModelBuilder::createFC(BuilderFCLayer::FCParams& params, IRBlob::Ptr input,
+                                    std::vector<std::string>& inputLayerNames) {
     auto inputDims = input->getTensorDesc().getDims();
     auto weightDims = params.weights.data->getTensorDesc().getDims();
     auto outputDims = weightDims[1] * weightDims[0]/inputDims[1];
@@ -101,7 +102,8 @@ OutputPort ModelBuilder::createFC(BuilderFCLayer::FCParams& params, IRBlob::Ptr 
         return strName;
     };
 
-    idx_t inputLayerId = getBuilderNetwork()->getBuilder()->addLayer(INLayer(getLayerName("input")) \
+    auto inLayerName = getLayerName("input");
+    idx_t inputLayerId = getBuilderNetwork()->getBuilder()->addLayer(INLayer(inLayerName) \
                                         .setPort(Port({inputDims})));
 
     idx_t weightsId =  getBuilderNetwork()->getBuilder()->addLayer(CONSTLayer("weights") \
@@ -129,6 +131,8 @@ OutputPort ModelBuilder::createFC(BuilderFCLayer::FCParams& params, IRBlob::Ptr 
     getBuilderNetwork()->mConnections.push_back(FCLayerId);
     InferenceEngine::TensorDesc td(g_layer_precision, dims, InferenceEngine::Layout::NC);
     data = std::make_shared<InferenceEngine::Data>(layer_name, td);
+
+    inputLayerNames.push_back(inLayerName);
     return data;
 }
 
@@ -150,21 +154,16 @@ IRBlob::Ptr ModelBuilder::generateBlobwithData(InferenceEngine::SizeVector dims,
     return blob;
 }
 
-std::vector<std::string> ModelBuilder::createFullLstm(LstmLayer::LstmParams& params, LstmLayer::LstmCellDescription& lstmDesc,
-                                                        IRBlob::Ptr input, IRBlob::Ptr cellStateIn, IRBlob::Ptr outputStateIn) {
-    auto outputDims = outputStateIn->getTensorDesc().getDims();
-    auto cellStateDims = cellStateIn->getTensorDesc().getDims();
+std::vector<std::string> ModelBuilder::createFullLstm(LstmLayer::LstmParams& params,
+                                                        LstmLayer::LstmCellDescription& lstmDesc,
+                                                        std::vector<std::string>& memorylayers,
+                                                        std::vector<std::string>& inputLayerNames) {
+    auto outputDims = params.outputState.data->getTensorDesc().getDims();
+    auto cellStateDims = params.cellState.data->getTensorDesc().getDims();
+    auto inputDims = params.input.data->getTensorDesc().getDims();
+
     std::string finalLayerName;
     std::vector<std::string> outputLayerNames;
-
-    // Creates a port object with data set to it
-    const auto createPort = [&](InferenceEngine::SizeVector dims, IRBlob::Ptr dataPtr) -> Port {
-        auto port = Port(dims);
-        PortData::Ptr portDataPtr = std::make_shared<PortData>(dims, InferenceEngine::Precision::FP32);
-        portDataPtr->setData(dataPtr);
-        port.setData(portDataPtr);
-        return port;
-    };
 
     // Generates a unique name for the input
     auto getLayerName = [&](std::string layerName) -> std::string {
@@ -204,34 +203,31 @@ std::vector<std::string> ModelBuilder::createFullLstm(LstmLayer::LstmParams& par
         outputLayerNames.push_back(srcLayerName);
     };
 
-    // input layer
-    auto inputDims = input->getTensorDesc().getDims();
-
     // Memory layer pair 1
     auto outputMemLayerName = getLayerName("h_{t-1}");
     auto h_t_1 = IEBuilder::MemoryLayer(outputMemLayerName).setId(std::to_string(getBuilderNetwork()->memory_layer_cnt));
-    auto port2 = createPort(outputDims, outputStateIn);
-    h_t_1.setOutputPort(port2);
+    h_t_1.setOutputPort(Port(outputDims));
     idx_t h_t_1Id = getBuilderNetwork()->getBuilder()->addLayer(h_t_1);
-    mBlob2LayerIdxMap[outputStateIn] = h_t_1Id;
 
     auto h_t = IEBuilder::MemoryLayer(getLayerName("h_t")).setId(std::to_string(getBuilderNetwork()->memory_layer_cnt));
     h_t.setInputPort(Port(outputDims));
     idx_t h_tId = getBuilderNetwork()->getBuilder()->addLayer(h_t);
+
+    memorylayers.push_back(std::to_string(getBuilderNetwork()->memory_layer_cnt));
 
     getBuilderNetwork()->memory_layer_cnt++;
 
     // Memory layer pair 2
     auto cellStateMemoryLayerName = getLayerName("c_{t-1}");
     auto c_t_1 = IEBuilder::MemoryLayer(cellStateMemoryLayerName).setId(std::to_string(getBuilderNetwork()->memory_layer_cnt));
-    auto port4 = createPort(cellStateDims, cellStateIn);
-    c_t_1.setOutputPort(port4);
+    c_t_1.setOutputPort(Port(cellStateDims));
     idx_t c_t_1Id = getBuilderNetwork()->getBuilder()->addLayer(c_t_1);
-    mBlob2LayerIdxMap[cellStateIn] = c_t_1Id;
 
     auto c_t = IEBuilder::MemoryLayer(getLayerName("c_t")).setId(std::to_string(getBuilderNetwork()->memory_layer_cnt));
     c_t.setInputPort(Port(cellStateDims));
     idx_t c_tId = getBuilderNetwork()->getBuilder()->addLayer(c_t);
+
+    memorylayers.push_back(std::to_string(getBuilderNetwork()->memory_layer_cnt));
 
     getBuilderNetwork()->memory_layer_cnt++;
 
@@ -253,8 +249,10 @@ std::vector<std::string> ModelBuilder::createFullLstm(LstmLayer::LstmParams& par
             }
         }
     } else {
-        inputLayerId = getBuilderNetwork()->getBuilder()->addLayer(INLayer(getLayerName("input")) \
+        auto name = getLayerName("input");
+        inputLayerId = getBuilderNetwork()->getBuilder()->addLayer(INLayer(name) \
                                             .setPort(Port(inputDims)));
+        inputLayerNames.push_back(name);
     }
 
     // i2i = W_{xi}x_t + b_i

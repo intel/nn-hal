@@ -48,6 +48,9 @@ namespace LstmLayer
 
     // TODO: Make these const operands
     struct LstmParams {
+        LstmCellData input;
+        LstmCellData cellState;
+        LstmCellData outputState;
         LstmCellData input2inputWeights;
         LstmCellData input2ForgetWeights;
         LstmCellData input2CellWeights;
@@ -90,14 +93,16 @@ class ModelBuilder {
         int check4LayerData(IRBlob::Ptr blob);
         void initializeBuilder();
 
-        OutputPort createFC(BuilderFCLayer::FCParams& params, IRBlob::Ptr input);
+        OutputPort createFC(BuilderFCLayer::FCParams& params, IRBlob::Ptr input,
+                            std::vector<std::string>& inputLayerNames);
+
         IRBlob::Ptr generateBlobwithData(InferenceEngine::SizeVector dims, 
                                             InferenceEngine::Layout layout, 
                                             std::vector<std::vector<float>> data_to_set);
         std::vector<std::string> createFullLstm(LstmLayer::LstmParams& params,
                                                 LstmLayer::LstmCellDescription& lstmDesc,
-                                                IRBlob::Ptr input, IRBlob::Ptr cellStateIn,
-                                                IRBlob::Ptr outputStateIn);
+                                                std::vector<std::string>& memorylayers,
+                                                std::vector<std::string>& inputLayerNames);
         std::shared_ptr<InferenceEngine::ICNNNetwork> convertBuilder();
         
         void addToBlobLayerMap(IRBlob::Ptr blob, int index) {

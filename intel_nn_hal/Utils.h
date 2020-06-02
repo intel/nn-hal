@@ -341,6 +341,10 @@ struct printHelper<float> {
     }
 };
 
+void writeBufferToFile(std::string filename,
+                        const float* buf,
+                        size_t length);
+
 }
 }
 }

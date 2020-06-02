@@ -148,26 +148,18 @@ bool GnaPreparedModel::initialize() {
 
 // TODO: Call parent class deinitialize from here
 void GnaPreparedModel::deinitialize() {
-    VLOG(L1, "deinitialize");
-    delete enginePtr;
-    enginePtr = nullptr;
+    VLOG(L1, "GnaPreparedModel - deinitialize");
 
-    delete mBuilderModel;
-    mBuilderModel = nullptr;
-
-    delete gnaPluginPtr;
-    gnaPluginPtr = nullptr;
-
-    for (const auto& operand : mOperands) {
-        /*        for (const auto& buf : operand.buffer) {
-                    VLOG(L1, "free buffer %p of operand %p", buf, &operand);
-                    if (buf != nullptr)
-                    delete buf;
-                }*/
-        // VLOG(L1, "free buffer %p of operand %p", operand.buffer, &operand);
-        // if (operand.buffer)
-        //    delete operand.buffer;
+    if (mBuilderModel) {
+        delete mBuilderModel;
+        mBuilderModel = nullptr;
     }
+
+    if (gnaPluginPtr) {
+        delete gnaPluginPtr;
+        gnaPluginPtr = nullptr;
+    }
+
     VLOG(L1, "free engine");
 }
 
@@ -194,99 +186,93 @@ void GnaPreparedModel::asyncExecute(const Request& request, MeasureTiming measur
     //hidl_vec<OutputShape> outputShapes(request.outputs.size());
     hidl_vec<OutputShape> outputShapes(request.outputs.size());
 
-    auto inOutData = [this, &requestPoolInfos](const std::vector<uint32_t>& indexes,
-                                            const hidl_vec<RequestArgument>& arguments,
-                                            bool inputFromRequest, Blob::Ptr& getBlob,
-                                            std::vector<OutputPort> mPorts) {
-        // do memcpy for input data
-        for (size_t i = 0; i < indexes.size(); i++) {
-            RunTimeOperandInfo& operand = mOperands[indexes[i]];
-            const RequestArgument& arg = arguments[i];
-            auto poolIndex = arg.location.poolIndex;
-            nnAssert(poolIndex < requestPoolInfos.size());
-            auto& r = requestPoolInfos[poolIndex];
-            if (arg.dimensions.size() > 0) {
+    auto getBlobFromMemoryPool = [&, this](uint32_t index) {
+        RunTimeOperandInfo& operand = mOperands[mModel.inputIndexes[index]];
+        const RequestArgument& arg = request.inputs[index];
+        auto poolIndex = arg.location.poolIndex;
+        nnAssert(poolIndex < requestPoolInfos.size());
+        auto& r = requestPoolInfos[poolIndex];
+
+        if (arg.dimensions.size() > 0) {
                 // It's the responsibility of the caller to validate that
                 // from.dimensions only modifies the dimensions that were
                 // unspecified in the model.  That's the case in SampleDriver.cpp
                 // with the call to validateRequest().
                 operand.dimensions = arg.dimensions;
-            }
-            operand.buffer = r.buffer + arg.location.offset;
-            operand.length = arg.location.length;
+        }
 
-            if (inputFromRequest) {
-                // model/request oputput pointer pass to inference engine input
-                // memcpy(operand.buffer, r.buffer + arg.location.offset, operand.length)
+        operand.buffer = r.buffer + arg.location.offset;
+        operand.length = arg.location.length;
 
-                if (i == 0) {
-                    getBlob  = GetInOutOperandAsBlob(
-                                        operand, const_cast<uint8_t*>(r.buffer + arg.location.offset),
-                                        operand.length);
+        return GetInOutOperandAsBlob(operand,
+                                     const_cast<uint8_t*>(r.buffer + arg.location.offset),
+                                     operand.length);
+    };
 
-                } else {
-                    if (gnaPluginPtr == nullptr) {
-                        auto inputBlob = GetInOutOperandAsBlob(
-                                            operand,
-                                            const_cast<uint8_t*>(r.buffer + arg.location.offset),
-                                            operand.length);  // if not doing memcpy
-
-                        /*auto ipBlobPtr = inputBlob->buffer().as<float*>();
-                        for (auto i =0; i < inputBlob->byteSize()/4; i++) {
-                            VLOG(L1, "%.6f", *(ipBlobPtr + i));
-                        }*/
-
-                        for (auto iter : mOpIndex2BlobMap) {
-                            if (iter.first == indexes[i]) {
-                                // VLOG(L1, "found index id=%d to be waiting for memcpy ptr=%p", indexes[i], iter.second.get());
-                                // VLOG(L1, "found index id=%d to be waiting for memcpy ptr=%d", indexes[i], iter.second.get());
-                                int layer_id = mBuilderModel->check4LayerData(iter.second);
-                                if( layer_id != -1) {
-                                    //VLOG(L1, "also found memcpy blob for id=%d", layer_id);
-                                    mBuilderModel->setLayerData(inputBlob, layer_id, iter.second);
-                                }
-                                else
-                                    VLOG(L1, "failed to found memcpy blob for id=%d", layer_id);
-
-                            }
-                        }
-                    }
-                }
-            }
+    auto copyDataToLayer = [&, this](uint32_t index) {
+        auto srcBlob = getBlobFromMemoryPool(index);
+        auto iter = mOpIndex2BlobMap.find(mModel.inputIndexes[index]);
+        if (iter != mOpIndex2BlobMap.end()) {
+            auto layerId = mBuilderModel->check4LayerData(iter->second);
+            if (layerId != -1)
+                mBuilderModel->setLayerData(srcBlob, layerId, iter->second);
+        } else {
+            ALOGE("Failed to layer for index:", index);
         }
     };
 
-    Blob::Ptr getInputBlob, getOutputBlob;
-    inOutData(mModel.inputIndexes, request.inputs, true, getInputBlob, mPorts);
-
     if (gnaPluginPtr == nullptr) {
+        /* copy weights, biases ..etc */
+        for (auto i=0; i < mModel.inputIndexes.size(); i++){
+            auto curIndex = mModel.inputIndexes[i];
+
+            auto itr = std::find_if(mInputPorts.begin(), mInputPorts.end(),
+                                        [&](const std::pair<uint32_t, LayerInfo>& elem) {
+                                            return (elem.first == curIndex);
+                                        });
+            if (itr != mInputPorts.end()) {
+                mlayerInputIndices.push_back(i);
+            } else {
+                copyDataToLayer(i);
+            }
+        }
+
         auto network = mBuilderModel->convertBuilder();
         gnaPluginPtr = new GnaNetwork(network, "GNA");
         InferenceEngine::CNNNetwork passed_network({network});
         gnaPluginPtr->loadNetwork(passed_network);
+        gnaPluginPtr->queryState();
+        gnaPluginPtr->reset();
     }
 
-    std::vector<Blob::Ptr> ptrInputBlobs;
+    for (auto index : mlayerInputIndices) {
+        auto inputIndex = mModel.inputIndexes[index];
+        auto srcBlob = getBlobFromMemoryPool(index);
 
-    for (auto& input : gnaPluginPtr->inputInfo) {
-        //VLOG(L1,"%p", (void*)enginePtr->inferRequest.GetBlob(input.first));
-        ptrInputBlobs.push_back(gnaPluginPtr->getInferRequest().GetBlob(input.first));
+        auto iter = mInputPorts.find(inputIndex);
+        if (iter != mInputPorts.end()) {
+            std::string layerName = iter->second.layerName;
+
+            if (iter->second.memoryLayer) {
+                gnaPluginPtr->setMemoryState(layerName, srcBlob);
+            } else {
+                // Make sure the layername is present in inputinfo from the layer
+                auto iter2 = std::find_if(gnaPluginPtr->inputInfo.begin(),
+                            gnaPluginPtr->inputInfo.end(),
+                            [layerName](const std::pair<std::string, InputInfo::Ptr>& elem){
+                                return (elem.first == layerName);
+                            });
+                if (iter2 == gnaPluginPtr->inputInfo.end()) {
+                    nnAssert("Input index does not have a input layer");
+                }
+
+                auto destBlob = gnaPluginPtr->getInferRequest().GetBlob(layerName);
+                uint8_t* dest = destBlob->buffer().as<uint8_t*>();
+                uint8_t* src = srcBlob->buffer().as<uint8_t*>();
+                std::memcpy(dest, src, srcBlob->byteSize());
+            }
+        }
     }
-
-    // TODO: Error check
-    float* source = getInputBlob->buffer().as<float*>();
-    float* dest = ptrInputBlobs[0]->buffer().as<float*>();
-
-    for (int i = 0; i < getInputBlob->byteSize()/4; i++) {
-       *(dest + i) = *(source + i);
-    }
-
-    std::vector<Blob::Ptr> ptrOutputBlobs;
-    for (auto& iter : gnaPluginPtr->outputInfo) {
-        auto blob = gnaPluginPtr->getInferRequest().GetBlob(iter.first);
-        ptrOutputBlobs.push_back(blob);
-    }
-
 
     VLOG(L1, "Run");
 
@@ -479,7 +465,12 @@ bool GnaPreparedModel::operationFullyConnected(const Operation& operation) {
         // ASSERT
     }
 
-    mPorts[operation.outputs[0]] = mBuilderModel->createFC(params, input);
+    std::vector<std::string> inLayers;
+    mPorts[operation.outputs[0]] = mBuilderModel->createFC(params, input, inLayers);
+
+    if (inLayers.size() != 0) {
+        mInputPorts.emplace(std::make_pair(operation.inputs[0], LayerInfo(inLayers[0], false)));
+    }
 
     /*
         //FIX ME : Work around since input size indims[0] != output nodes (wdims[0])
@@ -564,10 +555,8 @@ Outputs:
 */
 bool GnaPreparedModel::operationLSTM(const Operation& operation)
 {
-    //[23]{30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52}
     IRBuilder::LstmLayer::LstmParams  params;
 
-    // for each parameter we need to determine whether it is model input or not
     auto getOperandLifeTime = [&](uint32_t idx) {
         const auto op = mModel.operands[idx];
         return (int)op.lifetime;
@@ -585,16 +574,6 @@ bool GnaPreparedModel::operationLSTM(const Operation& operation)
 
         return blob;
     };
-
-    // for (auto i=0; i < operation.inputs.size(); i++) {
-    //      VLOG(L1, "input index = %d lifetime = %d", operation.inputs[i],
-    //                                                 getOperandLifeTime(i));
-    // }
-
-    // for (auto i=0; i < operation.outputs.size(); i++) {
-    //      VLOG(L1, "input index = %d lifetime = %d", operation.outputs[i],
-    //                                                 getOperandLifeTime(i));
-    // }
 
     IRBuilder::LstmLayer::LstmCellDescription lstmDesc;
 	lstmDesc.clippingThresholdCellState     = 0;
@@ -644,9 +623,14 @@ bool GnaPreparedModel::operationLSTM(const Operation& operation)
     }
     VLOG(L1, "Lstm cell description %s", lstmDescription.c_str());
 
-    auto input          = getIRBlobFromOperand(operation.inputs[0], 0);
-    auto outputStateIn  = getIRBlobFromOperand(operation.inputs[18], 18);
-    auto cellStateIn    = getIRBlobFromOperand(operation.inputs[19], 19);
+    params.input.data = getIRBlobFromOperand(operation.inputs[0], 0);
+    params.input.lifeTime = getOperandLifeTime(operation.inputs[0]);
+
+    params.outputState.data = getIRBlobFromOperand(operation.inputs[18], 18);
+    params.outputState.lifeTime = getOperandLifeTime(operation.inputs[18]);
+
+    params.cellState.data = getIRBlobFromOperand(operation.inputs[19], 19);
+    params.cellState.lifeTime = getOperandLifeTime(operation.inputs[19]);
 
     params.input2inputWeights.data     = getIRBlobFromOperand(operation.inputs[1], 1);
     params.input2inputWeights.lifeTime = getOperandLifeTime(operation.inputs[1]);
@@ -715,13 +699,23 @@ bool GnaPreparedModel::operationLSTM(const Operation& operation)
         params.outputLayerNormWeights.lifeTime = getOperandLifeTime(operation.inputs[26]);
     }
 
-    params.activationFunction               = PARAM_I32(20);
+    params.activationFunction = PARAM_I32(20);
 
-    auto outputLayerNames = mBuilderModel->createFullLstm(params, lstmDesc, input, cellStateIn, outputStateIn);
+    std::vector<std::string> memoryLayers, inLayers;
+    auto outputLayerNames = mBuilderModel->createFullLstm(params, lstmDesc, memoryLayers, inLayers);
 
     mOutputToLayerMap[operation.outputs[1]] = outputLayerNames[0];
     mOutputToLayerMap[operation.outputs[2]] = outputLayerNames[1];
     mOutputToLayerMap[operation.outputs[3]] = outputLayerNames[0];
+
+    if (memoryLayers.size() > 0) {
+        mInputPorts.emplace(std::make_pair(operation.inputs[18], LayerInfo(memoryLayers[0], true)));
+        mInputPorts.emplace(std::make_pair(operation.inputs[19], LayerInfo(memoryLayers[1], true)));
+
+        if (inLayers.size() > 0) {
+            mInputPorts.emplace(std::make_pair(operation.inputs[0], LayerInfo(inLayers[0], false)));
+        }
+    }
 
     return true;
 }

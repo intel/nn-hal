@@ -555,9 +555,11 @@ bool PreparedModel::initialize() {
 
 void PreparedModel::deinitialize() {
     VLOG(L1, "deinitialize");
+
     delete enginePtr;
     enginePtr = nullptr;
 
+    // ??
     for (const auto& operand : mOperands) {
         /*        for (const auto& buf : operand.buffer) {
                     VLOG(L1, "free buffer %p of operand %p", buf, &operand);

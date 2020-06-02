@@ -54,7 +54,7 @@ Blob::Ptr generateBlob(Precision pr, SizeVector dims, Layout la) {
 void GnaNetwork::loadNetwork(InferenceEngine::CNNNetwork& passed_network)
 {
     ALOGI("IENetwork.h void loadNetwork() GNA device");
-    InferencePlugin plugin(enginePtr);
+    //InferencePlugin plugin(enginePtr);
 
     /** Specifying the precision and layout of input data provided by the user.
       * This should be called before load of the network to the plugin **/
@@ -64,9 +64,10 @@ void GnaNetwork::loadNetwork(InferenceEngine::CNNNetwork& passed_network)
     std::map<std::string, std::string> gnaPluginConfig;
     gnaPluginConfig[GNAConfigParams::KEY_GNA_DEVICE_MODE] = "GNA_HW";
     gnaPluginConfig[GNAConfigParams::KEY_GNA_PRECISION] = "I16";
-    std::string scaleFactorConfigKey_1 = GNA_CONFIG_KEY(SCALE_FACTOR) + std::string("_") + std::to_string(1);
-    gnaPluginConfig[scaleFactorConfigKey_1] = std::to_string(2048);
+    std::string scaleFactorConfigKey_1 = GNA_CONFIG_KEY(SCALE_FACTOR) + std::string("_") + std::to_string(0);
+    gnaPluginConfig[scaleFactorConfigKey_1] = std::to_string(1);
     gnaPluginConfig[GNA_CONFIG_KEY(COMPACT_MODE)] = CONFIG_VALUE(NO);
+    gnaPluginConfig[GNA_CONFIG_KEY(PWL_UNIFORM_DESIGN)] = CONFIG_VALUE(YES);
     //gnaPluginConfig[GNA_CONFIG_KEY(LIB_N_THREADS)] = "3";
     config.insert(std::begin(gnaPluginConfig), std::end(gnaPluginConfig));
     ALOGI("IENetwork.h Create plugin");
