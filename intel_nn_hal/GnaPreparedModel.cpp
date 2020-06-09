@@ -613,13 +613,9 @@ bool GnaPreparedModel::operationLSTM(const Operation& operation)
         lstmDescription.append("noPeephole");
     }
 
-    if (operation.inputs.size() > 23) {
-        if (!isOperandDataNull(operation.inputs[24]) &&
-            !isOperandDataNull(operation.inputs[25]) &&
-            !isOperandDataNull(operation.inputs[26])) {
-            VLOG(L1, "Normalization weights are present.. Not supported yet.");
-            return false;
-        }
+    params.useLayerNorm = false;
+    if (operation.inputs.size() == 27) {
+        params.useLayerNorm = true;
     }
     VLOG(L1, "Lstm cell description %s", lstmDescription.c_str());
 
@@ -685,7 +681,7 @@ bool GnaPreparedModel::operationLSTM(const Operation& operation)
         params.projectionBias.lifeTime    = getOperandLifeTime(operation.inputs[17]);
     }
 
-    if (operation.inputs.size() > 23) {
+    if (params.useLayerNorm) {
         params.inputLayerNormWeights.data      = GetConstOperandAsTensor(operation.inputs[23], 23);
         params.inputLayerNormWeights.lifeTime = getOperandLifeTime(operation.inputs[23]);
 

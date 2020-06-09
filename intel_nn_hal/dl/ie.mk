@@ -76,6 +76,9 @@ inference-engine/src/inference_engine/builders/ie_tanh_layer.cpp \
 inference-engine/src/inference_engine/builders/ie_mvn_layer.cpp \
 inference-engine/src/inference_engine/builders/ie_reorg_yolo_layer.cpp \
 inference-engine/src/inference_engine/builders/ie_sigmoid_layer.cpp \
+inference-engine/src/inference_engine/builders/ie_log_layer.cpp \
+inference-engine/src/inference_engine/builders/ie_exp_layer.cpp \
+inference-engine/src/inference_engine/builders/ie_divbyn_layer.cpp \
 inference-engine/src/inference_engine/builders/ie_permute_layer.cpp \
 inference-engine/src/inference_engine/builders/ie_relu_layer.cpp \
 inference-engine/src/inference_engine/ie_cnn_layer_builder.cpp \
@@ -138,7 +141,7 @@ LOCAL_CFLAGS += -DIE_THREAD=IE_THREAD_OMP -DIMPLEMENT_INFERENCE_ENGINE_API -DGAP
 LOCAL_CFLAGS += -Wno-unused-variable -Wno-unused-parameter -Wno-non-virtual-dtor -Wno-missing-field-initializers  -fexceptions -frtti -Wno-error
 LOCAL_CFLAGS += -DENABLE_MKL_DNN -D__ANDROID__ -DNDEBUG -DIMPLEMENT_INFERENCE_ENGINE_API -fvisibility=default -std=gnu++11 -D_FORTIFY_SOURCE=2 -fPIE -DUSE_STATIC_IE
 #LOCAL_CFLAGS += -DNNLOG
-LOCAL_CFLAGS += -DENABLE_GNA
+LOCAL_CFLAGS += -DENABLE_GNA -DENABLE_IR_READER=ON -DIE_BUILD_POSTFIX="custom"
 
 
 
