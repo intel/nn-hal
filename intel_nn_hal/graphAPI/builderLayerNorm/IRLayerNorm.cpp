@@ -232,7 +232,6 @@ idx_t LayerNorm::addLayerNorm(IRBlob::Ptr norm_weights, IRBlob::Ptr norm_biases)
     for (int i = 0; i < N; i++)
     {
         zero_bias[0][i] = *(src2 + i);
-        std::cout << "zero_bias[0][i] = " << zero_bias[0][i] << "\n";
     }
     auto bias_blob = generateBlobwithData(dims_bias, layout, zero_bias);
     idx_t norm_bias_layer = builderNetwork->addLayer(CONSTLayer("norm_bias").setData(bias_blob));
