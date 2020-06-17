@@ -273,6 +273,22 @@ void GnaPreparedModel::asyncExecute(const Request& request, MeasureTiming measur
             }
         }
     }
+//TODO : Use Negative halfLog
+    std::vector<Blob::Ptr> constptrInputBlobs;
+    int j = 0;
+    for (auto& input : gnaPluginPtr->inputInfo) {
+        if(input.first.find("constInLayer") != std::string::npos) {
+            constptrInputBlobs.push_back(gnaPluginPtr->getInferRequest().GetBlob(input.first));
+            VLOG(L1,"input_%d = %s\n", j, input.first.c_str());
+        }
+        j++;
+    }
+    for (int i = 0; i < constptrInputBlobs.size(); i++) {
+    	float* dest = constptrInputBlobs[i]->buffer().as<float*>();
+        for (int j = 0; j < constptrInputBlobs[i]->byteSize()/4; j++) {
+            *(dest + j) = -0.5f;
+        }
+    }
 
     VLOG(L1, "Run");
 
@@ -617,6 +633,7 @@ bool GnaPreparedModel::operationLSTM(const Operation& operation)
     if (operation.inputs.size() == 27) {
         params.useLayerNorm = true;
     }
+
     VLOG(L1, "Lstm cell description %s", lstmDescription.c_str());
 
     params.input.data = getIRBlobFromOperand(operation.inputs[0], 0);

@@ -65,9 +65,13 @@ void GnaNetwork::loadNetwork(InferenceEngine::CNNNetwork& passed_network)
     gnaPluginConfig[GNAConfigParams::KEY_GNA_DEVICE_MODE] = "GNA_HW";
     gnaPluginConfig[GNAConfigParams::KEY_GNA_PRECISION] = "I16";
     std::string scaleFactorConfigKey_1 = GNA_CONFIG_KEY(SCALE_FACTOR) + std::string("_") + std::to_string(0);
-    gnaPluginConfig[scaleFactorConfigKey_1] = std::to_string(1);
+    gnaPluginConfig[scaleFactorConfigKey_1] = std::to_string(2048);
+    std::string scaleFactorConfigKey_2 = GNA_CONFIG_KEY(SCALE_FACTOR) + std::string("_") + std::to_string(1);
+    gnaPluginConfig[scaleFactorConfigKey_2] = std::to_string(2048);
+    std::string scaleFactorConfigKey_3 = GNA_CONFIG_KEY(SCALE_FACTOR) + std::string("_") + std::to_string(2);
+    gnaPluginConfig[scaleFactorConfigKey_3] = std::to_string(2048);
     gnaPluginConfig[GNA_CONFIG_KEY(COMPACT_MODE)] = CONFIG_VALUE(NO);
-    gnaPluginConfig[GNA_CONFIG_KEY(PWL_UNIFORM_DESIGN)] = CONFIG_VALUE(YES);
+    gnaPluginConfig[GNA_CONFIG_KEY(PWL_UNIFORM_DESIGN)] = CONFIG_VALUE(NO);
     //gnaPluginConfig[GNA_CONFIG_KEY(LIB_N_THREADS)] = "3";
     config.insert(std::begin(gnaPluginConfig), std::end(gnaPluginConfig));
     ALOGI("IENetwork.h Create plugin");
