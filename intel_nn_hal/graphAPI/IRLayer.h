@@ -44,19 +44,10 @@
 #include "ie_layers_property.hpp"
 #include "ie_layouts.h"
 #include "pugixml.hpp"
-#include "w_unistd.h"
 
 #ifdef _WIN32
 #define strncasecmp _strnicmp
 #endif
-
-namespace FileUtils {
-// Hack: should be in file utils, this is to avoid chaning master
-inline std::string GetCWD() {
-    char cwd[4096];
-    return getcwd(cwd, 4095);
-}
-};  // namespace FileUtils
 
 namespace android {
 namespace hardware {

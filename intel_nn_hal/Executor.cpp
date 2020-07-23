@@ -1084,12 +1084,6 @@ bool Executor::executeOperation(const Operation& operation) {
         case OperationType::RELU6:
             success = operationRELU6(operation);
             break;
-        case OperationType::LOGISTIC:
-            success = operationLogisticSigmoid(operation);
-            break;
-        case OperationType::TANH:
-            success = operationTANH(operation);
-            break;
         case OperationType::CONCATENATION:
             success = operationConCat(operation);
             break;
@@ -2408,12 +2402,6 @@ bool Executor::operationLRN(const Operation& operation) {
     return true;
 }
 
-bool Executor::operationLogisticSigmoid(const Operation& operation) {
-    VLOG(L1, "OperationType::LOGISTIC");
-    mPorts[operation.outputs[0]] = Sigmoid(getPort(operation.inputs[0]));
-
-    return true;
-}
 /*
 bool Executor::operationLSTM(const Operation& operation)
 {

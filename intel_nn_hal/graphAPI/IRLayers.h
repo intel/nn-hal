@@ -82,7 +82,7 @@ inline OutputPort addOutput(const IRLayer &layer, const InferenceEngine::SizeVec
     }
 
     layer->outData.push_back(data);
-    data->creatorLayer = layer;
+    data->getCreatorLayer() = layer;
 
 #ifdef NNLOG
     std::vector<size_t> outdims = data->getTensorDesc().getDims();
@@ -134,7 +134,7 @@ inline IRLayer Generic(const std::string &type, const OutputPort &src) {
 
 inline OutputPort output(const IRLayer &src, int index = 0) { return src->outData[index]; }
 
-inline IRLayer LayerOf(const OutputPort &src) { return src->creatorLayer.lock(); }
+inline IRLayer LayerOf(const OutputPort &src) { return src->getCreatorLayer().lock(); }
 
 inline IRLayer Generic(const std::string &type, const IRLayer &src) {
     return Generic(type, output(src));
@@ -677,10 +677,6 @@ inline OutputPort operator*(const Vector &weights, const OutputPort &op) {
 }
 
 namespace ActivationLayer {
-extern const std::string Sigmoid;
-
-extern const std::string Tanh;
-
 extern const std::string ReLU;
 
 static IRLayer create(const OutputPort &src, const std::string &type) {
@@ -693,18 +689,6 @@ static IRLayer create(const OutputPort &src, const std::string &type) {
         prm.name = name;
         layer = std::make_shared<InferenceEngine::ReLULayer>(prm);
         layer->type = "ReLU";
-    } else if ((strncasecmp(type.c_str(), "tanh", type.size()) == 0)) {
-        InferenceEngine::LayerParams prm;
-        prm.precision = g_layer_precision;
-        prm.name = name;
-        layer = std::make_shared<InferenceEngine::TanHLayer>(prm);
-        layer->type = "TanH";
-    } else if ((strncasecmp(type.c_str(), "sigmoid", type.size()) == 0)) {
-        InferenceEngine::LayerParams prm;
-        prm.precision = g_layer_precision;
-        prm.name = name;
-        layer = std::make_shared<InferenceEngine::SigmoidLayer>(prm);
-        layer->type = "Sigmoid";
     } else {
         InferenceEngine::LayerParams prm;
         prm.precision = g_layer_precision;
@@ -736,16 +720,6 @@ static IRLayer create(const IRLayer &src, const std::string &type) {
 template <typename T>
 OutputPort ReLU(const T &src) {
     return output(ActivationLayer::create(src, ActivationLayer::ReLU));
-}
-
-template <typename T>
-OutputPort Sigmoid(const T &src) {
-    return output(ActivationLayer::create(src, ActivationLayer::Sigmoid));
-}
-
-template <typename T>
-OutputPort Tanh(const T &src) {
-    return output(ActivationLayer::create(src, ActivationLayer::Tanh));
 }
 
 namespace SplitUtil {

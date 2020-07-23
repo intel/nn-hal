@@ -141,7 +141,6 @@ protected:
     bool operationL2Normalization(const Operation& operation);
     bool operationLRN(const Operation& operation);
     bool operationMaxPool2D(const Operation& operation);
-    bool operationLogisticSigmoid(const Operation& operation);
     // bool operationLSTM(const Operation& operation);
     bool operationMUL(const Operation& operation);
     bool operationRELU(const Operation& operation);
@@ -149,7 +148,6 @@ protected:
     bool operationRELU6(const Operation& operation);
     bool operationReshape(const Operation& operation);
     bool operationSoftmax(const Operation& operation);
-    bool operationTANH(const Operation& operation);
 
     void initializeInput();
     void finalizeOutput(/*RunTimeOperandInfo* output*/);

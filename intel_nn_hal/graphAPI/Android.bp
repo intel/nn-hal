@@ -1,0 +1,40 @@
+cc_library_static {
+
+    name: "libgraphAPI",
+    proprietary: true,
+    owner: "intel",
+    compile_multilib: "64",
+
+    srcs: [
+        "IRDocument.cpp",
+        "IRLayer.cpp",
+    ],
+
+    header_libs: [
+        "libinference_headers",
+        "libpugixml_headers",
+        "plugin_api_headers",
+        "libinference_legacy_headers",
+    ],
+
+    cflags: [
+        "-std=c++11",
+        "-fPIC",
+        "-fPIE",
+        "-Wall",
+        "-Wno-unused-variable",
+        "-Wno-unused-parameter",
+        "-Wno-non-virtual-dtor",
+        "-Wno-missing-field-initializers",
+        "-Wno-error",
+        "-D_FORTIFY_SOURCE=2",
+        "-fvisibility=default",
+        "-fexceptions",
+    ] + [
+        "-D__ANDROID__",
+        "-DIMPLEMENT_INFERENCE_ENGINE_API",
+        "-DIE_LEGACY",
+    ],
+
+    shared_libs: ["liblog"],
+}

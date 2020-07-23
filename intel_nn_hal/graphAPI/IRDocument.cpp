@@ -62,7 +62,7 @@ public:
 
     bool hasLayer(const string &lname) const { return _layers.find(lname) != _layers.end(); }
 
-    void addData(const DataPtr &data) { _data[data->name] = data; }
+    void addData(const DataPtr &data) { _data[data->getName()] = data; }
 
     void addOutput(const DataPtr &data) {
         addData(data);
@@ -76,7 +76,7 @@ public:
         // std::cout << "docdatadims[0] "<<docdatadims[0]<< "docdatadims[1]" <<docdatadims[1]<<
         // std::endl;
 
-        _outputData[data->name] = data;
+        _outputData[data->getName()] = data;
     }
 };
 
@@ -89,7 +89,7 @@ IRDocument::~IRDocument() {
 
 void IRDocument::add(const IRLayer &ir_layer) {
 #ifdef NNLOG
-    ALOGI("add ir_layer = %s", ir_layer->name.c_str());
+    ALOGI("add ir_layer = %s", ir_layer->getName().c_str());
 #endif
     network->addLayer(ir_layer);
     _layers.push_back(ir_layer);
@@ -105,7 +105,7 @@ void IRDocument::process(const IRLayer &layer) {
     add(layer);
     for (auto o : layer->outData) {
         network->addData(o);
-        for (auto l : o->inputTo) process(l.second);
+        for (auto l : o->getInputTo()) process(l.second);
     }
 }
 
@@ -117,11 +117,11 @@ void IRDocument::optimize() {
             auto lin = l->input();
             auto lout = output(l);
 
-            lin->inputTo.erase(l->name);
+            lin->getInputTo().erase(l->name);
 
-            auto lout_targets = lout->inputTo;
+            auto lout_targets = lout->getInputTo();
             for (auto i : lout_targets) {
-                lin->inputTo[i.first] = i.second;
+                lin->getInputTo()[i.first] = i.second;
                 // reaplce target input data from lout to lin
                 for (auto &tar_inp : i.second->insData) {
                     if (tar_inp.lock() == lout) {
@@ -145,7 +145,7 @@ void IRDocument::build() {
     InputsDataMap inputs;
     network->getInputsInfo(inputs);
     for (auto i : inputs) {
-        for (auto l : i.second->getInputData()->inputTo) process(l.second);
+        for (auto l : i.second->getInputData()->getInputTo()) process(l.second);
     }
 
     for (auto l : network->allLayers()) {
@@ -191,7 +191,9 @@ void IRDocument::saveBlobToIR(std::ostream &binFile,
         binFile.write(reinterpret_cast<const char *>(fp), blob->byteSize());
     }
 
-    node.append_attribute("precision").set_value(blob->precision().name());
+    auto precision = blob->getTensorDesc().getPrecision();
+    node.append_attribute("precision").set_value(precision.name());
+
 }
 
 void IRDocument::save(std::ostream &xml_os, std::ostream &bin_os) {
@@ -213,7 +215,7 @@ void IRDocument::save(std::ostream &xml_os, std::ostream &bin_os) {
         CNNLayer::Ptr inputLayer(new CNNLayer(prms));
         inputLayer->type = "Input";
         auto input_data = kvp.second->getInputData();
-        input_data->userObject.v_int = icnt++;
+        input_data->getUserObject().v_int = icnt++;
         inputLayer->outData.push_back(input_data);
         saveToIR(bin_os, layers, inputLayer);
     }
@@ -221,7 +223,7 @@ void IRDocument::save(std::ostream &xml_os, std::ostream &bin_os) {
     for (auto &cnn_layer : _layers) {
         cnn_layer->userValue.v_int = ++id_cnt;
         int pcnt = 0;
-        for (auto output : cnn_layer->outData) output->userObject.v_int = pcnt++;
+        for (auto output : cnn_layer->outData) output->getUserObject().v_int = pcnt++;
         saveToIR(bin_os, layers, cnn_layer);
     }
     pugi::xml_node edgesNode = root.append_child("edges");
@@ -232,9 +234,9 @@ void IRDocument::save(std::ostream &xml_os, std::ostream &bin_os) {
 
             edge.to.lid = kvp->userValue.v_int;
             edge.to.pid = pcnt++;
-            bool b = inputData.lock()->creatorLayer.expired();
-            edge.from.lid = b ? 0 : inputData.lock()->creatorLayer.lock()->userValue.v_int;
-            edge.from.pid = inputData.lock()->userObject.v_int;
+            bool b = inputData.lock()->getCreatorLayer().expired();
+            edge.from.lid = b ? 0 : inputData.lock()->getCreatorLayer().lock()->userValue.v_int;
+            edge.from.pid = inputData.lock()->getUserObject().v_int;
 
             _edges.push_back(edge);
 
@@ -290,9 +292,9 @@ InferenceEngine::InputInfo::Ptr IRDocument::createInput(const std::string &name,
 
     info->setInputData(inputData);
 
-    Precision inputPrecision = info->getInputPrecision();
+    Precision inputPrecision = info->getPrecision();
     if (inputPrecision == Precision::FP16) {
-        info->setInputPrecision(Precision::FP32);
+        info->setPrecision(Precision::FP32);
     }
 
     network->setInputInfo(info);
@@ -323,11 +325,11 @@ void IRDocument::addOutput(const DataPtr &src) { network->addOutput(src); }
  */
 void IRDocument::saveOutputToIR(pugi::xml_node &parent, const DataPtr &port) {
     auto node = parent.append_child("port");
-    node.append_attribute("id").set_value(port->userObject.v_int);
+    node.append_attribute("id").set_value(port->getUserObject().v_int);
     // node.append_attribute("buffer").set_value(reinterpret_cast<size_t>(buffer) & 0x00FFFFFF);
-    if (!port->inputTo.empty()) {
+    if (!port->getInputTo().empty()) {
         std::string comment = "connected to ";
-        for (auto peer : port->inputTo) comment += ", " + peer.first;
+        for (auto peer : port->getInputTo()) comment += ", " + peer.first;
         node.append_child(pugi::xml_node_type::node_comment).set_value(comment.c_str());
     }
     auto dims = port->getDims();
@@ -345,7 +347,7 @@ void IRDocument::saveOutputToIR(pugi::xml_node &parent, const DataPtr &port) {
 void IRDocument::saveInputToIR(pugi::xml_node &parent, int index, const DataPtr &port) {
     auto node = parent.append_child("port");
     node.append_attribute("id").set_value(index);
-    auto peer = port->creatorLayer.lock();
+    auto peer = port->getCreatorLayer().lock();
     if (peer) {
         auto comment = "connected to " + peer->name;
         node.append_child(pugi::xml_node_type::node_comment).set_value(comment.c_str());
@@ -414,7 +416,7 @@ void IRDocument::saveLayerToDot(std::ostream &dot, const IRLayer &irLayer) const
     for (auto &p : irLayer->outData) {
         dot << "| ";
         auto dims = p->getDims();
-        dot << "<p" << p->userObject.v_int << "> " << dims[0];
+        dot << "<p" << p->getUserObject().v_int << "> " << dims[0];
         for (int i = 1; i < dims.size(); ++i) dot << ", " << dims[i];
     }
     dot << "\"";

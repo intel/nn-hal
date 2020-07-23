@@ -1,0 +1,130 @@
+
+//#############################################################
+cc_library_shared {
+
+    name: "android.hardware.neuralnetworks@1.2-generic-impl",
+    proprietary: true,
+    owner: "intel",
+    compile_multilib: "64",
+
+    srcs: [
+        "Driver.cpp",
+        "PreparedModel.cpp",
+    ],
+
+    local_include_dirs: [
+        "graphAPI",
+    ],
+
+    include_dirs: [
+        "frameworks/ml/nn/common/include",
+        "frameworks/ml/nn/runtime/include",
+    ],
+
+    header_libs: [
+        "libinference_headers",
+        "libmkldnn_headers",
+        "libpugixml_headers",
+        "plugin_api_headers",
+    ],
+
+    cflags: [
+        "-fexceptions",
+        "-std=c++11",
+        "-fPIC",
+        "-fPIE",
+        "-Wall",
+        "-Wno-unused-variable",
+        "-Wno-unused-parameter",
+        "-Wno-non-virtual-dtor",
+        "-Wno-missing-field-initializers",
+        "-Wno-error",
+        "-Wextra",
+        "-Wno-extern-c-compat",
+        "-Wno-sign-compare",
+        "-Wno-unused-local-typedef",
+        "-Wno-unused-private-field",
+        "-Wno-invalid-partial-specialization",
+        "-Wno-array-bounds",
+        "-D_FORTIFY_SOURCE=2",
+        "-fvisibility=default",
+        "-fwrapv",
+        "-fstack-protector-all",
+        "-Wno-conversion-null",
+        "-Wnull-dereference",
+        "-Warray-bounds",
+        "-O2",
+    ] + [
+        "-D__ANDROID__",
+        "-DANDROID",
+        "-DIE_LEGACY",
+    ] + ["-DNN_DEBUG"],
+
+    strip: {
+        none: true,
+    },
+
+    shared_libs: [
+        "libhidlbase",
+        "libhidltransport",
+        "libutils",
+        "liblog",
+        "libcutils",
+        "libhardware",
+        "libbase",
+        "libhidlmemory",
+        "android.hardware.neuralnetworks@1.0",
+        "android.hardware.neuralnetworks@1.1",
+        "android.hardware.neuralnetworks@1.2",
+        "android.hidl.allocator@1.0",
+        "android.hidl.memory@1.0",
+        "libinference_engine",
+        "libinference_engine_legacy",
+    ],
+
+    static_libs: [
+        "libgraphAPI",
+        "libpugixml",
+        "libneuralnetworks_common",
+    ],
+
+}
+
+//##############################################################
+cc_binary {
+    name: "android.hardware.neuralnetworks@1.2-generic-service",
+    init_rc: [
+        "android.hardware.neuralnetworks@1.2-generic-cpu.rc",
+    ],
+    relative_install_path: "hw",
+    proprietary: true,
+    owner: "intel",
+    srcs: ["service.cpp"],
+
+    include_dirs: [
+        "frameworks/ml/nn/common/include",
+        "frameworks/ml/nn/runtime/include",
+    ],
+
+    cflags: [
+        "-fexceptions",
+        "-fPIC",
+        "-fPIE",
+        "-std=c++11",
+        "-Wno-error=deprecated-declarations",
+        "-fvisibility=default",
+    ],
+
+    shared_libs: [
+        "libhidlbase",
+        "libhidltransport",
+        "libutils",
+        "liblog",
+        "libcutils",
+        "libhardware",
+        "android.hardware.neuralnetworks@1.2",
+        "android.hardware.neuralnetworks@1.2-generic-impl",
+    ],
+
+    compile_multilib: "64",
+}

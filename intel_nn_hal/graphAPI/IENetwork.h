@@ -21,6 +21,8 @@
 
 #pragma once
 
+#define IE_LEGACY
+
 #include <ie_plugin_config.hpp>
 #include <ie_plugin_dispatcher.hpp>
 #include <ie_plugin_ptr.hpp>
@@ -32,7 +34,11 @@
 #include "ie_exception_conversion.hpp"
 #include "ie_iinfer_request.hpp"
 #include "ie_infer_request.hpp"
+#ifdef IE_LEGACY
 #include "ie_plugin_cpp.hpp"
+#else
+#include <ie_core.hpp>
+#endif // IE_LEGACY
 
 #include <android/log.h>
 #include <log/log.h>
@@ -109,7 +115,11 @@ static void setConfig(std::map<std::string, std::string> &config) {
 }
 
 class ExecuteNetwork {
+#ifdef IE_LEGACY
     InferenceEnginePluginPtr enginePtr;
+#else
+    CNNNetwork mCnnNetwork;
+#endif // IE_LEGACY
     ICNNNetwork *network;
     // IExecutableNetwork::Ptr pExeNet;
     ExecutableNetwork executable_network;
@@ -121,20 +131,28 @@ class ExecuteNetwork {
 
 public:
     ExecuteNetwork() : network(nullptr) {}
-    ExecuteNetwork(IRDocument &doc, TargetDevice target = TargetDevice::eCPU) : network(nullptr) {
+    ExecuteNetwork(IRDocument &doc,  std::string target = "CPU") : network(nullptr) {
+#ifdef IE_LEGACY
         InferenceEngine::PluginDispatcher dispatcher(
             {"/vendor/lib64", "/vendor/lib", "/system/lib64", "/system/lib", "", "./"});
-        enginePtr = dispatcher.getSuitablePlugin(target);
-
+        enginePtr = dispatcher.getPluginByDevice(target);
+#endif // IE_LEGACY
         network = doc.getNetwork();
         network->getInputsInfo(inputInfo);
         network->getOutputsInfo(outputInfo);
 
+#ifndef IE_LEGACY
+        std::shared_ptr<InferenceEngine::ICNNNetwork> sp_cnnNetwork;
+        sp_cnnNetwork.reset(network);
+        mCnnNetwork = InferenceEngine::CNNNetwork(sp_cnnNetwork);
+#endif // IE_LEGACY
         // size_t batch = 1;
         // network->setBatchSize(batch);
 
 #ifdef NNLOG
+#ifdef IE_LEGACY
         ALOGI("%s Plugin loaded", InferenceEngine::TargetDeviceInfo::name(target));
+#endif // IE_LEGACY
 #endif
     }
 
@@ -146,16 +164,26 @@ public:
 
     //~ExecuteNetwork(){ }
     void loadNetwork() {
+#ifdef IE_LEGACY
         std::map<std::string, std::string> networkConfig;
+        InferencePlugin plugin(enginePtr);
+
         setConfig(networkConfig);
 
-        InferencePlugin plugin(enginePtr);
+        ALOGI("%s before plugin.LoadNetwork()", __func__);
         executable_network = plugin.LoadNetwork(*network, networkConfig);
-        // std::cout << "Network loaded" << std::endl;
-        ALOGI("Network loaded");
 
+        ALOGI("%s before CreateInferRequest", __func__);
         inferRequest = executable_network.CreateInferRequest();
-        // std::cout << "infer request created" << std::endl;
+#else
+        Core ie_core(std::string("/vendor/etc/openvino/plugins.xml"));
+
+        ALOGI("%s Loading network to IE", __func__);
+        executable_network = ie_core.LoadNetwork(mCnnNetwork, std::string("CPU"));
+
+        ALOGI("%s Calling CreateInferRequest", __func__);
+        inferRequest = executable_network.CreateInferRequest();
+#endif // IE_LEGACY
     }
 
     void prepareInput() {
