@@ -42,7 +42,7 @@ class GnaPreparedModel : public PreparedModel {
     GnaNetwork* gnaPluginPtr;
 
 public:
-    GnaPreparedModel(const Model& model) : PreparedModel("GNA", model) {}
+    GnaPreparedModel(const Model& model) : PreparedModel("GNA", model), gnaPluginPtr(nullptr) {}
     ~GnaPreparedModel()  {  deinitialize(); }
 
     virtual bool initialize() override;

@@ -34,7 +34,6 @@
 #include <cassert>
 #include "IRDocument.h"
 #include "IRLayer.h"
-#include "file_utils.h"
 #include "ie_common.h"
 #include "ie_layers_property.hpp"
 

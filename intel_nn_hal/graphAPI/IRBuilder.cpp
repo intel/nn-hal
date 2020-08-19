@@ -484,10 +484,10 @@ std::vector<std::string> ModelBuilder::createFullLstm(LstmLayer::LstmParams& par
         getBuilderNetwork()->getBuilder()->connect({inputGateAddLayerId}, {cellstateToInputGateAddLayerId, 1});
         inputGateAddLayerId = cellstateToInputGateAddLayerId;
     }
-    ConstInLayer = getBuilderNetwork()->getBuilder()->addLayer(INLayer("constInLayer") \
-                   .setPort(Port({1,8})));
+
     if(params.useLayerNorm)
     {
+        ConstInLayer = getBuilderNetwork()->getBuilder()->addLayer(INLayer("constInLayer").setPort(Port({1,8})));
         LN::LayerNorm *inputGateLN = new LN::LayerNorm(inputGateAddLayerId, ConstInLayer, cellSize, getBuilderNetwork()->getBuilder(), "full2");
         inputGateNormLayerId = inputGateLN->addLayerNorm(params.inputLayerNormWeights.data, params.inputGateBias.data);
         inputGateAddLayerId = inputGateNormLayerId;
