@@ -154,21 +154,21 @@ void GnaPreparedModel::deinitialize() {
     VLOG(L1, "free engine");
 }
 
-bool quantizeToQuant8Signed(const float* inputData, int8_t* outputData, const Shape& outputShape, QuantDataParams* param) {
+bool quantizeToQuant8Signed(const float* inputData, int8_t* outputData, const Shape& outputShape) {
     uint32_t size = getNumberOfElements(outputShape.dimensions);
     for (uint32_t i = 0; i < size; ++i) {
         outputData[i] = static_cast<int8_t>(std::max<float>(
                 -128.0f,
-                std::min<float>(127.0f, param->zeroPoint +
-                                                std::round(inputData[i] / param->scale))));
+                std::min<float>(127.0f, outputShape.offset +
+                                                std::round(inputData[i] / outputShape.scale))));
     }
     return true;
 }
 
-bool quantizeToQuant16(const float* inputData, uint16_t* outputData, const Shape& outputShape, QuantDataParams* param) {
+bool quantizeToQuant16(const float* inputData, uint16_t* outputData, const Shape& outputShape) {
     uint32_t size = getNumberOfElements(outputShape.dimensions);
     for (uint32_t i = 0; i < size; ++i) {
-        outputData[i] = static_cast<uint16_t>(param->zeroPoint + (std::round(inputData[i] / param->scale)));
+        outputData[i] = static_cast<uint16_t>(outputShape.offset + (std::round(inputData[i] / outputShape.scale)));
     }
     return true;
 }
@@ -179,11 +179,6 @@ void GnaPreparedModel::asyncExecute(const V1_0_Request& request, MeasureTiming m
 
     time_point driverEnd, deviceStart, deviceEnd;
     if (measure == MeasureTiming::YES) deviceStart = now();
-
-    if (!validateRequest(request, mModel)) {
-        cb->notify(V1_0_ErrorStatus::INVALID_ARGUMENT);
-        return;
-    }
 
     std::vector<RunTimePoolInfo> requestPoolInfos;
     if (!setRunTimePoolInfosFromHidlMemories(&requestPoolInfos, request.pools)) {
@@ -327,15 +322,9 @@ void GnaPreparedModel::asyncExecute(const V1_0_Request& request, MeasureTiming m
                 Blob::Ptr outputBlob = gnaPluginPtr->getInferRequest().GetBlob(layerName);
                 float* srcPtr = outputBlob->buffer().as<float*>();
                 if (operand.type == OperandType::TENSOR_QUANT16_SYMM) {
-                    QuantDataParams *params = new QuantDataParams();
-                    params->scale = operand.scale;
-                    params->zeroPoint = operand.zeroPoint;
-                    quantizeToQuant16(srcPtr, (uint16_t*)destPtr, operand.shape(), params);
+                    quantizeToQuant16(srcPtr, (uint16_t*)destPtr, operand.shape());
                 } else if (operand.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED) {
-                    QuantDataParams *params = new QuantDataParams();
-                    params->scale = operand.scale;
-                    params->zeroPoint = operand.zeroPoint;
-                    quantizeToQuant8Signed(srcPtr, (int8_t*)destPtr, operand.shape(), params);
+                    quantizeToQuant8Signed(srcPtr, (int8_t*)destPtr, operand.shape());
                 } else if (operand.type == OperandType::TENSOR_FLOAT32) {
                     std::memcpy((uint8_t*)destPtr, outputBlob->buffer().as<uint8_t*>(), outputBlob->byteSize());
                 }
@@ -377,11 +366,13 @@ Return<V1_0_ErrorStatus> GnaPreparedModel::executeBase(const V1_0_Request& reque
         return V1_0_ErrorStatus::INVALID_ARGUMENT;
     }
 
-    if (!validateRequest(request, mModel)) {
+//TODO: Add back ValidateRequest
+#if 0
+    if (!validateRequest(request, convertToV1_0(mModel))) {
         notify(callback, V1_0_ErrorStatus::INVALID_ARGUMENT, {}, kNoTiming);
         return V1_0_ErrorStatus::INVALID_ARGUMENT;
     }
-
+#endif
     // This thread is intentionally detached because the driver service
     // is expected to live forever.
     // std::thread([this, request, measure, driverStart, callback] {

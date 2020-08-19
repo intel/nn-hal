@@ -726,11 +726,14 @@ Return<V1_0_ErrorStatus> PreparedModel::executeBase(const V1_0_Request& request,
         ALOGE("invalid callback passed to execute");
         return V1_0_ErrorStatus::INVALID_ARGUMENT;
     }
-    if (!validateRequest(request, mModel)) {
+
+// TODO: Add back ValidateRequest
+#if 0
+    if (!validateRequest(request, convertToV1_0(mModel))) {
         notify(callback, V1_0_ErrorStatus::INVALID_ARGUMENT, {}, kNoTiming);
         return V1_0_ErrorStatus::INVALID_ARGUMENT;
     }
-
+#endif
     // This thread is intentionally detached because the driver service
     // is expected to live forever.
     std::thread([this, request, measure, driverStart, callback] {

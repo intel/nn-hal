@@ -101,7 +101,7 @@ Return<ErrorStatus> Driver::prepareModel_1_3(const Model& model, ExecutionPrefer
         return ErrorStatus::INVALID_ARGUMENT;
     }
     if (!validateModel(model) || !validateExecutionPreference(preference)) {
-        callback->notify(ErrorStatus::INVALID_ARGUMENT, nullptr);
+        callback->notify(V1_0_ErrorStatus::INVALID_ARGUMENT, nullptr);
         return ErrorStatus::INVALID_ARGUMENT;
     }
 
