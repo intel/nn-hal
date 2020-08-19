@@ -64,25 +64,36 @@ static sp<PreparedModel> ModelFactory(const char* name, const Model& model) {
     return preparedModel;
 }
 
-Return<ErrorStatus> Driver::prepareModel(const V1_0_Model& model,
+Return<V1_0_ErrorStatus> Driver::prepareModel(const V1_0_Model& model,
                                          const sp<V1_0::IPreparedModelCallback>& callback) {
     ALOGI("Entering %s", __func__);
 
-    return ErrorStatus::NONE;
+    return V1_0_ErrorStatus::NONE;
 }
 
-Return<ErrorStatus> Driver::prepareModel_1_1(const V1_1_Model& model,
+Return<V1_0_ErrorStatus> Driver::prepareModel_1_1(const V1_1_Model& model,
                                              ExecutionPreference preference,
                                              const sp<V1_0::IPreparedModelCallback>& callback) {
     ALOGI("Entering %s", __func__);
 
-    return ErrorStatus::NONE;
+    return V1_0_ErrorStatus::NONE;
 }
-
-Return<ErrorStatus> Driver::prepareModel_1_2(const Model& model, ExecutionPreference preference,
+Return<V1_0_ErrorStatus> Driver::prepareModel_1_2(const V1_2_Model& model,
+                                             ExecutionPreference preference,
                                              const hidl_vec<hidl_handle>&,
                                              const hidl_vec<hidl_handle>&, const HidlToken&,
                                              const sp<V1_2::IPreparedModelCallback>& callback) {
+    ALOGI("Entering %s", __func__);
+
+    return V1_0_ErrorStatus::NONE;
+}
+
+Return<ErrorStatus> Driver::prepareModel_1_3(const Model& model, ExecutionPreference preference,
+					     Priority priority,
+					     const OptionalTimePoint& deadline,
+                                             const hidl_vec<hidl_handle>&,
+                                             const hidl_vec<hidl_handle>&, const HidlToken&,
+                                             const sp<V1_3::IPreparedModelCallback>& callback) {
     ALOGI("Entering %s", __func__);
 
     if (callback.get() == nullptr) {
@@ -103,11 +114,11 @@ Return<ErrorStatus> Driver::prepareModel_1_2(const Model& model, ExecutionPrefer
 
     if (!preparedModel->initialize()) {
         ALOGI("failed to initialize preparedmodel");
-        callback->notify(ErrorStatus::INVALID_ARGUMENT, nullptr);
+        callback->notify(V1_0_ErrorStatus::INVALID_ARGUMENT, nullptr);
         return ErrorStatus::NONE;
     }
 
-    callback->notify(ErrorStatus::NONE, preparedModel);
+    callback->notify(V1_0_ErrorStatus::NONE, preparedModel);
     return ErrorStatus::NONE;
 }
 
@@ -118,35 +129,47 @@ Return<DeviceStatus> Driver::getStatus() {
 
 Return<void> Driver::getVersionString(getVersionString_cb cb) {
     ALOGI("Entering %s", __func__);
-    cb(ErrorStatus::NONE, "intel_nn_hal");
+    cb(V1_0_ErrorStatus::NONE, "intel_nn_hal");
     return Void();
 }
 
 Return<void> Driver::getType(getType_cb cb) {
     ALOGI("Entering %s", __func__);
-    cb(ErrorStatus::NONE, V1_2::DeviceType::CPU);
+    cb(V1_0_ErrorStatus::NONE, V1_2::DeviceType::CPU);
     return Void();
 }
 
 Return<void> Driver::getSupportedExtensions(getSupportedExtensions_cb cb) {
     ALOGI("Entering %s", __func__);
-    cb(ErrorStatus::NONE, {/* No extensions. */});
+    cb(V1_0_ErrorStatus::NONE, {/* No extensions. */});
     return Void();
 }
 
 Return<void> Driver::getNumberOfCacheFilesNeeded(getNumberOfCacheFilesNeeded_cb cb) {
     ALOGI("Entering %s", __func__);
     // Set both numbers to be 0 for cache not supported.
-    cb(ErrorStatus::NONE, /*numModelCache=*/0, /*numDataCache=*/0);
+    cb(V1_0_ErrorStatus::NONE, /*numModelCache=*/0, /*numDataCache=*/0);
     return Void();
 }
 
-Return<ErrorStatus> Driver::prepareModelFromCache(
-    const hidl_vec<hidl_handle>&, const hidl_vec<hidl_handle>&, const HidlToken&,
-    const sp<V1_2::IPreparedModelCallback>& callback) {
+Return<ErrorStatus> Driver::prepareModelFromCache_1_3(
+    const OptionalTimePoint&,
+    const hidl_vec<hidl_handle>&,
+    const hidl_vec<hidl_handle>&,
+    const HidlToken&,
+    const sp<V1_3::IPreparedModelCallback>& callback) {
     ALOGI("Entering %s", __func__);
-    callback->notify_1_2(ErrorStatus::GENERAL_FAILURE, nullptr);
+    callback->notify_1_2(V1_0_ErrorStatus::GENERAL_FAILURE, nullptr);
     return ErrorStatus::GENERAL_FAILURE;
+}
+
+Return<V1_0_ErrorStatus> Driver::prepareModelFromCache(
+        const hidl_vec<hidl_handle>& modelCache,
+		const hidl_vec<hidl_handle>& dataCache,
+        const HidlToken& token,
+		const sp<V1_2::IPreparedModelCallback>& callback) {
+        ALOGI("Entering %s", __func__);
+        return V1_0_ErrorStatus::GENERAL_FAILURE;
 }
 
 Return<void> Driver::getCapabilities(getCapabilities_cb cb) {
@@ -162,6 +185,21 @@ Return<void> Driver::getCapabilities_1_1(getCapabilities_1_1_cb cb) {
 }
 
 Return<void> Driver::getCapabilities_1_2(getCapabilities_1_2_cb cb) {
+    ALOGI("Entering %s", __func__);
+    return Void();
+}
+
+Return<void> Driver::allocate(const BufferDesc& desc,
+		          const hidl_vec<sp<V1_3::IPreparedModel>>& preparedModels,
+		          const hidl_vec<BufferRole>& inputRoles,
+			  const hidl_vec<BufferRole>& outputRoles,
+	                    allocate_cb cb) {
+    ALOGI("Entering %s", __func__);
+    return Void();
+
+}
+
+Return<void> Driver::getCapabilities_1_3(getCapabilities_1_3_cb cb) {
     ALOGI("Entering %s", __func__);
     if (mName.compare("CPU") == 0) {
         ALOGI("CPU driver getCapabilities()");
@@ -219,11 +257,18 @@ Return<void> Driver::getSupportedOperations_1_1(const V1_1_Model& model,
     return Void();
 }
 
-Return<void> Driver::getSupportedOperations_1_2(const Model& model,
+Return<void> Driver::getSupportedOperations_1_2(const V1_2_Model& model,
                                                 getSupportedOperations_1_2_cb cb) {
     ALOGI("Entering %s", __func__);
 
-    int count = model.operations.size();
+    return Void();
+}
+
+Return<void> Driver::getSupportedOperations_1_3(const Model& model,
+                                                getSupportedOperations_1_3_cb cb) {
+    ALOGI("Entering %s", __func__);
+
+    int count = model.main.operations.size();
     std::vector<bool> supported(count, true);
 
     if (!validateModel(model)) {
@@ -233,7 +278,7 @@ Return<void> Driver::getSupportedOperations_1_2(const Model& model,
     }
 
     for (int i = 0; i < count; i++) {
-        const auto& operation = model.operations[i];
+        const auto& operation = model.main.operations[i];
         supported[i] = PreparedModel::isOperationSupported(operation, model, mName);
     }
     cb(ErrorStatus::NONE, supported);

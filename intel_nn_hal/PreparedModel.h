@@ -19,8 +19,9 @@
 
 #include <android/hardware/neuralnetworks/1.2/IPreparedModel.h>
 #include <android/hardware/neuralnetworks/1.2/types.h>
+#include <android/hardware/neuralnetworks/1.3/types.h>
 #include <android/hidl/memory/1.0/IMemory.h>
-#include <hardware/hardware.h>
+//#include <hardware/hardware.h>
 #include <hidlmemory/mapping.h>
 #include <sys/mman.h>
 #include <fstream>
@@ -90,7 +91,7 @@ public:
 
     ~PreparedModel() override { deinitialize(); }
     virtual bool initialize();
-    virtual Return<ErrorStatus> execute(const Request& request,
+    virtual Return<V1_0_ErrorStatus> execute(const V1_0_Request& request,
                                 const sp<V1_0::IExecutionCallback>& callback) override;
 
     // Return<ErrorStatus> executeBase(const Request& request, MeasureTiming measure,
@@ -100,10 +101,10 @@ public:
 protected:
     void deinitialize();
     bool initializeRunTimeOperandInfo();
-    virtual Return<ErrorStatus> executeBase(const Request& request, MeasureTiming measure,
+    virtual Return<V1_0_ErrorStatus> executeBase(const V1_0_Request& request, MeasureTiming measure,
                                     const sp<V1_0::IExecutionCallback>& callback);
 
-    void asyncExecute(const Request& request, MeasureTiming measure, time_point driverStart,
+    void asyncExecute(const V1_0_Request& request, MeasureTiming measure, time_point driverStart,
                       const sp<V1_0::IExecutionCallback>& callback);
 
     bool operationAdd(const Operation& operation);
@@ -129,14 +130,43 @@ protected:
 
     OutputPort handleFusion(const OutputPort& out, int32_t fusedOp);
     template <typename T>
-    T GetConstFromBuffer(const uint8_t* buf, uint32_t len);
+    T GetConstFromBuffer(const uint8_t* buf, uint32_t len) {
+    VLOG(L1, "buf: %p, len: %d", buf, len);
+    if (len != sizeof(T)) {
+        ALOGE("fix me: typeid(T).name() is %d should be %d bytes", len, sizeof(T));
+        // fix me if buffer is of type float and if float and V1_0_OperandLifeTime::CONSTANT_REFERENCE
+        nnAssert(false);
+    }
+    return *(T*)(buf);
+    }
     template <typename T>
     std::vector<T> GetConstVecFromBuffer(const uint8_t* buf, uint32_t len);
     const uint8_t* GetOperandMemory(const Model& model, uint32_t index, uint32_t& len_out);
+    //template <typename T>
+    //T ParseOperationInput(const Model& model, const Operation& operation, uint32_t index);
     template <typename T>
-    T ParseOperationInput(const Model& model, const Operation& operation, uint32_t index);
+	T ParseOperationInput(const Model& model, const Operation& operation,
+					     uint32_t index) {
+	    uint32_t inputIndex = operation.inputs[index];
+	    const auto operand = mModel.main.operands[inputIndex];
+	    ALOGE("operand index = %d", inputIndex);
+	    const auto value = GetConstOperand<T>(model, inputIndex);
+	    VLOG(L1, "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
+	    VLOG(L1, "Operation input index: %d, operand index: %d", index, inputIndex);
+	    VLOG(L1, "Operation: %s", toString(operation).c_str());
+	    //printHelper<T>::print(value, toString(operand).c_str());
+	    VLOG(L1, "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
+	    return value;
+	}
+    int64_t ParseOperationInput_i8(const Model& model, const Operation& operation, uint32_t index) {
+	return ParseOperationInput<int8_t>(model, operation, index);
+    }
     template <typename T>
-    T GetConstOperand(const Model& model, uint32_t index);
+    T GetConstOperand(const Model& model, uint32_t index) {
+        uint32_t len;
+        const uint8_t* buf = GetOperandMemory(model, index, len);
+        return GetConstFromBuffer<T>(buf, len);
+    }
     template <typename T>
     std::vector<T> GetConstVecOperand(const Model& model, uint32_t index);
     virtual Blob::Ptr GetConstOperandAsTensor(int operand_index, int operation_idx);

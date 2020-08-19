@@ -122,7 +122,7 @@ bool setRunTimePoolInfosFromHidlMemories(std::vector<RunTimePoolInfo>* poolInfos
 static bool setInfoAndAllocateIfNeeded(RunTimeOperandInfo* info, const Shape& shape) {
     // For user-provided model output operands, the parameters must match the Shape
     // calculated from the preparation step.
-    if (info->lifetime == OperandLifeTime::MODEL_OUTPUT) {
+    if (info->lifetime == V1_0_OperandLifeTime::SUBGRAPH_OUTPUT) {
         if (info->type != shape.type || info->dimensions != shape.dimensions) {
             LOG(ERROR) << "Invalid type or dimensions for model output";
             return false;
@@ -137,7 +137,7 @@ static bool setInfoAndAllocateIfNeeded(RunTimeOperandInfo* info, const Shape& sh
     info->dimensions = shape.dimensions;
     info->scale = shape.scale;
     info->zeroPoint = shape.offset;
-    if (info->lifetime == OperandLifeTime::TEMPORARY_VARIABLE && info->buffer == nullptr) {
+    if (info->lifetime == V1_0_OperandLifeTime::TEMPORARY_VARIABLE && info->buffer == nullptr) {
         uint32_t length = sizeOfData(info->type, info->dimensions);
         info->buffer = new uint8_t[length];
         if (info->buffer == nullptr) {
@@ -147,21 +147,6 @@ static bool setInfoAndAllocateIfNeeded(RunTimeOperandInfo* info, const Shape& sh
     return true;
 }
 
-template <typename T>
-T PreparedModel::ParseOperationInput(const Model& model, const Operation& operation,
-                                     uint32_t index) {
-    uint32_t inputIndex = operation.inputs[index];
-    const auto operand = mModel.operands[inputIndex];
-    VLOG(L1, "operand index = %d", inputIndex);
-    const auto value = GetConstOperand<T>(model, inputIndex);
-    VLOG(L1, "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
-    VLOG(L1, "Operation input index: %d, operand index: %d", index, inputIndex);
-    VLOG(L1, "Operation: %s", toString(operation).c_str());
-    printHelper<T>::print(value, toString(operand).c_str());
-    VLOG(L1, "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
-
-    return value;
-}
 
 OutputPort PreparedModel::handleFusion(const OutputPort& out, int32_t fusedOp) {
     VLOG(L1, "fusedOp: %d", fusedOp);
@@ -180,16 +165,6 @@ OutputPort PreparedModel::handleFusion(const OutputPort& out, int32_t fusedOp) {
     return out;
 }
 
-template <typename T>
-T PreparedModel::GetConstFromBuffer(const uint8_t* buf, uint32_t len) {
-    VLOG(L1, "buf: %p, len: %d", buf, len);
-    if (len != sizeof(T)) {
-        VLOG(L1, "fix me: typeid(T).name() should be %d bytes", sizeof(T));
-        // fix me if buffer is of type float and if float and OperandLifeTime::CONSTANT_REFERENCE
-        nnAssert(false);
-    }
-    return *(T*)(buf);
-}
 
 template <typename T>
 std::vector<T> PreparedModel::GetConstVecFromBuffer(const uint8_t* buf, uint32_t len) {
@@ -210,8 +185,8 @@ std::vector<T> PreparedModel::GetConstVecFromBuffer(const uint8_t* buf, uint32_t
 }
 
 bool PreparedModel::isOperandDataNull(int index) {
-    const auto op = mModel.operands[index];
-    if (op.lifetime == OperandLifeTime::NO_VALUE) {
+    const auto op = mModel.main.operands[index];
+    if (op.lifetime == V1_0_OperandLifeTime::NO_VALUE) {
         VLOG(L1, "index %d has life time NO_VALUE", index);
         return true;
     }
@@ -221,30 +196,31 @@ bool PreparedModel::isOperandDataNull(int index) {
 
 const uint8_t* PreparedModel::GetOperandMemory(const Model& model, uint32_t index,
                                                uint32_t& len_out) {
-    const auto op = model.operands[index];
+    const auto op = model.main.operands[index];
     len_out = op.location.length;
-    if (op.lifetime == OperandLifeTime::CONSTANT_COPY) {
+    if (op.lifetime == V1_0_OperandLifeTime::CONSTANT_COPY) {
         if (op.location.poolIndex != 0) {
             ALOGE("CONSTANT_COPY expects poolIndex to be 0");
             nnAssert(false);
         }
-        VLOG(L1, "operand lifetime OperandLifeTime::CONSTANT_COPY");
+        VLOG(L1, "operand lifetime V1_0_OperandLifeTime::CONSTANT_COPY");
         return (const_cast<uint8_t*>(&model.operandValues[op.location.offset]));
         // to.numberOfUsesLeft = 0;
-    } else if (op.lifetime == OperandLifeTime::CONSTANT_REFERENCE) {
-        VLOG(L1, "operand lifetime OperandLifeTime::CONSTANT_REFERENCE");
+    } else if (op.lifetime == V1_0_OperandLifeTime::CONSTANT_REFERENCE) {
+        VLOG(L1, "operand lifetime V1_0_OperandLifeTime::CONSTANT_REFERENCE");
         auto poolIndex = op.location.poolIndex;
         // nnAssert(poolIndex < mPoolInfos.size()); //aks fix me
         auto& r = mPoolInfos[poolIndex];
         return (const_cast<uint8_t*>(r.buffer + op.location.offset));
-    } else if (op.lifetime == OperandLifeTime::MODEL_INPUT ||
-               op.lifetime == OperandLifeTime::MODEL_OUTPUT ||
-               op.lifetime == OperandLifeTime::NO_VALUE) {
-        VLOG(L1, "operand lifetime OperandLifeTime::MODEL_INPUT||MODEL_OUTPUT||NO_VALUE");
+    } else if (op.lifetime == V1_0_OperandLifeTime::SUBGRAPH_INPUT ||
+               op.lifetime == V1_0_OperandLifeTime::SUBGRAPH_OUTPUT ||
+               op.lifetime == V1_0_OperandLifeTime::NO_VALUE) {
+        VLOG(L1, "operand lifetime V1_0_OperandLifeTime::SUBGRAPH_INPUT||SUBGRAPH_OUTPUT||NO_VALUE");
+
         len_out = sizeOfData(op.type, op.dimensions);
         return nullptr;
-    } else if (op.lifetime == OperandLifeTime::TEMPORARY_VARIABLE) {
-        VLOG(L1, "operand lifetime OperandLifeTime::TEMPORARY_VARIABLE");
+    } else if (op.lifetime == V1_0_OperandLifeTime::TEMPORARY_VARIABLE) {
+        VLOG(L1, "operand lifetime V1_0_OperandLifeTime::TEMPORARY_VARIABLE");
         VLOG(L1, "operand is expected to be const, but lifetime is %d", op.lifetime);
         len_out = sizeOfData(op.type, op.dimensions);
         // nnAssert(false);
@@ -254,14 +230,6 @@ const uint8_t* PreparedModel::GetOperandMemory(const Model& model, uint32_t inde
     ALOGE("operand is expected to be const, but lifetime is %d", op.lifetime);
     nnAssert(false);  // temp fix since some time const operand set as TEMPORARY_VARIABLE
     return nullptr;
-}
-
-template <typename T>
-T PreparedModel::GetConstOperand(const Model& model, uint32_t index) {
-    dumpOperand(index);
-    uint32_t len;
-    const uint8_t* buf = GetOperandMemory(model, index, len);
-    return GetConstFromBuffer<T>(buf, len);
 }
 
 template <typename T>
@@ -291,8 +259,8 @@ OutputPort PreparedModel::getPort(int index) {
         VLOG(L1, "index is a const!");
         nnAssert(false);
     }
-    const auto op = mModel.operands[index];
-    if (op.lifetime == OperandLifeTime::MODEL_INPUT) {
+    const auto op = mModel.main.operands[index];
+    if (op.lifetime == V1_0_OperandLifeTime::SUBGRAPH_INPUT) {
         VLOG(L1, "Model input operand\n");
         std::ostringstream operandName;
         operandName << "input" << index;
@@ -336,16 +304,16 @@ OutputPort PreparedModel::getPort(int index) {
 
         return mPorts[index];
     }
-    if (op.lifetime == OperandLifeTime::MODEL_OUTPUT) {
+    if (op.lifetime == V1_0_OperandLifeTime::SUBGRAPH_OUTPUT) {
         VLOG(L1, "Model output expected as input, not possible");
         nnAssert(false);
     }
-    if (op.lifetime == OperandLifeTime::NO_VALUE) {
+    if (op.lifetime == V1_0_OperandLifeTime::NO_VALUE) {
         VLOG(L1, "port is expected to be allocated for this as output from other layer");
         nnAssert(false);
     }
-    if (op.lifetime == OperandLifeTime::TEMPORARY_VARIABLE) {
-        VLOG(L1, "getport OperandLifeTime::TEMPORARY_VARIABLE\n");
+    if (op.lifetime == V1_0_OperandLifeTime::TEMPORARY_VARIABLE) {
+        VLOG(L1, "getport V1_0_OperandLifeTime::TEMPORARY_VARIABLE\n");
         if (!mPorts[index]) nnAssert(false);
         VLOG(L1, "mPorts[%d] already allocated\n", index);
         return mPorts[index];
@@ -358,8 +326,9 @@ void PreparedModel::SetOperandMemory(const Model& model, uint32_t index, uint32_
                                      const uint8_t* buf) {}
 
 bool PreparedModel::initializeRunTimeOperandInfo() {
-    // initialize runtime operand info from model.
-    const size_t count = mModel.operands.size();
+    // initialize runtime operand info from model.main.
+    const size_t count = mModel.main.operands.size();
+    ALOGE("OperandType = %d\n", count);
     if (!count) {
         VLOG(L1, "NNERR:Operand Count is 0");
         return false;
@@ -368,9 +337,9 @@ bool PreparedModel::initializeRunTimeOperandInfo() {
     mPorts.resize(count);
     // TensorDims dims;
 
-    // Start by setting the runtime info to what's in the model.
+    // Start by setting the runtime info to what's in the model.main.
     for (size_t i = 0; i < count; i++) {
-        const V1_2::Operand& from = mModel.operands[i];
+        const V1_3::Operand& from = mModel.main.operands[i];
         RunTimeOperandInfo& to = mOperands[i];
         to.dimensions.resize(from.dimensions.size());
         for (size_t j = 0; j < from.dimensions.size(); j++) {
@@ -401,16 +370,16 @@ bool PreparedModel::initializeRunTimeOperandInfo() {
         to.length = from.location.length;
         to.lifetime = from.lifetime;
         switch (from.lifetime) {
-            case OperandLifeTime::TEMPORARY_VARIABLE:
+            case V1_0_OperandLifeTime::TEMPORARY_VARIABLE:
                 to.buffer = nullptr;
                 to.length = sizeOfData(to.type, to.dimensions);
                 to.numberOfUsesLeft = from.numberOfConsumers;
                 break;
-            case OperandLifeTime::CONSTANT_COPY:
+            case V1_0_OperandLifeTime::CONSTANT_COPY:
                 to.buffer = const_cast<uint8_t*>(&mModel.operandValues[from.location.offset]);
                 to.numberOfUsesLeft = 0;
                 break;
-            case OperandLifeTime::CONSTANT_REFERENCE: {
+            case V1_0_OperandLifeTime::CONSTANT_REFERENCE: {
                 auto poolIndex = from.location.poolIndex;
                 nnAssert(poolIndex < mPoolInfos.size());
                 auto& r = mPoolInfos[poolIndex];
@@ -418,9 +387,9 @@ bool PreparedModel::initializeRunTimeOperandInfo() {
                 to.numberOfUsesLeft = 0;
                 break;
             }
-            case OperandLifeTime::MODEL_INPUT:
-            case OperandLifeTime::MODEL_OUTPUT:
-            case OperandLifeTime::NO_VALUE:
+            case V1_0_OperandLifeTime::SUBGRAPH_INPUT:
+            case V1_0_OperandLifeTime::SUBGRAPH_OUTPUT:
+            case V1_0_OperandLifeTime::NO_VALUE:
                 to.buffer = nullptr;
                 to.numberOfUsesLeft = 0;
                 break;
@@ -437,7 +406,7 @@ bool PreparedModel::initialize() {
     bool success = false;
 
     // Check operation supoorted or not, user may not call getOpertionSupported()
-    for (const auto& operation : mModel.operations) {
+    for (const auto& operation : mModel.main.operations) {
         success = isOperationSupported(operation, mModel, mTargetDevice);
         dumpOperationSupport(operation, success);
         if (!success) {
@@ -459,7 +428,7 @@ bool PreparedModel::initialize() {
         return false;
     }
 
-    for (const auto& operation : mModel.operations) {
+    for (const auto& operation : mModel.main.operations) {
         VLOG(L1, "get operation %d ready to add", operation.type);
         dumpOperation(operation);
         switch (operation.type) {
@@ -533,7 +502,7 @@ bool PreparedModel::initialize() {
     mNet.buildNetwork();
     std::fstream dot;
     std::string graphfile("/data/local/graphfile");
-    if (mModel.operations.size() > 1) {
+    if (mModel.main.operations.size() > 1) {
         mNet.save(graphfile);
         VLOG(L1, "saving to IR if operation count > 1");
     } else
@@ -612,22 +581,22 @@ void printOperandbuf(int level, const uint8_t* buffer, const std::vector<uint32_
 }
 
 #endif
-static Return<void> notify(const sp<V1_0::IExecutionCallback>& callback, const ErrorStatus& status,
+static Return<void> notify(const sp<V1_0::IExecutionCallback>& callback, const V1_0_ErrorStatus& status,
                            const hidl_vec<OutputShape>&, Timing) {
     return callback->notify(status);
 }
 
-static Return<void> notify(const sp<V1_2::IExecutionCallback>& callback, const ErrorStatus& status,
+static Return<void> notify(const sp<V1_2::IExecutionCallback>& callback, const V1_0_ErrorStatus& status,
                            const hidl_vec<OutputShape>& outputShapes, Timing timing) {
     return callback->notify_1_2(status, outputShapes, timing);
 }
 
-void PreparedModel::asyncExecute(const Request& request, MeasureTiming measure,
+void PreparedModel::asyncExecute(const V1_0_Request& request, MeasureTiming measure,
                                  time_point driverStart,
                                  const sp<V1_0::IExecutionCallback>& callback) {
     std::vector<RunTimePoolInfo> requestPoolInfos;
     if (!setRunTimePoolInfosFromHidlMemories(&requestPoolInfos, request.pools)) {
-        notify(callback, ErrorStatus::GENERAL_FAILURE, {}, kNoTiming);
+        notify(callback, V1_0_ErrorStatus::GENERAL_FAILURE, {}, kNoTiming);
         return;
     }
 
@@ -648,7 +617,7 @@ void PreparedModel::asyncExecute(const Request& request, MeasureTiming measure,
             if (arg.dimensions.size() > 0) {
                 // It's the responsibility of the caller to validate that
                 // from.dimensions only modifies the dimensions that were
-                // unspecified in the model.  That's the case in SampleDriver.cpp
+                // unspecified in the model.main.  That's the case in SampleDriver.cpp
                 // with the call to validateRequest().
                 operand.dimensions = arg.dimensions;
             }
@@ -676,8 +645,8 @@ void PreparedModel::asyncExecute(const Request& request, MeasureTiming measure,
 
     VLOG(L1, "pass request inputs/outputs buffer to network/model respectively");
 
-    inOutData(mModel.inputIndexes, request.inputs, true, enginePtr, mPorts);
-    inOutData(mModel.outputIndexes, request.outputs, false, enginePtr, mPorts);
+    inOutData(mModel.main.inputIndexes, request.inputs, true, enginePtr, mPorts);
+    inOutData(mModel.main.outputIndexes, request.outputs, false, enginePtr, mPorts);
 
     VLOG(L1, "Run");
 
@@ -690,15 +659,15 @@ void PreparedModel::asyncExecute(const Request& request, MeasureTiming measure,
     }
 
     InferenceEngine::TBlob<float>::Ptr outBlob =
-        enginePtr->getBlob(mPorts[mModel.outputIndexes[0]]->getName());
+        enginePtr->getBlob(mPorts[mModel.main.outputIndexes[0]]->getName());
 
     InferenceEngine::TBlob<float>::Ptr inBlob =
-        enginePtr->getBlob(mPorts[mModel.inputIndexes[0]]->getName());
+        enginePtr->getBlob(mPorts[mModel.main.inputIndexes[0]]->getName());
     hidl_vec<OutputShape> outputShapes;
 #ifdef NN_DEBUG
     {
         VLOG(L1, "Model output0 are:");
-        const RunTimeOperandInfo& output = mOperands[mModel.outputIndexes[0]];
+        const RunTimeOperandInfo& output = mOperands[mModel.main.outputIndexes[0]];
 
         auto nelem = (outBlob->size() > 20 ? 20 : outBlob->size());
         for (int i = 0; i < nelem; i++) {
@@ -706,7 +675,7 @@ void PreparedModel::asyncExecute(const Request& request, MeasureTiming measure,
         }
 
         VLOG(L1, "Model input0 are:");
-        const RunTimeOperandInfo& input = mOperands[mModel.inputIndexes[0]];
+        const RunTimeOperandInfo& input = mOperands[mModel.main.inputIndexes[0]];
 
         nelem = (inBlob->size() > 20 ? 20 : inBlob->size());
         for (int i = 0; i < nelem; i++) {
@@ -720,16 +689,16 @@ void PreparedModel::asyncExecute(const Request& request, MeasureTiming measure,
         Timing timing = {.timeOnDevice = uint64_t(microsecondsDuration(deviceEnd, deviceStart)),
                          .timeInDriver = uint64_t(microsecondsDuration(driverEnd, driverStart))};
         // VLOG(L1, "Driver::asyncExecute timing = %s", toString(timing));
-        returned = notify(callback, ErrorStatus::NONE, outputShapes, timing);
+        returned = notify(callback, V1_0_ErrorStatus::NONE, outputShapes, timing);
     } else {
-        returned = notify(callback, ErrorStatus::NONE, outputShapes, kNoTiming);
+        returned = notify(callback, V1_0_ErrorStatus::NONE, outputShapes, kNoTiming);
     }
     if (!returned.isOk()) {
         ALOGE("hidl callback failed to return properly: %s", returned.description().c_str());
     }
 }
 
-Return<ErrorStatus> PreparedModel::executeBase(const Request& request, MeasureTiming measure,
+Return<V1_0_ErrorStatus> PreparedModel::executeBase(const V1_0_Request& request, MeasureTiming measure,
                                                const sp<V1_0::IExecutionCallback>& callback) {
     VLOG(L1, "executebase");
 
@@ -738,11 +707,11 @@ Return<ErrorStatus> PreparedModel::executeBase(const Request& request, MeasureTi
 
     if (callback.get() == nullptr) {
         ALOGE("invalid callback passed to execute");
-        return ErrorStatus::INVALID_ARGUMENT;
+        return V1_0_ErrorStatus::INVALID_ARGUMENT;
     }
     if (!validateRequest(request, mModel)) {
-        notify(callback, ErrorStatus::INVALID_ARGUMENT, {}, kNoTiming);
-        return ErrorStatus::INVALID_ARGUMENT;
+        notify(callback, V1_0_ErrorStatus::INVALID_ARGUMENT, {}, kNoTiming);
+        return V1_0_ErrorStatus::INVALID_ARGUMENT;
     }
 
     // This thread is intentionally detached because the driver service
@@ -751,10 +720,10 @@ Return<ErrorStatus> PreparedModel::executeBase(const Request& request, MeasureTi
         asyncExecute(request, measure, driverStart, callback);
     }).detach();
 
-    return ErrorStatus::NONE;
+    return V1_0_ErrorStatus::NONE;
 }
 
-Return<ErrorStatus> PreparedModel::execute(const Request& request,
+Return<V1_0_ErrorStatus> PreparedModel::execute(const V1_0_Request& request,
                                            const sp<V1_0::IExecutionCallback>& callback) {
     VLOG(L1, "Begin to execute");
     return executeBase(request, MeasureTiming::NO, callback);
@@ -773,14 +742,14 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
 
 #ifdef DISABLE_ALL_QUANT
     for (auto i : operation.inputs) {
-        const auto input = model.operands[i];
+        const auto input = model.main.operands[i];
         if (input.type == OperandType::TENSOR_QUANT8_ASYMM) {
             VLOG_CHECKFAIL("input quant");
             return false;
         }
     }
     for (auto i : operation.outputs) {
-        const auto output = model.operands[i];
+        const auto output = model.main.operands[i];
         if (output.type == OperandType::TENSOR_QUANT8_ASYMM) {
             VLOG_CHECKFAIL("output quant");
             return false;
@@ -788,14 +757,14 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
     }
 #else
     for (auto i : operation.inputs) {
-        const auto input = model.operands[i];
+        const auto input = model.main.operands[i];
         if (input.type == OperandType::TENSOR_QUANT8_ASYMM && input.zeroPoint != 0) {
             VLOG_CHECKFAIL("input quant");
             return false;
         }
     }
     for (auto i : operation.outputs) {
-        const auto output = model.operands[i];
+        const auto output = model.main.operands[i];
         if (output.type == OperandType::TENSOR_QUANT8_ASYMM && output.zeroPoint != 0) {
             VLOG_CHECKFAIL("output quant");
             return false;
@@ -849,9 +818,9 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
     switch (operation.type) {
         case OperationType::CONV_2D: {
             int oper_size = operation.inputs.size();
-            const auto& input0 = model.operands[operation.inputs[OP_INPUT_IDX_CONV]];
-            const auto& input1 = model.operands[operation.inputs[OP_FILTER_IDX_CONV]];
-            const auto& input2 = model.operands[operation.inputs[OP_BIAS_IDX_CONV]];
+            const auto& input0 = model.main.operands[operation.inputs[OP_INPUT_IDX_CONV]];
+            const auto& input1 = model.main.operands[operation.inputs[OP_FILTER_IDX_CONV]];
+            const auto& input2 = model.main.operands[operation.inputs[OP_BIAS_IDX_CONV]];
 
             VLOG(L1, "Validating CONV2D params");
             // filter in == channel
@@ -900,10 +869,10 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
             // Check all other Input operand types for implicit/explicit Padding
 
             if (oper_size == IMPL_PAD_PARAMS_CONV) {
-                const auto& input3 = model.operands[operation.inputs[OP_PADSCHEME_IDX_CONV]];
-                const auto& input4 = model.operands[operation.inputs[OP_STRD_WD_IDX_IMPL_CONV]];
-                const auto& input5 = model.operands[operation.inputs[OP_STRD_HT_IDX_IMPL_CONV]];
-                const auto& input6 = model.operands[operation.inputs[OP_ACTV_FUNC_IDX_IMPL_CONV]];
+                const auto& input3 = model.main.operands[operation.inputs[OP_PADSCHEME_IDX_CONV]];
+                const auto& input4 = model.main.operands[operation.inputs[OP_STRD_WD_IDX_IMPL_CONV]];
+                const auto& input5 = model.main.operands[operation.inputs[OP_STRD_HT_IDX_IMPL_CONV]];
+                const auto& input6 = model.main.operands[operation.inputs[OP_ACTV_FUNC_IDX_IMPL_CONV]];
 
                 if (input3.type != OperandType::INT32 || input4.type != OperandType::INT32 ||
                     input5.type != OperandType::INT32 || input6.type != OperandType::INT32) {
@@ -911,13 +880,13 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
                     return false;
                 }
             } else if (oper_size == EXPL_PAD_PARAMS_CONV) {
-                const auto& input3 = model.operands[operation.inputs[OP_PADL_IDX_CONV]];
-                const auto& input4 = model.operands[operation.inputs[OP_PADR_IDX_CONV]];
-                const auto& input5 = model.operands[operation.inputs[OP_PADH_IDX_CONV]];
-                const auto& input6 = model.operands[operation.inputs[OP_PADW_IDX_CONV]];
-                const auto& input7 = model.operands[operation.inputs[OP_STRD_WD_IDX_EXPL_CONV]];
-                const auto& input8 = model.operands[operation.inputs[OP_STRD_HT_IDX_EXPL_CONV]];
-                const auto& input9 = model.operands[operation.inputs[OP_ACTV_FUNC_IDX_EXPL_CONV]];
+                const auto& input3 = model.main.operands[operation.inputs[OP_PADL_IDX_CONV]];
+                const auto& input4 = model.main.operands[operation.inputs[OP_PADR_IDX_CONV]];
+                const auto& input5 = model.main.operands[operation.inputs[OP_PADH_IDX_CONV]];
+                const auto& input6 = model.main.operands[operation.inputs[OP_PADW_IDX_CONV]];
+                const auto& input7 = model.main.operands[operation.inputs[OP_STRD_WD_IDX_EXPL_CONV]];
+                const auto& input8 = model.main.operands[operation.inputs[OP_STRD_HT_IDX_EXPL_CONV]];
+                const auto& input9 = model.main.operands[operation.inputs[OP_ACTV_FUNC_IDX_EXPL_CONV]];
 
                 if (input3.type != OperandType::INT32 || input4.type != OperandType::INT32 ||
                     input5.type != OperandType::INT32 || input6.type != OperandType::INT32 ||
@@ -928,7 +897,7 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
                 }
             }
 
-            const auto& output = model.operands[operation.outputs[0]];
+            const auto& output = model.main.operands[operation.outputs[0]];
 
             if (output.type != OperandType::TENSOR_FLOAT32) {
                 VLOG(L1, "NNERR:output operand types invalid,aborting!!");
@@ -940,12 +909,12 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
 
         case OperationType::DEPTHWISE_CONV_2D: {
             VLOG(L1, "Validating DEPTHWISE_CONV_2D params");
-            const auto& input0 = model.operands[operation.inputs[OP_INPUT_IDX_CONV]];
-            const auto& input1 = model.operands[operation.inputs[OP_FILTER_IDX_CONV]];
+            const auto& input0 = model.main.operands[operation.inputs[OP_INPUT_IDX_CONV]];
+            const auto& input1 = model.main.operands[operation.inputs[OP_FILTER_IDX_CONV]];
             // depth_out = depth_in * depth_multiplier,input1 is depth_out and input0 is
             // depth_in
 
-            const auto& input2 = model.operands[operation.inputs[OP_BIAS_IDX_CONV]];
+            const auto& input2 = model.main.operands[operation.inputs[OP_BIAS_IDX_CONV]];
 
             int oper_size = operation.inputs.size();
 
@@ -985,12 +954,12 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
             // Check all other Input operand types for implicit/explicit Padding
 
             if (oper_size == IMPL_PAD_PARAMS_DW_CONV) {
-                const auto& input3 = model.operands[operation.inputs[OP_PADSCHEME_IDX_CONV]];
-                const auto& input4 = model.operands[operation.inputs[OP_STRD_WD_IDX_IMPL_CONV]];
-                const auto& input5 = model.operands[operation.inputs[OP_STRD_HT_IDX_IMPL_CONV]];
-                const auto& input6 = model.operands[operation.inputs[OP_DW_CONV_DPM_IMPL]];
+                const auto& input3 = model.main.operands[operation.inputs[OP_PADSCHEME_IDX_CONV]];
+                const auto& input4 = model.main.operands[operation.inputs[OP_STRD_WD_IDX_IMPL_CONV]];
+                const auto& input5 = model.main.operands[operation.inputs[OP_STRD_HT_IDX_IMPL_CONV]];
+                const auto& input6 = model.main.operands[operation.inputs[OP_DW_CONV_DPM_IMPL]];
                 const auto& input7 =
-                    model.operands[operation.inputs[OP_ACTV_FUNC_IDX_IMPL_DW_CONV]];
+                    model.main.operands[operation.inputs[OP_ACTV_FUNC_IDX_IMPL_DW_CONV]];
 
                 if (input3.type != OperandType::INT32 || input4.type != OperandType::INT32 ||
                     input5.type != OperandType::INT32 || input6.type != OperandType::INT32 ||
@@ -999,15 +968,15 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
                     return false;
                 }
             } else if (oper_size == EXPL_PAD_PARAMS_DW_CONV) {
-                const auto& input3 = model.operands[operation.inputs[OP_PADL_IDX_CONV]];
-                const auto& input4 = model.operands[operation.inputs[OP_PADR_IDX_CONV]];
-                const auto& input5 = model.operands[operation.inputs[OP_PADH_IDX_CONV]];
-                const auto& input6 = model.operands[operation.inputs[OP_PADW_IDX_CONV]];
-                const auto& input7 = model.operands[operation.inputs[OP_STRD_WD_IDX_EXPL_CONV]];
-                const auto& input8 = model.operands[operation.inputs[OP_STRD_HT_IDX_EXPL_CONV]];
-                const auto& input9 = model.operands[operation.inputs[OP_DW_CONV_DPM_EXPL]];
+                const auto& input3 = model.main.operands[operation.inputs[OP_PADL_IDX_CONV]];
+                const auto& input4 = model.main.operands[operation.inputs[OP_PADR_IDX_CONV]];
+                const auto& input5 = model.main.operands[operation.inputs[OP_PADH_IDX_CONV]];
+                const auto& input6 = model.main.operands[operation.inputs[OP_PADW_IDX_CONV]];
+                const auto& input7 = model.main.operands[operation.inputs[OP_STRD_WD_IDX_EXPL_CONV]];
+                const auto& input8 = model.main.operands[operation.inputs[OP_STRD_HT_IDX_EXPL_CONV]];
+                const auto& input9 = model.main.operands[operation.inputs[OP_DW_CONV_DPM_EXPL]];
                 const auto& input10 =
-                    model.operands[operation.inputs[OP_ACTV_FUNC_IDX_EXPL_DW_CONV]];
+                    model.main.operands[operation.inputs[OP_ACTV_FUNC_IDX_EXPL_DW_CONV]];
 
                 if (input3.type != OperandType::INT32 || input4.type != OperandType::INT32 ||
                     input5.type != OperandType::INT32 || input6.type != OperandType::INT32 ||
@@ -1018,7 +987,7 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
                 }
             }
 
-            const auto& output = model.operands[operation.outputs[0]];
+            const auto& output = model.main.operands[operation.outputs[0]];
 
             if (output.type != OperandType::TENSOR_FLOAT32) {
                 VLOG(L1, "NNERR:output operand types invalid,aborting!!");
@@ -1029,11 +998,11 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
 
         case OperationType::SOFTMAX: {
             VLOG(L1, "Validating SOFTMAX operation params");
-            const auto& input0 = model.operands[operation.inputs[OP_INPUT_IDX_CONV]];
-            const auto& input1 = model.operands[operation.inputs[1]];
+            const auto& input0 = model.main.operands[operation.inputs[OP_INPUT_IDX_CONV]];
+            const auto& input1 = model.main.operands[operation.inputs[1]];
             float beta = getOperandConstVal<float>(model, input1);
 
-            const auto& output = model.operands[operation.outputs[0]];
+            const auto& output = model.main.operands[operation.outputs[0]];
 
             // Check Input/Filter  Operand type
             if (input0.type != OperandType::TENSOR_FLOAT32 || input1.type != OperandType::FLOAT32) {
@@ -1056,7 +1025,7 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
         case OperationType::AVERAGE_POOL_2D:
         case OperationType::MAX_POOL_2D: {
             int oper_size = operation.inputs.size();
-            const auto& input0 = model.operands[operation.inputs[OP_INPUT_IDX_POOL]];
+            const auto& input0 = model.main.operands[operation.inputs[OP_INPUT_IDX_POOL]];
             VLOG(L1, "Validating AVG_POOL_2D params");
 
             if (input0.type != OperandType::TENSOR_FLOAT32) {
@@ -1073,12 +1042,12 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
             // Check all other Input operand types for implicit/explicit Padding
 
             if (oper_size == IMPL_PAD_PARAMS_POOL) {
-                const auto& input1 = model.operands[operation.inputs[OP_PADSCHEME_IDX_POOL]];
-                const auto& input2 = model.operands[operation.inputs[OP_STRD_WD_IDX_IMPL_POOL]];
-                const auto& input3 = model.operands[operation.inputs[OP_STRD_HT_IDX_IMPL_POOL]];
-                const auto& input4 = model.operands[operation.inputs[OP_FLT_WD_IDX_IMPL_POOL]];
-                const auto& input5 = model.operands[operation.inputs[OP_FLT_HT_IDX_IMPL_POOL]];
-                const auto& input6 = model.operands[operation.inputs[OP_ACTV_FUNC_IDX_IMPL_POOL]];
+                const auto& input1 = model.main.operands[operation.inputs[OP_PADSCHEME_IDX_POOL]];
+                const auto& input2 = model.main.operands[operation.inputs[OP_STRD_WD_IDX_IMPL_POOL]];
+                const auto& input3 = model.main.operands[operation.inputs[OP_STRD_HT_IDX_IMPL_POOL]];
+                const auto& input4 = model.main.operands[operation.inputs[OP_FLT_WD_IDX_IMPL_POOL]];
+                const auto& input5 = model.main.operands[operation.inputs[OP_FLT_HT_IDX_IMPL_POOL]];
+                const auto& input6 = model.main.operands[operation.inputs[OP_ACTV_FUNC_IDX_IMPL_POOL]];
 
                 if (input1.type != OperandType::INT32 || input2.type != OperandType::INT32 ||
                     input3.type != OperandType::INT32 || input4.type != OperandType::INT32 ||
@@ -1087,15 +1056,15 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
                     return false;
                 }
             } else if (oper_size == EXPL_PAD_PARAMS_POOL) {
-                const auto& input1 = model.operands[operation.inputs[OP_PADL_IDX_POOL]];
-                const auto& input2 = model.operands[operation.inputs[OP_PADR_IDX_POOL]];
-                const auto& input3 = model.operands[operation.inputs[OP_PADH_IDX_POOL]];
-                const auto& input4 = model.operands[operation.inputs[OP_PADW_IDX_POOL]];
-                const auto& input5 = model.operands[operation.inputs[OP_STRD_WD_IDX_EXPL_POOL]];
-                const auto& input6 = model.operands[operation.inputs[OP_STRD_HT_IDX_EXPL_POOL]];
-                const auto& input7 = model.operands[operation.inputs[OP_FLT_WD_IDX_EXPL_POOL]];
-                const auto& input8 = model.operands[operation.inputs[OP_FLT_HT_IDX_EXPL_POOL]];
-                const auto& input9 = model.operands[operation.inputs[OP_ACTV_FUNC_IDX_EXPL_POOL]];
+                const auto& input1 = model.main.operands[operation.inputs[OP_PADL_IDX_POOL]];
+                const auto& input2 = model.main.operands[operation.inputs[OP_PADR_IDX_POOL]];
+                const auto& input3 = model.main.operands[operation.inputs[OP_PADH_IDX_POOL]];
+                const auto& input4 = model.main.operands[operation.inputs[OP_PADW_IDX_POOL]];
+                const auto& input5 = model.main.operands[operation.inputs[OP_STRD_WD_IDX_EXPL_POOL]];
+                const auto& input6 = model.main.operands[operation.inputs[OP_STRD_HT_IDX_EXPL_POOL]];
+                const auto& input7 = model.main.operands[operation.inputs[OP_FLT_WD_IDX_EXPL_POOL]];
+                const auto& input8 = model.main.operands[operation.inputs[OP_FLT_HT_IDX_EXPL_POOL]];
+                const auto& input9 = model.main.operands[operation.inputs[OP_ACTV_FUNC_IDX_EXPL_POOL]];
 
                 if (input1.type != OperandType::INT32 || input2.type != OperandType::INT32 ||
                     input3.type != OperandType::INT32 || input4.type != OperandType::INT32 ||
@@ -1107,7 +1076,7 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
                 }
             }
 
-            const auto& output = model.operands[operation.outputs[0]];
+            const auto& output = model.main.operands[operation.outputs[0]];
 
             if (output.type != OperandType::TENSOR_FLOAT32) {
                 VLOG(L1, "NNERR:output operand types invalid,aborting!!");
@@ -1115,9 +1084,9 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
             }
         } break;
         case OperationType::FULLY_CONNECTED: {
-            const auto& input0 = model.operands[operation.inputs[OP_INPUT_IDX_FC]];
-            const auto& input1 = model.operands[operation.inputs[OP_WGHT_IDX_FC]];
-            const auto& input2 = model.operands[operation.inputs[OP_BIAS_IDX_FC]];
+            const auto& input0 = model.main.operands[operation.inputs[OP_INPUT_IDX_FC]];
+            const auto& input1 = model.main.operands[operation.inputs[OP_WGHT_IDX_FC]];
+            const auto& input2 = model.main.operands[operation.inputs[OP_BIAS_IDX_FC]];
 
             if (input0.type != OperandType::TENSOR_FLOAT32 ||
                 input1.type != OperandType::TENSOR_FLOAT32 ||
@@ -1145,14 +1114,14 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
                 return false;
             }
 
-            const auto& input3 = model.operands[operation.inputs[OP_ACTV_IDX_FC]];
+            const auto& input3 = model.main.operands[operation.inputs[OP_ACTV_IDX_FC]];
 
             if (input3.type != OperandType::INT32) {
                 VLOG(L1, "NNERR: input3  invalid operand types");
                 return false;
             }
 
-            const auto& output = model.operands[operation.outputs[0]];
+            const auto& output = model.main.operands[operation.outputs[0]];
 
             if (output.type != OperandType::TENSOR_FLOAT32) {
                 VLOG(L1, "NNERR:invalid output operand types for FC ,aborting!!");
@@ -1163,8 +1132,8 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
         case OperationType::RELU1:
         case OperationType::RELU6:
         case OperationType::LOGISTIC: {
-            const auto& input0 = model.operands[operation.inputs[0]];
-            const auto& output = model.operands[operation.outputs[0]];
+            const auto& input0 = model.main.operands[operation.inputs[0]];
+            const auto& output = model.main.operands[operation.outputs[0]];
 
             if (input0.dimensions.size() > 4 || input0.type != OperandType::TENSOR_FLOAT32 ||
                 operation.outputs.size() > 1 || operation.inputs.size() > 1 ||
@@ -1183,9 +1152,9 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
             break;
 
         case OperationType::ADD: {
-            const auto& input0 = model.operands[operation.inputs[OP_INPUT0_IDX_ADD]];
-            const auto& input1 = model.operands[operation.inputs[OP_INPUT1_IDX_ADD]];
-            const auto& input2 = model.operands[operation.inputs[OP_ACTV_IDX_ADD]];
+            const auto& input0 = model.main.operands[operation.inputs[OP_INPUT0_IDX_ADD]];
+            const auto& input1 = model.main.operands[operation.inputs[OP_INPUT1_IDX_ADD]];
+            const auto& input2 = model.main.operands[operation.inputs[OP_ACTV_IDX_ADD]];
             if (input0.dimensions != input1.dimensions) {
                 VLOG(L1, "NNERR:dims not match");
                 return false;
@@ -1201,7 +1170,7 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
                 return false;
             }
 
-            const auto& output = model.operands[operation.outputs[0]];
+            const auto& output = model.main.operands[operation.outputs[0]];
 
             if (output.type != input0.type) {
                 VLOG(L1, "NNERR: output type not equalt to input0 type ,aborting!!");
@@ -1218,14 +1187,14 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
     }
 #ifdef DISABLE_ALL_QUANT
     for (auto i : operation.inputs) {
-        const auto input = model.operands[i];
+        const auto input = model.main.operands[i];
         if (input.type == OperandType::TENSOR_QUANT8_ASYMM) {
             VLOG_CHECKFAIL("input quant");
             return false;
         }
     }
     for (auto i : operation.outputs) {
-        const auto output = model.operands[i];
+        const auto output = model.main.operands[i];
         if (output.type == OperandType::TENSOR_QUANT8_ASYMM) {
             VLOG_CHECKFAIL("output quant");
             return false;
@@ -1241,10 +1210,10 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
 bool PreparedModel::isConst(int index) {
     VLOG(L1, "---------------------------------------------");
     VLOG(L1, "Operand index: %d", index);
-    const auto op = mModel.operands[index];
+    const auto op = mModel.main.operands[index];
     VLOG(L1, " %s", toString(op).c_str());
-    bool ret = (op.lifetime == OperandLifeTime::CONSTANT_COPY ||
-                op.lifetime == OperandLifeTime::CONSTANT_REFERENCE);
+    bool ret = (op.lifetime == V1_0_OperandLifeTime::CONSTANT_COPY ||
+                op.lifetime == V1_0_OperandLifeTime::CONSTANT_REFERENCE);
     VLOG(L1, "%s", ret ? "Const" : "Non-Const");
     VLOG(L1, "---------------------------------------------");
     return ret;
@@ -2351,7 +2320,7 @@ bool PreparedModel::operationTANH(const Operation& operation) {
 
 void PreparedModel::initializeInput() {
     VLOG(L1, "initialize Input");
-    for (auto i : mModel.inputIndexes) {
+    for (auto i : mModel.main.inputIndexes) {
         int dims_size = mOperands[i].dimensions.size();
 
         VLOG(L1, "mPorts[%d] %s dims size %d", i, mPorts[i]->getName().c_str(), dims_size);
@@ -2373,7 +2342,7 @@ void PreparedModel::initializeInput() {
 
 bool PreparedModel::finalizeOutput(/*RunTimeOperandInfo* output */) {
     VLOG(L1, "finalize Output");
-    for (auto i : mModel.outputIndexes) {
+    for (auto i : mModel.main.outputIndexes) {
         int dims_size = mOperands[i].dimensions.size();
 
         mPorts[i]->setPrecision(InferenceEngine::Precision::FP32);
@@ -2395,7 +2364,7 @@ bool PreparedModel::finalizeOutput(/*RunTimeOperandInfo* output */) {
 }
 
 IRBlob::Ptr VpuPreparedModel::GetConstWeightsOperandAsTensor(uint32_t index) {
-    const auto op = mModel.operands[index];
+    const auto op = mModel.main.operands[index];
     uint32_t len;
     const uint8_t* buf = GetOperandMemory(mModel, index, len);
 
@@ -2515,7 +2484,7 @@ IRBlob::Ptr VpuPreparedModel::GetConstWeightsOperandAsTensor(uint32_t index) {
 }
 
 IRBlob::Ptr VpuPreparedModel::GetConstOperandAsTensor(int index, int operation_idx) {
-    const auto op = mModel.operands[index];
+    const auto op = mModel.main.operands[index];
     uint32_t len;
     const uint8_t* buf = GetOperandMemory(mModel, index, len);
 
@@ -2639,7 +2608,7 @@ Blob::Ptr VpuPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const 
                                                   uint32_t& len) {
     if (op.type == OperandType::TENSOR_FLOAT32 || op.type == OperandType::FLOAT32) {
 #ifndef MYRIAD_FP16  // Myriad supports FP32 only for network input/output
-        if (op.lifetime == OperandLifeTime::MODEL_INPUT) {
+        if (op.lifetime == V1_0_OperandLifeTime::SUBGRAPH_INPUT) {
             VLOG(L1, "Create input blob !!!!");
             vec<unsigned int> order;
             Layout layout;
@@ -2658,7 +2627,7 @@ Blob::Ptr VpuPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const 
             TensorDesc td(InferenceEngine::Precision::FP32, permuteDims(inputDims, order), layout);
 
             if (buf == nullptr) {
-                VLOG(L1, "MODEL_INPUT buf is NULL !!!!!!!!!!!!!!!");
+                VLOG(L1, "SUBGRAPH_INPUT buf is NULL !!!!!!!!!!!!!!!");
                 InferenceEngine::TBlob<float>::Ptr blob =
                     std::make_shared<InferenceEngine::TBlob<float>>(td);
                 blob->allocate();
@@ -2699,7 +2668,7 @@ Blob::Ptr VpuPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const 
                     return blob;
                 }
             }
-        } else if (op.lifetime == OperandLifeTime::MODEL_OUTPUT) {
+        } else if (op.lifetime == V1_0_OperandLifeTime::SUBGRAPH_OUTPUT) {
             VLOG(L1, "Create output blob");
             vec<unsigned int> order;
             Layout layout;
@@ -2727,7 +2696,7 @@ Blob::Ptr VpuPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const 
 
 #else  // FP16 support if Myriad does not support FP32 for network input/output
 
-        if (op.lifetime == OperandLifeTime::MODEL_INPUT) {
+        if (op.lifetime == V1_0_OperandLifeTime::SUBGRAPH_INPUT) {
             // todo: create a readOnly blob that accepts const pointers
             // InferenceEngine::TBlob<short>::Ptr blob =
             // std::make_shared<InferenceEngine::TBlob<short>>(td);
@@ -2770,7 +2739,7 @@ Blob::Ptr VpuPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const 
             }
 
             return blob;
-        } else if (op.lifetime == OperandLifeTime::MODEL_OUTPUT) {
+        } else if (op.lifetime == V1_0_OperandLifeTime::SUBGRAPH_OUTPUT) {
             vec<unsigned int> order;
             Layout layout;
             if (op.dimensions.size() == 4) {
@@ -2824,7 +2793,7 @@ Blob::Ptr VpuPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const 
 
 IRBlob::Ptr CpuPreparedModel::GetConstWeightsOperandAsTensor(uint32_t index) {
     dumpOperand(index);
-    const auto op = mModel.operands[index];
+    const auto op = mModel.main.operands[index];
     uint32_t len;
     const uint8_t* buf = GetOperandMemory(mModel, index, len);
     VLOG(L1, "CpuPreparedModel:: Operand: index: %d, len: %d, buf: %p", index, len, buf);
@@ -2912,7 +2881,7 @@ IRBlob::Ptr CpuPreparedModel::GetConstWeightsOperandAsTensor(uint32_t index) {
 
 IRBlob::Ptr CpuPreparedModel::GetConstOperandAsTensor(int operand_idx, int operation_idx) {
     dumpOperand(operand_idx);
-    const auto op = mModel.operands[operand_idx];
+    const auto op = mModel.main.operands[operand_idx];
     uint32_t len;
 
     const uint8_t* buf = GetOperandMemory(mModel, operand_idx, len);
@@ -2999,7 +2968,7 @@ IRBlob::Ptr CpuPreparedModel::GetConstOperandAsTensor(int operand_idx, int opera
 Blob::Ptr CpuPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const uint8_t* buf,
                                                   uint32_t& len) {
     if (op.type == OperandType::TENSOR_FLOAT32 || op.type == OperandType::FLOAT32) {
-        if (op.lifetime == OperandLifeTime::MODEL_INPUT) {
+        if (op.lifetime == V1_0_OperandLifeTime::SUBGRAPH_INPUT) {
             VLOG(L1, "Create input blob !!!!");
             vec<unsigned int> order;
             Layout layout;
@@ -3018,7 +2987,7 @@ Blob::Ptr CpuPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const 
             TensorDesc td(InferenceEngine::Precision::FP32, permuteDims(inputDims, order), layout);
 
             if (buf == nullptr) {
-                VLOG(L1, "MODEL_INPUT buf is NULL !!!!!!!!!!!!!!!");
+                VLOG(L1, "SUBGRAPH_INPUT buf is NULL !!!!!!!!!!!!!!!");
                 InferenceEngine::TBlob<float>::Ptr blob =
                     std::make_shared<InferenceEngine::TBlob<float>>(td);
                 blob->allocate();
@@ -3059,7 +3028,7 @@ Blob::Ptr CpuPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const 
                     return blob;
                 }
             }
-        } else if (op.lifetime == OperandLifeTime::MODEL_OUTPUT) {
+        } else if (op.lifetime == V1_0_OperandLifeTime::SUBGRAPH_OUTPUT) {
             VLOG(L1, "Create output blob !!!!");
             vec<unsigned int> order;
             Layout layout;
@@ -3076,7 +3045,7 @@ Blob::Ptr CpuPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const 
 
             TensorDesc td(InferenceEngine::Precision::FP32, toDims(op.dimensions), layout);  // nhwc
             if (buf == nullptr) {
-                VLOG(L1, "MODEL_OUTPUT buf is NULL !!!!!!!!!!!!!!!");
+                VLOG(L1, "SUBGRAPH_OUTPUT buf is NULL !!!!!!!!!!!!!!!");
                 InferenceEngine::TBlob<float>::Ptr blob =
                     std::make_shared<InferenceEngine::TBlob<float>>(td);
                 blob->allocate();
@@ -3101,7 +3070,7 @@ Blob::Ptr CpuPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const 
 
 Blob::Ptr GpuPreparedModel::GetConstOperandAsTensor(int operand_idx, int operation_idx) {
     dumpOperand(operand_idx);
-    const auto op = mModel.operands[operand_idx];
+    const auto op = mModel.main.operands[operand_idx];
     uint32_t len = 0;
 
     const uint8_t* buf = GetOperandMemory(mModel, operand_idx, len);
@@ -3187,7 +3156,7 @@ Blob::Ptr GpuPreparedModel::GetConstOperandAsTensor(int operand_idx, int operati
 Blob::Ptr GpuPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const uint8_t* buf,
                                                   uint32_t& len) {
     if (OperandType::TENSOR_FLOAT32 == op.type || OperandType::FLOAT32 == op.type) {
-        if (op.lifetime == OperandLifeTime::MODEL_INPUT) {
+        if (op.lifetime == V1_0_OperandLifeTime::SUBGRAPH_INPUT) {
             vec<unsigned int> order;
             Layout layout;
 
@@ -3246,7 +3215,7 @@ Blob::Ptr GpuPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const 
                     return blob;
                 }
             }
-        } else if (op.lifetime == OperandLifeTime::MODEL_OUTPUT) {
+        } else if (op.lifetime == V1_0_OperandLifeTime::SUBGRAPH_OUTPUT) {
             vec<unsigned int> order;
             Layout layout;
 
@@ -3282,7 +3251,7 @@ Blob::Ptr GpuPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const 
 
 Blob::Ptr GpuPreparedModel::GetConstWeightsOperandAsTensor(uint32_t index) {
     dumpOperand(index);
-    const auto op = mModel.operands[index];
+    const auto op = mModel.main.operands[index];
     uint32_t len = 0;
     const uint8_t* buf = GetOperandMemory(mModel, index, len);
 

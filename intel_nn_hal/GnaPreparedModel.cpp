@@ -27,7 +27,7 @@ T getOperandConstVal(const Model& model, const Operand& operand) {
 }
 
 // TODO: Code duplication
-static Return<void> notify(const sp<V1_0::IExecutionCallback>& callback, const ErrorStatus& status,
+static Return<void> notify(const sp<V1_0::IExecutionCallback>& callback, const V1_0_ErrorStatus& status,
                            const hidl_vec<OutputShape>&, Timing) {
     return callback->notify(status);
 }
@@ -36,7 +36,7 @@ void GnaPreparedModel::initializeInput() {
     VLOG(L1, "initialize Input");
 
 #if 0
-    for (auto i : mModel.inputIndexes) {
+    for (auto i : mModel.main.inputIndexes) {
         int dims_size = mOperands[i].dimensions.size();
 
         VLOGDIMS(L1, mOperands[i].dimensions, "current operand inpu dims:");
@@ -58,7 +58,7 @@ void GnaPreparedModel::initializeInput() {
 
 bool GnaPreparedModel::finalizeOutput(/*RunTimeOperandInfo* output */) {
     VLOG(L1, "finalize Output");
-    for (auto i : mModel.outputIndexes) {
+    for (auto i : mModel.main.outputIndexes) {
         int dims_size = mOperands[i].dimensions.size();
 
         //VLOG(L1, "mPorts[%d] %s dims size %d", i, mPorts[i]->getName().c_str(), dims_size);
@@ -81,7 +81,7 @@ bool GnaPreparedModel::initialize() {
     bool success = false;
 
     // Check operation supoorted or not, user may not call getOpertionSupported()
-    for (const auto& operation : mModel.operations) {
+    for (const auto& operation : mModel.main.operations) {
         success = isOperationSupported(operation, mModel, mTargetDevice);
         dumpOperationSupport(operation, success);
         if (!success) {
@@ -105,7 +105,7 @@ bool GnaPreparedModel::initialize() {
     mBuilderModel = new IRBuilder::ModelBuilder();
     mBuilderModel->initializeBuilder();
 
-    for (const auto& operation : mModel.operations) {
+    for (const auto& operation : mModel.main.operations) {
         VLOG(L1, "get operation %d ready to add", operation.type);
         dumpOperation(operation);
         switch (operation.type) {
@@ -177,7 +177,7 @@ void GnaPreparedModel::asyncExecute(const Request& request, MeasureTiming measur
 
     std::vector<RunTimePoolInfo> requestPoolInfos;
     if (!setRunTimePoolInfosFromHidlMemories(&requestPoolInfos, request.pools)) {
-        cb->notify(ErrorStatus::GENERAL_FAILURE);
+        cb->notify(V1_0_ErrorStatus::GENERAL_FAILURE);
         return;
     }
 
@@ -187,7 +187,7 @@ void GnaPreparedModel::asyncExecute(const Request& request, MeasureTiming measur
     hidl_vec<OutputShape> outputShapes(request.outputs.size());
 
     auto getBlobFromMemoryPool = [&, this](uint32_t index) {
-        RunTimeOperandInfo& operand = mOperands[mModel.inputIndexes[index]];
+        RunTimeOperandInfo& operand = mOperands[mModel.main.inputIndexes[index]];
         const RequestArgument& arg = request.inputs[index];
         auto poolIndex = arg.location.poolIndex;
         nnAssert(poolIndex < requestPoolInfos.size());
@@ -196,7 +196,7 @@ void GnaPreparedModel::asyncExecute(const Request& request, MeasureTiming measur
         if (arg.dimensions.size() > 0) {
                 // It's the responsibility of the caller to validate that
                 // from.dimensions only modifies the dimensions that were
-                // unspecified in the model.  That's the case in SampleDriver.cpp
+                // unspecified in the model.main.  That's the case in SampleDriver.cpp
                 // with the call to validateRequest().
                 operand.dimensions = arg.dimensions;
         }
@@ -211,7 +211,7 @@ void GnaPreparedModel::asyncExecute(const Request& request, MeasureTiming measur
 
     auto copyDataToLayer = [&, this](uint32_t index) {
         auto srcBlob = getBlobFromMemoryPool(index);
-        auto iter = mOpIndex2BlobMap.find(mModel.inputIndexes[index]);
+        auto iter = mOpIndex2BlobMap.find(mModel.main.inputIndexes[index]);
         if (iter != mOpIndex2BlobMap.end()) {
             auto layerId = mBuilderModel->check4LayerData(iter->second);
             if (layerId != -1)
@@ -223,8 +223,8 @@ void GnaPreparedModel::asyncExecute(const Request& request, MeasureTiming measur
 
     if (gnaPluginPtr == nullptr) {
         /* copy weights, biases ..etc */
-        for (auto i=0; i < mModel.inputIndexes.size(); i++){
-            auto curIndex = mModel.inputIndexes[i];
+        for (auto i=0; i < mModel.main.inputIndexes.size(); i++){
+            auto curIndex = mModel.main.inputIndexes[i];
 
             auto itr = std::find_if(mInputPorts.begin(), mInputPorts.end(),
                                         [&](const std::pair<uint32_t, LayerInfo>& elem) {
@@ -246,7 +246,7 @@ void GnaPreparedModel::asyncExecute(const Request& request, MeasureTiming measur
     }
 
     for (auto index : mlayerInputIndices) {
-        auto inputIndex = mModel.inputIndexes[index];
+        auto inputIndex = mModel.main.inputIndexes[index];
         auto srcBlob = getBlobFromMemoryPool(index);
 
         auto iter = mInputPorts.find(inputIndex);
@@ -296,14 +296,15 @@ void GnaPreparedModel::asyncExecute(const Request& request, MeasureTiming measur
     gnaPluginPtr->Infer();
 
     auto reqOutputs = request.outputs;
-    for (auto i =0; i < mModel.outputIndexes.size(); i++) {
-        auto index = mModel.outputIndexes[i];
+    for (auto i =0; i < mModel.main.outputIndexes.size(); i++) {
+        auto index = mModel.main.outputIndexes[i];
+        RunTimeOperandInfo& operand = mOperands[index];
         const RequestArgument& arg = reqOutputs[i];
         auto poolIndex = arg.location.poolIndex;
         nnAssert(poolIndex < requestPoolInfos.size());
         auto& r = requestPoolInfos[poolIndex];
 
-        uint8_t* destPtr = const_cast<uint8_t*>(r.buffer + arg.location.offset);
+        void* destPtr = r.buffer + arg.location.offset;
 
         // Get the name of the layer from which we want to copy the data
         auto elementIdx = mOutputToLayerMap.find(index);
@@ -314,8 +315,20 @@ void GnaPreparedModel::asyncExecute(const Request& request, MeasureTiming measur
             auto element = gnaPluginPtr->outputInfo.find(layerName);
             if (element != gnaPluginPtr->outputInfo.end()) {
                 Blob::Ptr outputBlob = gnaPluginPtr->getInferRequest().GetBlob(layerName);
-                uint8_t* srcPtr = outputBlob->buffer().as<uint8_t*>();
-                std::memcpy(destPtr, srcPtr, outputBlob->byteSize());
+                float* srcPtr = outputBlob->buffer().as<float*>();
+                if (operand.type == OperandType::TENSOR_QUANT16_SYMM) {
+                    QuantDataParams *params = new QuantDataParams();
+                    params->scale = operand.scale;
+                    params->zeroPoint = operand.zeroPoint;
+                    quantizeToQuant16(srcPtr, (uint16_t*)destPtr, operand.shape(), params);
+                } else if (operand.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED) {
+                    QuantDataParams *params = new QuantDataParams();
+                    params->scale = operand.scale;
+                    params->zeroPoint = operand.zeroPoint;
+                    quantizeToQuant8Signed(srcPtr, (int8_t*)destPtr, operand.shape(), params);
+                } else if (operand.type == OperandType::TENSOR_FLOAT32) {
+                    std::memcpy((uint8_t*)destPtr, outputBlob->buffer().as<uint8_t*>(), outputBlob->byteSize());
+                }
             } else {
                 VLOG(L1, "could not find layer:%s in index layer map", layerName.c_str());
             }
@@ -334,15 +347,15 @@ void GnaPreparedModel::asyncExecute(const Request& request, MeasureTiming measur
         Timing timing = {.timeOnDevice = uint64_t(microsecondsDuration(deviceEnd, deviceStart)),
                          .timeInDriver = uint64_t(microsecondsDuration(deviceEnd, deviceStart))};
         ALOGE("Driver::asyncExecute timing = %s", toString(timing).c_str());
-        cb->notify(ErrorStatus::NONE);
+        cb->notify(V1_0_ErrorStatus::NONE);
     } else {
         VLOG(L1, "MeasureTiming - No. Returning with no error");
-        cb->notify(ErrorStatus::NONE);
+        cb->notify(V1_0_ErrorStatus::NONE);
     }
 }
 
 // TODO: call the same asyncExecute function as above
-Return<ErrorStatus> GnaPreparedModel::executeBase(const Request& request, MeasureTiming measure,
+Return<V1_0_ErrorStatus> GnaPreparedModel::executeBase(const V1_0_Request& request, MeasureTiming measure,
                                                const sp<V1_0::IExecutionCallback>& callback) {
     VLOG(L1, "executebase");
 
@@ -351,12 +364,12 @@ Return<ErrorStatus> GnaPreparedModel::executeBase(const Request& request, Measur
 
     if (callback.get() == nullptr) {
         ALOGE("invalid callback passed to execute");
-        return ErrorStatus::INVALID_ARGUMENT;
+        return V1_0_ErrorStatus::INVALID_ARGUMENT;
     }
 
     if (!validateRequest(request, mModel)) {
-        notify(callback, ErrorStatus::INVALID_ARGUMENT, {}, kNoTiming);
-        return ErrorStatus::INVALID_ARGUMENT;
+        notify(callback, V1_0_ErrorStatus::INVALID_ARGUMENT, {}, kNoTiming);
+        return V1_0_ErrorStatus::INVALID_ARGUMENT;
     }
 
     // This thread is intentionally detached because the driver service
@@ -366,7 +379,7 @@ Return<ErrorStatus> GnaPreparedModel::executeBase(const Request& request, Measur
     // }).detach();
     asyncExecute(request, measure, driverStart, callback);
 
-    return ErrorStatus::NONE;
+    return V1_0_ErrorStatus::NONE;
 }
 
 bool GnaPreparedModel::operationFullyConnected(const Operation& operation) {
@@ -415,16 +428,16 @@ bool GnaPreparedModel::operationFullyConnected(const Operation& operation) {
     FULLY_CONNECTED = 9,
      */
 
-    auto getOperandLifeTime = [&](uint32_t idx) {
-        const auto op = mModel.operands[idx];
+    auto getV1_0_OperandLifeTime = [&](uint32_t idx) {
+        const auto op = mModel.main.operands[idx];
         return (int)op.lifetime;
     };
 
     auto getIRBlobFromOperand = [&](uint32_t idx, uint32_t offset) {
-        const auto op = mModel.operands[idx];
+        const auto op = mModel.main.operands[idx];
 
         auto blob = GetConstOperandAsTensor(idx, offset);
-        if (op.lifetime == OperandLifeTime::MODEL_INPUT)
+        if (op.lifetime == V1_0_OperandLifeTime::SUBGRAPH_INPUT)
         {
             mOpIndex2BlobMap[idx] = blob;
             VLOG(L1, "blob idx=%d (model_input) ptr=%p", idx, blob.get());
@@ -435,7 +448,7 @@ bool GnaPreparedModel::operationFullyConnected(const Operation& operation) {
 
     // for (auto i=0; i < operation.inputs.size(); i++) {
     //     auto idx = operation.inputs[i];
-    //     const auto op = mModel.operands[idx];
+    //     const auto op = mModel.main.operands[idx];
     //     VLOG(L1, "idx=%d lifetime=%d", idx, op.lifetime);
     // }
 
@@ -447,10 +460,10 @@ bool GnaPreparedModel::operationFullyConnected(const Operation& operation) {
     auto input = getIRBlobFromOperand(operation.inputs[0], 0);
 
     params.weights.data = getIRBlobFromOperand(operation.inputs[1], 1);
-    params.weights.lifeTime = getOperandLifeTime(operation.inputs[1]);
+    params.weights.lifeTime = getV1_0_OperandLifeTime(operation.inputs[1]);
 
     params.bias.data = getIRBlobFromOperand(operation.inputs[2], 2);
-    params.bias.lifeTime = getOperandLifeTime(operation.inputs[2]);
+    params.bias.lifeTime = getV1_0_OperandLifeTime(operation.inputs[2]);
 
     auto inputDims = input->getTensorDesc().getDims();
     for (auto i = 0; i < inputDims.size(); i++) VLOG(L1, "input dims[%d] = %d ", i, inputDims[i]);
@@ -573,16 +586,16 @@ bool GnaPreparedModel::operationLSTM(const Operation& operation)
 {
     IRBuilder::LstmLayer::LstmParams  params;
 
-    auto getOperandLifeTime = [&](uint32_t idx) {
-        const auto op = mModel.operands[idx];
+    auto getV1_0_OperandLifeTime = [&](uint32_t idx) {
+        const auto op = mModel.main.operands[idx];
         return (int)op.lifetime;
     };
 
     auto getIRBlobFromOperand = [&](uint32_t idx, uint32_t offset) {
-        const auto op = mModel.operands[idx];
+        const auto op = mModel.main.operands[idx];
 
         auto blob = GetConstOperandAsTensor(idx, offset);
-        if (op.lifetime == OperandLifeTime::MODEL_INPUT)
+        if (op.lifetime == V1_0_OperandLifeTime::SUBGRAPH_INPUT)
         {
             mOpIndex2BlobMap[idx] = blob;
             VLOG(L1, "blob idx=%d (model_input) ptr=%p", idx, blob.get());
@@ -637,79 +650,79 @@ bool GnaPreparedModel::operationLSTM(const Operation& operation)
     VLOG(L1, "Lstm cell description %s", lstmDescription.c_str());
 
     params.input.data = getIRBlobFromOperand(operation.inputs[0], 0);
-    params.input.lifeTime = getOperandLifeTime(operation.inputs[0]);
+    params.input.lifeTime = getV1_0_OperandLifeTime(operation.inputs[0]);
 
     params.outputState.data = getIRBlobFromOperand(operation.inputs[18], 18);
-    params.outputState.lifeTime = getOperandLifeTime(operation.inputs[18]);
+    params.outputState.lifeTime = getV1_0_OperandLifeTime(operation.inputs[18]);
 
     params.cellState.data = getIRBlobFromOperand(operation.inputs[19], 19);
-    params.cellState.lifeTime = getOperandLifeTime(operation.inputs[19]);
+    params.cellState.lifeTime = getV1_0_OperandLifeTime(operation.inputs[19]);
 
     params.input2inputWeights.data     = getIRBlobFromOperand(operation.inputs[1], 1);
-    params.input2inputWeights.lifeTime = getOperandLifeTime(operation.inputs[1]);
+    params.input2inputWeights.lifeTime = getV1_0_OperandLifeTime(operation.inputs[1]);
 
     params.input2ForgetWeights.data     = getIRBlobFromOperand(operation.inputs[2], 2);
-    params.input2ForgetWeights.lifeTime    = getOperandLifeTime(operation.inputs[2]);
+    params.input2ForgetWeights.lifeTime    = getV1_0_OperandLifeTime(operation.inputs[2]);
 
     params.input2CellWeights.data     = getIRBlobFromOperand(operation.inputs[3], 3);
-    params.input2CellWeights.lifeTime     = getOperandLifeTime(operation.inputs[3]);
+    params.input2CellWeights.lifeTime     = getV1_0_OperandLifeTime(operation.inputs[3]);
 
     params.input2OutputWeights.data     = getIRBlobFromOperand(operation.inputs[4], 4);
-    params.input2OutputWeights.lifeTime     = getOperandLifeTime(operation.inputs[4]);
+    params.input2OutputWeights.lifeTime     = getV1_0_OperandLifeTime(operation.inputs[4]);
 
     params.recurrant2inputWeights.data     = getIRBlobFromOperand(operation.inputs[5], 5);
-    params.recurrant2inputWeights.lifeTime     = getOperandLifeTime(operation.inputs[5]);
+    params.recurrant2inputWeights.lifeTime     = getV1_0_OperandLifeTime(operation.inputs[5]);
 
     params.recurrant2ForgetWeights.data     = getIRBlobFromOperand(operation.inputs[6], 6);
-    params.recurrant2ForgetWeights.lifeTime     = getOperandLifeTime(operation.inputs[6]);
+    params.recurrant2ForgetWeights.lifeTime     = getV1_0_OperandLifeTime(operation.inputs[6]);
 
     params.recurrant2CellWeights.data     = getIRBlobFromOperand(operation.inputs[7], 7);
-    params.recurrant2CellWeights.lifeTime     = getOperandLifeTime(operation.inputs[7]);
+    params.recurrant2CellWeights.lifeTime     = getV1_0_OperandLifeTime(operation.inputs[7]);
 
     params.recurrant2OutputWeights.data     = getIRBlobFromOperand(operation.inputs[8], 8);
-    params.recurrant2OutputWeights.lifeTime     = getOperandLifeTime(operation.inputs[8]);
+    params.recurrant2OutputWeights.lifeTime     = getV1_0_OperandLifeTime(operation.inputs[8]);
 
     params.cell2InputWeights.data     = getIRBlobFromOperand(operation.inputs[9], 9);
-    params.cell2InputWeights.lifeTime     = getOperandLifeTime(operation.inputs[9]);
+    params.cell2InputWeights.lifeTime     = getV1_0_OperandLifeTime(operation.inputs[9]);
 
     params.cell2ForgetWeights.data     = getIRBlobFromOperand(operation.inputs[10], 10);
-    params.cell2ForgetWeights.lifeTime     = getOperandLifeTime(operation.inputs[10]);
+    params.cell2ForgetWeights.lifeTime     = getV1_0_OperandLifeTime(operation.inputs[10]);
 
     params.cell2OutputWeights.data  = getIRBlobFromOperand(operation.inputs[11], 11);
-    params.cell2OutputWeights.lifeTime  = getOperandLifeTime(operation.inputs[11]);
+    params.cell2OutputWeights.lifeTime  = getV1_0_OperandLifeTime(operation.inputs[11]);
 
     params.inputGateBias.data = getIRBlobFromOperand(operation.inputs[12], 12);
-    params.inputGateBias.lifeTime = getOperandLifeTime(operation.inputs[12]);
+    params.inputGateBias.lifeTime = getV1_0_OperandLifeTime(operation.inputs[12]);
 
     params.forgetGateBias.data   = getIRBlobFromOperand(operation.inputs[13], 13);
-    params.forgetGateBias.lifeTime   = getOperandLifeTime(operation.inputs[13]);
+    params.forgetGateBias.lifeTime   = getV1_0_OperandLifeTime(operation.inputs[13]);
 
     params.cellBias.data = getIRBlobFromOperand(operation.inputs[14], 14);
-    params.cellBias.lifeTime = getOperandLifeTime(operation.inputs[14]);
+    params.cellBias.lifeTime = getV1_0_OperandLifeTime(operation.inputs[14]);
 
     params.outputGateBias.data    = getIRBlobFromOperand(operation.inputs[15], 15);
-    params.outputGateBias.lifeTime    = getOperandLifeTime(operation.inputs[15]);
+    params.outputGateBias.lifeTime    = getV1_0_OperandLifeTime(operation.inputs[15]);
 
     if (lstmDesc.projectionLayerEnabled) {
         params.projectionWeights.data       = getIRBlobFromOperand(operation.inputs[16], 16);
-        params.projectionWeights.lifeTime       = getOperandLifeTime(operation.inputs[16]);
+        params.projectionWeights.lifeTime       = getV1_0_OperandLifeTime(operation.inputs[16]);
 
         params.projectionBias.data    = getIRBlobFromOperand(operation.inputs[17], 17);
-        params.projectionBias.lifeTime    = getOperandLifeTime(operation.inputs[17]);
+        params.projectionBias.lifeTime    = getV1_0_OperandLifeTime(operation.inputs[17]);
     }
 
     if (params.useLayerNorm) {
         params.inputLayerNormWeights.data      = GetConstOperandAsTensor(operation.inputs[23], 23);
-        params.inputLayerNormWeights.lifeTime = getOperandLifeTime(operation.inputs[23]);
+        params.inputLayerNormWeights.lifeTime = getV1_0_OperandLifeTime(operation.inputs[23]);
 
         params.forgetLayerNormWeights.data     = GetConstOperandAsTensor(operation.inputs[24], 24);
-        params.forgetLayerNormWeights.lifeTime = getOperandLifeTime(operation.inputs[24]);
+        params.forgetLayerNormWeights.lifeTime = getV1_0_OperandLifeTime(operation.inputs[24]);
 
         params.cellLayerNormWeights.data       = GetConstOperandAsTensor(operation.inputs[25], 25);
-        params.cellLayerNormWeights.lifeTime = getOperandLifeTime(operation.inputs[25]);
+        params.cellLayerNormWeights.lifeTime = getV1_0_OperandLifeTime(operation.inputs[25]);
 
         params.outputLayerNormWeights.data     = GetConstOperandAsTensor(operation.inputs[26], 26);
-        params.outputLayerNormWeights.lifeTime = getOperandLifeTime(operation.inputs[26]);
+        params.outputLayerNormWeights.lifeTime = getV1_0_OperandLifeTime(operation.inputs[26]);
     }
 
     params.activationFunction = PARAM_I32(20);
@@ -717,9 +730,9 @@ bool GnaPreparedModel::operationLSTM(const Operation& operation)
     std::vector<std::string> memoryLayers, inLayers;
     auto outputLayerNames = mBuilderModel->createFullLstm(params, lstmDesc, memoryLayers, inLayers);
 
-    mOutputToLayerMap[operation.outputs[1]] = outputLayerNames[0];
-    mOutputToLayerMap[operation.outputs[2]] = outputLayerNames[1];
-    mOutputToLayerMap[operation.outputs[3]] = outputLayerNames[0];
+    mOutputToLayerMap[operation.outputs[0]] = outputLayerNames[0];
+    mOutputToLayerMap[operation.outputs[1]] = outputLayerNames[1];
+    mOutputToLayerMap[operation.outputs[2]] = outputLayerNames[0];
 
     if (memoryLayers.size() > 0) {
         mInputPorts.emplace(std::make_pair(operation.inputs[18], LayerInfo(memoryLayers[0], true)));
@@ -909,7 +922,7 @@ IRBlob::Ptr GnaPreparedModel::GetConstOperandAsTensor(int operand_index, int ope
 Blob::Ptr GnaPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const uint8_t *buf, uint32_t& len)
 {
     if (op.type == OperandType::TENSOR_FLOAT32 || op.type == OperandType::FLOAT32) {
-        if (op.lifetime == OperandLifeTime::MODEL_INPUT) {
+        if (op.lifetime == V1_0_OperandLifeTime::SUBGRAPH_INPUT) {
             if (buf == nullptr)
                 VLOG(L1, "MODEL_INPUT buf is NULL !!!!!!!!!!!!!!!");
 
@@ -966,9 +979,9 @@ Blob::Ptr GnaPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const 
                 }
                 return blob;
             }
-        } else if (op.lifetime == OperandLifeTime::MODEL_OUTPUT) {
+        } else if (op.lifetime == V1_0_OperandLifeTime::SUBGRAPH_OUTPUT) {
             if (buf == nullptr)
-                VLOG(L1, "MODEL_OUTPUT buf is NULL !!!!!!!!!!!!!!!");
+                VLOG(L1, "SUBGRAPH_OUTPUT buf is NULL !!!!!!!!!!!!!!!");
 
             vec<unsigned int> order;
             Layout layout;

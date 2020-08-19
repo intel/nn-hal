@@ -18,7 +18,7 @@ namespace IRBuilder
 
 namespace IEBuilder = InferenceEngine::Builder;
 
-using OperandLifeTime = android::hardware::neuralnetworks::V1_0::OperandLifeTime;
+using V1_0_OperandLifeTime = android::hardware::neuralnetworks::V1_3::OperandLifeTime;
 using idx_t = InferenceEngine::idx_t;
 using Port = InferenceEngine::Port;
 using PortData = InferenceEngine::PortData;
@@ -123,13 +123,13 @@ OutputPort ModelBuilder::createFC(BuilderFCLayer::FCParams& params, IRBlob::Ptr 
 
     idx_t weightsId =  getBuilderNetwork()->getBuilder()->addLayer(CONSTLayer("weights") \
                        .setData(params.weights.data));
-    if (params.weights.lifeTime == (int)OperandLifeTime::MODEL_INPUT)
+    if (params.weights.lifeTime == (int)V1_0_OperandLifeTime::SUBGRAPH_INPUT)
     {
         mBlob2LayerIdxMap[params.weights.data] = weightsId;
     }
 
     idx_t biasId =  getBuilderNetwork()->getBuilder()->addLayer(CONSTLayer("bias").setData(params.bias.data));
-    if (params.bias.lifeTime == (int)OperandLifeTime::MODEL_INPUT)
+    if (params.bias.lifeTime == (int)V1_0_OperandLifeTime::SUBGRAPH_INPUT)
     {
         mBlob2LayerIdxMap[params.bias.data] = biasId;
     }
@@ -201,7 +201,7 @@ std::vector<std::string> ModelBuilder::createFullLstm(LstmLayer::LstmParams& par
     {
         idx_t weightsId =  getBuilderNetwork()->getBuilder()->addLayer(CONSTLayer("weights") \
                            .setData(weights.data));
-        if (weights.lifeTime == (int)OperandLifeTime::MODEL_INPUT)
+        if (weights.lifeTime == (int)V1_0_OperandLifeTime::SUBGRAPH_INPUT)
         {
             mBlob2LayerIdxMap[weights.data] = weightsId;
         }
@@ -217,14 +217,14 @@ std::vector<std::string> ModelBuilder::createFullLstm(LstmLayer::LstmParams& par
     {
         idx_t weightsId =  getBuilderNetwork()->getBuilder()->addLayer(CONSTLayer("weights") \
                            .setData(weights.data));
-        if (weights.lifeTime == (int)OperandLifeTime::MODEL_INPUT)
+        if (weights.lifeTime == (int)V1_0_OperandLifeTime::SUBGRAPH_INPUT)
         {
             mBlob2LayerIdxMap[weights.data] = weightsId;
         }
 
         idx_t biasId =  getBuilderNetwork()->getBuilder()->addLayer(CONSTLayer("bias") \
                         .setData(bias.data));
-        if (bias.lifeTime == (int)OperandLifeTime::MODEL_INPUT)
+        if (bias.lifeTime == (int)V1_0_OperandLifeTime::SUBGRAPH_INPUT)
         {
             mBlob2LayerIdxMap[bias.data] = biasId;
         }
@@ -342,7 +342,7 @@ std::vector<std::string> ModelBuilder::createFullLstm(LstmLayer::LstmParams& par
 
     // r2f = W_{hf}h_{t-1}
     idx_t weightsId =  getBuilderNetwork()->getBuilder()->addLayer(CONSTLayer("weights").setData(params.recurrant2ForgetWeights.data));
-    if (params.recurrant2ForgetWeights.lifeTime == (int)OperandLifeTime::MODEL_INPUT)
+    if (params.recurrant2ForgetWeights.lifeTime == (int)V1_0_OperandLifeTime::SUBGRAPH_INPUT)
     {
         mBlob2LayerIdxMap[params.recurrant2ForgetWeights.data] = weightsId;
     }
@@ -352,7 +352,7 @@ std::vector<std::string> ModelBuilder::createFullLstm(LstmLayer::LstmParams& par
 
     // r2c = W_{hc}h_{t-1}
     weightsId =  getBuilderNetwork()->getBuilder()->addLayer(CONSTLayer("weights").setData(params.recurrant2CellWeights.data));
-    if (params.recurrant2CellWeights.lifeTime == (int)OperandLifeTime::MODEL_INPUT)
+    if (params.recurrant2CellWeights.lifeTime == (int)V1_0_OperandLifeTime::SUBGRAPH_INPUT)
     {
         mBlob2LayerIdxMap[params.recurrant2CellWeights.data] = weightsId;
     }
@@ -362,7 +362,7 @@ std::vector<std::string> ModelBuilder::createFullLstm(LstmLayer::LstmParams& par
 
     // r2o = W_{ho}h_{t-1}
     weightsId =  getBuilderNetwork()->getBuilder()->addLayer(CONSTLayer("weights").setData(params.recurrant2OutputWeights.data));
-    if (params.recurrant2OutputWeights.lifeTime == (int)OperandLifeTime::MODEL_INPUT)
+    if (params.recurrant2OutputWeights.lifeTime == (int)V1_0_OperandLifeTime::SUBGRAPH_INPUT)
     {
         mBlob2LayerIdxMap[params.recurrant2OutputWeights.data] = weightsId;
     }
@@ -375,7 +375,7 @@ std::vector<std::string> ModelBuilder::createFullLstm(LstmLayer::LstmParams& par
     {
         //c2i = W_{ci}C_{t-1}
         weightsId =  getBuilderNetwork()->getBuilder()->addLayer(CONSTLayer("weights").setData(params.cell2InputWeights.data));
-        if (params.recurrant2OutputWeights.lifeTime == (int)OperandLifeTime::MODEL_INPUT)
+        if (params.recurrant2OutputWeights.lifeTime == (int)V1_0_OperandLifeTime::SUBGRAPH_INPUT)
         {
             mBlob2LayerIdxMap[params.cell2InputWeights.data] = weightsId;
         }
@@ -385,7 +385,7 @@ std::vector<std::string> ModelBuilder::createFullLstm(LstmLayer::LstmParams& par
 
         //c2f = W_{cf}C_{t-1}
         weightsId =  getBuilderNetwork()->getBuilder()->addLayer(CONSTLayer("weights").setData(params.cell2ForgetWeights.data));
-        if (params.cell2ForgetWeights.lifeTime == (int)OperandLifeTime::MODEL_INPUT)
+        if (params.cell2ForgetWeights.lifeTime == (int)V1_0_OperandLifeTime::SUBGRAPH_INPUT)
         {
             mBlob2LayerIdxMap[params.cell2ForgetWeights.data] = weightsId;
         }
@@ -567,7 +567,7 @@ std::vector<std::string> ModelBuilder::createFullLstm(LstmLayer::LstmParams& par
         // o_t = sigma(W_{xo}x_t+W_{ho}h_{t-1}+W_{co}C_t+b_o)
         //c2o = W_{co}C_{t}
         weightsId =  getBuilderNetwork()->getBuilder()->addLayer(CONSTLayer("weights").setData(params.cell2OutputWeights.data));
-        if (params.cell2OutputWeights.lifeTime == (int)OperandLifeTime::MODEL_INPUT)
+        if (params.cell2OutputWeights.lifeTime == (int)V1_0_OperandLifeTime::SUBGRAPH_INPUT)
         {
             mBlob2LayerIdxMap[params.cell2OutputWeights.data] = weightsId;
         }
@@ -604,13 +604,13 @@ std::vector<std::string> ModelBuilder::createFullLstm(LstmLayer::LstmParams& par
 
         // W_{proj}(o_t \odot g(C_t))+b_{proj}
         idx_t projWeightsLayerId =  getBuilderNetwork()->getBuilder()->addLayer(CONSTLayer("weights").setData(params.projectionWeights.data));
-        if (params.projectionWeights.lifeTime == (int)OperandLifeTime::MODEL_INPUT)
+        if (params.projectionWeights.lifeTime == (int)V1_0_OperandLifeTime::SUBGRAPH_INPUT)
         {
             mBlob2LayerIdxMap[params.projectionWeights.data] = projWeightsLayerId;
         }
 
         idx_t projBiasLayerId =  getBuilderNetwork()->getBuilder()->addLayer(CONSTLayer("bias").setData(params.projectionBias.data));
-        if (params.projectionBias.lifeTime == (int)OperandLifeTime::MODEL_INPUT)
+        if (params.projectionBias.lifeTime == (int)V1_0_OperandLifeTime::SUBGRAPH_INPUT)
         {
             mBlob2LayerIdxMap[params.projectionBias.data] = projBiasLayerId;
         }

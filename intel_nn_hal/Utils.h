@@ -3,8 +3,8 @@
 
 #include <android/hardware/neuralnetworks/1.2/IPreparedModel.h>
 #include <android/hardware/neuralnetworks/1.2/types.h>
+#include <android/hardware/neuralnetworks/1.3/types.h>
 #include <android/hidl/memory/1.0/IMemory.h>
-#include <hardware/hardware.h>
 #include <hidlmemory/mapping.h>
 #include <sys/mman.h>
 #include <fstream>
@@ -44,19 +44,19 @@ extern unsigned int debugMask;
 
 #define dumpOperand(index)                                      \
     do {                                                        \
-        const auto op = mModel.operands[index];                 \
-        ALOGI("---------------------------------------------"); \
-        ALOGI("Operand index: %d", index);                      \
-        ALOGI("%s", toString(op).c_str());                      \
-        ALOGI("---------------------------------------------"); \
+        const auto op = mModel.main.operands[index];                 \
+        ALOGE("---------------------------------------------"); \
+        ALOGE("Operand index: %d", index);                      \
+        ALOGE("%s", toString(op).c_str());                      \
+        ALOGE("---------------------------------------------"); \
     } while (0)
 
 #define dumpOperation(operation)                                \
     do {                                                        \
-        ALOGI("---------------------------------------------"); \
-        ALOGI("Operation:");                                    \
-        ALOGI("%s", toString(operation).c_str());               \
-        ALOGI("---------------------------------------------"); \
+        ALOGE("---------------------------------------------"); \
+        ALOGE("Operation:");                                    \
+        ALOGE("%s", toString(operation).c_str());               \
+        ALOGE("---------------------------------------------"); \
     } while (0)
 
 #define dumpOperationSupport(operation, support)                    \
@@ -212,7 +212,7 @@ struct RunTimeOperandInfo {
     // The length of the buffer.
     uint32_t length;
     // Whether this is a temporary variable, a model input, a constant, etc.
-    OperandLifeTime lifetime;
+    V1_0_OperandLifeTime lifetime;
     // Keeps track of how many operations have yet to make use
     // of this temporary variable.  When the count is decremented to 0,
     // we free the buffer.  For non-temporary variables, this count is
@@ -226,7 +226,7 @@ struct RunTimeOperandInfo {
 
 // Used to keep a pointer to each of the memory pools.
 struct RunTimePoolInfo {
-    sp<IMemory> memory;
+    sp<::android::hidl::memory::V1_0::IMemory> memory;
     hidl_memory hidlMemory;
     uint8_t* buffer;
 

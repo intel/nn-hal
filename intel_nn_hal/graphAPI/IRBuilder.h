@@ -3,6 +3,7 @@
 
 #pragma once
 #include <android/hardware/neuralnetworks/1.2/types.h>
+#include <android/hardware/neuralnetworks/1.3/types.h>
 #include "IRLayers.h"
 
 namespace android

@@ -3,6 +3,7 @@
 
 #include <android/hardware/neuralnetworks/1.2/IPreparedModel.h>
 #include <android/hardware/neuralnetworks/1.2/types.h>
+#include <android/hardware/neuralnetworks/1.3/types.h>
 #include <android/hidl/memory/1.0/IMemory.h>
 #include <hardware/hardware.h>
 #include <hidlmemory/mapping.h>
@@ -52,7 +53,7 @@ public:
     virtual Blob::Ptr GetInOutOperandAsBlob(RunTimeOperandInfo& op, const uint8_t *buf, uint32_t& len) override;
     virtual Blob::Ptr GetConstWeightsOperandAsTensor(uint32_t index) override;
 
-    virtual Return<ErrorStatus> execute(const Request& request,
+    virtual Return<V1_0_ErrorStatus> execute(const V1_0_Request& request,
                                 const sp<V1_0::IExecutionCallback>& callback) override {
         return executeBase(request, MeasureTiming::NO, callback);
     }
@@ -64,10 +65,10 @@ public:
 
 protected:
     void deinitialize();
-    virtual Return<ErrorStatus> executeBase(const Request& request, MeasureTiming measure,
+    virtual Return<V1_0_ErrorStatus> executeBase(const V1_0_Request& request, MeasureTiming measure,
                                     const sp<V1_0::IExecutionCallback>& callback) override;
 
-    void asyncExecute(const Request& request, MeasureTiming measure, time_point driverStart,
+    void asyncExecute(const V1_0_Request& request, MeasureTiming measure, time_point driverStart,
                       const sp<V1_0::IExecutionCallback>& callback);
 
 };
