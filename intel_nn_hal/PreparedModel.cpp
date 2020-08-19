@@ -217,7 +217,14 @@ const uint8_t* PreparedModel::GetOperandMemory(const Model& model, uint32_t inde
                op.lifetime == V1_0_OperandLifeTime::NO_VALUE) {
         VLOG(L1, "operand lifetime V1_0_OperandLifeTime::SUBGRAPH_INPUT||SUBGRAPH_OUTPUT||NO_VALUE");
 
+        if (op.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED ||
+            op.type == OperandType::TENSOR_QUANT8_SYMM ||
+            op.type == OperandType::TENSOR_QUANT16_SYMM ) {
+            len_out = sizeOfData(OperandType::TENSOR_FLOAT32, op.dimensions);
+            VLOG(L1, "raviraj.. %s Hacking quant8 to float32", __func__);
+        } else {
         len_out = sizeOfData(op.type, op.dimensions);
+        }
         return nullptr;
     } else if (op.lifetime == V1_0_OperandLifeTime::TEMPORARY_VARIABLE) {
         VLOG(L1, "operand lifetime V1_0_OperandLifeTime::TEMPORARY_VARIABLE");
@@ -347,6 +354,7 @@ bool PreparedModel::initializeRunTimeOperandInfo() {
         }
 
         to.scale = from.scale;
+        to.zeroPoint = from.zeroPoint;
         switch (from.type) {
             case OperandType::TENSOR_FLOAT32:
             case OperandType::FLOAT32:
@@ -359,6 +367,15 @@ bool PreparedModel::initializeRunTimeOperandInfo() {
             case OperandType::TENSOR_INT32:
                 to.type = from.type;
                 break;
+	    case OperandType::TENSOR_QUANT8_SYMM:
+                to.type = from.type;
+                break;
+	    case OperandType::TENSOR_QUANT8_ASYMM_SIGNED:
+                to.type = from.type;
+		break;
+	    case OperandType::TENSOR_QUANT16_SYMM:
+                to.type = from.type;
+		break;
             case OperandType::TENSOR_QUANT8_ASYMM:
                 ALOGE("OperandType::TENSOR_QUANT8_ASYMM is not supported");
                 break;
@@ -772,12 +789,12 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
     }
 #endif
 
-    if (device.compare("GNA")) {
+    if (!device.compare("GNA")) {
         VLOG(L1, "GNA device. Checking operation supported by GNA");
 
         auto isOperandDataNull = [&] (int index) {
-            const auto op = model.operands[index];
-            if (op.lifetime == OperandLifeTime::NO_VALUE) {
+            const auto op = model.main.operands[index];
+            if (op.lifetime == V1_0_OperandLifeTime::NO_VALUE) {
                 VLOG(L1, "index %d has life time NO_VALUE", index);
                 return true;
             }
@@ -785,18 +802,8 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
         };
 
         switch (operation.type) {
+            case OperationType::QUANTIZED_LSTM:
             case OperationType::LSTM:
-                // Check for normalization weights
-                // If no normalization weights are given, the inputs size is 23
-                if (operation.inputs.size() > 23) {
-                    if (!isOperandDataNull(operation.inputs[24]) &&
-                        !isOperandDataNull(operation.inputs[25]) &&
-                        !isOperandDataNull(operation.inputs[26])) {
-                        VLOG(L1, "Normalization weights are present.. Not supported yet.");
-                        return false;
-                    }
-                }
-
                 // yet to add support for CIFG
                 if (isOperandDataNull(operation.inputs[1]) ||
                     isOperandDataNull(operation.inputs[5]) ||
@@ -813,6 +820,7 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
                 VLOG(L1, "OP (%d) not supported", operation.type);
                 return false;
         }
+		return true;
     }
 
     switch (operation.type) {

@@ -62,6 +62,7 @@ public:
     virtual bool finalizeOutput() override;
 
     bool operationLSTM(const Operation& operation);
+    bool operationQuantizedLSTM(const Operation& operation);
 
 protected:
     void deinitialize();

@@ -16,6 +16,7 @@
 #include <thread>
 #include "ValidateHal.h"
 #include "IRBuilder.h"
+#include "Driver.h"
 
 enum DebugLevel {
     L0,

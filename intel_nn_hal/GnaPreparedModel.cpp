@@ -18,6 +18,7 @@ namespace neuralnetworks {
 namespace nnhal {
 
 using namespace android::nn;
+using namespace IRBuilder::LstmLayer;
 static const Timing kNoTiming = {.timeOnDevice = UINT64_MAX, .timeInDriver = UINT64_MAX};
 
 template <typename T>
@@ -109,6 +110,9 @@ bool GnaPreparedModel::initialize() {
         VLOG(L1, "get operation %d ready to add", operation.type);
         dumpOperation(operation);
         switch (operation.type) {
+           case OperationType::QUANTIZED_LSTM:
+                success = operationQuantizedLSTM(operation);
+                break;
 
            case OperationType::LSTM:
                 success = operationLSTM(operation);
@@ -130,19 +134,6 @@ bool GnaPreparedModel::initialize() {
     initializeInput();
     finalizeOutput();
 
-
-    // initialize IE operation input/output ports
-    //    convertModel(mNet);
-
-    // debug graph
-   /*  mNet.buildNetwork();
-    std::fstream dot;
-    std::string graphfile("/data/local/graphfile");
-    dot.open("/data/local/graph.dot", std::ios::out);
-    mNet.save(graphfile);
-    mNet.crateDotFile(dot);
-    dot.close(); */
-
     return true;
 }
 
@@ -163,7 +154,26 @@ void GnaPreparedModel::deinitialize() {
     VLOG(L1, "free engine");
 }
 
-void GnaPreparedModel::asyncExecute(const Request& request, MeasureTiming measure, time_point driverStart,
+bool quantizeToQuant8Signed(const float* inputData, int8_t* outputData, const Shape& outputShape, QuantDataParams* param) {
+    uint32_t size = getNumberOfElements(outputShape.dimensions);
+    for (uint32_t i = 0; i < size; ++i) {
+        outputData[i] = static_cast<int8_t>(std::max<float>(
+                -128.0f,
+                std::min<float>(127.0f, param->zeroPoint +
+                                                std::round(inputData[i] / param->scale))));
+    }
+    return true;
+}
+
+bool quantizeToQuant16(const float* inputData, uint16_t* outputData, const Shape& outputShape, QuantDataParams* param) {
+    uint32_t size = getNumberOfElements(outputShape.dimensions);
+    for (uint32_t i = 0; i < size; ++i) {
+        outputData[i] = static_cast<uint16_t>(param->zeroPoint + (std::round(inputData[i] / param->scale)));
+    }
+    return true;
+}
+
+void GnaPreparedModel::asyncExecute(const V1_0_Request& request, MeasureTiming measure, time_point driverStart,
                           const sp<V1_0::IExecutionCallback>& cb) {
     VLOG(L1, "Begin to executeSynchronously");
 
@@ -171,7 +181,7 @@ void GnaPreparedModel::asyncExecute(const Request& request, MeasureTiming measur
     if (measure == MeasureTiming::YES) deviceStart = now();
 
     if (!validateRequest(request, mModel)) {
-        cb->notify(ErrorStatus::INVALID_ARGUMENT);
+        cb->notify(V1_0_ErrorStatus::INVALID_ARGUMENT);
         return;
     }
 
@@ -746,10 +756,202 @@ bool GnaPreparedModel::operationLSTM(const Operation& operation)
     return true;
 }
 
+bool GnaPreparedModel::operationQuantizedLSTM(const Operation& operation)
+{
+    IRBuilder::LstmLayer::QuantLstmParams  params;
+
+    auto getV1_0_OperandLifeTime = [&](uint32_t idx) {
+        const auto op = mModel.main.operands[idx];
+        return (int)op.lifetime;
+    };
+
+    auto getIRBlobFromOperand = [&](uint32_t idx, uint32_t offset) {
+        const auto op = mModel.main.operands[idx];
+
+        auto blob = GetConstOperandAsTensor(idx, offset);
+        if (op.lifetime == V1_0_OperandLifeTime::SUBGRAPH_INPUT)
+        {
+            mOpIndex2BlobMap[idx] = blob;
+        }
+
+        return blob;
+    };
+
+    IRBuilder::LstmLayer::LstmCellDescription lstmDesc;
+    lstmDesc.clippingThresholdCellState     = 0;
+    lstmDesc.clippingThresholdProjState     = 0;
+    lstmDesc.cifgEnabled                    = false;
+    lstmDesc.projectionLayerEnabled         = false;
+    lstmDesc.peepholeEnabled                = false;
+
+    lstmDesc.clippingThresholdCellState     = PARAM_FP(24); //(mModel, operation, 24);
+    lstmDesc.clippingThresholdProjState     = PARAM_FP(25); // mModel, operation, 25);
+
+    std::string lstmDescription;
+    if (isOperandDataNull(operation.inputs[1]) ||
+        isOperandDataNull(operation.inputs[5]) ||
+        isOperandDataNull(operation.inputs[12])) {
+        lstmDescription.append("Cifg");
+        lstmDesc.cifgEnabled = true;
+    } else {
+        lstmDescription.append("noCifg");
+    }
+
+    if (!isOperandDataNull(operation.inputs[16]))
+    {
+        lstmDescription.append("Projection");
+        lstmDesc.projectionLayerEnabled = true;
+    } else {
+        lstmDescription.append("noProjection");
+    }
+
+    if (!isOperandDataNull(operation.inputs[9]) ||
+        !isOperandDataNull(operation.inputs[10]) ||
+        !isOperandDataNull(operation.inputs[11]))
+    {
+        lstmDescription.append("Peephole");
+        lstmDesc.peepholeEnabled = true;
+    } else {
+        lstmDescription.append("noPeephole");
+    }
+
+    params.useLayerNorm = true;
+
+
+    VLOG(L1, "Lstm cell description %s", lstmDescription.c_str());
+
+    params.input.data = getIRBlobFromOperand(operation.inputs[0], 0);
+    params.input.lifeTime = getV1_0_OperandLifeTime(operation.inputs[0]);
+
+    params.outputState.data = getIRBlobFromOperand(operation.inputs[18], 18);
+    params.outputState.lifeTime = getV1_0_OperandLifeTime(operation.inputs[18]);
+
+    params.cellState.data = getIRBlobFromOperand(operation.inputs[19], 19);
+    params.cellState.lifeTime = getV1_0_OperandLifeTime(operation.inputs[19]);
+
+    params.input2inputWeights.data     = getIRBlobFromOperand(operation.inputs[1], 1);
+    params.input2inputWeights.lifeTime = getV1_0_OperandLifeTime(operation.inputs[1]);
+
+    params.input2ForgetWeights.data     = getIRBlobFromOperand(operation.inputs[2], 2);
+    params.input2ForgetWeights.lifeTime    = getV1_0_OperandLifeTime(operation.inputs[2]);
+
+    params.input2CellWeights.data     = getIRBlobFromOperand(operation.inputs[3], 3);
+    params.input2CellWeights.lifeTime     = getV1_0_OperandLifeTime(operation.inputs[3]);
+
+    params.input2OutputWeights.data     = getIRBlobFromOperand(operation.inputs[4], 4);
+    params.input2OutputWeights.lifeTime     = getV1_0_OperandLifeTime(operation.inputs[4]);
+
+    params.recurrant2inputWeights.data     = getIRBlobFromOperand(operation.inputs[5], 5);
+    params.recurrant2inputWeights.lifeTime     = getV1_0_OperandLifeTime(operation.inputs[5]);
+
+    params.recurrant2ForgetWeights.data     = getIRBlobFromOperand(operation.inputs[6], 6);
+    params.recurrant2ForgetWeights.lifeTime     = getV1_0_OperandLifeTime(operation.inputs[6]);
+
+    params.recurrant2CellWeights.data     = getIRBlobFromOperand(operation.inputs[7], 7);
+    params.recurrant2CellWeights.lifeTime     = getV1_0_OperandLifeTime(operation.inputs[7]);
+
+    params.recurrant2OutputWeights.data     = getIRBlobFromOperand(operation.inputs[8], 8);
+    params.recurrant2OutputWeights.lifeTime     = getV1_0_OperandLifeTime(operation.inputs[8]);
+
+    params.cell2InputWeights.data     = getIRBlobFromOperand(operation.inputs[9], 9);
+    params.cell2InputWeights.lifeTime     = getV1_0_OperandLifeTime(operation.inputs[9]);
+
+    params.cell2ForgetWeights.data     = getIRBlobFromOperand(operation.inputs[10], 10);
+    params.cell2ForgetWeights.lifeTime     = getV1_0_OperandLifeTime(operation.inputs[10]);
+
+    params.cell2OutputWeights.data  = getIRBlobFromOperand(operation.inputs[11], 11);
+    params.cell2OutputWeights.lifeTime  = getV1_0_OperandLifeTime(operation.inputs[11]);
+
+    params.inputGateBias.data = getIRBlobFromOperand(operation.inputs[12], 12);
+    params.inputGateBias.lifeTime = getV1_0_OperandLifeTime(operation.inputs[12]);
+
+    params.forgetGateBias.data   = getIRBlobFromOperand(operation.inputs[13], 13);
+    params.forgetGateBias.lifeTime   = getV1_0_OperandLifeTime(operation.inputs[13]);
+
+    params.cellBias.data = getIRBlobFromOperand(operation.inputs[14], 14);
+    params.cellBias.lifeTime = getV1_0_OperandLifeTime(operation.inputs[14]);
+
+    params.outputGateBias.data    = getIRBlobFromOperand(operation.inputs[15], 15);
+    params.outputGateBias.lifeTime    = getV1_0_OperandLifeTime(operation.inputs[15]);
+
+    if (lstmDesc.projectionLayerEnabled) {
+        params.projectionWeights.data       = getIRBlobFromOperand(operation.inputs[16], 16);
+        params.projectionWeights.lifeTime       = getV1_0_OperandLifeTime(operation.inputs[16]);
+
+        params.projectionBias.data    = getIRBlobFromOperand(operation.inputs[17], 17);
+        params.projectionBias.lifeTime    = getV1_0_OperandLifeTime(operation.inputs[17]);
+    }
+
+    if (params.useLayerNorm) {
+        params.inputLayerNormWeights.data      = GetConstOperandAsTensor(operation.inputs[20], 20);
+        params.inputLayerNormWeights.lifeTime = getV1_0_OperandLifeTime(operation.inputs[20]);
+
+        params.forgetLayerNormWeights.data     = GetConstOperandAsTensor(operation.inputs[21], 21);
+        params.forgetLayerNormWeights.lifeTime = getV1_0_OperandLifeTime(operation.inputs[21]);
+
+        params.cellLayerNormWeights.data       = GetConstOperandAsTensor(operation.inputs[22], 22);
+        params.cellLayerNormWeights.lifeTime = getV1_0_OperandLifeTime(operation.inputs[22]);
+
+        params.outputLayerNormWeights.data     = GetConstOperandAsTensor(operation.inputs[23], 23);
+        params.outputLayerNormWeights.lifeTime = getV1_0_OperandLifeTime(operation.inputs[23]);
+
+        params.scaleInputGateLayerNorm.data = GetConstOperandAsTensor(operation.inputs[26], 26);
+        params.scaleInputGateLayerNorm.lifeTime = getV1_0_OperandLifeTime(operation.inputs[26]);
+        
+        params.scaleForgetGateLayerNorm.data = GetConstOperandAsTensor(operation.inputs[27], 27);
+        params.scaleForgetGateLayerNorm.lifeTime = getV1_0_OperandLifeTime(operation.inputs[27]);
+
+        params.scaleCellGateLayerNorm.data = GetConstOperandAsTensor(operation.inputs[28], 28);
+        params.scaleCellGateLayerNorm.lifeTime = getV1_0_OperandLifeTime(operation.inputs[28]);
+        
+        params.scaleOutputGateLayerNorm.data = GetConstOperandAsTensor(operation.inputs[29], 29);
+        params.scaleOutputGateLayerNorm.lifeTime = getV1_0_OperandLifeTime(operation.inputs[29]);
+
+
+    }
+
+    params.zeroPointHiddenLayer = PARAM_I32(30);
+    params.scalePointHiddenLayer = PARAM_FP(31);
+
+    std::vector<std::string> memoryLayers, inLayers;
+    auto outputLayerNames = mBuilderModel->createFullLstm(params, lstmDesc, memoryLayers, inLayers);
+
+    mOutputToLayerMap[operation.outputs[0]] = outputLayerNames[0];
+    mOutputToLayerMap[operation.outputs[1]] = outputLayerNames[1];
+    mOutputToLayerMap[operation.outputs[2]] = outputLayerNames[0];
+
+    if (memoryLayers.size() > 0) {
+        mInputPorts.emplace(std::make_pair(operation.inputs[18], LayerInfo(memoryLayers[0], true)));
+        mInputPorts.emplace(std::make_pair(operation.inputs[19], LayerInfo(memoryLayers[1], true)));
+
+        if (inLayers.size() > 0) {
+            mInputPorts.emplace(std::make_pair(operation.inputs[0], LayerInfo(inLayers[0], false)));
+        }
+    }
+
+    return true;
+}
+
+template<typename T>
+bool deQuantize(const uint8_t* inputData, const uint32_t& len, const float scale, const int32_t zeroPoint, float* outputData) {
+      int32_t value;
+      const T* inputBuf = reinterpret_cast<const T*>(inputData);
+      for (int i = 0; i < len; ++i) {
+        value = *(inputBuf + i);
+        outputData[i] = static_cast<float>(scale * (value - zeroPoint));
+      }
+      return true;
+}
 IRBlob::Ptr GnaPreparedModel::GetConstWeightsOperandAsTensor(uint32_t index)
 {
     dumpOperand(index);
-    const auto op = mModel.operands[index];
+    const auto op = mModel.main.operands[index];
+    bool isQuantInput = false;
+    if (op.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED ||
+            op.type == OperandType::TENSOR_QUANT8_SYMM ||
+            op.type == OperandType::TENSOR_QUANT16_SYMM ) {
+        isQuantInput = true;
+    }
     uint32_t len;
     const uint8_t *buf = GetOperandMemory(mModel, index, len);
 
@@ -785,9 +987,24 @@ IRBlob::Ptr GnaPreparedModel::GetConstWeightsOperandAsTensor(uint32_t index)
 
         TensorDesc td(InferenceEngine::Precision::FP32, permuteDims(inputDims, order), layout);
         if (inputDims.size() != 4) {
+            InferenceEngine::TBlob<float>::Ptr blob = nullptr;
+                if (isQuantInput) {
+                    blob = std::make_shared<InferenceEngine::TBlob<float>>(td);
+                    blob->allocate();
+
+                    if (op.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED) {
+                        deQuantize<int8_t>(buf, getNumberOfElements(op.dimensions), op.scale, op.zeroPoint, blob->buffer().as<float*>());
+                    } else if (op.type == OperandType::TENSOR_QUANT8_SYMM, 8) {
+                        deQuantize<int8_t>(buf, getNumberOfElements(op.dimensions), op.scale, 0, blob->buffer().as<float*>());
+                    } else if (op.type == OperandType::TENSOR_QUANT16_SYMM) {
+                        deQuantize<int16_t>(buf, getNumberOfElements(op.dimensions), op.scale, 0, blob->buffer().as<float*>()); // Ugly hack reverting
+                    }
+                }
+                else {
             InferenceEngine::TBlob<float>::Ptr blob =
                                 std::make_shared<InferenceEngine::TBlob<float>>(td, (float *)buf, len);
             blob->allocate();
+                }
             return blob;
         } else {
             InferenceEngine::TBlob<float>::Ptr blob =
@@ -836,12 +1053,24 @@ IRBlob::Ptr GnaPreparedModel::GetConstWeightsOperandAsTensor(uint32_t index)
 IRBlob::Ptr GnaPreparedModel::GetConstOperandAsTensor(int operand_index, int operation_idx)
 {
     dumpOperand(operand_index);
-    const auto op = mModel.operands[operand_index];
+    const auto op = mModel.main.operands[operand_index];
+    bool isQuantInput = false;
+    if (op.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED || 
+            op.type == OperandType::TENSOR_QUANT8_SYMM ||
+            op.type == OperandType::TENSOR_QUANT16_SYMM ||
+            op.type == OperandType::TENSOR_INT32) {
+        VLOG(L1, "__func__ Quant input");
+        isQuantInput = true;
+    }
     uint32_t len;
     const uint8_t *buf = GetOperandMemory(mModel, operand_index, len);
 
     VLOG(L1, "GnaPreparedModel:: Operand: index: %d, len: %d, buf: %p", operand_index, len, buf);
-    if (op.type == OperandType::TENSOR_FLOAT32 || op.type == OperandType::FLOAT32) {
+    if (op.type == OperandType::TENSOR_FLOAT32 || op.type == OperandType::FLOAT32 || 
+        op.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED || 
+        op.type == OperandType::TENSOR_QUANT8_SYMM ||
+        op.type == OperandType::TENSOR_QUANT16_SYMM ||
+        op.type == OperandType::TENSOR_INT32) {
         vec<unsigned int> order;
         Layout layout;
         if (op.dimensions.size() == 4) {
@@ -874,8 +1103,25 @@ IRBlob::Ptr GnaPreparedModel::GetConstOperandAsTensor(int operand_index, int ope
             return blob;
         } else {
             if (inputDims.size() != 4) {
-                InferenceEngine::TBlob<float>::Ptr blob =
-                            std::make_shared<InferenceEngine::TBlob<float>>(td, (float *)buf, len);
+                InferenceEngine::TBlob<float>::Ptr blob = nullptr;
+                if (isQuantInput) {
+                    blob = std::make_shared<InferenceEngine::TBlob<float>>(td);
+                    blob->allocate();
+
+                    if (op.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED) {
+                        deQuantize<int8_t>(buf, getNumberOfElements(op.dimensions), op.scale, op.zeroPoint, blob->buffer().as<float*>());
+                    } else if (op.type == OperandType::TENSOR_QUANT8_SYMM) {
+                        deQuantize<int8_t>(buf, getNumberOfElements(op.dimensions), op.scale, 0, blob->buffer().as<float*>());
+                    } else if (op.type == OperandType::TENSOR_QUANT16_SYMM) {
+                        deQuantize<int16_t>(buf, getNumberOfElements(op.dimensions), op.scale, 0, blob->buffer().as<float*>());
+                    } else if (op.type == OperandType::TENSOR_INT32) {
+                        deQuantize<int32_t>(buf, getNumberOfElements(op.dimensions), op.scale, 0, blob->buffer().as<float*>());
+                    }
+
+                } else {
+                    blob = std::make_shared<InferenceEngine::TBlob<float>>(td, (float *)buf, len);
+                    blob->allocate();
+                }
                 return blob;
             } else {
                 InferenceEngine::TBlob<float>::Ptr blob =
@@ -906,13 +1152,8 @@ IRBlob::Ptr GnaPreparedModel::GetConstOperandAsTensor(int operand_index, int ope
                 return blob;
             }
         }
-    } else if (op.type == OperandType::TENSOR_INT32) {
-        if (buf == nullptr)
-            VLOG(L1, "TENSOR_INT32 buf is NULL !!!!!!!!!!!!!!!");
-
-        TensorDesc td(InferenceEngine::Precision::I32, toDims(op.dimensions), Layout::ANY);
-        return std::make_shared<InferenceEngine::TBlob<float>>(td, (float *)buf, len);
-    } else {
+    }
+    else {
         VLOG(L1, "Do not support const tensors of type ", op.type);
         nnAssert(false);
     }
@@ -921,10 +1162,17 @@ IRBlob::Ptr GnaPreparedModel::GetConstOperandAsTensor(int operand_index, int ope
 
 Blob::Ptr GnaPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const uint8_t *buf, uint32_t& len)
 {
-    if (op.type == OperandType::TENSOR_FLOAT32 || op.type == OperandType::FLOAT32) {
+    bool isQuantInput = false;
+    if (op.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED || 
+            op.type == OperandType::TENSOR_QUANT8_SYMM ||
+            op.type == OperandType::TENSOR_QUANT16_SYMM ) {
+        isQuantInput = true;
+    }
+
+    if (op.type == OperandType::TENSOR_FLOAT32 || op.type == OperandType::FLOAT32 || isQuantInput)  {
         if (op.lifetime == V1_0_OperandLifeTime::SUBGRAPH_INPUT) {
             if (buf == nullptr)
-                VLOG(L1, "MODEL_INPUT buf is NULL !!!!!!!!!!!!!!!");
+                VLOG(L1, "SUBGRAPH_INPUT buf is NULL !!!!!!!!!!!!!!!");
 
             vec<unsigned int> order;
             Layout layout;
@@ -944,11 +1192,22 @@ Blob::Ptr GnaPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const 
             auto inputDims = toDims(op.dimensions);
             TensorDesc td(InferenceEngine::Precision::FP32, permuteDims(inputDims, order), layout);
             if (inputDims.size() != 4) {
-                //VLOG(L1, "buf data %f", *((float*)buf));
-                //VLOG(L1, "buf data %f", *((float*)buf + 1));
-                InferenceEngine::TBlob<float>::Ptr blob =
-                                std::make_shared<InferenceEngine::TBlob<float>>(td, (float *)buf, len);
+                InferenceEngine::TBlob<float>::Ptr blob = nullptr;
+
+                if (isQuantInput) {
+                    blob = std::make_shared<InferenceEngine::TBlob<float>>(td);
                 blob->allocate();
+                    if (op.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED) {
+                        deQuantize<int8_t>(buf, getNumberOfElements(op.dimensions), op.scale, op.zeroPoint, blob->buffer().as<float*>());
+                    } else if (op.type == OperandType::TENSOR_QUANT8_SYMM) {
+                        deQuantize<int8_t>(buf, getNumberOfElements(op.dimensions), op.scale, 0, blob->buffer().as<float*>());
+                    } else if (op.type == OperandType::TENSOR_QUANT16_SYMM) {
+                        deQuantize<int16_t>(buf, getNumberOfElements(op.dimensions), op.scale, 0, blob->buffer().as<float*>());
+                    }
+                } else {
+                    blob = std::make_shared<InferenceEngine::TBlob<float>>(td, (float *)buf, len);
+                    blob->allocate();
+                }
                 return blob;
             } else {
                 InferenceEngine::TBlob<float>::Ptr blob =

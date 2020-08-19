@@ -89,6 +89,16 @@ struct LstmParams
     int  activationFunction;
 };
 
+struct QuantLstmParams: LstmParams{
+    LstmCellData scaleInputGateLayerNorm;
+    LstmCellData scaleForgetGateLayerNorm;
+    LstmCellData scaleCellGateLayerNorm;
+    LstmCellData scaleOutputGateLayerNorm;
+
+    int zeroPointHiddenLayer;
+    float scalePointHiddenLayer;
+};
+
 // TODO: fix the return
 } // LstmLayer namespace
 
