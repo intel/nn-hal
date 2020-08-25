@@ -74,6 +74,13 @@ class GnaNetwork
 public:
     InputsDataMap inputInfo = {};
     OutputsDataMap outputInfo = {};
+    std::map<std::string, InferenceEngineProfileInfo> perfCounters;
+    int noInferCall = 0;
+    double totalTime = 0.0f;
+    std::vector<double> inferTime;
+    std::vector<double> inferTimeGNA;
+    std::map<std::string, InferenceEngineProfileInfo> totalPerfCounters;
+
     std::vector<InferenceEngine::Blob::Ptr> ptrInputBlobs;
     GnaNetwork() : network(nullptr){}
 

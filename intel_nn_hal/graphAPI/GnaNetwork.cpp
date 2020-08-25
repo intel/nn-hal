@@ -51,6 +51,20 @@ Blob::Ptr generateBlob(Precision pr, SizeVector dims, Layout la) {
     return blob;
 }
 
+void getPerformanceCounters(InferenceEngine::InferRequest &request,
+		                                           std::map<std::string, InferenceEngine::InferenceEngineProfileInfo> &perfCounters) {
+	           auto retPerfCounters = request.GetPerformanceCounts();
+		              for (const auto &pair : retPerfCounters) {
+				                                     perfCounters[pair.first] = pair.second;
+								                                        }
+}
+
+void sumPerformanceCounters(std::map<std::string, InferenceEngine::InferenceEngineProfileInfo> const &perfCounters,
+		                                           std::map<std::string, InferenceEngine::InferenceEngineProfileInfo> &totalPerfCounters) {
+	           for (const auto &pair : perfCounters) {
+			                              totalPerfCounters[pair.first].realTime_uSec += pair.second.realTime_uSec;
+						                                     }
+}
 void GnaNetwork::loadNetwork(InferenceEngine::CNNNetwork& passed_network)
 {
     ALOGI("IENetwork.h void loadNetwork() GNA device");
@@ -64,6 +78,7 @@ void GnaNetwork::loadNetwork(InferenceEngine::CNNNetwork& passed_network)
     std::map<std::string, std::string> gnaPluginConfig;
     gnaPluginConfig[GNAConfigParams::KEY_GNA_DEVICE_MODE] = "GNA_HW";
     gnaPluginConfig[GNAConfigParams::KEY_GNA_PRECISION] = "I8";
+    gnaPluginConfig[PluginConfigParams::KEY_PERF_COUNT] = PluginConfigParams::YES;
     std::string scaleFactorConfigKey_1 = GNA_CONFIG_KEY(SCALE_FACTOR) + std::string("_") + std::to_string(0);
     gnaPluginConfig[scaleFactorConfigKey_1] = std::to_string(2048);
     std::string scaleFactorConfigKey_2 = GNA_CONFIG_KEY(SCALE_FACTOR) + std::string("_") + std::to_string(1);

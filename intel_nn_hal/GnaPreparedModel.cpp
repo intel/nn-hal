@@ -6,8 +6,15 @@
 #include <log/log.h>
 #include <fstream>
 #include <thread>
+#include <time.h>
+#include <chrono>
+
 #include "ValidateHal.h"
 #include "Utils.h"
+
+typedef std::chrono::high_resolution_clock Time;
+typedef std::chrono::duration<double, std::ratio<1, 1000>> ms;
+typedef std::chrono::duration<float> fsec;
 
 //#include "ExecutionBurstServer.h"
 //#include "OperationsUtils.h"
@@ -140,6 +147,26 @@ bool GnaPreparedModel::initialize() {
 // TODO: Call parent class deinitialize from here
 void GnaPreparedModel::deinitialize() {
     VLOG(L1, "GnaPreparedModel - deinitialize");
+    for (const auto &it : gnaPluginPtr->totalPerfCounters) {
+               std::string const &counter_name = it.first;
+               float current_units = static_cast<float>(it.second.realTime_uSec);
+               float call_units = current_units / gnaPluginPtr->noInferCall;
+               // if GNA HW counters
+               // get frequency of GNA module
+               float freq = 200;//getGnaFrequencyMHz();
+               current_units /= freq * 1000;
+               call_units /= freq;
+              std::cout << std::setw(30) << std::left << counter_name.substr(4, counter_name.size() - 1);
+              std::cout << std::setw(16) << std::right << current_units;
+              std::cout << std::setw(21) << std::right << call_units;
+              std::cout << std::endl;
+    }
+    std::vector<double>::iterator min_infer_time = std::min_element(gnaPluginPtr->inferTimeGNA.begin(), gnaPluginPtr->inferTimeGNA.end());
+    VLOG(L1, "deinitialize infer times");
+    for (auto iter: gnaPluginPtr->inferTimeGNA) {
+	        VLOG(L1, "%fms  ", iter);
+    }
+    std::cout << "Minimum infer time " << gnaPluginPtr->inferTimeGNA.at(std::distance(gnaPluginPtr->inferTimeGNA.begin(), min_infer_time)) << "\n";
 
     if (mBuilderModel) {
         delete mBuilderModel;
@@ -299,6 +326,18 @@ void GnaPreparedModel::asyncExecute(const V1_0_Request& request, MeasureTiming m
 
     // auto output = execute.Infer(input).wait();
     gnaPluginPtr->Infer();
+    auto gna_t1 = Time::now();
+    fsec gna_fs = gna_t1 - gna_t0;
+    ms d_gna = std::chrono::duration_cast<ms>(gna_fs);
+    gnaPluginPtr->inferTimeGNA.push_back(d_gna.count());
+    gnaPluginPtr->noInferCall++; 
+    auto retPerfCounters = gnaPluginPtr->getInferRequest().GetPerformanceCounts();
+    for (const auto &pair : retPerfCounters) {
+        gnaPluginPtr->perfCounters[pair.first] = pair.second;
+    }
+    for (const auto &pair : gnaPluginPtr->perfCounters) {
+        gnaPluginPtr->totalPerfCounters[pair.first].realTime_uSec += pair.second.realTime_uSec;
+    }
 
     auto reqOutputs = request.outputs;
     for (auto i =0; i < mModel.main.outputIndexes.size(); i++) {
