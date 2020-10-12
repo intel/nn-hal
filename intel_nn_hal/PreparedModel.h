@@ -29,6 +29,10 @@
 #include "Driver.h"
 #include "IENetwork.h"
 
+#ifdef USE_NGRAPH
+#include "create_ngraph.hpp"
+#endif
+
 #define EXPL_PAD 1
 #define IMPL_PAD 2
 
@@ -128,6 +132,10 @@ public:
           enginePtr(nullptr),
           mPadreq(EXPL_PAD) {
         g_layer_precision = InferenceEngine::Precision::FP16;
+#ifdef USE_NGRAPH
+        mUseNgraph = isNgraphPropSet(); //TODO:Should additionally check if all the ops are supported
+        mCreateNgraph = std::make_shared<CreateNgraph>();
+#endif
     }
 
     PreparedModel(const std::string device, const Model& model)
@@ -142,6 +150,10 @@ public:
             g_layer_precision = InferenceEngine::Precision::FP16;
         else
             g_layer_precision = InferenceEngine::Precision::UNSPECIFIED;
+#ifdef USE_NGRAPH
+        mUseNgraph = isNgraphPropSet();
+        mCreateNgraph = std::make_shared<CreateNgraph>();
+#endif
     }
 
     ~PreparedModel() override { deinitialize(); }
@@ -161,6 +173,10 @@ public:
     // Return<ErrorStatus> executeBase(const Request& request, MeasureTiming measure,
     //                             const sp<T_IExecutionCallback>& callback);
     static bool isOperationSupported(const Operation& operation, const Model& model);
+#ifdef USE_NGRAPH
+    void ConvertBlobToNHWC(InferenceEngine::TBlob<float>::Ptr blob, uint8_t* buf,
+                    std::vector<uint32_t> opDims);
+#endif
 
 protected:
     void deinitialize();
@@ -221,6 +237,10 @@ protected:
     std::vector<RunTimeOperandInfo> mOperands;
     std::vector<RunTimePoolInfo> mPoolInfos;
     IRDocument mNet;
+#ifdef USE_NGRAPH
+    std::shared_ptr<CreateNgraph> mCreateNgraph;
+    bool mUseNgraph;
+#endif
     std::vector<OutputPort> mPorts;  // typedef std::shared_ptr<Data> DataPtr;
     ExecuteNetwork* enginePtr;
     uint32_t mPadreq;

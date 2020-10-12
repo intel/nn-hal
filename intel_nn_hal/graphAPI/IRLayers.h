@@ -45,6 +45,8 @@
 #include <log/log.h>
 #endif
 
+#define USE_NGRAPH
+
 namespace android {
 namespace hardware {
 namespace neuralnetworks {
@@ -74,6 +76,12 @@ inline OutputPort addOutput(const IRLayer &layer, const InferenceEngine::SizeVec
         InferenceEngine::TensorDesc td(g_layer_precision, dims, InferenceEngine::Layout::NHWC);
         data = std::make_shared<InferenceEngine::Data>(d_name, td);
 
+    } else if (dims.size() == 3) {
+#ifdef NNLOG
+        ALOGI("addOutput data dims %d ", dims.size());
+#endif
+        InferenceEngine::TensorDesc td(g_layer_precision, dims, InferenceEngine::Layout::CHW);
+        data = std::make_shared<InferenceEngine::Data>(d_name, td);
     } else {
         std::cout << "addOutput dims size " << dims.size() << std::endl;
         // InferenceEngine::TensorDesc td(g_layer_precision, dims, InferenceEngine::Layout::ANY);
@@ -284,6 +292,37 @@ struct ConvolutionParams {
     IRBlob::Ptr biases;
     std::string padType;
 };
+
+#ifdef USE_NGRAPH
+struct GenConvParams {
+    int groups = 1;
+    std::vector<float> weightsBuf;
+    std::vector<size_t> weightsDims;
+    std::vector<float> biasesBuf;
+    std::vector<size_t> biasesDims;
+    size_t weightsSize;
+    std::vector<size_t> strides;
+    std::vector<std::ptrdiff_t> pads_begin;
+    std::vector<std::ptrdiff_t> pads_end;
+    std::vector<size_t> dilations;
+    const char* pad_type;
+};
+
+inline void ConvolutionParamsToGenConvParams(ConvolutionParams &cPrms, GenConvParams & gPrms, IRBlob::Ptr weights, IRBlob::Ptr biases) {
+    gPrms.groups = cPrms.groups;
+    float* buffer = weights->buffer().as<float*>();
+    gPrms.weightsBuf = {buffer, buffer + weights->size()};
+    gPrms.weightsDims = weights->getTensorDesc().getDims();
+    buffer = biases->buffer().as<float*>();
+    gPrms.biasesBuf = {buffer, buffer + biases->size()};
+    gPrms.biasesDims = biases->getTensorDesc().getDims();
+    gPrms.strides = {(size_t)cPrms.stride.x, (size_t)cPrms.stride.y};
+    gPrms.pads_begin = {cPrms.pad_start.x, cPrms.pad_start.y};
+    gPrms.pads_end = {cPrms.pad_end.x, cPrms.pad_end.y};
+    gPrms.dilations = {1, 1};
+    gPrms.pad_type = cPrms.padType.c_str();
+}
+#endif
 
 inline size_t in_ch(const OutputPort &src) {
     auto dims = src->getTensorDesc().getDims();

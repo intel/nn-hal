@@ -29,6 +29,9 @@
 #include <inference_engine.hpp>
 #include "IRDocument.h"
 #include "IRLayers.h"
+#ifdef USE_NGRAPH
+#undef IE_LEGACY
+#endif
 
 #include <fstream>
 #include "ie_exception_conversion.hpp"
@@ -46,6 +49,11 @@
 #ifdef ENABLE_MYRIAD
 #include "vpu_plugin_config.hpp"
 #endif
+
+#ifdef USE_NGRAPH
+#include <cutils/properties.h>
+#endif
+
 using namespace InferenceEngine::details;
 using namespace InferenceEngine;
 
@@ -114,6 +122,13 @@ static void setConfig(std::map<std::string, std::string> &config) {
     // VPU_CONFIG_VALUE(NHWC);
 }
 
+#ifdef USE_NGRAPH
+static bool isNgraphPropSet() {
+    const char ngIrProp[] = "nn.hal.ngraph";
+    return property_get_bool(ngIrProp, false);
+}
+#endif
+
 class ExecuteNetwork {
 #ifdef IE_LEGACY
     InferenceEnginePluginPtr enginePtr;
@@ -128,23 +143,45 @@ class ExecuteNetwork {
     IInferRequest::Ptr req;
     InferRequest inferRequest;
     ResponseDesc resp;
+#ifdef USE_NGRAPH
+    bool mNgraphProp = false;
+#endif
 
 public:
-    ExecuteNetwork() : network(nullptr) {}
+    ExecuteNetwork() : network(nullptr) {
+    }
+#ifdef USE_NGRAPH
+    ExecuteNetwork(CNNNetwork ngraphNetwork, IRDocument &doc,  std::string target = "CPU") : network(nullptr) {
+        mNgraphProp = isNgraphPropSet();
+#else
     ExecuteNetwork(IRDocument &doc,  std::string target = "CPU") : network(nullptr) {
+#endif
 #ifdef IE_LEGACY
         InferenceEngine::PluginDispatcher dispatcher(
             {"/vendor/lib64", "/vendor/lib", "/system/lib64", "/system/lib", "", "./"});
         enginePtr = dispatcher.getPluginByDevice(target);
 #endif // IE_LEGACY
-        network = doc.getNetwork();
-        network->getInputsInfo(inputInfo);
-        network->getOutputsInfo(outputInfo);
+#ifdef USE_NGRAPH
+        if(mNgraphProp) {
+            inputInfo = ngraphNetwork.getInputsInfo();
+            outputInfo = ngraphNetwork.getOutputsInfo();
+        } else
+#endif
+        {
+            network = doc.getNetwork();
+            network->getInputsInfo(inputInfo);
+            network->getOutputsInfo(outputInfo);
+        }
 
 #ifndef IE_LEGACY
-        std::shared_ptr<InferenceEngine::ICNNNetwork> sp_cnnNetwork;
-        sp_cnnNetwork.reset(network);
-        mCnnNetwork = InferenceEngine::CNNNetwork(sp_cnnNetwork);
+#ifdef USE_NGRAPH
+        if(!mNgraphProp)
+#endif
+        {
+            std::shared_ptr<InferenceEngine::ICNNNetwork> sp_cnnNetwork;
+            sp_cnnNetwork.reset(network);
+            mCnnNetwork = InferenceEngine::CNNNetwork(sp_cnnNetwork);
+        }
 #endif // IE_LEGACY
         // size_t batch = 1;
         // network->setBatchSize(batch);
@@ -163,7 +200,11 @@ public:
     }
 
     //~ExecuteNetwork(){ }
+#ifdef USE_NGRAPH
+    void loadNetwork(CNNNetwork ngraphNetwork) {
+#else
     void loadNetwork() {
+#endif
 #ifdef IE_LEGACY
         std::map<std::string, std::string> networkConfig;
         InferencePlugin plugin(enginePtr);
@@ -178,8 +219,22 @@ public:
 #else
         Core ie_core(std::string("/vendor/etc/openvino/plugins.xml"));
 
+#ifdef USE_NGRAPH
+    try {
+        if(mNgraphProp == true) {
+            ALOGI("%s LoadNetwork actually using ngraphNetwork", __func__);
+            executable_network = ie_core.LoadNetwork(ngraphNetwork, std::string("CPU"));
+        } else {
+            ALOGI("%s LoadNetwork actually using mCnnNetwork", __func__);
+            executable_network = ie_core.LoadNetwork(mCnnNetwork, std::string("CPU"));
+        }
+    } catch (const std::exception& ex) {
+        ALOGE("%s Exception !!! %s", __func__, ex.what());
+    }
+#else
         ALOGI("%s Loading network to IE", __func__);
         executable_network = ie_core.LoadNetwork(mCnnNetwork, std::string("CPU"));
+#endif
 
         ALOGI("%s Calling CreateInferRequest", __func__);
         inferRequest = executable_network.CreateInferRequest();
