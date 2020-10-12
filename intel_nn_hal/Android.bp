@@ -22,6 +22,7 @@ cc_library_shared {
     ],
 
     header_libs: [
+        "libngraph_headers",
         "libinference_headers",
         "libmkldnn_headers",
         "libpugixml_headers",
@@ -80,6 +81,7 @@ cc_library_shared {
         "android.hidl.memory@1.0",
         "libinference_engine",
         "libinference_engine_legacy",
+        "libngraph",
     ],
 
     static_libs: [

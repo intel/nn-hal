@@ -11,6 +11,7 @@ cc_library_static {
     ],
 
     header_libs: [
+        "libngraph_headers",
         "libinference_headers",
         "libpugixml_headers",
         "plugin_api_headers",
@@ -36,5 +37,8 @@ cc_library_static {
         "-DIE_LEGACY",
     ],
 
-    shared_libs: ["liblog"],
+    shared_libs: [
+        "liblog",
+        "libngraph",
+    ],
 }

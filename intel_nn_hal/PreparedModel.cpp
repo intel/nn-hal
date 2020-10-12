@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "PreparedModel"
-
 #include "PreparedModel.h"
 #include <android-base/logging.h>
 #include <android/log.h>
@@ -25,9 +23,13 @@
 #include "ValidateHal.h"
 //#include "ExecutionBurstServer.h"
 //#include "OperationsUtils.h"
+#ifdef USE_NGRAPH
+#include <cutils/properties.h>
+#endif
 
 #define DISABLE_ALL_QUANT
 //#define NN_DEBUG
+#define LOG_TAG "PreparedModel"
 
 enum DebugLevel {
     L0,
@@ -789,19 +791,29 @@ T PreparedModel::ParseOperationInput(const Model& model, const Operation& operat
 
 OutputPort PreparedModel::handleFusion(const OutputPort& out, int32_t fusedOp) {
     VLOG(L1, "fusedOp: %d", fusedOp);
+    OutputPort ret = out;
     if (fusedOp == (int32_t)FusedActivationFunc::RELU) {
         VLOG(L1, "fusedOp is RELU");
-        return ReLU(out);
+        ret = ReLU(out);
+#ifdef USE_NGRAPH
+	mCreateNgraph->addRelu(ret->getName(), out->getName());
+#endif
     } else if (fusedOp == (int32_t)FusedActivationFunc::RELU1) {
         VLOG(L1, "fusedOp is RELU1");
-        return Clamp(out, -1, 1);
+        ret = Clamp(out, -1, 1);
+#ifdef USE_NGRAPH
+	mCreateNgraph->addClamp(ret->getName(), out->getName(), -1, 1);
+#endif
     } else if (fusedOp == (int32_t)FusedActivationFunc::RELU6) {
         VLOG(L1, "fusedOp is RELU6");
-        return Clamp(out, 0, 6);
+        ret = Clamp(out, 0, 6);
+#ifdef USE_NGRAPH
+	mCreateNgraph->addClamp(ret->getName(), out->getName(), 0, 6);
+#endif
     }
 
     VLOG(L1, "No ActivationFunc");
-    return out;
+    return ret;
 }
 
 template <typename T>
@@ -922,6 +934,9 @@ OutputPort PreparedModel::getPort(int index) {
         auto operandInfo = mNet.createInput(
             operandName.str(), permuteDims(toDims(op.dimensions), order));  // NHWC -> NCHW
         mPorts[index] = operandInfo->getInputData();
+#ifdef USE_NGRAPH
+	mCreateNgraph->addInputParameter(operandName.str(), mPorts[index]->getTensorDesc().getDims());
+#endif
         // TODO: workaround 3-D
         int dims_size = op.dimensions.size();
 
@@ -1132,14 +1147,28 @@ bool PreparedModel::initialize() {
 
     initializeInput();
     success = finalizeOutput();
+
+    InferenceEngine::CNNNetwork ngraph_net;
+#ifdef USE_NGRAPH
+    ngraph_net = mCreateNgraph->generate(std::string("/data/vendor/ir/ngraph_ir.xml"), 
+		    std::string("/data/vendor/ir/ngraph_ir.bin"));
+#endif
     if (success == false) return success;
 
     mNet.buildNetwork();
 
     VLOG(L1, "initialize ExecuteNetwork for device %s", mTargetDevice.c_str());
+#ifdef USE_NGRAPH
+    enginePtr = new ExecuteNetwork(ngraph_net, mNet, mTargetDevice);
+#else
     enginePtr = new ExecuteNetwork(mNet, mTargetDevice);
+#endif
     enginePtr->prepareInput();
+#ifdef USE_NGRAPH
+    enginePtr->loadNetwork(ngraph_net);
+#else
     enginePtr->loadNetwork();
+#endif
 
     return true;
 }
@@ -1534,19 +1563,33 @@ Return<void> PreparedModel::executeSynchronously(const Request& request, Measure
                     operand, const_cast<uint8_t*>(r.buffer + arg.location.offset),
                     operand.length);  // if not doing memcpy
                 VLOG(L1, "Copy inputBlob for mPorts[%d]->name %s", indexes[i],
+#ifdef USE_NGRAPH
+                    mCreateNgraph->getNodeName(mPorts[indexes[i]]->getName()).c_str());
+                auto destBlob = (mUseNgraph == true) ?
+                     enginePtr->getBlob(mCreateNgraph->getNodeName(mPorts[indexes[i]]->getName())) :
+                        enginePtr->getBlob(mPorts[indexes[i]]->getName());
+#else
                      mPorts[indexes[i]]->getName().c_str());
 
                 auto destBlob = enginePtr->getBlob(mPorts[indexes[i]]->getName());
+#endif
                 uint8_t* dest = destBlob->buffer().as<uint8_t*>();
                 uint8_t* src = inputBlob->buffer().as<uint8_t*>();
                 std::memcpy(dest, src, inputBlob->byteSize());
             } else {
+                VLOG(L1, "copyData from IE to Android blob for mPorts[%d]->name %s", indexes[i],
+#ifdef USE_NGRAPH
+                     mCreateNgraph->getNodeName(mPorts[indexes[i]]->getName()).c_str());
+                auto srcBlob = (mUseNgraph == true) ?
+                     enginePtr->getBlob(mCreateNgraph->getNodeName(mPorts[indexes[i]]->getName())) :
+                        enginePtr->getBlob(mPorts[indexes[i]]->getName());
+#else
+                     mPorts[indexes[i]]->getName().c_str());
+                auto srcBlob = enginePtr->getBlob(mPorts[indexes[i]]->getName());
+#endif
                 auto outputBlob = GetInOutOperandAsBlob(
                     operand, const_cast<uint8_t*>(r.buffer + arg.location.offset),
                     operand.length);  // if not doing memcpy
-                VLOG(L1, "copyData from IE to Android blob for mPorts[%d]->name %s", indexes[i],
-                     mPorts[indexes[i]]->getName().c_str());
-                auto srcBlob = enginePtr->getBlob(mPorts[indexes[i]]->getName());
                 uint8_t* dest = outputBlob->buffer().as<uint8_t*>();
                 uint8_t* src = srcBlob->buffer().as<uint8_t*>();
                 std::memcpy(dest, src, outputBlob->byteSize());
@@ -1572,10 +1615,22 @@ Return<void> PreparedModel::executeSynchronously(const Request& request, Measure
     }
 
     InferenceEngine::TBlob<float>::Ptr outBlob =
+#ifdef USE_NGRAPH
+        (mUseNgraph == true) ?
+        enginePtr->getBlob(mCreateNgraph->getNodeName(mPorts[mModel.outputIndexes[0]]->getName())) :
         enginePtr->getBlob(mPorts[mModel.outputIndexes[0]]->getName());
+#else
+        enginePtr->getBlob(mPorts[mModel.outputIndexes[0]]->getName());
+#endif
 
     InferenceEngine::TBlob<float>::Ptr inBlob =
+#ifdef USE_NGRAPH
+        (mUseNgraph == true) ?
+        enginePtr->getBlob(mCreateNgraph->getNodeName(mPorts[mModel.inputIndexes[0]]->getName())):
         enginePtr->getBlob(mPorts[mModel.inputIndexes[0]]->getName());
+#else
+        enginePtr->getBlob(mPorts[mModel.inputIndexes[0]]->getName());
+#endif
     hidl_vec<OutputShape> outputShapes;
 #ifdef NN_DEBUG
     {
@@ -1963,6 +2018,16 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
 
         case OperationType::TANH:
             break;
+#ifdef USE_NGRAPH
+        case OperationType::CONCATENATION:
+        case OperationType::RESHAPE:
+            if (!isNgraphPropSet()) //TODO:using this API as mUseNgraph is non-static
+            {
+                VLOG(L1, "operation supported only for ngraph %d", operation.type);
+                return false;
+            } else
+                break;
+#endif
 
         case OperationType::ADD: {
             const auto& input0 = model.operands[operation.inputs[OP_INPUT0_IDX_ADD]];
@@ -2320,14 +2385,37 @@ bool PreparedModel::operationConCat(const Operation& operation) {
     uint32_t axis;
     auto n = operation.inputs.size() - 1;
     std::vector<OutputPort> inputs;
+
+#ifdef USE_NGRAPH
+    const auto op = mModel.operands[operation.inputs[0]];
+    auto input = getPort(operation.inputs[0]);
+    auto inDims = input->getTensorDesc().getDims();
+        if (op.dimensions.size() == 4) {
+            std::vector<uint32_t> axisMap = {2, 3, 1}; //NCHW = axisMap[NHWC]
+            axis = axisMap[PARAM_I32(n)];
+        } else if (op.dimensions.size() == 3) {
+            std::vector<uint32_t> axisMap = {2, 3, 1}; //NCHW = axisMap[HWC]
+            axis = axisMap[PARAM_I32(n)];
+        }
+     VLOG(L1, "shape of output tensor axis %d inDims size %d, op_dimensionsize %d", axis, inDims.size(), op.dimensions.size());
+#else
     if (getPort(operation.inputs[0])->getLayout() == InferenceEngine::NCHW) {
         std::vector<uint32_t> axisMap = {0, 2, 3, 1};
         axis = axisMap[PARAM_I32(n)];
     } else
         axis = PARAM_I32(n);
+#endif
 
     for (int i = 0; i < n; i++) inputs.push_back(getPort(operation.inputs[i]));
     auto out = Concat(inputs, axis);
+#ifdef USE_NGRAPH
+    std::vector<std::string> inputNames;
+    for (int i = 0; i < inputs.size(); ++i)
+    {
+        inputNames.push_back(inputs[i]->getName());
+    }
+    mCreateNgraph->addConcat(out->getName(), inputNames, axis);
+#endif
     mPorts[operation.outputs[0]] = out;
 
     return true;
@@ -2543,6 +2631,11 @@ bool PreparedModel::operationConv2D(const Operation& operation) {
 
     prms.biases = static_cast<IRBlob::Ptr>(bias);
     auto out = Convolution(input, prms);
+#ifdef USE_NGRAPH
+    GenConvParams genConvPrms;
+    ConvolutionParamsToGenConvParams(prms, genConvPrms, filter, bias);
+    mCreateNgraph->addConvolution(out->getName(), input->getName(), genConvPrms);
+#endif
 
     if (fusion_index < 0) {
         VLOG(L1, "invalid fusion index");
@@ -2764,6 +2857,11 @@ bool PreparedModel::operationDepthwiseConv2D(const Operation& operation) {
 
     prms.biases = static_cast<IRBlob::Ptr>(bias);
     auto out = Convolution(input, prms);
+#ifdef USE_NGRAPH
+    GenConvParams genConvPrms;
+    ConvolutionParamsToGenConvParams(prms, genConvPrms, filter, bias);
+    mCreateNgraph->addConvolution(out->getName(), input->getName(), genConvPrms);
+#endif
 
     if (fusion_index < 0) {
         VLOG(L1, "invalid fusion index");
@@ -3035,6 +3133,11 @@ bool PreparedModel::operationReshape(const Operation& operation) {
 
     int strechDim = -1;
     auto numOutputElements = 1;  // shape
+#ifdef USE_NGRAPH
+    VLOG(L1, "mModel outDims size[%d] ", outDims.size());
+    if (mUseNgraph == true && outDims.size() == 3)
+        outDims.insert(outDims.begin(), 1);
+#endif
     for (auto i = 0; i < outDims.size(); i++) {
         VLOG(L1, "operand1: shape of output tensor outDims[%d] = %d ", i, outDims[i]);
         if ((int)outDims[i] < 0) {
@@ -3062,6 +3165,9 @@ bool PreparedModel::operationReshape(const Operation& operation) {
     }
     // Note: " error [VPU] Unsupported 1 D dimensions" for reshape output and fix me
     mPorts[operation.outputs[0]] = Reshape(outDims, input);
+#ifdef USE_NGRAPH
+    mCreateNgraph->addReshape(mPorts[operation.outputs[0]]->getName(), input->getName(), outDims);
+#endif
 
     return true;
 }
@@ -3141,6 +3247,9 @@ bool PreparedModel::finalizeOutput(/*RunTimeOperandInfo* output */) {
 
         mPorts[i]->setPrecision(InferenceEngine::Precision::FP32);
         mNet.addOutput(mPorts[i]);
+#ifdef USE_NGRAPH
+        mCreateNgraph->setResultNode(mPorts[i]->getName());
+#endif
 
         VLOG(L1, "mPorts[%d] %s dims size %d", i, mPorts[i]->getName().c_str(), dims_size);
         VLOGDIMS(L1, mOperands[i].dimensions, "current operand Output dims:");
@@ -3832,6 +3941,10 @@ Blob::Ptr CpuPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const 
             } else if (op.dimensions.size() == 2) {
                 // order = {0, 1};
                 layout = Layout::NC;
+            } else if (op.dimensions.size() == 3) {
+                //order = {0, 1, 2, 3};  // nhwc -> nchw
+                layout = Layout::CHW;
+                ALOGI("Anoob : GetInOutOperandAsBlob output already transposed to NHWC");
             } else {
                 // order = {0}; //(op.dimensions.size() < 2)
                 layout = Layout::C;
