@@ -124,7 +124,7 @@ static void setConfig(std::map<std::string, std::string> &config) {
 
 #ifdef USE_NGRAPH
 static bool isNgraphPropSet() {
-    const char ngIrProp[] = "nn.hal.ngraph";
+    const char ngIrProp[] = "vendor.nn.hal.ngraph";
     return property_get_bool(ngIrProp, false);
 }
 #endif
