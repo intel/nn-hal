@@ -29,19 +29,16 @@ private:
 public:
     InferenceEngine::CNNNetwork generate(std::string xmlPath, std::string binPath) {
 #ifdef NNLOG1
-        ALOGD("%s : Called", __func__);
+        ALOGD("%s : Called with xmlPath %s", __func__, xmlPath.c_str());
 #endif
-        InferenceEngine::CNNNetwork cnn_n;
-        try {
         auto ngraph_function = std::make_shared<ngraph::Function>(mResultNodes, mInputParams);
         InferenceEngine::CNNNetwork cnn = InferenceEngine::CNNNetwork(ngraph_function);
-        //InferenceEngine::ResponseDesc resp;
+        try {
         cnn.serialize(xmlPath, binPath);
-        return cnn;
         } catch (const std::exception& ex) {
                 ALOGE("%s Exception !!! %s", __func__, ex.what());
         }
-        return cnn_n;
+        return cnn;
     }
     void addNode(std::string nodeName, std::shared_ptr<ngraph::Node> node) {
 #ifdef NNLOG1

@@ -1150,8 +1150,8 @@ bool PreparedModel::initialize() {
 
     InferenceEngine::CNNNetwork ngraph_net;
 #ifdef USE_NGRAPH
-    ngraph_net = mCreateNgraph->generate(std::string("/data/vendor/ir/ngraph_ir.xml"), 
-		    std::string("/data/vendor/ir/ngraph_ir.bin"));
+    ngraph_net = mCreateNgraph->generate(std::string("/data/vendor/neuralnetworks/ngraph_ir.xml"),
+		    std::string("/data/vendor/neuralnetworks/ngraph_ir.bin"));
 #endif
     if (success == false) return success;
 
