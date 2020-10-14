@@ -30,7 +30,7 @@ config("target_defaults") {
         "-Wno-unuse",
     ]
     cflags_cc = [
-        "-std=c++14",
+        "-std=c++17",
         "-Wno-inconsistent-missing-override",
     ]
     ldflags = [

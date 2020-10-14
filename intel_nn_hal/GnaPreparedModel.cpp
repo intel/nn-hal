@@ -138,8 +138,30 @@ bool GnaPreparedModel::initialize() {
         }
     }
 
-    initializeInput();
-    finalizeOutput();
+    //initializeInput();
+    //finalizeOutput();
+
+    /* copy weights, biases ..etc */
+    for (auto i=0; i < mModel.main.inputIndexes.size(); i++){
+        auto curIndex = mModel.main.inputIndexes[i];
+
+        auto itr = std::find_if(mInputPorts.begin(), mInputPorts.end(),
+                                    [&](const std::pair<uint32_t, LayerInfo>& elem) {
+                                        return (elem.first == curIndex);
+                                    });
+        if (itr != mInputPorts.end()) {
+            mlayerInputIndices.push_back(i);
+        } else {
+            nnAssert("Cannot set data to non-input layers during infer request");
+        }
+    }
+
+    auto network = mBuilderModel->convertBuilder();
+    gnaPluginPtr = new GnaNetwork(network, "GNA");
+    InferenceEngine::CNNNetwork passed_network({network});
+    gnaPluginPtr->loadNetwork(passed_network);
+    gnaPluginPtr->queryState();
+    gnaPluginPtr->reset();
 
     return true;
 }
@@ -253,30 +275,6 @@ void GnaPreparedModel::asyncExecute(const V1_0_Request& request, MeasureTiming m
         }
     };
 
-    if (gnaPluginPtr == nullptr) {
-        /* copy weights, biases ..etc */
-        for (auto i=0; i < mModel.main.inputIndexes.size(); i++){
-            auto curIndex = mModel.main.inputIndexes[i];
-
-            auto itr = std::find_if(mInputPorts.begin(), mInputPorts.end(),
-                                        [&](const std::pair<uint32_t, LayerInfo>& elem) {
-                                            return (elem.first == curIndex);
-                                        });
-            if (itr != mInputPorts.end()) {
-                mlayerInputIndices.push_back(i);
-            } else {
-                copyDataToLayer(i);
-            }
-        }
-
-        auto network = mBuilderModel->convertBuilder();
-        gnaPluginPtr = new GnaNetwork(network, "GNA");
-        InferenceEngine::CNNNetwork passed_network({network});
-        gnaPluginPtr->loadNetwork(passed_network);
-        gnaPluginPtr->queryState();
-        gnaPluginPtr->reset();
-    }
-
     for (auto index : mlayerInputIndices) {
         auto inputIndex = mModel.main.inputIndexes[index];
         auto srcBlob = getBlobFromMemoryPool(index);
@@ -324,10 +322,9 @@ void GnaPreparedModel::asyncExecute(const V1_0_Request& request, MeasureTiming m
 
     VLOG(L1, "Run");
 
-    // auto output = execute.Infer(input).wait();
+    auto gna_t0 = Time::now();
     gnaPluginPtr->Infer();
-    auto gna_t1 = Time::now();
-    fsec gna_fs = gna_t1 - gna_t0;
+    fsec gna_fs = (Time::now()) - gna_t0;
     ms d_gna = std::chrono::duration_cast<ms>(gna_fs);
     gnaPluginPtr->inferTimeGNA.push_back(d_gna.count());
     gnaPluginPtr->noInferCall++; 
