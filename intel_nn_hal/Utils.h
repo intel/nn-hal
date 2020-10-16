@@ -369,7 +369,7 @@ typedef struct _metrics{
         auto avg_infer =
             std::accumulate(infer_time.begin(), infer_time.end(), 0) / (infer_time.size());
         std::cout << std::setw(25) << " Dequant time(ms):"
-                  << std::setw(25)   << " Quant time(ms):"
+                  << std::setw(25)   << " Quant time(us):"
                   << std::setw(25)   << " NW load time(ms):"
                   << std::setw(25)   << " Avg infer time(ms):"
                   << std::setw(25)   << " Infer calls:"

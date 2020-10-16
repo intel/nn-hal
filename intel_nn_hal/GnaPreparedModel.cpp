@@ -236,7 +236,7 @@ bool quantizeToQuant8Signed(const float* inputData, int8_t* outputData, const Sh
                 std::min<float>(127.0f, outputShape.offset +
                                                 std::round(inputData[i] / outputShape.scale))));
     }
-    runtime_metrics.quant_time += (double(millisecondsDuration(now(), start)));
+    runtime_metrics.quant_time += (double(microsecondsDuration(now(), start)));
     return true;
 }
 
@@ -247,7 +247,7 @@ bool quantizeToQuant16(const float* inputData, uint16_t* outputData, const Shape
     for (uint32_t i = 0; i < size; ++i) {
         outputData[i] = static_cast<uint16_t>(outputShape.offset + (std::round(inputData[i] / outputShape.scale)));
     }
-    runtime_metrics.quant_time += (double(millisecondsDuration(now(), start)));
+    runtime_metrics.quant_time += (double(microsecondsDuration(now(), start)));
     return true;
 }
 
