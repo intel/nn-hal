@@ -54,6 +54,9 @@ auto microsecondsDuration(decltype(now()) end, decltype(now()) start) {
     return std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 };
 
+auto millisecondsDuration(decltype(now()) end, decltype(now()) start) {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+};
 }  // namespace
 
 // Base class used to create vpu drivers for the NN HAL.  This class

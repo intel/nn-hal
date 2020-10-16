@@ -346,6 +346,53 @@ void writeBufferToFile(std::string filename,
                         const float* buf,
                         size_t length);
 
+typedef struct _metrics{
+    double deQuant_time;
+    double quant_time;
+    double nw_load_time;
+    double avg_infer_time;
+    uint64_t infer_calls;
+    double irBuild_time;
+    std::vector<double> infer_time;
+
+    void reset() {
+        deQuant_time = 0;
+        quant_time = 0;
+        nw_load_time = 0;
+        avg_infer_time = 0;
+        infer_calls = 0;
+        irBuild_time =0;
+        infer_time = {};
+    }
+
+    void print() {
+        auto avg_infer =
+            std::accumulate(infer_time.begin(), infer_time.end(), 0) / (infer_time.size());
+        std::cout << std::setw(25) << " Dequant time(ms):"
+                  << std::setw(25)   << " Quant time(ms):"
+                  << std::setw(25)   << " NW load time(ms):"
+                  << std::setw(25)   << " Avg infer time(ms):"
+                  << std::setw(25)   << " Infer calls:"
+                  << std::setw(25)   << " OV IR Build time(ms):"
+                    << std::endl;
+        std::cout << std::setw(25) <<  deQuant_time
+                   << std::setw(25) <<  quant_time
+                   << std::setw(25)  << nw_load_time
+                   << std::setw(25)  << avg_infer
+                   << std::setw(25)  << infer_calls
+                   << std::setw(25)  << irBuild_time
+                    << std::endl;
+
+        std::stringstream outputlog;
+        outputlog << "All infer times: ";
+        for (auto t : infer_time) {
+            outputlog << t << " ";
+        }
+        outputlog << std::endl;
+
+        std::cout << outputlog.str();
+    }
+} metrics;
 }
 }
 }

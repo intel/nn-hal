@@ -12,6 +12,7 @@
 
 #include "GnaNetwork.h"
 #include "PreparedModel.h"
+#include "Utils.h"
 
 #define EXPL_PAD 1
 #define IMPL_PAD 2
@@ -41,9 +42,20 @@ class GnaPreparedModel : public PreparedModel {
     IRBuilder::ModelBuilder* mBuilderModel;
     GnaNetwork* gnaPluginPtr;
 
+    bool isDecoderNw, isEnc0Nw, isEnc1Nw;
+    metrics runtimeMetrics;
 public:
-    GnaPreparedModel(const Model& model) : PreparedModel("GNA", model), gnaPluginPtr(nullptr) {}
-    ~GnaPreparedModel()  {  deinitialize(); }
+    GnaPreparedModel(const Model& model) : PreparedModel("GNA", model), gnaPluginPtr(nullptr),
+                                            isDecoderNw(false), isEnc0Nw(false), isEnc1Nw(false) {
+        runtimeMetrics.reset();
+    }
+    ~GnaPreparedModel()  {
+        std::string nw_name = isDecoderNw?"Decoder":isEnc0Nw?"Encoder0":"Encoder1";
+        std::cout << " ********* " << nw_name
+                    << " ***********" << std::endl;
+        runtimeMetrics.print();
+        deinitialize();
+    }
 
     virtual bool initialize() override;
     virtual bool operationFullyConnected(const Operation& operation) override;
