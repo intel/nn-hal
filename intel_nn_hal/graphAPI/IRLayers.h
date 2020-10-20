@@ -305,15 +305,16 @@ struct GenConvParams {
     std::vector<std::ptrdiff_t> pads_begin;
     std::vector<std::ptrdiff_t> pads_end;
     std::vector<size_t> dilations;
-    const char* pad_type;
+    const char *pad_type;
 };
 
-inline void ConvolutionParamsToGenConvParams(ConvolutionParams &cPrms, GenConvParams & gPrms, IRBlob::Ptr weights, IRBlob::Ptr biases) {
+inline void ConvolutionParamsToGenConvParams(ConvolutionParams &cPrms, GenConvParams &gPrms,
+                                             IRBlob::Ptr weights, IRBlob::Ptr biases) {
     gPrms.groups = cPrms.groups;
-    float* buffer = weights->buffer().as<float*>();
+    float *buffer = weights->buffer().as<float *>();
     gPrms.weightsBuf = {buffer, buffer + weights->size()};
     gPrms.weightsDims = weights->getTensorDesc().getDims();
-    buffer = biases->buffer().as<float*>();
+    buffer = biases->buffer().as<float *>();
     gPrms.biasesBuf = {buffer, buffer + biases->size()};
     gPrms.biasesDims = biases->getTensorDesc().getDims();
     gPrms.strides = {(size_t)cPrms.stride.x, (size_t)cPrms.stride.y};

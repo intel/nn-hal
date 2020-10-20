@@ -38,6 +38,6 @@ int main(int argc, char* argv[]) {
                             deviceType, status);
         joinRpcThreadpool();
     }
-    
+
     return 0;
 }
