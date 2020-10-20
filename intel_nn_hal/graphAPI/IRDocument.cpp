@@ -193,7 +193,6 @@ void IRDocument::saveBlobToIR(std::ostream &binFile,
 
     auto precision = blob->getTensorDesc().getPrecision();
     node.append_attribute("precision").set_value(precision.name());
-
 }
 
 void IRDocument::save(std::ostream &xml_os, std::ostream &bin_os) {

@@ -133,7 +133,8 @@ public:
           mPadreq(EXPL_PAD) {
         g_layer_precision = InferenceEngine::Precision::FP16;
 #ifdef USE_NGRAPH
-        mUseNgraph = isNgraphPropSet(); //TODO:Should additionally check if all the ops are supported
+        mUseNgraph =
+            isNgraphPropSet();  // TODO:Should additionally check if all the ops are supported
         mCreateNgraph = std::make_shared<CreateNgraph>();
 #endif
     }
@@ -175,7 +176,7 @@ public:
     static bool isOperationSupported(const Operation& operation, const Model& model);
 #ifdef USE_NGRAPH
     void ConvertBlobToNHWC(InferenceEngine::TBlob<float>::Ptr blob, uint8_t* buf,
-                    std::vector<uint32_t> opDims);
+                           std::vector<uint32_t> opDims);
 #endif
 
 protected:
