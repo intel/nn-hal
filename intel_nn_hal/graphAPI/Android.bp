@@ -20,7 +20,6 @@ cc_library_static {
 
     cflags: [
         "-std=c++11",
-        "-fPIC",
         "-fPIE",
         "-Wall",
         "-Wno-unused-variable",
@@ -31,6 +30,7 @@ cc_library_static {
         "-D_FORTIFY_SOURCE=2",
         "-fvisibility=default",
         "-fexceptions",
+        "-fPIC",
     ] + [
         "-D__ANDROID__",
         "-DIMPLEMENT_INFERENCE_ENGINE_API",
