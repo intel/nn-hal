@@ -32,6 +32,10 @@ using TANHLayer = InferenceEngine::Builder::TanHLayer;
 using CLAMPLayer = InferenceEngine::Builder::ClampLayer;
 using IRBlob = android::hardware::neuralnetworks::nnhal::IRBlob;
 using OutputPort = android::hardware::neuralnetworks::nnhal::OutputPort;
+using CONCATLayer = InferenceEngine::Builder::ConcatLayer;
+using SPLITLayer = InferenceEngine::Builder::SplitLayer;
+using RESHAPELayer = InferenceEngine::Builder::ReshapeLayer;
+using PERMUTELayer = InferenceEngine::Builder::PermuteLayer;
 
 static void dumpDimensions(const std::string str, const InferenceEngine::SizeVector& dim)
 {
@@ -423,17 +427,6 @@ std::vector<std::string> ModelBuilder::createFullLstm(LstmLayer::LstmParams& par
     outputGateSumLayer.setEltwiseType(ELTWISELayer::SUM);
     idx_t outputGateAddLayerId = getBuilderNetwork()->getBuilder()->addLayer(outputGateSumLayer);
 
-    // Sigmoid
-    idx_t inputGateActivationFn = getBuilderNetwork()->getBuilder()->addLayer(SIGMOIDLayer(getLayerName("sigmoid")) \
-                                  .setPort(Port(cellStateDims, InferenceEngine::Precision::FP32)));
-    idx_t forgetGateActivationFn = getBuilderNetwork()->getBuilder()->addLayer(SIGMOIDLayer(getLayerName("sigmoid")) \
-                                   .setPort(Port(cellStateDims, InferenceEngine::Precision::FP32)));
-
-    idx_t cellGateTanhFn = getBuilderNetwork()->getBuilder()->addLayer(TANHLayer(getLayerName("tanh")) \
-                           .setPort(Port(cellStateDims, InferenceEngine::Precision::FP32)));
-    idx_t outputGateActivationFn = getBuilderNetwork()->getBuilder()->addLayer(SIGMOIDLayer(getLayerName("sigmoid")) \
-                                   .setPort(Port(cellStateDims, InferenceEngine::Precision::FP32)));
-
     ELTWISELayer newCellMulLayer = ELTWISELayer(getLayerName("mul"));
     newCellMulLayer.setEltwiseType(ELTWISELayer::MUL);
     idx_t newCellStateMulLayerId = getBuilderNetwork()->getBuilder()->addLayer(newCellMulLayer);
@@ -484,39 +477,7 @@ std::vector<std::string> ModelBuilder::createFullLstm(LstmLayer::LstmParams& par
         getBuilderNetwork()->getBuilder()->connect({inputGateAddLayerId}, {cellstateToInputGateAddLayerId, 1});
         inputGateAddLayerId = cellstateToInputGateAddLayerId;
     }
-
-    if(params.useLayerNorm)
-    {
-        ConstInLayer = getBuilderNetwork()->getBuilder()->addLayer(INLayer("constInLayer").setPort(Port({1,8})));
-        LN::LayerNorm *inputGateLN = new LN::LayerNorm(inputGateAddLayerId, ConstInLayer, cellSize, getBuilderNetwork()->getBuilder(), "full2");
-        inputGateNormLayerId = inputGateLN->addLayerNorm(params.inputLayerNormWeights.data, params.inputGateBias.data);
-        inputGateAddLayerId = inputGateNormLayerId;
-    }
-    // i_t = sigma(W_{xi}x_t+W_{hi}h_{t-1}+W_{ci}C_{t-1}+b_i)
-    getBuilderNetwork()->getBuilder()->connect({inputGateAddLayerId}, {inputGateActivationFn});
-    getBuilderNetwork()->getBuilder()->connect({inputGateActivationFn}, {newCellStateMulLayerId, 0});
-
-    // cell gate
-    // g(W_{xc}x_t+W_{hc}h_{t-1}+b_c)
-    getBuilderNetwork()->getBuilder()->connect({i2cLayerId}, {cellGateAddLayerId, 0});
-    getBuilderNetwork()->getBuilder()->connect({r2cLayerId}, {cellGateAddLayerId, 1});
-
-    if(params.useLayerNorm)
-    {
-        LN::LayerNorm *cellGateLN = new LN::LayerNorm(cellGateAddLayerId, ConstInLayer, cellSize, getBuilderNetwork()->getBuilder(), "xmean2");
-        cellGateNormLayerId = cellGateLN->addLayerNorm(params.cellLayerNormWeights.data, params.cellBias.data);
-        cellGateAddLayerId = cellGateNormLayerId;
-    }
-
-    getBuilderNetwork()->getBuilder()->connect({cellGateAddLayerId}, {cellGateTanhFn});
-
-    // i_t (dot) g(W_{xc}x_t+W_{hc}h_{t-1}+b_c)
-    getBuilderNetwork()->getBuilder()->connect({cellGateTanhFn}, {newCellStateMulLayerId, 1});
-    getBuilderNetwork()->getBuilder()->connect({newCellStateMulLayerId}, {updateCellSumLayerId, 0});
-
-    // Forget gate
-    // f_t = sigma(W_{xf}x_t+W_{hf}h_{t-1}+b_f)
-    // W_{xf}x_t+W_{hf}h_{t-1}+b_f
+     // forget gate connections
     getBuilderNetwork()->getBuilder()->connect({i2fLayerId}, {forgetGateAddLayerId, 0});
     getBuilderNetwork()->getBuilder()->connect({r2fLayerId}, {forgetGateAddLayerId, 1});
     if (lstmDesc.peepholeEnabled)
@@ -527,39 +488,9 @@ std::vector<std::string> ModelBuilder::createFullLstm(LstmLayer::LstmParams& par
         forgetGateAddLayerId = cellStateToForgetGateAddLayerId;
     }
 
-    if(params.useLayerNorm)
-    {
-        LN::LayerNorm *forgetGateLN = new LN::LayerNorm(forgetGateAddLayerId, ConstInLayer, cellSize, getBuilderNetwork()->getBuilder(), "xmean2");
-        forgetGateNormLayerId = forgetGateLN->addLayerNorm(params.forgetLayerNormWeights.data, params.forgetGateBias.data);
-        forgetGateAddLayerId = forgetGateNormLayerId;
-    }
+    getBuilderNetwork()->getBuilder()->connect({i2cLayerId}, {cellGateAddLayerId, 0});
+    getBuilderNetwork()->getBuilder()->connect({r2cLayerId}, {cellGateAddLayerId, 1});
 
-    // f_t = sigma(W_{xi}x_t+W_{hi}h_{t-1}+W_{ci}C_{t-1}+b_i)
-    getBuilderNetwork()->getBuilder()->connect({forgetGateAddLayerId}, {forgetGateActivationFn});
-    getBuilderNetwork()->getBuilder()->connect({c_t_1Id}, {oldCellStateMulLayerId, 0});
-    getBuilderNetwork()->getBuilder()->connect({forgetGateActivationFn}, {oldCellStateMulLayerId, 1});
-
-    // f_t (dot) C_{t-1} + i_t (dot) g(W_{xc}x_t+W_{hc}h_{t-1}+b_c)
-    getBuilderNetwork()->getBuilder()->connect({oldCellStateMulLayerId}, {updateCellSumLayerId, 1});
-    if (lstmDesc.clippingThresholdCellState)
-    {
-        // C_t = clip(f_t (dot) C_{t-1} + i_t (dot) g(W_{xc}x_t+W_{hc}h_{t-1}+b_c), t_{cell})
-        getBuilderNetwork()->getBuilder()->connect({updateCellSumLayerId}, {cellStateClampLayerId});
-        getBuilderNetwork()->getBuilder()->connect({cellStateClampLayerId}, {c_tId});
-
-        // g(C_t)
-        getBuilderNetwork()->getBuilder()->connect({cellStateClampLayerId}, {outputGateTanhFn});
-    }
-    else
-    {
-        // C_t = f_t (dot) C_{t-1} + i_t (dot) g(W_{xc}x_t+W_{hc}h_{t-1}+b_c)
-        getBuilderNetwork()->getBuilder()->connect({updateCellSumLayerId}, {c_tId});
-
-        // g(C_t)
-        getBuilderNetwork()->getBuilder()->connect({updateCellSumLayerId}, {outputGateTanhFn});
-    }
-
-    // Output Gate (o_t)
     getBuilderNetwork()->getBuilder()->connect({i2oLayerId}, {outputGateAddLayerId, 0});
     getBuilderNetwork()->getBuilder()->connect({r2oLayerId}, {outputGateAddLayerId, 1});
     if (lstmDesc.peepholeEnabled)
@@ -580,18 +511,80 @@ std::vector<std::string> ModelBuilder::createFullLstm(LstmLayer::LstmParams& par
         getBuilderNetwork()->getBuilder()->connect({outputGateAddLayerId}, {cellStateToOutputGateAddLayerId, 1});
         outputGateAddLayerId = cellStateToOutputGateAddLayerId;
     }
-    if(params.useLayerNorm)
-    {
-        LN::LayerNorm *outputGateLN = new LN::LayerNorm(outputGateAddLayerId, ConstInLayer, cellSize, getBuilderNetwork()->getBuilder(), "xmean2");
-        outputGateNormLayerId = outputGateLN->addLayerNorm(params.outputLayerNormWeights.data, params.outputGateBias.data);
-        outputGateAddLayerId = outputGateNormLayerId;
-    }
-    getBuilderNetwork()->getBuilder()->connect({outputGateAddLayerId}, {outputGateActivationFn}); // o_t
-    // o_t = sigma(W_{xo}x_t+W_{ho}h_{t-1}+W_{co}C_t+b_o)
-    // W_{xo}x_t+W_{ho}h_{t-1}
+    
+    // Default is to always use batched Layer Norm 
+    // Keep a flag incase we observe performance regressions 
+    if(params.useLayerNorm) {
+        if(!params.useBatchedLayerNorm) {
+            ConstInLayer = getBuilderNetwork()->getBuilder()->addLayer(INLayer("constInLayer").setPort(Port({1,8})));
+            LN::LayerNorm *inputGateLN = new LN::LayerNorm(inputGateAddLayerId, ConstInLayer, cellSize, getBuilderNetwork()->getBuilder());
+            inputGateNormLayerId = inputGateLN->addLayerNorm(params.inputLayerNormWeights.data, params.inputGateBias.data);
+            inputGateAddLayerId = inputGateNormLayerId;
 
+            LN::LayerNorm *forgetGateLN = new LN::LayerNorm(forgetGateAddLayerId, ConstInLayer, cellSize, getBuilderNetwork()->getBuilder());
+            forgetGateNormLayerId = forgetGateLN->addLayerNorm(params.forgetLayerNormWeights.data, params.forgetGateBias.data);
+            forgetGateAddLayerId = forgetGateNormLayerId;
 
+            LN::LayerNorm *cellGateLN = new LN::LayerNorm(cellGateAddLayerId, ConstInLayer, cellSize, getBuilderNetwork()->getBuilder());
+            cellGateNormLayerId = cellGateLN->addLayerNorm(params.cellLayerNormWeights.data, params.cellBias.data);
+            cellGateAddLayerId = cellGateNormLayerId;
+
+            LN::LayerNorm *outputGateLN = new LN::LayerNorm(outputGateAddLayerId, ConstInLayer, cellSize, getBuilderNetwork()->getBuilder());
+            outputGateNormLayerId = outputGateLN->addLayerNorm(params.outputLayerNormWeights.data, params.outputGateBias.data);
+            outputGateAddLayerId = outputGateNormLayerId;
+        }
+        else {
+            ConstInLayer = getBuilderNetwork()->getBuilder()->addLayer(INLayer("constInLayer").setPort(Port({1,32})));
+            LN::BatchedLayerNorm *BatchedLN = new LN::BatchedLayerNorm(inputGateAddLayerId, forgetGateAddLayerId, cellGateAddLayerId, outputGateAddLayerId,
+                                                                        ConstInLayer, cellSize, getBuilderNetwork()->getBuilder(), "norm");
+            idx_t LNid = BatchedLN->addBatchedLayerNorm(params);
+            inputGateAddLayerId = BatchedLN->getIGateLNId();
+            forgetGateAddLayerId = BatchedLN->getFGateLNId();
+            cellGateAddLayerId = BatchedLN->getCGateLNId();
+            outputGateAddLayerId = BatchedLN->getOGateLNId();
+        }
+    }  
+    // i_t = sigma(W_{xi}x_t+W_{hi}h_{t-1}+W_{ci}C_{t-1}+b_i)
+    idx_t inputGateActivationFn = getBuilderNetwork()->getBuilder()->addLayer({inputGateAddLayerId}, SIGMOIDLayer(getLayerName("sigmoid")) \
+                                  .setPort(Port(cellStateDims)));
+    // f_t = sigma(W_{xf}x_t+W_{hf}h_{t-1}+b_f)
+    idx_t forgetGateActivationFn = getBuilderNetwork()->getBuilder()->addLayer({forgetGateAddLayerId}, SIGMOIDLayer(getLayerName("sigmoid")) \
+                                   .setPort(Port(cellStateDims)));
+    // g(W_{xc}x_t+W_{hc}h_{t-1}+b_c)
+    idx_t cellGateTanhFn = getBuilderNetwork()->getBuilder()->addLayer({cellGateAddLayerId}, TANHLayer(getLayerName("tanh")) \
+                           .setPort(Port(cellStateDims)));
     //o_t = sigma(W_{xo}x_t+W_{ho}h_{t-1}+W_{co}C_t+b_o)
+    idx_t outputGateActivationFn = getBuilderNetwork()->getBuilder()->addLayer({outputGateAddLayerId}, SIGMOIDLayer(getLayerName("sigmoid")) \
+                                   .setPort(Port(cellStateDims)));
+
+    // i_t (dot) g(W_{xc}x_t+W_{hc}h_{t-1}+b_c)
+    getBuilderNetwork()->getBuilder()->connect({inputGateActivationFn}, {newCellStateMulLayerId, 0});
+    getBuilderNetwork()->getBuilder()->connect({cellGateTanhFn}, {newCellStateMulLayerId, 1});
+
+    // f_t (dot) C_{t-1} + i_t (dot) g(W_{xc}x_t+W_{hc}h_{t-1}+b_c)
+    getBuilderNetwork()->getBuilder()->connect({newCellStateMulLayerId}, {updateCellSumLayerId, 0});
+    getBuilderNetwork()->getBuilder()->connect({oldCellStateMulLayerId}, {updateCellSumLayerId, 1});
+
+    getBuilderNetwork()->getBuilder()->connect({c_t_1Id}, {oldCellStateMulLayerId, 0});
+    getBuilderNetwork()->getBuilder()->connect({forgetGateActivationFn}, {oldCellStateMulLayerId, 1});
+
+    if (lstmDesc.clippingThresholdCellState)
+    {
+        // C_t = clip(f_t (dot) C_{t-1} + i_t (dot) g(W_{xc}x_t+W_{hc}h_{t-1}+b_c), t_{cell})
+        getBuilderNetwork()->getBuilder()->connect({updateCellSumLayerId}, {cellStateClampLayerId});
+        getBuilderNetwork()->getBuilder()->connect({cellStateClampLayerId}, {c_tId});
+
+        // g(C_t)
+        getBuilderNetwork()->getBuilder()->connect({cellStateClampLayerId}, {outputGateTanhFn});
+    }
+    else
+    {
+        // C_t = f_t (dot) C_{t-1} + i_t (dot) g(W_{xc}x_t+W_{hc}h_{t-1}+b_c)
+        getBuilderNetwork()->getBuilder()->connect({updateCellSumLayerId}, {c_tId});
+
+        // g(C_t)
+        getBuilderNetwork()->getBuilder()->connect({updateCellSumLayerId}, {outputGateTanhFn});
+    }
 
     // h_t = o_t dot g(C_t)
     getBuilderNetwork()->getBuilder()->connect({outputGateActivationFn}, {newOutputMulLayerId, 0});

@@ -31,11 +31,13 @@
  */
 
 #include "../IRLayers.h"
+#include "IRBuilder.h"
 #include "ie_network.hpp"
 #include "ie_builders.hpp"
 
 namespace IEBuilder = InferenceEngine::Builder;
 using IRBlob = android::hardware::neuralnetworks::nnhal::IRBlob;
+using LstmParams = android::hardware::neuralnetworks::nnhal::IRBuilder::LstmLayer::LstmParams;
 using idx_t = InferenceEngine::idx_t;
 
 namespace LN
@@ -55,25 +57,29 @@ public:
 
 class LayerNorm
 {
-    using idx_t = InferenceEngine::idx_t;
 
 private:
     idx_t inputLayerId;
-    idx_t inputLayerId2;
+
     idx_t outputLayerId;
     IEBuilder::Network* builderNetwork;
-    unsigned long N;
     int layer_name_count = 0;
     std::string output_node;
 
 public:
-    LayerNorm(idx_t inLayer, idx_t inLayer2, unsigned long Num, IEBuilder::Network* bNetwork, std::string output)
+    unsigned long N;
+    idx_t inputLayerId2;
+    using idx_t = InferenceEngine::idx_t;
+    LayerNorm(idx_t inLayer, idx_t inLayer2, unsigned long Num, IEBuilder::Network* bNetwork, std::string output = "norm")
     {
         inputLayerId = inLayer;
         inputLayerId2 = inLayer2;
         N = Num;
         builderNetwork = bNetwork;
         output_node = output;
+    }
+    IEBuilder::Network* getBuiltNetwork() {
+        return builderNetwork;
     }
 
     IRBlob::Ptr generateBlobwithData(InferenceEngine::SizeVector dims, InferenceEngine::Layout layout, std::vector<std::vector<float>> data_to_set)
@@ -109,8 +115,44 @@ public:
         return blob;
     }
 
-    idx_t addLayerNorm(IRBlob::Ptr norm_weights, IRBlob::Ptr norm_biases);
+    virtual idx_t addLayerNorm(IRBlob::Ptr norm_weights, IRBlob::Ptr norm_biases);
     idx_t add_Node(idx_t prevLayerID, BuilderNode *nodeToAdd, bool bias, int outputNum);
 
 };
+
+class BatchedLayerNorm : public LayerNorm {
+    private:
+        idx_t inputGateLayerId;
+        idx_t forgetGateLayerId;
+        idx_t outputGateLayerId;
+        idx_t cellGateLayerId;
+
+    public:
+    BatchedLayerNorm(idx_t inputGateLayer, idx_t forgetGateLayer, idx_t cellGateLayer, idx_t outputGateLayer, idx_t inLayer2, 
+                    unsigned long Num, IEBuilder::Network* bNetwork, std::string output = "norm") :
+                    LayerNorm(0, inLayer2, Num, bNetwork, output)
+                    {
+                        inputGateLayerId = inputGateLayer;
+                        forgetGateLayerId = forgetGateLayer;
+                        cellGateLayerId = cellGateLayer;
+                        outputGateLayerId = outputGateLayer;
+                        std::cout << "Initializing Batched LayerNorm\n";
+                    }
+
+    idx_t addBatchedLayerNorm(LstmParams& params);
+    idx_t getIGateLNId() {
+        return inputGateLayerId;
+    }
+    idx_t getFGateLNId() {
+        return forgetGateLayerId;
+    }
+    idx_t getCGateLNId() {
+        return cellGateLayerId;
+    }
+    idx_t getOGateLNId() {
+        return outputGateLayerId;
+    }
+
+};
+
 }

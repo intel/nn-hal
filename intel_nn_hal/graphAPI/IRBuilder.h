@@ -86,6 +86,7 @@ struct LstmParams
     LstmCellData cellLayerNormWeights;
 
     bool useLayerNorm;
+    bool useBatchedLayerNorm;
     int  activationFunction;
 };
 

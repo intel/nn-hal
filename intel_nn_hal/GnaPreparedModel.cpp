@@ -715,6 +715,7 @@ bool GnaPreparedModel::operationLSTM(const Operation& operation)
     params.useLayerNorm = false;
     if (operation.inputs.size() == 27) {
         params.useLayerNorm = true;
+        params.useBatchedLayerNorm = true;
     }
 
     VLOG(L1, "Lstm cell description %s", lstmDescription.c_str());
