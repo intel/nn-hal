@@ -103,6 +103,11 @@ std::shared_ptr<InferenceEngine::ICNNNetwork> ModelBuilder::convertBuilder()
     return cnnNetwork;
 }
 
+/*OutputPort ModelBuilder::createAdd(BuilderFCLayer::FCParams& params, IRBlob::Ptr input,
+                                  std::vector<std::string>& inputLayerNames)
+{*/
+
+
 OutputPort ModelBuilder::createFC(BuilderFCLayer::FCParams& params, IRBlob::Ptr input,
                                   std::vector<std::string>& inputLayerNames)
 {

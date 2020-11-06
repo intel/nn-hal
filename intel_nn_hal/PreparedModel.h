@@ -194,6 +194,7 @@ protected:
 
     InferenceEngine::ICNNNetwork  *mCnnNetbuilder;
     std::map<int, IRBlob::Ptr> mOpIndex2BlobMap;
+    std::unordered_map<std::string, IRBlob::Ptr> mLayerNameBlobMap;
 };
 
 class VpuPreparedModel : public PreparedModel {
