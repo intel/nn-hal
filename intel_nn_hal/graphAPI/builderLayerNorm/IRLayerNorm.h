@@ -60,31 +60,32 @@ class LayerNorm
 
 private:
     idx_t inputLayerId;
-
     idx_t outputLayerId;
     IEBuilder::Network* builderNetwork;
     int layer_name_count = 0;
     std::string output_node;
+    unsigned long N;
 
 public:
-    unsigned long N;
-    idx_t inputLayerId2;
     using idx_t = InferenceEngine::idx_t;
-    LayerNorm(idx_t inLayer, idx_t inLayer2, unsigned long Num, IEBuilder::Network* bNetwork, std::string output = "norm")
+    LayerNorm(idx_t inLayer, unsigned long Num, IEBuilder::Network* bNetwork, std::string output = "norm")
     {
         inputLayerId = inLayer;
-        inputLayerId2 = inLayer2;
         N = Num;
         builderNetwork = bNetwork;
         output_node = output;
     }
+
     IEBuilder::Network* getBuiltNetwork() {
         return builderNetwork;
     }
 
+    unsigned long getCellSize() {
+        return N;
+    }
+
     IRBlob::Ptr generateBlobwithData(InferenceEngine::SizeVector dims, InferenceEngine::Layout layout, std::vector<std::vector<float>> data_to_set)
     {
-
         InferenceEngine::TensorDesc td(InferenceEngine::Precision::FP32, dims, layout);
 
         InferenceEngine::TBlob<float>::Ptr blob =
@@ -128,15 +129,14 @@ class BatchedLayerNorm : public LayerNorm {
         idx_t cellGateLayerId;
 
     public:
-    BatchedLayerNorm(idx_t inputGateLayer, idx_t forgetGateLayer, idx_t cellGateLayer, idx_t outputGateLayer, idx_t inLayer2, 
-                    unsigned long Num, IEBuilder::Network* bNetwork, std::string output = "norm") :
-                    LayerNorm(0, inLayer2, Num, bNetwork, output)
+    BatchedLayerNorm(idx_t inputGateLayer, idx_t forgetGateLayer, idx_t cellGateLayer, idx_t outputGateLayer,
+                    unsigned long NumCell, IEBuilder::Network* bNetwork, std::string output = "norm") :
+                    LayerNorm(0, NumCell, bNetwork, output)
                     {
                         inputGateLayerId = inputGateLayer;
                         forgetGateLayerId = forgetGateLayer;
                         cellGateLayerId = cellGateLayer;
                         outputGateLayerId = outputGateLayer;
-                        std::cout << "Initializing Batched LayerNorm\n";
                     }
 
     idx_t addBatchedLayerNorm(LstmParams& params);
@@ -152,7 +152,6 @@ class BatchedLayerNorm : public LayerNorm {
     idx_t getOGateLNId() {
         return outputGateLayerId;
     }
-
 };
 
 }

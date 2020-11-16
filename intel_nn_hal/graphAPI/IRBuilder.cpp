@@ -516,27 +516,25 @@ std::vector<std::string> ModelBuilder::createFullLstm(LstmLayer::LstmParams& par
     // Keep a flag incase we observe performance regressions 
     if(params.useLayerNorm) {
         if(!params.useBatchedLayerNorm) {
-            ConstInLayer = getBuilderNetwork()->getBuilder()->addLayer(INLayer("constInLayer").setPort(Port({1,8})));
-            LN::LayerNorm *inputGateLN = new LN::LayerNorm(inputGateAddLayerId, ConstInLayer, cellSize, getBuilderNetwork()->getBuilder());
+            LN::LayerNorm *inputGateLN = new LN::LayerNorm(inputGateAddLayerId, cellSize, getBuilderNetwork()->getBuilder());
             inputGateNormLayerId = inputGateLN->addLayerNorm(params.inputLayerNormWeights.data, params.inputGateBias.data);
             inputGateAddLayerId = inputGateNormLayerId;
 
-            LN::LayerNorm *forgetGateLN = new LN::LayerNorm(forgetGateAddLayerId, ConstInLayer, cellSize, getBuilderNetwork()->getBuilder());
+            LN::LayerNorm *forgetGateLN = new LN::LayerNorm(forgetGateAddLayerId, cellSize, getBuilderNetwork()->getBuilder());
             forgetGateNormLayerId = forgetGateLN->addLayerNorm(params.forgetLayerNormWeights.data, params.forgetGateBias.data);
             forgetGateAddLayerId = forgetGateNormLayerId;
 
-            LN::LayerNorm *cellGateLN = new LN::LayerNorm(cellGateAddLayerId, ConstInLayer, cellSize, getBuilderNetwork()->getBuilder());
+            LN::LayerNorm *cellGateLN = new LN::LayerNorm(cellGateAddLayerId, cellSize, getBuilderNetwork()->getBuilder());
             cellGateNormLayerId = cellGateLN->addLayerNorm(params.cellLayerNormWeights.data, params.cellBias.data);
             cellGateAddLayerId = cellGateNormLayerId;
 
-            LN::LayerNorm *outputGateLN = new LN::LayerNorm(outputGateAddLayerId, ConstInLayer, cellSize, getBuilderNetwork()->getBuilder());
+            LN::LayerNorm *outputGateLN = new LN::LayerNorm(outputGateAddLayerId, cellSize, getBuilderNetwork()->getBuilder());
             outputGateNormLayerId = outputGateLN->addLayerNorm(params.outputLayerNormWeights.data, params.outputGateBias.data);
             outputGateAddLayerId = outputGateNormLayerId;
         }
         else {
-            ConstInLayer = getBuilderNetwork()->getBuilder()->addLayer(INLayer("constInLayer").setPort(Port({1,32})));
             LN::BatchedLayerNorm *BatchedLN = new LN::BatchedLayerNorm(inputGateAddLayerId, forgetGateAddLayerId, cellGateAddLayerId, outputGateAddLayerId,
-                                                                        ConstInLayer, cellSize, getBuilderNetwork()->getBuilder(), "norm");
+                                                                         cellSize, getBuilderNetwork()->getBuilder(), "norm");
             idx_t LNid = BatchedLN->addBatchedLayerNorm(params);
             inputGateAddLayerId = BatchedLN->getIGateLNId();
             forgetGateAddLayerId = BatchedLN->getFGateLNId();

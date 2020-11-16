@@ -206,8 +206,6 @@ int main(int argc, char* argv[]) {
 
     inputLayerId = LNBuilderModel->getBuilderNetwork()->getBuilder()->addLayer(INLayer("input") \
                                                     .setPort(Port({1,cellSize})));
-    inputLayerId2 = LNBuilderModel->getBuilderNetwork()->getBuilder()->addLayer(INLayer("input2") \
-                                                    .setPort(Port({1,8})));
 
     LN::LayerNorm *LN = new LN::LayerNorm(inputLayerId, inputLayerId2, cellSize, LNBuilderModel->getBuilderNetwork()->getBuilder(), output_node);
 
