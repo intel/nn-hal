@@ -102,7 +102,7 @@ public:
 	    ALOGI("infer request created");
     }
 
-    void loadNetwork(InferenceEngine::CNNNetwork& passed_network);
+    void loadNetwork(InferenceEngine::CNNNetwork& passed_network, bool isDecoderNw);
 
     void prepareInput();
 

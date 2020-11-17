@@ -151,7 +151,7 @@ protected:
 					     uint32_t index) {
 	    uint32_t inputIndex = operation.inputs[index];
 	    const auto operand = mModel.main.operands[inputIndex];
-	    ALOGE("operand index = %d", inputIndex);
+	    VLOG("operand index = %d", inputIndex);
 	    const auto value = GetConstOperand<T>(model, inputIndex);
 	    VLOG(L1, "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
 	    VLOG(L1, "Operation input index: %d, operand index: %d", index, inputIndex);

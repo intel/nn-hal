@@ -180,7 +180,7 @@ bool GnaPreparedModel::initialize() {
     runtimeMetrics.irBuild_time = (double(millisecondsDuration(irbuild_end, irbuild_start)));
     gnaPluginPtr = new GnaNetwork(network, "GNA");
     InferenceEngine::CNNNetwork passed_network({network});
-    gnaPluginPtr->loadNetwork(passed_network);
+    gnaPluginPtr->loadNetwork(passed_network, isDecoderNw);
     time_point gnabuild_end = now();
     runtimeMetrics.nw_load_time = (double(millisecondsDuration(gnabuild_end, irbuild_end)));
     gnaPluginPtr->queryState();
@@ -397,7 +397,7 @@ void GnaPreparedModel::asyncExecute(const V1_0_Request& request, MeasureTiming m
         driverEnd = now();
         Timing timing = {.timeOnDevice = uint64_t(microsecondsDuration(deviceEnd, deviceStart)),
                          .timeInDriver = uint64_t(microsecondsDuration(deviceEnd, deviceStart))};
-        ALOGE("Driver::asyncExecute timing = %s", toString(timing).c_str());
+        VLOG("Driver::asyncExecute timing = %s", toString(timing).c_str());
         cb->notify(V1_0_ErrorStatus::NONE);
     } else {
         VLOG(L1, "MeasureTiming - No. Returning with no error");

@@ -65,20 +65,23 @@ void sumPerformanceCounters(std::map<std::string, InferenceEngine::InferenceEngi
 			                              totalPerfCounters[pair.first].realTime_uSec += pair.second.realTime_uSec;
 						                                     }
 }
-void GnaNetwork::loadNetwork(InferenceEngine::CNNNetwork& passed_network)
+void GnaNetwork::loadNetwork(InferenceEngine::CNNNetwork& passed_network, bool isDecoderNw)
 {
-    ALOGI("IENetwork.h void loadNetwork() GNA device");
-    //InferencePlugin plugin(enginePtr);
-
     /** Specifying the precision and layout of input data provided by the user.
       * This should be called before load of the network to the plugin **/
-    ALOGI("IENetwork.h TargetDevice eGNA");
     std::map<std::string, std::string> config;
     //config[CONFIG_KEY(LOG_LEVEL)] = CONFIG_VALUE(LOG_INFO);
     std::map<std::string, std::string> gnaPluginConfig;
     gnaPluginConfig[GNAConfigParams::KEY_GNA_DEVICE_MODE] = "GNA_HW";
     gnaPluginConfig[GNAConfigParams::KEY_GNA_PRECISION] = "I8";
     gnaPluginConfig[PluginConfigParams::KEY_PERF_COUNT] = PluginConfigParams::YES;
+    if (isDecoderNw) {
+        gnaPluginConfig[PluginConfigParams::KEY_IDENTITY_SCALE_FACTOR] =  std::to_string(512);
+    }
+    else {
+        gnaPluginConfig[PluginConfigParams::KEY_IDENTITY_SCALE_FACTOR] =  std::to_string(256);
+    }
+
     std::string scaleFactorConfigKey_1 = GNA_CONFIG_KEY(SCALE_FACTOR) + std::string("_") + std::to_string(0);
     gnaPluginConfig[scaleFactorConfigKey_1] = std::to_string(2048);
     std::string scaleFactorConfigKey_2 = GNA_CONFIG_KEY(SCALE_FACTOR) + std::string("_") + std::to_string(1);
@@ -97,7 +100,6 @@ void GnaNetwork::loadNetwork(InferenceEngine::CNNNetwork& passed_network)
     gnaPluginConfig[GNA_CONFIG_KEY(PWL_UNIFORM_DESIGN)] = CONFIG_VALUE(NO);
     //gnaPluginConfig[GNA_CONFIG_KEY(LIB_N_THREADS)] = "3";
     config.insert(std::begin(gnaPluginConfig), std::end(gnaPluginConfig));
-    ALOGI("IENetwork.h Create plugin");
 
 	  InferenceEngine::Core ie;
 	  executable_network = ie.LoadNetwork(passed_network, "GNA", config);

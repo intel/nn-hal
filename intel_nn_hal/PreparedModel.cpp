@@ -335,7 +335,6 @@ void PreparedModel::SetOperandMemory(const Model& model, uint32_t index, uint32_
 bool PreparedModel::initializeRunTimeOperandInfo() {
     // initialize runtime operand info from model.main.
     const size_t count = mModel.main.operands.size();
-    ALOGE("OperandType = %d\n", count);
     if (!count) {
         VLOG(L1, "NNERR:Operand Count is 0");
         return false;
