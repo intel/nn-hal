@@ -19,16 +19,6 @@ cc_library_shared {
     include_dirs: [
         "frameworks/ml/nn/common/include",
         "frameworks/ml/nn/runtime/include",
-        "external/grpc-grpc",
-        "external/grpc-grpc/include",
-        "external/grpc-grpc/third_party/cares",
-        "external/grpc-grpc/third_party/cares/config_android",
-        "external/grpc-grpc/src/core/ext/filters/client_channel",
-        "external/grpc-grpc/third_party/nanopb",
-        "external/protobuf",
-        "external/protobuf/src",
-        "external/protobuf/config",
-        "external/protobuf/android"
     ],
 
     header_libs: [
@@ -93,8 +83,6 @@ cc_library_shared {
         "libinference_engine",
         "libinference_engine_legacy",
         "libngraph",
-        "libgrpc++",
-        "libprotobuf-cpp-full"
     ],
 
     static_libs: [
@@ -103,45 +91,6 @@ cc_library_shared {
         "libneuralnetworks_common",
     ],
 
-    generated_headers: [
-        "HelloworldProtoStub_h",
-    ],
-    generated_sources: [
-        "HelloworldProtoStub_cc",
-    ],
-
-}
-
-genrule {
-    name: "HelloworldProtoStub_h",
-    tools: [
-        "aprotoc",
-        "protoc-gen-grpc-cpp-plugin",
-    ],
-    cmd: "$(location aprotoc) -I$$(dirname $(in)) -Iexternal/protobuf/src --plugin=protoc-gen-grpc=$(location protoc-gen-grpc-cpp-plugin) $(in) --grpc_out=$(genDir) --cpp_out=$(genDir)",
-    srcs: [
-        "proto/helloworld.proto",
-    ],
-    out: [
-        "helloworld.pb.h",
-        "helloworld.grpc.pb.h",
-    ],
-}
-
-genrule {
-    name: "HelloworldProtoStub_cc",
-    tools: [
-        "aprotoc",
-        "protoc-gen-grpc-cpp-plugin",
-    ],
-    cmd: "$(location aprotoc) -I$$(dirname $(in)) -Iexternal/protobuf/src --plugin=protoc-gen-grpc=$(location protoc-gen-grpc-cpp-plugin) $(in) --grpc_out=$(genDir) --cpp_out=$(genDir)",
-    srcs: [
-        "proto/helloworld.proto",
-    ],
-    out: [
-        "helloworld.pb.cc",
-        "helloworld.grpc.pb.cc",
-    ],
 }
 
 //##############################################################

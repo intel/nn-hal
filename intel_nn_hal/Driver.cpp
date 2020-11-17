@@ -22,21 +22,6 @@
 #include "PreparedModel.h"
 #include "ValidateHal.h"
 
-// sample gRPC client connection headers
-#include <grpcpp/grpcpp.h>
-#include <iostream>
-#include <memory>
-#include <string>
-#include "GreeterClient.h"
-#include "helloworld.grpc.pb.h"
-
-using grpc::Channel;
-using grpc::ClientContext;
-using grpc::Status;
-using helloworld::Greeter;
-using helloworld::HelloReply;
-using helloworld::HelloRequest;
-
 namespace android {
 namespace hardware {
 namespace neuralnetworks {
@@ -93,12 +78,6 @@ Return<ErrorStatus> Driver::prepareModel_1_2(const Model& model, ExecutionPrefer
                                              const hidl_vec<hidl_handle>&, const HidlToken&,
                                              const sp<V1_2::IPreparedModelCallback>& callback) {
     ALOGI("Entering %s", __func__);
-
-    // sample gRPC client connection code
-    GreeterClient greeter(
-        grpc::CreateChannel("localhost:50051", grpc::InsecureChannelCredentials()));
-    auto reply = greeter.SayHello("world");
-    ALOGI("***********GRPC server response************* %s", reply.c_str());
 
     if (callback.get() == nullptr) {
         ALOGI("invalid callback passed to prepareModel");
