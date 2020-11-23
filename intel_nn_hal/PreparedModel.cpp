@@ -417,7 +417,7 @@ bool PreparedModel::initializeRunTimeOperandInfo() {
     return true;
 }
 
-bool PreparedModel::initialize() {
+bool PreparedModel::initialize(const hidl_vec<hidl_handle>& modelCache, const HidlToken& token) {
     VLOG(L1, "initialize");
     bool success = false;
 
@@ -536,6 +536,11 @@ bool PreparedModel::initialize() {
     enginePtr->loadNetwork();
 
     return true;
+}
+
+bool PreparedModel::initializeFromCache(const hidl_vec<hidl_handle>& modelCache,  const HidlToken& token) {
+    std::cout << "Inside initializeFromCache" << std::endl;
+    return false;
 }
 
 void PreparedModel::deinitialize() {

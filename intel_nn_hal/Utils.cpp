@@ -513,6 +513,14 @@ void writeBufferToFile(std::string filename,
     ofs.close();
 }
 
+std::string getTokenString(const HidlToken& token) {
+    std::string tokenStr(ANEURALNETWORKS_BYTE_SIZE_OF_CACHE_TOKEN * 2 + 1, '0');
+    for (uint32_t i = 0; i < ANEURALNETWORKS_BYTE_SIZE_OF_CACHE_TOKEN; i++) {
+        tokenStr[i * 2] = 'A' + (token[i] & 0x0F);
+        tokenStr[i * 2 + 1] = 'A' + (token[i] >> 4);
+    }
+    return  tokenStr;
+}
 }
 }
 }

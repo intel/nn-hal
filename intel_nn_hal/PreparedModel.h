@@ -91,8 +91,26 @@ public:
             g_layer_precision = InferenceEngine::Precision::UNSPECIFIED;
     }
 
+    PreparedModel(const std::string device)
+        : mTargetDevice(device),
+          mNet("nnNet"),
+          enginePtr(nullptr),
+          mPadreq(EXPL_PAD) {
+        if (mTargetDevice == "CPU" || mTargetDevice == "GPU")
+            g_layer_precision = InferenceEngine::Precision::FP32;
+        else if (mTargetDevice == "MYRIAD")
+            g_layer_precision = InferenceEngine::Precision::FP16;
+        else if (mTargetDevice == "GNA")
+            g_layer_precision = InferenceEngine::Precision::FP32;
+        else
+            g_layer_precision = InferenceEngine::Precision::UNSPECIFIED;
+    }
+
     ~PreparedModel() override { deinitialize(); }
-    virtual bool initialize();
+    virtual bool initialize(const hidl_vec<hidl_handle>& modelCache, const HidlToken& token);
+
+    virtual bool initializeFromCache(const hidl_vec<hidl_handle>& modelCache, const HidlToken& token);
+
     virtual Return<V1_0_ErrorStatus> execute(const V1_0_Request& request,
                                 const sp<V1_0::IExecutionCallback>& callback) override;
 
@@ -194,7 +212,6 @@ protected:
 
     InferenceEngine::ICNNNetwork  *mCnnNetbuilder;
     std::map<int, IRBlob::Ptr> mOpIndex2BlobMap;
-    std::unordered_map<std::string, IRBlob::Ptr> mLayerNameBlobMap;
 };
 
 class VpuPreparedModel : public PreparedModel {

@@ -64,6 +64,15 @@ static sp<PreparedModel> ModelFactory(const char* name, const Model& model) {
     return preparedModel;
 }
 
+static sp<PreparedModel> ModelFactory(const char* name) {
+    sp<PreparedModel> preparedModel = NULL;
+    
+    if (strcmp(name, "GNA") == 0)
+        preparedModel = new GnaPreparedModel();
+
+    return preparedModel;
+}
+
 Return<V1_0_ErrorStatus> Driver::prepareModel(const V1_0_Model& model,
                                          const sp<V1_0::IPreparedModelCallback>& callback) {
     VLOG("Entering %s", __func__);
@@ -91,8 +100,8 @@ Return<V1_0_ErrorStatus> Driver::prepareModel_1_2(const V1_2_Model& model,
 Return<ErrorStatus> Driver::prepareModel_1_3(const Model& model, ExecutionPreference preference,
 					     Priority priority,
 					     const OptionalTimePoint& deadline,
-                                             const hidl_vec<hidl_handle>&,
-                                             const hidl_vec<hidl_handle>&, const HidlToken&,
+                                             const hidl_vec<hidl_handle>& modelCache,
+                                             const hidl_vec<hidl_handle>& dataCache, const HidlToken& token,
                                              const sp<V1_3::IPreparedModelCallback>& callback) {
     VLOG("Entering %s", __func__);
 
@@ -112,7 +121,7 @@ Return<ErrorStatus> Driver::prepareModel_1_3(const Model& model, ExecutionPrefer
         return ErrorStatus::INVALID_ARGUMENT;
     }
 
-    if (!preparedModel->initialize()) {
+    if (!preparedModel->initialize(modelCache, token)) {
         ALOGE("failed to initialize preparedmodel");
         callback->notify(V1_0_ErrorStatus::INVALID_ARGUMENT, nullptr);
         return ErrorStatus::NONE;
@@ -148,19 +157,38 @@ Return<void> Driver::getSupportedExtensions(getSupportedExtensions_cb cb) {
 Return<void> Driver::getNumberOfCacheFilesNeeded(getNumberOfCacheFilesNeeded_cb cb) {
     VLOG("Entering %s", __func__);
     // Set both numbers to be 0 for cache not supported.
-    cb(V1_0_ErrorStatus::NONE, /*numModelCache=*/0, /*numDataCache=*/0);
+    cb(V1_0_ErrorStatus::NONE, 3, 0);
     return Void();
 }
 
 Return<ErrorStatus> Driver::prepareModelFromCache_1_3(
     const OptionalTimePoint&,
+    const hidl_vec<hidl_handle>& modelCache,
     const hidl_vec<hidl_handle>&,
-    const hidl_vec<hidl_handle>&,
-    const HidlToken&,
+    const HidlToken& token,
     const sp<V1_3::IPreparedModelCallback>& callback) {
     VLOG("Entering %s", __func__);
-    callback->notify_1_2(V1_0_ErrorStatus::GENERAL_FAILURE, nullptr);
-    return ErrorStatus::GENERAL_FAILURE;
+	
+    if (callback.get() == nullptr) {
+        ALOGI("invalid callback passed to prepareModel");
+        return ErrorStatus::INVALID_ARGUMENT;
+    }
+
+    // TODO: make asynchronous later
+    sp<PreparedModel> preparedModel = ModelFactory(mName.c_str());
+    if (preparedModel == NULL) {
+        ALOGI("failed to create preparedmodel");
+        return ErrorStatus::INVALID_ARGUMENT;
+    }
+
+    bool success = preparedModel->initializeFromCache(modelCache, token);
+    if (success) {
+        callback->notify(V1_0_ErrorStatus::NONE, preparedModel);
+        return ErrorStatus::NONE;
+    } else {
+        callback->notify(V1_0_ErrorStatus::GENERAL_FAILURE, preparedModel);
+        return ErrorStatus::GENERAL_FAILURE;
+    }
 }
 
 Return<V1_0_ErrorStatus> Driver::prepareModelFromCache(

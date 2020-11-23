@@ -38,6 +38,8 @@ class GnaPreparedModel : public PreparedModel {
     std::map<uint32_t, LayerInfo> mInputPorts;
     std::map<uint32_t, std::string> mOutputToLayerMap;
     std::vector<uint32_t> mlayerInputIndices; /* to be filled during the infer call. Need to optimize */
+    std::vector<uint32_t> mModelInputIndices;
+    std::vector<uint32_t> mModelOutputIndices;
 
     IRBuilder::ModelBuilder* mBuilderModel;
     GnaNetwork* gnaPluginPtr;
@@ -49,6 +51,10 @@ public:
                                             isDecoderNw(false), isEnc0Nw(false), isEnc1Nw(false) {
         runtimeMetrics.reset();
     }
+	GnaPreparedModel() : PreparedModel("GNA"), gnaPluginPtr(nullptr),
+                                            isDecoderNw(false), isEnc0Nw(false), isEnc1Nw(false) {
+        runtimeMetrics.reset();
+    }
     ~GnaPreparedModel()  {
         std::string nw_name = isDecoderNw?"Decoder":isEnc0Nw?"Encoder0":"Encoder1";
         std::cout << " ********* " << nw_name
@@ -57,7 +63,8 @@ public:
         deinitialize();
     }
 
-    virtual bool initialize() override;
+    virtual bool initialize(const hidl_vec<hidl_handle>& modelCache, const HidlToken& token) override;
+    virtual bool initializeFromCache(const hidl_vec<hidl_handle>& modelCache, const HidlToken& token) override;
     virtual bool operationFullyConnected(const Operation& operation) override;
 
     virtual Blob::Ptr GetConstOperandAsTensor(int operand_index, int operation_idx) override;
@@ -70,6 +77,7 @@ public:
     }
 
     virtual void initializeInput() override;
+    void initializeInput(std::vector<uint32_t>& indexVec);
     virtual bool finalizeOutput() override;
 
     bool operationLSTM(const Operation& operation);

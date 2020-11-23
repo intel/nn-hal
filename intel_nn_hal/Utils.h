@@ -12,11 +12,13 @@
 #include <android-base/logging.h>
 #include <android/log.h>
 #include <log/log.h>
-#include <fstream>
+#include <NeuralNetworks.h>
 #include <thread>
 #include "ValidateHal.h"
 #include "IRBuilder.h"
 #include "Driver.h"
+
+//#define PERF_COUNTERS
 
 enum DebugLevel {
     L0,
@@ -393,6 +395,8 @@ typedef struct _metrics{
         std::cout << outputlog.str();
     }
 } metrics;
+
+std::string getTokenString(const HidlToken& token);
 }
 }
 }

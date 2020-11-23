@@ -74,14 +74,15 @@ void GnaNetwork::loadNetwork(InferenceEngine::CNNNetwork& passed_network, bool i
     std::map<std::string, std::string> gnaPluginConfig;
     gnaPluginConfig[GNAConfigParams::KEY_GNA_DEVICE_MODE] = "GNA_HW";
     gnaPluginConfig[GNAConfigParams::KEY_GNA_PRECISION] = "I8";
+#ifdef PERF_COUNTERS
     gnaPluginConfig[PluginConfigParams::KEY_PERF_COUNT] = PluginConfigParams::YES;
+#endif
     if (isDecoderNw) {
         gnaPluginConfig[PluginConfigParams::KEY_IDENTITY_SCALE_FACTOR] =  std::to_string(512);
     }
     else {
         gnaPluginConfig[PluginConfigParams::KEY_IDENTITY_SCALE_FACTOR] =  std::to_string(256);
     }
-
     std::string scaleFactorConfigKey_1 = GNA_CONFIG_KEY(SCALE_FACTOR) + std::string("_") + std::to_string(0);
     gnaPluginConfig[scaleFactorConfigKey_1] = std::to_string(2048);
     std::string scaleFactorConfigKey_2 = GNA_CONFIG_KEY(SCALE_FACTOR) + std::string("_") + std::to_string(1);
@@ -108,6 +109,52 @@ void GnaNetwork::loadNetwork(InferenceEngine::CNNNetwork& passed_network, bool i
     //     throw std::logic_error("Sample supports topologies only with 1 input");
     // }
     outputInfo = passed_network.getOutputsInfo();
+    inferRequest = executable_network.CreateInferRequest();
+}
+
+void GnaNetwork::importNetwork(const std::string& gnaModel, bool isDecoderNw)
+{
+    ALOGI("LoadNetwork from local file %s", gnaModel.c_str());
+    //InferencePlugin plugin(enginePtr);
+
+    /** Specifying the precision and layout of input data provided by the user.
+      * This should be called before load of the network to the plugin **/
+    std::map<std::string, std::string> config;
+    //config[CONFIG_KEY(LOG_LEVEL)] = CONFIG_VALUE(LOG_INFO);
+    std::map<std::string, std::string> gnaPluginConfig;
+    gnaPluginConfig[GNAConfigParams::KEY_GNA_DEVICE_MODE] = "GNA_HW";
+    gnaPluginConfig[GNAConfigParams::KEY_GNA_PRECISION] = "I8";
+#ifdef PERF_COUNTERS
+    gnaPluginConfig[PluginConfigParams::KEY_PERF_COUNT] = PluginConfigParams::YES;
+#endif
+    if (isDecoderNw) {
+        gnaPluginConfig[PluginConfigParams::KEY_IDENTITY_SCALE_FACTOR] =  std::to_string(512);
+    }
+    else {
+        gnaPluginConfig[PluginConfigParams::KEY_IDENTITY_SCALE_FACTOR] =  std::to_string(256);
+    }    
+    std::string scaleFactorConfigKey_1 = GNA_CONFIG_KEY(SCALE_FACTOR) + std::string("_") + std::to_string(0);
+    gnaPluginConfig[scaleFactorConfigKey_1] = std::to_string(2048);
+    std::string scaleFactorConfigKey_2 = GNA_CONFIG_KEY(SCALE_FACTOR) + std::string("_") + std::to_string(1);
+    gnaPluginConfig[scaleFactorConfigKey_2] = std::to_string(2048);
+    std::string scaleFactorConfigKey_3 = GNA_CONFIG_KEY(SCALE_FACTOR) + std::string("_") + std::to_string(2);
+    gnaPluginConfig[scaleFactorConfigKey_3] = std::to_string(2048);
+    std::string scaleFactorConfigKey_4 = GNA_CONFIG_KEY(SCALE_FACTOR) + std::string("_") + std::to_string(3);
+    gnaPluginConfig[scaleFactorConfigKey_4] = std::to_string(2048);
+    std::string scaleFactorConfigKey_5 = GNA_CONFIG_KEY(SCALE_FACTOR) + std::string("_") + std::to_string(4);
+    gnaPluginConfig[scaleFactorConfigKey_5] = std::to_string(2048);
+    std::string scaleFactorConfigKey_6 = GNA_CONFIG_KEY(SCALE_FACTOR) + std::string("_") + std::to_string(5);
+    gnaPluginConfig[scaleFactorConfigKey_6] = std::to_string(2048);
+    std::string scaleFactorConfigKey_7 = GNA_CONFIG_KEY(SCALE_FACTOR) + std::string("_") + std::to_string(6);
+    gnaPluginConfig[scaleFactorConfigKey_7] = std::to_string(2048);
+    gnaPluginConfig[GNA_CONFIG_KEY(COMPACT_MODE)] = CONFIG_VALUE(NO);
+    gnaPluginConfig[GNA_CONFIG_KEY(PWL_UNIFORM_DESIGN)] = CONFIG_VALUE(NO);
+    //gnaPluginConfig[GNA_CONFIG_KEY(LIB_N_THREADS)] = "3";
+    config.insert(std::begin(gnaPluginConfig), std::end(gnaPluginConfig));
+    ALOGI("IENetwork.h Create plugin");
+
+	InferenceEngine::Core ie;
+	executable_network = ie.ImportNetwork(gnaModel, "GNA", config);
     inferRequest = executable_network.CreateInferRequest();
 }
 

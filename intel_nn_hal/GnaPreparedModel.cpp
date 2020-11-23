@@ -43,29 +43,75 @@ static Return<void> notify(const sp<V1_0::IExecutionCallback>& callback, const V
     return callback->notify(status);
 }
 
+inline void writeNBytes(const void *ptr, uint32_t size, int fd) {
+    auto ret = write(fd, static_cast<const char*>(ptr), size);
+}
+
+template <class T>
+inline void writeBits(const T & obj, int fd) {
+    auto ret = write(fd, reinterpret_cast<const char *>(&obj), sizeof(T));
+}
+
+template <class T>
+inline void readBits(T & obj, int fd) {
+    auto ret = read(fd, reinterpret_cast<char *>(&obj), sizeof(T));
+}
+
+inline void readNBytes(void * ptr, uint32_t size, int fd) {
+    auto ret = read(fd, reinterpret_cast<char *>(ptr), size);
+}
+
+template <int nBits, class T>
+inline void readNBits(T & obj, int fd) {
+    std::array<uint8_t, nBits / 8> tmp;
+    auto ret= read(fd, reinterpret_cast<char *>(&tmp), nBits / 8);
+    obj = * reinterpret_cast<T*>(&tmp.front());
+}
+
 void GnaPreparedModel::initializeInput() {
     VLOG(L1, "initialize Input");
 
-#if 0
-    for (auto i : mModel.main.inputIndexes) {
-        int dims_size = mOperands[i].dimensions.size();
+    /* copy weights, biases ..etc */
+    for (auto i=0; i < mModel.main.inputIndexes.size(); i++) {
+        auto curIndex = mModel.main.inputIndexes[i];
+        mModelInputIndices.emplace_back(mModel.main.inputIndexes[i]);
+        // ALOGE("Searching for input index:%d", curIndex);
 
-        VLOGDIMS(L1, mOperands[i].dimensions, "current operand inpu dims:");
-
-        //auto inputDims = mPorts[i]->getTensorDesc().getDims();
-
-        /* uint32_t nelem = getNumberOfElements(mOperands[i].dimensions);
-        auto inputElem = sizeOfTensor(inputDims);
-        if (nelem != inputElem) {
-            VLOG(L1, "set operand input dims to real input dims\n");
-            for (auto j = 0; j < inputDims.size(); j++)
-                mOperands[i].dimensions[j] = static_cast<uint32_t>(inputDims[j]);
-            mOperands[i].length = sizeOfData(mOperands[i].type, mOperands[i].dimensions);
-        } */
+        auto itr = std::find_if(mInputPorts.begin(), mInputPorts.end(),
+                                    [&](const std::pair<uint32_t, LayerInfo>& elem) {
+                                        return (elem.first == curIndex);
+                                    });
+        if (itr != mInputPorts.end()) {
+            mlayerInputIndices.push_back(i);
+        } else {
+            nnAssert("Cannot set data to non-input layers during infer request");
+        }
     }
-#endif
+
+    for (auto i =0; i < mModel.main.outputIndexes.size(); i++) {
+        mModelOutputIndices.emplace_back(mModel.main.outputIndexes[i]);
+    }
 }
 
+void GnaPreparedModel::initializeInput(std::vector<uint32_t>& indexVec) {
+    VLOG(L1, "initialize Input");
+
+    /* copy weights, biases ..etc */
+    for (auto i=0; i < indexVec.size(); i++) {
+        auto curIndex = indexVec[i];
+        // ALOGE("Searching for input index:%d", curIndex);
+
+        auto itr = std::find_if(mInputPorts.begin(), mInputPorts.end(),
+                                    [&](const std::pair<uint32_t, LayerInfo>& elem) {
+                                        return (elem.first == curIndex);
+                                    });
+        if (itr != mInputPorts.end()) {
+            mlayerInputIndices.push_back(i);
+        } else {
+            nnAssert("Cannot set data to non-input layers during infer request");
+        }
+    }
+}
 
 bool GnaPreparedModel::finalizeOutput(/*RunTimeOperandInfo* output */) {
     VLOG(L1, "finalize Output");
@@ -87,7 +133,7 @@ bool GnaPreparedModel::finalizeOutput(/*RunTimeOperandInfo* output */) {
     return true;
 }
 
-bool GnaPreparedModel::initialize() {
+bool GnaPreparedModel::initialize(const hidl_vec<hidl_handle>& modelCache, const HidlToken& token) {
     VLOG(L1, "initialize");
     bool success = false;
 
@@ -160,40 +206,212 @@ bool GnaPreparedModel::initialize() {
         }
     }
 
-    //initializeInput();
-    //finalizeOutput();
-
-    /* copy weights, biases ..etc */
-    for (auto i=0; i < mModel.main.inputIndexes.size(); i++){
-        auto curIndex = mModel.main.inputIndexes[i];
-
-        auto itr = std::find_if(mInputPorts.begin(), mInputPorts.end(),
-                                    [&](const std::pair<uint32_t, LayerInfo>& elem) {
-                                        return (elem.first == curIndex);
-                                    });
-        if (itr != mInputPorts.end()) {
-            mlayerInputIndices.push_back(i);
-        } else {
-            nnAssert("Cannot set data to non-input layers during infer request");
-        }
-    }
+    initializeInput();
 
     auto network = mBuilderModel->convertBuilder();
-    time_point irbuild_end = now();
-    runtimeMetrics.irBuild_time = (double(millisecondsDuration(irbuild_end, irbuild_start)));
     gnaPluginPtr = new GnaNetwork(network, "GNA");
     InferenceEngine::CNNNetwork passed_network({network});
     gnaPluginPtr->loadNetwork(passed_network, isDecoderNw);
-    time_point gnabuild_end = now();
-    runtimeMetrics.nw_load_time = (double(millisecondsDuration(gnabuild_end, irbuild_end)));
     gnaPluginPtr->queryState();
     gnaPluginPtr->reset();
 
+    if (modelCache.size() > 0 ) {
+        // TODO: Add magic header
+        auto modelCacheFd = modelCache[1]->data[0];
+        auto operandCount = mModel.main.operands.size();
+        writeBits(operandCount, modelCacheFd);
+
+        for (auto i=0; i < operandCount; i++) {
+            RunTimeOperandInfo& runtimeOp = mOperands[i];
+
+            int type = static_cast<int>(runtimeOp.type);
+            writeBits(type, modelCacheFd);
+
+            auto sizeOfVec = runtimeOp.dimensions.size();
+            writeBits(sizeOfVec, modelCacheFd);
+
+            for (auto val: runtimeOp.dimensions)
+                writeBits(val, modelCacheFd);
+
+            // TODO: For float is this best way to serialize the value???
+            writeBits(runtimeOp.scale, modelCacheFd);
+            writeBits(runtimeOp.zeroPoint, modelCacheFd);
+            writeBits(runtimeOp.lifetime, modelCacheFd);
+            writeBits(runtimeOp.numberOfUsesLeft, modelCacheFd);
+        }
+
+        // Write input indexes and output indexes
+        auto ioIndexSize = mModel.main.inputIndexes.size();
+        writeBits(ioIndexSize, modelCacheFd);
+        for (auto i=0; i < mModel.main.inputIndexes.size(); i++) {
+            auto index = mModel.main.inputIndexes[i];
+            writeBits(index, modelCacheFd);
+        }
+
+        ioIndexSize = mModel.main.outputIndexes.size();
+        writeBits(ioIndexSize, modelCacheFd);
+        for (auto i=0; i < mModel.main.outputIndexes.size(); i++) {
+            auto index = mModel.main.outputIndexes[i];
+            writeBits(index, modelCacheFd);
+        }
+
+        // Export the graph to cache
+        gnaPluginPtr->exportGraph("NNCACHE" + std::to_string(modelCache[0]->data[0]));
+
+        // Store the input names
+        modelCacheFd = modelCache[2]->data[0];
+
+        auto inputSize = mInputPorts.size();
+        writeBits(inputSize, modelCacheFd);
+        for (auto iter: mInputPorts) {
+            // index
+            writeBits(iter.first, modelCacheFd);
+
+            // string
+            writeBits(static_cast<uint32_t>(sizeof(iter.second.layerName.size() + 1)), modelCacheFd);
+            writeBits(strlen(iter.second.layerName.c_str()) + 1, modelCacheFd);
+            writeNBytes(iter.second.layerName.c_str(), strlen(iter.second.layerName.c_str()) + 1 , modelCacheFd);
+
+            // bool
+            int memoryLayer = iter.second.memoryLayer?1:0;
+            writeBits(memoryLayer, modelCacheFd);
+        }
+
+        // Store the output names
+        inputSize = mOutputToLayerMap.size();
+        writeBits(inputSize, modelCacheFd);
+        for (auto iter: mOutputToLayerMap) {
+            // index
+            writeBits(iter.first, modelCacheFd);
+
+            // string
+            writeBits(static_cast<uint32_t>(sizeof(iter.second.size() + 1)), modelCacheFd);
+            writeBits(strlen(iter.second.c_str()) + 1, modelCacheFd);
+            writeNBytes(iter.second.c_str(), strlen(iter.second.c_str()) + 1 , modelCacheFd);
+        }
+    }
+
+    return true;
+}
+
+#define DECODER_TOKEN_STR "NKCALNANMECO"
+#define ENC0_TOKEN_STR "CCMNOPFOK"
+#define ENC1_TOKEN_STR "GOLMLCLJPG"
+
+bool GnaPreparedModel::initializeFromCache(const hidl_vec<hidl_handle>& modelCache, const HidlToken& token) {
+    std::string tokenStr = getTokenString(token);
+    if (tokenStr.compare(0, strlen(DECODER_TOKEN_STR), DECODER_TOKEN_STR) == 0)
+        isDecoderNw = true;
+    else if(tokenStr.compare(0, strlen(ENC0_TOKEN_STR), ENC0_TOKEN_STR) == 0)
+        isEnc0Nw = true;
+    else if(tokenStr.compare(0, strlen(ENC1_TOKEN_STR), ENC1_TOKEN_STR) == 0)
+        isEnc1Nw = true;
+
+    // TODO: Add magic header
+    auto modelCacheFd = modelCache[1]->data[0];
+    std::size_t operandCount = 0;
+    readBits(operandCount, modelCacheFd);
+
+    mOperands.resize(operandCount);
+
+    for (auto i=0; i < operandCount; i++) {
+        RunTimeOperandInfo& runtimeOp = mOperands[i];
+
+        int type = 0;
+        readBits(type, modelCacheFd);
+        runtimeOp.type = static_cast<android::hardware::neuralnetworks::nnhal::OperandType>(type);
+
+        std::size_t sizeOfVec = 0;
+        readBits(sizeOfVec, modelCacheFd);
+        for (auto i =0; i < sizeOfVec; i++) {
+            uint32_t val = 0;
+            readBits(val, modelCacheFd);
+            runtimeOp.dimensions.emplace_back(val);
+        }
+
+        // TODO: For float is this best way to serialize the value???
+        readBits(runtimeOp.scale, modelCacheFd);
+        readBits(runtimeOp.zeroPoint, modelCacheFd);
+        readBits(runtimeOp.lifetime, modelCacheFd);
+        readBits(runtimeOp.numberOfUsesLeft, modelCacheFd);
+        runtimeOp.buffer = nullptr;
+        runtimeOp.length = 0;
+    }
+
+    // Write input indexes and output indexes
+    std::size_t ioIndexSize = 0;
+    readBits(ioIndexSize, modelCacheFd);
+    for (auto i=0; i < ioIndexSize; i++) {
+        auto index = 0;
+        readBits(index, modelCacheFd);
+        mModelInputIndices.emplace_back(index);
+    }
+
+    ioIndexSize = 0;
+    readBits(ioIndexSize, modelCacheFd);
+    for (auto i=0; i < ioIndexSize; i++) {
+        auto index = 0;
+        readBits(index, modelCacheFd);
+        mModelOutputIndices.emplace_back(index);
+    }
+
+    auto layersFd = modelCache[2]->data[0];
+
+    // read size of inputs
+    std::size_t vecSize = 0;
+    readBits(vecSize, layersFd);
+    for (auto i=0; i < vecSize; i++) {
+        // index
+        uint32_t layerId = 0;
+        readBits(layerId, layersFd);
+
+        // string
+        uint32_t size = 0;
+        readBits(size, layersFd);
+        uint32_t nameSize = 0;
+        readNBits<64>(nameSize, layersFd);
+        std::vector<char> inName(nameSize);
+        readNBytes(inName.data(), nameSize, layersFd);
+        std::string layerName = std::string(inName.begin(), inName.end() - 1);
+
+        // bool
+        uint32_t memLayer = 0;
+        readBits(memLayer, layersFd);
+        mInputPorts.emplace(std::make_pair(layerId, LayerInfo(layerName, memLayer)));
+    }
+
+    // read size of ouputs
+    vecSize = 0;
+    readBits(vecSize, layersFd);
+    for (auto i=0; i < vecSize; i++) {
+        // index
+        uint32_t layerId = 0;
+        readBits(layerId, layersFd);
+
+        // string
+        uint32_t size = 0;
+        readBits(size, layersFd);
+        uint32_t nameSize = 0;
+        readNBits<64>(nameSize, layersFd);
+        std::vector<char> inName(nameSize);
+        readNBytes(inName.data(), nameSize, layersFd);
+        std::string layerName = std::string(inName.begin(), inName.end() - 1);
+        mOutputToLayerMap.emplace(std::make_pair(layerId, layerName));
+    }
+
+    // Load the network from cache file
+    gnaPluginPtr = new GnaNetwork(nullptr, "GNA");
+    gnaPluginPtr->importNetwork("NNCACHE" + std::to_string(modelCache[0]->data[0]), isDecoderNw);
+    gnaPluginPtr->queryState();
+    gnaPluginPtr->reset();
+    
+    initializeInput(mModelInputIndices);
     return true;
 }
 
 // TODO: Call parent class deinitialize from here
 void GnaPreparedModel::deinitialize() {
+#ifdef PERF_COUNTERS
     VLOG(L1, "GnaPreparedModel - deinitialize");
     for (const auto &it : gnaPluginPtr->totalPerfCounters) {
                std::string const &counter_name = it.first;
@@ -215,7 +433,7 @@ void GnaPreparedModel::deinitialize() {
 	        VLOG(L1, "%fms  ", iter);
     }
     std::cout << "Minimum infer time " << gnaPluginPtr->inferTimeGNA.at(std::distance(gnaPluginPtr->inferTimeGNA.begin(), min_infer_time)) << "\n";
-
+#endif
     if (mBuilderModel) {
         delete mBuilderModel;
         mBuilderModel = nullptr;
@@ -307,7 +525,7 @@ void GnaPreparedModel::asyncExecute(const V1_0_Request& request, MeasureTiming m
     hidl_vec<OutputShape> outputShapes(request.outputs.size());
 
     auto getBlobFromMemoryPool = [&, this](uint32_t index) {
-        RunTimeOperandInfo& operand = mOperands[mModel.main.inputIndexes[index]];
+        RunTimeOperandInfo& operand = mOperands[mModelInputIndices[index]];
         const RequestArgument& arg = request.inputs[index];
         auto poolIndex = arg.location.poolIndex;
         nnAssert(poolIndex < requestPoolInfos.size());
@@ -342,7 +560,7 @@ void GnaPreparedModel::asyncExecute(const V1_0_Request& request, MeasureTiming m
     };
 
     for (auto index : mlayerInputIndices) {
-        auto inputIndex = mModel.main.inputIndexes[index];
+        auto inputIndex = mModelInputIndices[index];
         auto srcBlob = getBlobFromMemoryPool(index);
 
         auto iter = mInputPorts.find(inputIndex);
@@ -367,10 +585,13 @@ void GnaPreparedModel::asyncExecute(const V1_0_Request& request, MeasureTiming m
                 uint8_t* src = srcBlob->buffer().as<uint8_t*>();
                 std::memcpy(dest, src, srcBlob->byteSize());
             }
+        } else {
+            std::cout << "Index:" << inputIndex << " not found in input layers" << std::endl;
         }
     }
     VLOG(L1, "Run");
 
+#ifdef PERF_COUNTERS
     auto gna_t0 = Time::now();
     gnaPluginPtr->Infer();
     auto gna_t1 = Time::now();
@@ -387,10 +608,13 @@ void GnaPreparedModel::asyncExecute(const V1_0_Request& request, MeasureTiming m
     for (const auto &pair : gnaPluginPtr->perfCounters) {
         gnaPluginPtr->totalPerfCounters[pair.first].realTime_uSec += pair.second.realTime_uSec;
     }
+#else
+        gnaPluginPtr->Infer();
+#endif
 
     auto reqOutputs = request.outputs;
-    for (auto i =0; i < mModel.main.outputIndexes.size(); i++) {
-        auto index = mModel.main.outputIndexes[i];
+    for (auto i =0; i < mModelOutputIndices.size(); i++) {
+        auto index = mModelOutputIndices[i];
         RunTimeOperandInfo& operand = mOperands[index];
         const RequestArgument& arg = reqOutputs[i];
         auto poolIndex = arg.location.poolIndex;
@@ -405,22 +629,9 @@ void GnaPreparedModel::asyncExecute(const V1_0_Request& request, MeasureTiming m
             auto layerName = elementIdx->second;
 
             // Check if the layername is present in the output map
-            auto element = gnaPluginPtr->outputInfo.find(layerName);
-            if (element != gnaPluginPtr->outputInfo.end()) {
-                Blob::Ptr outputBlob;
-                if(mLayerNameBlobMap.size() == mOutputToLayerMap.size()) {
-                    outputBlob = mLayerNameBlobMap[layerName];
-                }
-                else {
-                    if (mLayerNameBlobMap.find(layerName) == mLayerNameBlobMap.end()) {
-                        outputBlob = gnaPluginPtr->getInferRequest().GetBlob(layerName);
-                        mLayerNameBlobMap[layerName] = outputBlob;
-        
-                    }
-                    else {
-                        outputBlob = mLayerNameBlobMap[layerName];
-                    }
-                }
+            auto element = gnaPluginPtr->getOutputsInfo().find(layerName);
+            if (element != gnaPluginPtr->getOutputsInfo().end()) {
+                Blob::Ptr outputBlob = gnaPluginPtr->getInferRequest().GetBlob(layerName);
                 float* srcPtr = outputBlob->buffer().as<float*>();
                 if (operand.type == OperandType::TENSOR_QUANT16_SYMM) {
                     quantizeToQuant16(srcPtr, (uint16_t*)destPtr, operand.shape(), runtimeMetrics);

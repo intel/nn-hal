@@ -84,13 +84,12 @@ public:
     std::vector<InferenceEngine::Blob::Ptr> ptrInputBlobs;
     GnaNetwork() : network(nullptr){}
 
-    GnaNetwork(std::shared_ptr<ICNNNetwork> curr_network, std::string target = "CPU")
+    GnaNetwork(std::shared_ptr<ICNNNetwork> curr_network, std::string target = "GNA")
     {
-        //InferenceEngine::PluginDispatcher dispatcher(
-          //  {"/vendor/lib64", "/vendor/lib", "/system/lib64", "/system/lib", "", "./"});
-        //enginePtr = dispatcher.getSuitablePlugin(target);
-        InferenceEngine::CNNNetwork cnnnetwork({curr_network});
-        network = curr_network;
+        if (curr_network) {
+            InferenceEngine::CNNNetwork cnnnetwork({curr_network});
+            network = curr_network;
+        }
         #ifdef NNLOG
             ALOGI("%s Plugin loaded",InferenceEngine::TargetDeviceInfo::name(target));
         #endif
@@ -103,6 +102,8 @@ public:
     }
 
     void loadNetwork(InferenceEngine::CNNNetwork& passed_network, bool isDecoderNw);
+
+    void importNetwork(const std::string& gnaModel, bool isDecoderNw);
 
     void prepareInput();
 
@@ -137,4 +138,16 @@ public:
     }
 
     void Infer();
+
+    void exportGraph(const std::string& fileName) {
+        executable_network.Export(fileName);
+    }
+
+    ConstInputsDataMap getInputsInfo() {
+        return executable_network.GetInputsInfo();
+    }
+
+    ConstOutputsDataMap getOutputsInfo() {
+        return executable_network.GetOutputsInfo();
+    }
 };
