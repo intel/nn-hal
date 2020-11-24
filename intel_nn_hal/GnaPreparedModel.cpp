@@ -141,6 +141,7 @@ bool GnaPreparedModel::initialize(const hidl_vec<hidl_handle>& modelCache, const
     for (auto op: mModel.main.operations) {
         if (op.type == OperationType::FULLY_CONNECTED) {
             isDecoderNw = true;
+            modelNameStr = "Decoder";
             break;
         } else if (op.type == OperationType::QUANTIZED_LSTM) {
             lstmCount++;
@@ -150,8 +151,10 @@ bool GnaPreparedModel::initialize(const hidl_vec<hidl_handle>& modelCache, const
     if (!isDecoderNw) {
         if (lstmCount > 3) {
             isEnc1Nw = true;
+            modelNameStr = "Encoder0";
         } else {
             isEnc0Nw = true;
+            modelNameStr = "Encoder1";
         }
     }
 
@@ -209,9 +212,13 @@ bool GnaPreparedModel::initialize(const hidl_vec<hidl_handle>& modelCache, const
     initializeInput();
 
     auto network = mBuilderModel->convertBuilder();
+    time_point irbuild_end = now();
+    runtimeMetrics.irBuild_time = (double(millisecondsDuration(irbuild_end, irbuild_start)));
     gnaPluginPtr = new GnaNetwork(network, "GNA");
     InferenceEngine::CNNNetwork passed_network({network});
     gnaPluginPtr->loadNetwork(passed_network, isDecoderNw);
+    time_point gnabuild_end = now();
+    runtimeMetrics.nw_load_time = (double(millisecondsDuration(gnabuild_end, irbuild_end)));
     gnaPluginPtr->queryState();
     gnaPluginPtr->reset();
 
@@ -294,18 +301,25 @@ bool GnaPreparedModel::initialize(const hidl_vec<hidl_handle>& modelCache, const
     return true;
 }
 
-#define DECODER_TOKEN_STR "NKCALNANMECO"
-#define ENC0_TOKEN_STR "CCMNOPFOK"
-#define ENC1_TOKEN_STR "GOLMLCLJPG"
+#define DECODER_TOKEN_STR "NKCALNANMECOLCLACCGLHLPKGNJKLGBGHDMBCJOEPGIMCKMDBLCNIFOCGBKOMLDG"
+#define ENC0_TOKEN_STR "CCMNOPFOKCFPKCJGECMBGJDMKBNMJOMGEOGONKGBCJIIOGDNOJMCNDFMODBMHMIB"
+#define ENC1_TOKEN_STR "GOLMLCLJPGLLEGMEHNBHHBBIIFGPDDOLOOOJEGPHOONEPLCIOGODLPDMGNHKJLCA"
 
 bool GnaPreparedModel::initializeFromCache(const hidl_vec<hidl_handle>& modelCache, const HidlToken& token) {
+    time_point irBuildStart = now();
     std::string tokenStr = getTokenString(token);
-    if (tokenStr.compare(0, strlen(DECODER_TOKEN_STR), DECODER_TOKEN_STR) == 0)
+    if (tokenStr.compare(0, strlen(DECODER_TOKEN_STR), DECODER_TOKEN_STR) == 0) {
         isDecoderNw = true;
-    else if(tokenStr.compare(0, strlen(ENC0_TOKEN_STR), ENC0_TOKEN_STR) == 0)
+        modelNameStr = "Decoder";
+    }
+    else if(tokenStr.compare(0, strlen(ENC0_TOKEN_STR), ENC0_TOKEN_STR) == 0) {
         isEnc0Nw = true;
-    else if(tokenStr.compare(0, strlen(ENC1_TOKEN_STR), ENC1_TOKEN_STR) == 0)
+        modelNameStr = "Encoder0";
+    }
+    else if(tokenStr.compare(0, strlen(ENC1_TOKEN_STR), ENC1_TOKEN_STR) == 0) {
         isEnc1Nw = true;
+        modelNameStr = "Encoder1";
+    }
 
     // TODO: Add magic header
     auto modelCacheFd = modelCache[1]->data[0];
@@ -402,6 +416,8 @@ bool GnaPreparedModel::initializeFromCache(const hidl_vec<hidl_handle>& modelCac
     // Load the network from cache file
     gnaPluginPtr = new GnaNetwork(nullptr, "GNA");
     gnaPluginPtr->importNetwork("NNCACHE" + std::to_string(modelCache[0]->data[0]), isDecoderNw);
+    time_point irBuildEnd = now();
+    runtimeMetrics.nw_load_time = (double(millisecondsDuration(irBuildEnd, irBuildStart)));
     gnaPluginPtr->queryState();
     gnaPluginPtr->reset();
     

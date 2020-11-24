@@ -45,13 +45,14 @@ class GnaPreparedModel : public PreparedModel {
     GnaNetwork* gnaPluginPtr;
 
     bool isDecoderNw, isEnc0Nw, isEnc1Nw;
+    std::string modelNameStr;
     metrics runtimeMetrics;
 public:
-    GnaPreparedModel(const Model& model) : PreparedModel("GNA", model), gnaPluginPtr(nullptr),
+    GnaPreparedModel(const Model& model) : PreparedModel("GNA", model), gnaPluginPtr(nullptr), mBuilderModel(nullptr),
                                             isDecoderNw(false), isEnc0Nw(false), isEnc1Nw(false) {
         runtimeMetrics.reset();
     }
-	GnaPreparedModel() : PreparedModel("GNA"), gnaPluginPtr(nullptr),
+	GnaPreparedModel() : PreparedModel("GNA"), gnaPluginPtr(nullptr), mBuilderModel(nullptr),
                                             isDecoderNw(false), isEnc0Nw(false), isEnc1Nw(false) {
         runtimeMetrics.reset();
     }

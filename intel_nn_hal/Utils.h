@@ -358,41 +358,46 @@ typedef struct _metrics{
     std::vector<double> infer_time;
 
     void reset() {
-        deQuant_time = 0;
-        quant_time = 0;
-        nw_load_time = 0;
-        avg_infer_time = 0;
+        deQuant_time = 0.0;
+        quant_time = 0.0;
+        nw_load_time = 0.0;
+        avg_infer_time = 0.0;
         infer_calls = 0;
-        irBuild_time =0;
+        irBuild_time =0.0;
         infer_time = {};
     }
 
     void print() {
-        auto avg_infer =
-            std::accumulate(infer_time.begin(), infer_time.end(), 0) / (infer_time.size());
+
+        auto avg_infer = 0;
+
+        if (!infer_time.empty()) {
+            avg_infer = std::accumulate(infer_time.begin(), infer_time.end(), 0) / (infer_time.size());
+
+            std::stringstream outputlog;
+            outputlog << "All infer times: ";
+            for (auto t : infer_time) {
+                outputlog << t << " ";
+            }
+            outputlog << std::endl;
+
+            std::cout << outputlog.str();
+        }
+
         std::cout << std::setw(25) << " Dequant time(ms):"
                   << std::setw(25)   << " Quant time(us):"
                   << std::setw(25)   << " NW load time(ms):"
                   << std::setw(25)   << " Avg infer time(ms):"
                   << std::setw(25)   << " Infer calls:"
                   << std::setw(25)   << " OV IR Build time(ms):"
-                    << std::endl;
+                  << std::endl;
         std::cout << std::setw(25) <<  deQuant_time
                    << std::setw(25) <<  quant_time
                    << std::setw(25)  << nw_load_time
                    << std::setw(25)  << avg_infer
                    << std::setw(25)  << infer_calls
                    << std::setw(25)  << irBuild_time
-                    << std::endl;
-
-        std::stringstream outputlog;
-        outputlog << "All infer times: ";
-        for (auto t : infer_time) {
-            outputlog << t << " ";
-        }
-        outputlog << std::endl;
-
-        std::cout << outputlog.str();
+                   << std::endl;
     }
 } metrics;
 
