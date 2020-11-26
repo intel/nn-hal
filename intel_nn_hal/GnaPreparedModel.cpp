@@ -223,96 +223,95 @@ bool GnaPreparedModel::initialize(const hidl_vec<hidl_handle>& modelCache, const
     gnaPluginPtr->reset();
 
     if (modelCache.size() > 0 ) {
-        // TODO: Add magic header
-        auto modelCacheFd = modelCache[1]->data[0];
+        // Export the graph to cache
+        auto modelFd = modelCache[0]->data[0];
+        gnaPluginPtr->exportGraph("NNCACHE" + std::to_string(modelFd));
+
+        // TODO: Check for file integrity
+        auto dataCacheFd = modelCache[1]->data[0];
         auto operandCount = mModel.main.operands.size();
-        writeBits(operandCount, modelCacheFd);
+        writeBits(operandCount, dataCacheFd);
 
         for (auto i=0; i < operandCount; i++) {
             RunTimeOperandInfo& runtimeOp = mOperands[i];
 
             int type = static_cast<int>(runtimeOp.type);
-            writeBits(type, modelCacheFd);
+            writeBits(type, dataCacheFd);
 
             auto sizeOfVec = runtimeOp.dimensions.size();
-            writeBits(sizeOfVec, modelCacheFd);
+            writeBits(sizeOfVec, dataCacheFd);
 
             for (auto val: runtimeOp.dimensions)
-                writeBits(val, modelCacheFd);
+                writeBits(val, dataCacheFd);
 
             // TODO: For float is this best way to serialize the value???
-            writeBits(runtimeOp.scale, modelCacheFd);
-            writeBits(runtimeOp.zeroPoint, modelCacheFd);
-            writeBits(runtimeOp.lifetime, modelCacheFd);
-            writeBits(runtimeOp.numberOfUsesLeft, modelCacheFd);
+            writeBits(runtimeOp.scale, dataCacheFd);
+            writeBits(runtimeOp.zeroPoint, dataCacheFd);
+            writeBits(runtimeOp.lifetime, dataCacheFd);
+            writeBits(runtimeOp.numberOfUsesLeft, dataCacheFd);
         }
 
         // Write input indexes and output indexes
         auto ioIndexSize = mModel.main.inputIndexes.size();
-        writeBits(ioIndexSize, modelCacheFd);
+        writeBits(ioIndexSize, dataCacheFd);
         for (auto i=0; i < mModel.main.inputIndexes.size(); i++) {
             auto index = mModel.main.inputIndexes[i];
-            writeBits(index, modelCacheFd);
+            writeBits(index, dataCacheFd);
         }
 
         ioIndexSize = mModel.main.outputIndexes.size();
-        writeBits(ioIndexSize, modelCacheFd);
+        writeBits(ioIndexSize, dataCacheFd);
         for (auto i=0; i < mModel.main.outputIndexes.size(); i++) {
             auto index = mModel.main.outputIndexes[i];
-            writeBits(index, modelCacheFd);
+            writeBits(index, dataCacheFd);
         }
 
-        // Export the graph to cache
-        gnaPluginPtr->exportGraph("NNCACHE" + std::to_string(modelCache[0]->data[0]));
-
-        // Store the input names
-        modelCacheFd = modelCache[2]->data[0];
-
         auto inputSize = mInputPorts.size();
-        writeBits(inputSize, modelCacheFd);
+        writeBits(inputSize, dataCacheFd);
         for (auto iter: mInputPorts) {
             // index
-            writeBits(iter.first, modelCacheFd);
+            writeBits(iter.first, dataCacheFd);
 
             // string
-            writeBits(static_cast<uint32_t>(sizeof(iter.second.layerName.size() + 1)), modelCacheFd);
-            writeBits(strlen(iter.second.layerName.c_str()) + 1, modelCacheFd);
-            writeNBytes(iter.second.layerName.c_str(), strlen(iter.second.layerName.c_str()) + 1 , modelCacheFd);
+            writeBits(static_cast<uint32_t>(sizeof(iter.second.layerName.size() + 1)), dataCacheFd);
+            writeBits(strlen(iter.second.layerName.c_str()) + 1, dataCacheFd);
+            writeNBytes(iter.second.layerName.c_str(), strlen(iter.second.layerName.c_str()) + 1 , dataCacheFd);
 
             // bool
             int memoryLayer = iter.second.memoryLayer?1:0;
-            writeBits(memoryLayer, modelCacheFd);
+            writeBits(memoryLayer, dataCacheFd);
         }
 
         // Store the output names
         inputSize = mOutputToLayerMap.size();
-        writeBits(inputSize, modelCacheFd);
+        writeBits(inputSize, dataCacheFd);
         for (auto iter: mOutputToLayerMap) {
             // index
-            writeBits(iter.first, modelCacheFd);
+            writeBits(iter.first, dataCacheFd);
 
             // string
-            writeBits(static_cast<uint32_t>(sizeof(iter.second.size() + 1)), modelCacheFd);
-            writeBits(strlen(iter.second.c_str()) + 1, modelCacheFd);
-            writeNBytes(iter.second.c_str(), strlen(iter.second.c_str()) + 1 , modelCacheFd);
+            writeBits(static_cast<uint32_t>(sizeof(iter.second.size() + 1)), dataCacheFd);
+            writeBits(strlen(iter.second.c_str()) + 1, dataCacheFd);
+            writeNBytes(iter.second.c_str(), strlen(iter.second.c_str()) + 1 , dataCacheFd);
         }
+
+        // TODO: Identify location to store the hash value
+        dataCacheFd = modelCache[2]->data[0];
+        std::string hashStr = computeHashFromFd(modelFd);
+        const auto hashLen = strlen(hashStr.c_str());
+        writeBits(static_cast<uint32_t>(hashLen), dataCacheFd);
+        writeNBytes(hashStr.c_str(), hashLen, dataCacheFd);
     }
 
     return true;
 }
 
-#define DECODER_TOKEN_STR "NKCALNANMECOLCLACCGLHLPKGNJKLGBGHDMBCJOEPGIMCKMDBLCNIFOCGBKOMLDG"
-#define ENC0_TOKEN_STR "CCMNOPFOKCFPKCJGECMBGJDMKBNMJOMGEOGONKGBCJIIOGDNOJMCNDFMODBMHMIB"
-#define ENC1_TOKEN_STR "GOLMLCLJPGLLEGMEHNBHHBBIIFGPDDOLOOOJEGPHOONEPLCIOGODLPDMGNHKJLCA"
-
 bool GnaPreparedModel::initializeFromCache(const hidl_vec<hidl_handle>& modelCache, const HidlToken& token) {
-    time_point irBuildStart = now();
     std::string tokenStr = getTokenString(token);
     if (tokenStr.compare(0, strlen(DECODER_TOKEN_STR), DECODER_TOKEN_STR) == 0) {
         isDecoderNw = true;
         modelNameStr = "Decoder";
-    }
-    else if(tokenStr.compare(0, strlen(ENC0_TOKEN_STR), ENC0_TOKEN_STR) == 0) {
+    } else if(tokenStr.compare(0, strlen(ENC0_TOKEN_STR), ENC0_TOKEN_STR) == 0) {
         isEnc0Nw = true;
         modelNameStr = "Encoder0";
     }
@@ -321,10 +320,32 @@ bool GnaPreparedModel::initializeFromCache(const hidl_vec<hidl_handle>& modelCac
         modelNameStr = "Encoder1";
     }
 
-    // TODO: Add magic header
-    auto modelCacheFd = modelCache[1]->data[0];
+    time_point irBuildStart = now();
+    // Load the network from cache file
+    gnaPluginPtr = new GnaNetwork(nullptr, "GNA");
+    gnaPluginPtr->importNetwork("NNCACHE" + std::to_string(modelCache[0]->data[0]), isDecoderNw);
+    gnaPluginPtr->queryState();
+    gnaPluginPtr->reset();
+
+    std::string hash = computeHashFromFd(modelCache[0]->data[0]);
+
+    // Read the Hash value
+    auto dataCacheFd = modelCache[2]->data[0];
+    uint32_t hashLen = 0;
+    readNBits<32>(hashLen, dataCacheFd);
+    std::string storedHashString("", hashLen);
+    readNBytes(&storedHashString[0], hashLen, dataCacheFd);
+
+    if (hash.compare(0, std::string::npos, storedHashString) != 0) {
+        ALOGE("SHA256 digest does not match");
+        ALOGE("Stored hash:", storedHashString.c_str());
+        ALOGE("Computed hash:", hash.c_str());
+        nnAssert("Model cache stored has been corrupted. Checksum does not match");
+    }
+
+    dataCacheFd = modelCache[1]->data[0];
     std::size_t operandCount = 0;
-    readBits(operandCount, modelCacheFd);
+    readBits(operandCount, dataCacheFd);
 
     mOperands.resize(operandCount);
 
@@ -332,96 +353,89 @@ bool GnaPreparedModel::initializeFromCache(const hidl_vec<hidl_handle>& modelCac
         RunTimeOperandInfo& runtimeOp = mOperands[i];
 
         int type = 0;
-        readBits(type, modelCacheFd);
+        readBits(type, dataCacheFd);
         runtimeOp.type = static_cast<android::hardware::neuralnetworks::nnhal::OperandType>(type);
 
         std::size_t sizeOfVec = 0;
-        readBits(sizeOfVec, modelCacheFd);
+        readBits(sizeOfVec, dataCacheFd);
         for (auto i =0; i < sizeOfVec; i++) {
             uint32_t val = 0;
-            readBits(val, modelCacheFd);
+            readBits(val, dataCacheFd);
             runtimeOp.dimensions.emplace_back(val);
         }
 
         // TODO: For float is this best way to serialize the value???
-        readBits(runtimeOp.scale, modelCacheFd);
-        readBits(runtimeOp.zeroPoint, modelCacheFd);
-        readBits(runtimeOp.lifetime, modelCacheFd);
-        readBits(runtimeOp.numberOfUsesLeft, modelCacheFd);
+        readBits(runtimeOp.scale, dataCacheFd);
+        readBits(runtimeOp.zeroPoint, dataCacheFd);
+        readBits(runtimeOp.lifetime, dataCacheFd);
+        readBits(runtimeOp.numberOfUsesLeft, dataCacheFd);
         runtimeOp.buffer = nullptr;
         runtimeOp.length = 0;
     }
 
     // Write input indexes and output indexes
     std::size_t ioIndexSize = 0;
-    readBits(ioIndexSize, modelCacheFd);
+    readBits(ioIndexSize, dataCacheFd);
     for (auto i=0; i < ioIndexSize; i++) {
         auto index = 0;
-        readBits(index, modelCacheFd);
+        readBits(index, dataCacheFd);
         mModelInputIndices.emplace_back(index);
     }
 
     ioIndexSize = 0;
-    readBits(ioIndexSize, modelCacheFd);
+    readBits(ioIndexSize, dataCacheFd);
     for (auto i=0; i < ioIndexSize; i++) {
         auto index = 0;
-        readBits(index, modelCacheFd);
+        readBits(index, dataCacheFd);
         mModelOutputIndices.emplace_back(index);
     }
 
-    auto layersFd = modelCache[2]->data[0];
-
     // read size of inputs
     std::size_t vecSize = 0;
-    readBits(vecSize, layersFd);
+    readBits(vecSize, dataCacheFd);
     for (auto i=0; i < vecSize; i++) {
         // index
         uint32_t layerId = 0;
-        readBits(layerId, layersFd);
+        readBits(layerId, dataCacheFd);
 
         // string
         uint32_t size = 0;
-        readBits(size, layersFd);
+        readBits(size, dataCacheFd);
         uint32_t nameSize = 0;
-        readNBits<64>(nameSize, layersFd);
+        readNBits<64>(nameSize, dataCacheFd);
         std::vector<char> inName(nameSize);
-        readNBytes(inName.data(), nameSize, layersFd);
+        readNBytes(inName.data(), nameSize, dataCacheFd);
         std::string layerName = std::string(inName.begin(), inName.end() - 1);
 
         // bool
         uint32_t memLayer = 0;
-        readBits(memLayer, layersFd);
+        readBits(memLayer, dataCacheFd);
         mInputPorts.emplace(std::make_pair(layerId, LayerInfo(layerName, memLayer)));
     }
 
     // read size of ouputs
     vecSize = 0;
-    readBits(vecSize, layersFd);
+    readBits(vecSize, dataCacheFd);
     for (auto i=0; i < vecSize; i++) {
         // index
         uint32_t layerId = 0;
-        readBits(layerId, layersFd);
+        readBits(layerId, dataCacheFd);
 
         // string
         uint32_t size = 0;
-        readBits(size, layersFd);
+        readBits(size, dataCacheFd);
         uint32_t nameSize = 0;
-        readNBits<64>(nameSize, layersFd);
+        readNBits<64>(nameSize, dataCacheFd);
         std::vector<char> inName(nameSize);
-        readNBytes(inName.data(), nameSize, layersFd);
+        readNBytes(inName.data(), nameSize, dataCacheFd);
         std::string layerName = std::string(inName.begin(), inName.end() - 1);
         mOutputToLayerMap.emplace(std::make_pair(layerId, layerName));
     }
 
-    // Load the network from cache file
-    gnaPluginPtr = new GnaNetwork(nullptr, "GNA");
-    gnaPluginPtr->importNetwork("NNCACHE" + std::to_string(modelCache[0]->data[0]), isDecoderNw);
+    initializeInput(mModelInputIndices);
+
     time_point irBuildEnd = now();
     runtimeMetrics.nw_load_time = (double(millisecondsDuration(irBuildEnd, irBuildStart)));
-    gnaPluginPtr->queryState();
-    gnaPluginPtr->reset();
-    
-    initializeInput(mModelInputIndices);
     return true;
 }
 

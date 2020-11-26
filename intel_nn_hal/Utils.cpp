@@ -6,6 +6,7 @@
 
 #include <fstream>
 #include <sys/stat.h>
+#include "openssl/evp.h"
 
 unsigned int debugMask = ((1 << (L1 + 1)) - 1);
 
@@ -520,6 +521,46 @@ std::string getTokenString(const HidlToken& token) {
         tokenStr[i * 2 + 1] = 'A' + (token[i] >> 4);
     }
     return  tokenStr;
+}
+
+std::string computeHashFromFd(int modelFd) {
+    unsigned char hashValue[EVP_MAX_MD_SIZE];
+    unsigned int hashLen;
+
+    OpenSSL_add_all_algorithms();
+    auto md = EVP_get_digestbyname("SHA512");
+    if (md != NULL) {
+        EVP_MD_CTX *mdctx;
+        mdctx = EVP_MD_CTX_new();
+        if (mdctx != NULL) {
+            EVP_DigestInit_ex(mdctx, md, NULL);
+            auto fileLen = lseek(modelFd, 0, SEEK_END);
+            lseek(modelFd, 0, SEEK_SET);
+            size_t bytesRead = 0, bytesToRead = fileLen;
+            char buf[10240];
+            while (bytesToRead > 0) {
+                auto numBytes = read(modelFd, buf, 10240);
+                if (numBytes > 0) {
+                    EVP_DigestUpdate(mdctx, buf, numBytes);
+                }
+                bytesRead += numBytes;
+                bytesToRead = fileLen - bytesRead;
+            }
+            EVP_DigestFinal_ex(mdctx, hashValue, &hashLen);
+            EVP_MD_CTX_free(mdctx);
+            lseek(modelFd, 0, SEEK_SET);
+        } else {
+            nnAssert("Unable to initialize context for computing SHA512 hash");
+        }
+    } else {
+        nnAssert("Unable to get SHA512 digest");
+    }
+
+    std::stringstream hashString;
+    for(unsigned int i=0; i < hashLen; i++)
+        hashString << std::hex << static_cast<int>(hashValue[i]);
+
+    return hashString.str();
 }
 }
 }

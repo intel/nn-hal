@@ -112,7 +112,9 @@ shared_library("intel_nnhal") {
     "inference_engine_c_api",
     "inference_engine_preproc",
     "inference_engine",
-    "nn-common"
+    "nn-common",
+    "ssl",
+    "crypto"
   ]
   lib_dirs = [
     "${sysroot}/usr/local/deployment_tools/inference_engine/lib/intel64/"

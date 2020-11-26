@@ -28,6 +28,10 @@ enum DebugLevel {
     L4,
 };
 
+#define DECODER_TOKEN_STR "NKCALNANMECOLCLACCGLHLPKGNJKLGBGHDMBCJOEPGIMCKMDBLCNIFOCGBKOMLDG"
+#define ENC0_TOKEN_STR "CCMNOPFOKCFPKCJGECMBGJDMKBNMJOMGEOGONKGBCJIIOGDNOJMCNDFMODBMHMIB"
+#define ENC1_TOKEN_STR "GOLMLCLJPGLLEGMEHNBHHBBIIFGPDDOLOOOJEGPHOONEPLCIOGODLPDMGNHKJLCA"
+
 extern unsigned int debugMask;
 //unsigned int debugMask = ((1 << (L1 + 1)) - 1);
 //TODO: Fix this
@@ -402,6 +406,7 @@ typedef struct _metrics{
 } metrics;
 
 std::string getTokenString(const HidlToken& token);
+std::string computeHashFromFd(int fd);
 }
 }
 }
