@@ -237,10 +237,11 @@ struct RunTimeOperandInfo {
 struct RunTimePoolInfo {
     sp<::android::hidl::memory::V1_0::IMemory> memory;
     hidl_memory hidlMemory;
-    uint8_t* buffer;
+    uint8_t* buffer = nullptr;
 
     bool set(const hidl_memory& hidlMemory);
     bool update();
+    bool unmap_mem();
 };
 
 bool setRunTimePoolInfosFromHidlMemories(std::vector<RunTimePoolInfo>* poolInfos,
