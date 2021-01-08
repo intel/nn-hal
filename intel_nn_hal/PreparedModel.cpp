@@ -52,6 +52,20 @@ size_t product(const vec<T>& dims) {
     return rc;
 }
 
+bool RunTimePoolInfo::unmap_mem() {
+        if (buffer){
+            const size_t size = hidlMemory.size();
+            if (hidlMemory.name() == "mmap_fd") {
+                if (munmap(buffer, size)) {
+                    VLOG(L1, "Unmap failed\n");
+                    return false;
+                }
+                buffer = nullptr;
+            }
+        }
+    return true;
+}
+
 // TODO: short term, make share memory mapping and updating a utility function.
 // TODO: long term, implement mmap_fd as a hidl IMemory service.
 bool RunTimePoolInfo::set(const hidl_memory& hidlMemory) {
