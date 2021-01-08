@@ -844,6 +844,10 @@ void GnaPreparedModel::asyncExecute(const V1_0_Request& request, MeasureTiming m
         runtimeInfo.update();
     }
 
+    for (auto runtimeInfo : requestPoolInfos) {
+        runtimeInfo.unmap_mem();
+    }
+
     if (measure == MeasureTiming::YES) {
         driverEnd = now();
         Timing timing = {.timeOnDevice = uint64_t(microsecondsDuration(deviceEnd, deviceStart)),
