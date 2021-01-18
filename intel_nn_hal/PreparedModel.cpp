@@ -1066,6 +1066,12 @@ bool PreparedModel::initialize() {
     VLOG(L1, "initialize");
     bool success = false;
 
+    //NgraphNetworkCreator ngc(mModel, "CPU");
+    mNgc->initializeModel();//NgraphNetworkCreator
+    auto ngraph_function = mNgc->generateGraph();
+    InferenceEngine::CNNNetwork ngraph_net = InferenceEngine::CNNNetwork(ngraph_function);
+    ngraph_net.serialize("/data/vendor/neuralnetworks/ngraph_ir.xml", "/data/vendor/neuralnetworks/ngraph_ir.bin");
+
     // Check operation supoorted or not, user may not call getOpertionSupported()
     for (const auto& operation : mModel.operations) {
         success = isOperationSupported(operation, mModel);
@@ -1088,7 +1094,7 @@ bool PreparedModel::initialize() {
         VLOG(L1, "initializeRunTimeOperandInfo failed.");
         return false;
     }
-
+/*
     for (const auto& operation : mModel.operations) {
         VLOG(L1, "get operation %d ready to add", operation.type);
         dumpOperation(operation);
@@ -1157,7 +1163,7 @@ bool PreparedModel::initialize() {
     if (success == false) return success;
 
     mNet.buildNetwork();
-
+*/
     VLOG(L1, "initialize ExecuteNetwork for device %s", mTargetDevice.c_str());
 #ifdef USE_NGRAPH
     enginePtr = new ExecuteNetwork(ngraph_net, mNet, mTargetDevice);
@@ -1566,10 +1572,12 @@ Return<void> PreparedModel::executeSynchronously(const Request& request, Measure
                     operand.length);  // if not doing memcpy
                 VLOG(L1, "Copy inputBlob for mPorts[%d]->name %s", indexes[i],
 #ifdef USE_NGRAPH
-                     mCreateNgraph->getNodeName(mPorts[indexes[i]]->getName()).c_str());
+                     //mCreateNgraph->getNodeName(mPorts[indexes[i]]->getName()).c_str());
+                     mNgc->getNodeName(indexes[i]).c_str());
                 auto destBlob = (mUseNgraph == true)
                                     ? enginePtr->getBlob(
-                                          mCreateNgraph->getNodeName(mPorts[indexes[i]]->getName()))
+                                          //mCreateNgraph->getNodeName(mPorts[indexes[i]]->getName()))
+                                          mNgc->getNodeName(indexes[i]))
                                     : enginePtr->getBlob(mPorts[indexes[i]]->getName());
 #else
                      mPorts[indexes[i]]->getName().c_str());
@@ -1582,10 +1590,12 @@ Return<void> PreparedModel::executeSynchronously(const Request& request, Measure
             } else {
                 VLOG(L1, "copyData from IE to Android blob for mPorts[%d]->name %s", indexes[i],
 #ifdef USE_NGRAPH
-                     mCreateNgraph->getNodeName(mPorts[indexes[i]]->getName()).c_str());
+                     //mCreateNgraph->getNodeName(mPorts[indexes[i]]->getName()).c_str());
+                     mNgc->getNodeName(indexes[i]).c_str());
                 auto srcBlob = (mUseNgraph == true)
                                    ? enginePtr->getBlob(
-                                         mCreateNgraph->getNodeName(mPorts[indexes[i]]->getName()))
+                                         //mCreateNgraph->getNodeName(mPorts[indexes[i]]->getName()))
+                                         mNgc->getNodeName(indexes[i]))
                                    : enginePtr->getBlob(mPorts[indexes[i]]->getName());
 #else
                      mPorts[indexes[i]]->getName().c_str());
@@ -1620,8 +1630,9 @@ Return<void> PreparedModel::executeSynchronously(const Request& request, Measure
 
     InferenceEngine::TBlob<float>::Ptr outBlob =
 #ifdef USE_NGRAPH
-        (mUseNgraph == true) ? enginePtr->getBlob(mCreateNgraph->getNodeName(
-                                   mPorts[mModel.outputIndexes[0]]->getName()))
+        (mUseNgraph == true) ? enginePtr->getBlob(//mCreateNgraph->getNodeName(
+                                   //mPorts[mModel.outputIndexes[0]]->getName()))
+                                   mNgc->getNodeName(mModel.outputIndexes[0]))
                              : enginePtr->getBlob(mPorts[mModel.outputIndexes[0]]->getName());
 #else
         enginePtr->getBlob(mPorts[mModel.outputIndexes[0]]->getName());
@@ -1629,8 +1640,9 @@ Return<void> PreparedModel::executeSynchronously(const Request& request, Measure
 
     InferenceEngine::TBlob<float>::Ptr inBlob =
 #ifdef USE_NGRAPH
-        (mUseNgraph == true) ? enginePtr->getBlob(mCreateNgraph->getNodeName(
-                                   mPorts[mModel.inputIndexes[0]]->getName()))
+        (mUseNgraph == true) ? enginePtr->getBlob(//mCreateNgraph->getNodeName(
+                                   //mPorts[mModel.inputIndexes[0]]->getName()))
+                                   mNgc->getNodeName(mModel.inputIndexes[0]))
                              : enginePtr->getBlob(mPorts[mModel.inputIndexes[0]]->getName());
 #else
         enginePtr->getBlob(mPorts[mModel.inputIndexes[0]]->getName());
@@ -1683,11 +1695,15 @@ T getOperandConstVal(const Model& model, const Operand& operand) {
 }
 
 bool PreparedModel::isOperationSupported(const Operation& operation, const Model& model) {
-    VLOG(L1, "Check operation %d", operation.type);
+    //VLOG(L1, "Check operation %d", operation.type);
+    ALOGD("Check operation %d", operation.type);
 
 #define VLOG_CHECKFAIL(fail) VLOG(L1, "Check failed: %s", fail)
 
     switch (operation.type) {
+        case OperationType::CONCATENATION:
+            break;
+        /*
         case OperationType::CONV_2D: {
             int oper_size = operation.inputs.size();
             const auto& input0 = model.operands[operation.inputs[OP_INPUT_IDX_CONV]];
@@ -2058,9 +2074,10 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
                 VLOG(L1, "NNERR: output type not equalt to input0 type ,aborting!!");
                 return false;
             }
-        } break;
+        } break;*/
         default:
-            VLOG(L1, "unsupport operation %d", operation.type);
+            //VLOG(L1, "unsupport operation %d", operation.type);
+            ALOGD("unsupport operation %d", operation.type);
             return false;
     }
 #ifdef DISABLE_ALL_QUANT
@@ -3877,6 +3894,7 @@ Blob::Ptr CpuPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const 
                                                   uint32_t& len) {
     if (op.type == OperandType::TENSOR_FLOAT32 || op.type == OperandType::FLOAT32) {
         if (op.lifetime == OperandLifeTime::MODEL_INPUT) {
+            std::vector<uint32_t> dims(op.dimensions.begin(), op.dimensions.end());
             VLOG(L1, "Create input blob !!!!");
             vec<unsigned int> order;
             Layout layout;
@@ -3886,12 +3904,18 @@ Blob::Ptr CpuPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const 
             } else if (op.dimensions.size() == 2) {
                 order = {0, 1};
                 layout = Layout::NC;
+            } else if (op.dimensions.size() == 3) {//Inputs are forced to 4D
+                dims.insert(dims.begin(), 1);
+                order = {0, 3, 1, 2};  // nhwc -> nchw
+                layout = Layout::NCHW;
             } else {
                 order = {0};  //(op.dimensions.size() < 2)
                 layout = Layout::C;
             }
 
-            auto inputDims = toDims(op.dimensions);
+            //auto inputDims = toDims(op.dimensions);
+            ALOGD("GetInOutOperandAsBlob dims size %d", op.dimensions.size());
+            auto inputDims = toDims(dims);
             TensorDesc td(InferenceEngine::Precision::FP32, permuteDims(inputDims, order), layout);
 
             if (buf == nullptr) {

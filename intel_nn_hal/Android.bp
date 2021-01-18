@@ -14,6 +14,8 @@ cc_library_shared {
 
     local_include_dirs: [
         "graphAPI",
+        "ngraph_creator/include",
+        "ngraph_creator/operations/include",
     ],
 
     include_dirs: [
@@ -59,7 +61,7 @@ cc_library_shared {
         "-D__ANDROID__",
         "-DANDROID",
         "-DIE_LEGACY",
-    ] + ["-DNN_DEBUG"],
+    ],
 
     strip: {
         none: true,
@@ -89,6 +91,7 @@ cc_library_shared {
         "libgraphAPI",
         "libpugixml",
         "libneuralnetworks_common",
+        "libngraph_creator",
     ],
 
 }
