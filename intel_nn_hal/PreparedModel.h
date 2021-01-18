@@ -33,6 +33,8 @@
 #include "create_ngraph.hpp"
 #endif
 
+#include <NgraphNetworkCreator.hpp>
+
 #define EXPL_PAD 1
 #define IMPL_PAD 2
 
@@ -137,6 +139,7 @@ public:
             isNgraphPropSet();  // TODO:Should additionally check if all the ops are supported
         mCreateNgraph = std::make_shared<CreateNgraph>();
 #endif
+        mNgc = std::make_shared<NgraphNetworkCreator>(mModel, mTargetDevice);
     }
 
     PreparedModel(const std::string device, const Model& model)
@@ -155,6 +158,7 @@ public:
         mUseNgraph = isNgraphPropSet();
         mCreateNgraph = std::make_shared<CreateNgraph>();
 #endif
+        mNgc = std::make_shared<NgraphNetworkCreator>(mModel, mTargetDevice);
     }
 
     ~PreparedModel() override { deinitialize(); }
@@ -242,6 +246,7 @@ protected:
     std::shared_ptr<CreateNgraph> mCreateNgraph;
     bool mUseNgraph;
 #endif
+    std::shared_ptr<NgraphNetworkCreator> mNgc;
     std::vector<OutputPort> mPorts;  // typedef std::shared_ptr<Data> DataPtr;
     ExecuteNetwork* enginePtr;
     uint32_t mPadreq;
