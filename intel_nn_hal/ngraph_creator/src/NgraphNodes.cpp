@@ -17,10 +17,12 @@ ngraph::Output<ngraph::Node> NgraphNodes::getOperationOutput(size_t index) {
 }
 
 void NgraphNodes::setResultNode(size_t outputIndex) {
-    // TODO: Replace Convert with Result
-    // Using Convert instead of Result due to crash with libinference_engine_legacy
-    std::shared_ptr<ngraph::Node> resultNode = std::make_shared<ngraph::opset3::Convert>(
-        mOperationOutputs[outputIndex], ngraph::element::f32);
+    // TODO: Construct this similar to other operations
+    ngraph::AxisVector order = {0, 2, 3, 1};  // NCHW_NHWC
+    const auto order_node =
+        ngraph::opset3::Constant::create(ngraph::element::i64, ngraph::Shape{order.size()}, order);
+    std::shared_ptr<ngraph::Node> resultNode =
+        std::make_shared<ngraph::opset3::Transpose>(mOperationOutputs[outputIndex], order_node);
     mResultsMap[outputIndex] = resultNode;
 }
 
@@ -39,7 +41,7 @@ std::shared_ptr<ngraph::Function> NgraphNodes::generateGraph() {
     for (auto const& temp : mResultsMap) resultNodes.push_back(temp.second);
     // TODO: Remove the Dummy Concat
     // Dummy Concat to join the disconnected graph(ssd_mobilenet Obj Det with only Concat)
-    resultNodes.push_back(std::make_shared<ngraph::opset3::Concat>(resultNodes, 1));
+    resultNodes.push_back(std::make_shared<ngraph::opset3::Concat>(resultNodes, 3));
     ngraph::ParameterVector inputParams;
     inputParams.reserve(mInputParamsMap.size());
     for (auto const& temp : mInputParamsMap) inputParams.push_back(temp.second);
