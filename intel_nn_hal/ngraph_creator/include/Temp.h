@@ -12,7 +12,7 @@ namespace neuralnetworks {
 namespace nnhal {
 
 // TODO: should use NNAPI_Utils:: GetConstOperand, ParseOperationInput
-int GetConstOperand(const Model& model, uint32_t index) {
+static int GetConstOperand(const Model& model, uint32_t index) {
     const auto op = model.operands[index];
     if (op.lifetime == OperandLifeTime::CONSTANT_COPY) {
         if (op.location.poolIndex != 0) {
@@ -25,7 +25,7 @@ int GetConstOperand(const Model& model, uint32_t index) {
     ALOGE("FIX ME : Return unknown");
     return 0;
 }
-int ParseOperationInput(const Model& model, const Operation& operation, uint32_t index) {
+static int ParseOperationInput(const Model& model, const Operation& operation, uint32_t index) {
     uint32_t inputIndex = operation.inputs[index];
     const auto operand = model.operands[inputIndex];
     return GetConstOperand(model, inputIndex);
