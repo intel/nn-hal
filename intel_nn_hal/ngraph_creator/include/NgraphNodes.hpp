@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Temp.h>  //TODO: Remove this once NNAPI_Utils is ready
 #include <cstdio>
 #include <ngraph/ngraph.hpp>
 #include <ngraph/opsets/opset3.hpp>
@@ -14,7 +15,6 @@ private:
     std::vector<ngraph::Output<ngraph::Node>> mOperationOutputs;
     std::map<int, std::shared_ptr<ngraph::opset3::Parameter>> mInputParamsMap;
     std::map<int, std::shared_ptr<ngraph::Node>> mResultsMap;
-    std::string INVALID_STRING;
 
 public:
     NgraphNodes(size_t size);

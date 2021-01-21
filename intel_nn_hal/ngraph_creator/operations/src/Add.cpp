@@ -9,6 +9,7 @@ Add::Add(const Model& model) : OperationsBase(model) {}
 
 bool Add::validate(const Operation& op) { return true; }
 
+// TODO: Implement APIs createNode & createNodeForPlugin. These are just dummy placeholders.
 std::shared_ptr<ngraph::Node> Add::createNode(const Operation& operation) {
     auto input = mNgraphNodes->getOperationOutput(operation.inputs[OP_INPUT_IDX_CONV]);
     std::shared_ptr<ngraph::Node> constantOp =

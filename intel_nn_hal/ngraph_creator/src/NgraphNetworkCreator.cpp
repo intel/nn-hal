@@ -18,8 +18,8 @@ void NgraphNetworkCreator::createInputParams() {
         std::shared_ptr<ngraph::opset3::Parameter> inputParam;
         auto& origDims = mModel.operands[i].dimensions;
         std::vector<size_t> dims(origDims.begin(), origDims.end());
-        if (dims.size() == 3) {
-            ALOGD("createInputParams converting operand %d to 4D", i);
+        if (dims.size() == 3) {  // TODO:Handle other dims size too
+            ALOGI("createInputParams converting operand %d to 4D", i);
             dims.insert(dims.begin(), 1);
         }
         switch (mModel.operands[i].type) {
@@ -27,7 +27,7 @@ void NgraphNetworkCreator::createInputParams() {
             case OperandType::TENSOR_FLOAT32:
                 inputParam = std::make_shared<ngraph::opset3::Parameter>(
                     ngraph::element::f32, ngraph::Shape(dims.begin(), dims.end()));
-                ALOGD("createInputParams created inputIndex %d, type %d", i,
+                ALOGV("createInputParams created inputIndex %d, type %d", i,
                       mModel.operands[i].type);
                 break;
             default:
@@ -53,7 +53,7 @@ bool NgraphNetworkCreator::initializeModel() {
     for (const auto& operation : mModel.operations) {
         auto op = mOpFctryInst.getOperation(operation.type, mModel);
         if (op == nullptr) {
-            ALOGD("initializeModel Failure at type %d", operation.type);
+            ALOGE("initializeModel Failure at type %d", operation.type);
             return false;
         }
         op->connectOperationToGraph(operation);
