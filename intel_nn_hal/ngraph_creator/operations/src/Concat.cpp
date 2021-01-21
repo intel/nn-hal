@@ -6,26 +6,6 @@ namespace hardware {
 namespace neuralnetworks {
 namespace nnhal {
 
-// TODO: should use NNAPI_Utils:: GetConstOperand, ParseOperationInput
-int GetConstOperand(const Model& model, uint32_t index) {
-    const auto op = model.operands[index];
-    if (op.lifetime == OperandLifeTime::CONSTANT_COPY) {
-        if (op.location.poolIndex != 0) {
-            ALOGE("CONSTANT_COPY expects poolIndex to be 0");
-            // nnAssert(false);
-        }
-        ALOGD("operand lifetime OperandLifeTime::CONSTANT_COPY");
-        return model.operandValues[op.location.offset];
-    }
-    ALOGE("FIX ME : Return unknown");
-    return 0;
-}
-int ParseOperationInput(const Model& model, const Operation& operation, uint32_t index) {
-    uint32_t inputIndex = operation.inputs[index];
-    const auto operand = model.operands[inputIndex];
-    return GetConstOperand(model, inputIndex);
-}
-
 Concat::Concat(const Model& model) : OperationsBase(model) {}
 
 bool Concat::validate(const Operation& op) { return true; }
@@ -40,8 +20,7 @@ std::shared_ptr<ngraph::Node> Concat::createNode(const Operation& operation) {
         auto inputIndex = operation.inputs[i];
         auto inputOp = mNgraphNodes->getOperationOutput(inputIndex);
         const auto op = mModel.operands[inputIndex];
-        ALOGD("createNode inputIndex %d, inputOp %s, lifetime %d", inputIndex,
-              /*(inputOp ? "Valid" : "NULL")*/ inputOp.get_index(), op.lifetime);
+        ALOGD("createNode inputIndex %d, lifetime %d", inputIndex, op.lifetime);
         if (op.lifetime == OperandLifeTime::CONSTANT_COPY ||
             op.lifetime == OperandLifeTime::CONSTANT_REFERENCE ||
             op.lifetime ==

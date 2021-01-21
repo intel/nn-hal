@@ -4,7 +4,7 @@ namespace android {
 namespace hardware {
 namespace neuralnetworks {
 namespace nnhal {
-// Add is supposed to create an Add Node based on the arguments/parameters.
+
 class Add : public OperationsBase {
 public:
     Add(const Model& model);
