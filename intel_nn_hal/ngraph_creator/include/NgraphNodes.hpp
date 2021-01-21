@@ -11,17 +11,18 @@ namespace nnhal {
 
 class NgraphNodes {
 private:
-    std::vector<std::shared_ptr<ngraph::Node>> mOperationOutputs;
-    ngraph::ParameterVector mInputParams;
-    std::vector<std::shared_ptr<ngraph::Node>> mResultNodes;
+    std::vector<ngraph::Output<ngraph::Node>> mOperationOutputs;
+    std::map<int, std::shared_ptr<ngraph::opset3::Parameter>> mInputParamsMap;
+    std::map<int, std::shared_ptr<ngraph::Node>> mResultsMap;
+    std::string INVALID_STRING;
 
 public:
     NgraphNodes(size_t size);
 
-    void addInputParam(std::shared_ptr<ngraph::opset3::Parameter> inParam);
-    void setOperationOutput(size_t index, std::shared_ptr<ngraph::Node> node);
-    std::shared_ptr<ngraph::Node> getOperationOutput(size_t index);
-    void setResultNode(size_t index);
+    void addInputParam(size_t index, std::shared_ptr<ngraph::opset3::Parameter> inParam);
+    void setOperationOutput(size_t index, ngraph::Output<ngraph::Node> output);
+    ngraph::Output<ngraph::Node> getOperationOutput(size_t index);
+    void setResultNode(size_t outputIndex);
 
     const std::string& getNodeName(size_t index);
 

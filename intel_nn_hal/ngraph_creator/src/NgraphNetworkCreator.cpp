@@ -35,7 +35,7 @@ void NgraphNetworkCreator::createInputParams() {
                       mModel.operands[i].type);
                 inputParam = nullptr;
         }
-        mNgraphNodes->addInputParam(inputParam);
+        mNgraphNodes->addInputParam(i, inputParam);
         mNgraphNodes->setOperationOutput(i, inputParam);
     }
 }
@@ -56,21 +56,20 @@ bool NgraphNetworkCreator::initializeModel() {
             ALOGD("initializeModel Failure at type %d", operation.type);
             return false;
         }
-        mNgraphNodes->setOperationOutput(
-            operation.outputs[0],  // TODO: Handle multiple Outputs(eg.LSTM). Assumption here : each
-                                   // node has only 1 output.
-            op->createNodeForPlugin(operation));
+        op->connectOperationToGraph(operation);
     }
     ALOGD("initializeModel Success");
     return true;
 }
 
 const std::string& NgraphNetworkCreator::getNodeName(uint32_t index) {
+    ALOGD("getNodeName %d", index);
     return mNgraphNodes->getNodeName(index);
 }
 
 std::shared_ptr<ngraph::Function> NgraphNetworkCreator::generateGraph() {
     for (auto i : mModel.outputIndexes) {
+        ALOGD("setResultNode %d", i);
         mNgraphNodes->setResultNode(i);
     }
     return mNgraphNodes->generateGraph();
