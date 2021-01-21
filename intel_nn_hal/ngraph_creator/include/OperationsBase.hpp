@@ -19,17 +19,18 @@ protected:
     std::shared_ptr<NgraphNodes> mNgraphNodes;
     enum ConversionType { NHWC_NCHW, NCHW_NHWC };
     std::shared_ptr<ngraph::Node> transpose(ConversionType type,
-                                            std::shared_ptr<ngraph::Node> input);
+                                            ngraph::Output<ngraph::Node> input);
     virtual std::shared_ptr<ngraph::Node> createNode(const Operation& op) = 0;
+    // override createNodeForPlugin in case sPluginType specific implementation is required
+    virtual std::shared_ptr<ngraph::Node> createNodeForPlugin(const Operation& op);
 
 public:
     static std::string sPluginType;
     OperationsBase(const Model& model);
     void setNgraphNodes(std::shared_ptr<NgraphNodes> nodes);
     virtual bool validate(const Operation& op);
-
-    // override createNodeForPlugin in case sPluginType specific implementation is required
-    virtual std::shared_ptr<ngraph::Node> createNodeForPlugin(const Operation& op);
+    // override connectOperationToGraph in case Operation has multiple outputs
+    virtual void connectOperationToGraph(const Operation& op);
 };
 
 }  // namespace nnhal

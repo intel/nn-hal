@@ -34,14 +34,14 @@ std::shared_ptr<ngraph::Node> Concat::createNode(const Operation& operation) {
     auto n = operation.inputs.size() - 1;
     std::vector<uint32_t> axisMap = {2, 3, 1};  // NCHW = axisMap[NHWC]
     auto axis = axisMap[ParseOperationInput(mModel, operation, n)];
-    std::vector<std::shared_ptr<ngraph::Node>> inputs;
+    std::vector<ngraph::Output<ngraph::Node>> inputs;
     ALOGD("createNode n %d, axis %d", n, axis);
     for (int i = 0; i < n; i++) {
         auto inputIndex = operation.inputs[i];
         auto inputOp = mNgraphNodes->getOperationOutput(inputIndex);
         const auto op = mModel.operands[inputIndex];
         ALOGD("createNode inputIndex %d, inputOp %s, lifetime %d", inputIndex,
-              (inputOp ? "Valid" : "NULL"), op.lifetime);
+              /*(inputOp ? "Valid" : "NULL")*/ inputOp.get_index(), op.lifetime);
         if (op.lifetime == OperandLifeTime::CONSTANT_COPY ||
             op.lifetime == OperandLifeTime::CONSTANT_REFERENCE ||
             op.lifetime ==
