@@ -3925,11 +3925,12 @@ Blob::Ptr CpuPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const 
                 blob->allocate();
                 return blob;
             } else {
-                if (inputDims.size() != 4) {
+                ALOGD("GetInOutOperandAsBlob dims size %d", inputDims.size());
+                //if (inputDims.size() != 4) {
                     InferenceEngine::TBlob<float>::Ptr blob =
                         std::make_shared<InferenceEngine::TBlob<float>>(td, (float*)buf, len);
                     return blob;
-                } else {
+                /*} else {
                     InferenceEngine::TBlob<float>::Ptr blob =
                         std::make_shared<InferenceEngine::TBlob<float>>(td);
                     blob->allocate();
@@ -3958,7 +3959,7 @@ Blob::Ptr CpuPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const 
                     }
 
                     return blob;
-                }
+                }*/
             }
         } else if (op.lifetime == OperandLifeTime::MODEL_OUTPUT) {
             VLOG(L1, "Create output blob !!!!");
