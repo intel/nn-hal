@@ -18,7 +18,7 @@ cc_library_static {
         "libngraph_headers",
     ],
     include_dirs: [
-        "vendor/intel/external/project-celadon/nn-hal/intel_nn_hal",
+        "vendor/intel/external/project-celadon/nn-hal",
     ],
     local_include_dirs: [
         "include/",
