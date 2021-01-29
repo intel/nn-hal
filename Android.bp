@@ -100,7 +100,7 @@ cc_library_shared {
 cc_binary {
     name: "android.hardware.neuralnetworks@1.2-generic-service",
     init_rc: [
-        "android.hardware.neuralnetworks@1.2-generic-cpu.rc",
+        "config/android.hardware.neuralnetworks@1.2-generic-cpu.rc",
     ],
     relative_install_path: "hw",
     proprietary: true,
