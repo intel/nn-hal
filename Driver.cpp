@@ -17,9 +17,12 @@
 #define LOG_TAG "Driver"
 
 #include "Driver.h"
+
 #include <android-base/logging.h>
 #include <thread>
-#include "PreparedModel.h"
+#include "BasePreparedModel.h"
+#include "CpuPreparedModel.h"
+#include "GnaPreparedModel.h"
 #include "ValidateHal.h"
 
 namespace android {
@@ -28,6 +31,7 @@ namespace neuralnetworks {
 namespace nnhal {
 
 using namespace android::nn;
+
 hidl_vec<Capabilities::OperandPerformance> nonExtensionOperandPerformance(PerformanceInfo perf) {
     using OpPerf = Capabilities::OperandPerformance;
 
@@ -45,119 +49,53 @@ hidl_vec<Capabilities::OperandPerformance> nonExtensionOperandPerformance(Perfor
 
     return ret;
 }
-static sp<PreparedModel> ModelFactory(const char* name, const Model& model) {
-    sp<PreparedModel> preparedModel = NULL;
 
-    if (strcmp(name, "CPU") == 0)
-        preparedModel = new CpuPreparedModel(model);
-    else if (strcmp(name, "VPU") == 0)
-        preparedModel = new VpuPreparedModel(model);
-    else if (strcmp(name, "GPU") == 0)
-        preparedModel = new GpuPreparedModel(model);
+// For HAL-1.0 version
+Return<void> Driver::getCapabilities(getCapabilities_cb cb) {
+    ALOGV("Entering %s", __func__);
 
-    return preparedModel;
+    return Void();
+}
+
+Return<void> Driver::getSupportedOperations(const V1_0_Model& model, getSupportedOperations_cb cb) {
+    ALOGV("Entering %s", __func__);
+
+    return Void();
 }
 
 Return<ErrorStatus> Driver::prepareModel(const V1_0_Model& model,
                                          const sp<V1_0::IPreparedModelCallback>& callback) {
-    ALOGI("Entering %s", __func__);
+    ALOGV("Entering %s", __func__);
 
     return ErrorStatus::NONE;
+}
+
+// For HAL-1.1 version
+Return<void> Driver::getCapabilities_1_1(getCapabilities_1_1_cb cb) {
+    ALOGV("Entering %s", __func__);
+
+    return Void();
+}
+
+Return<void> Driver::getSupportedOperations_1_1(const V1_1_Model& model,
+                                                getSupportedOperations_1_1_cb cb) {
+    ALOGV("Entering %s", __func__);
+
+    return Void();
 }
 
 Return<ErrorStatus> Driver::prepareModel_1_1(const V1_1_Model& model,
                                              ExecutionPreference preference,
                                              const sp<V1_0::IPreparedModelCallback>& callback) {
-    ALOGI("Entering %s", __func__);
+    ALOGV("Entering %s", __func__);
 
     return ErrorStatus::NONE;
 }
 
-Return<ErrorStatus> Driver::prepareModel_1_2(const Model& model, ExecutionPreference preference,
-                                             const hidl_vec<hidl_handle>&,
-                                             const hidl_vec<hidl_handle>&, const HidlToken&,
-                                             const sp<V1_2::IPreparedModelCallback>& callback) {
-    ALOGI("Entering %s", __func__);
-
-    if (callback.get() == nullptr) {
-        ALOGI("invalid callback passed to prepareModel");
-        return ErrorStatus::INVALID_ARGUMENT;
-    }
-    if (!validateModel(model) || !validateExecutionPreference(preference)) {
-        callback->notify(ErrorStatus::INVALID_ARGUMENT, nullptr);
-        return ErrorStatus::INVALID_ARGUMENT;
-    }
-
-    // TODO: make asynchronous later
-    sp<PreparedModel> preparedModel = ModelFactory(mName.c_str(), model);
-    if (preparedModel == NULL) {
-        ALOGI("failed to create preparedmodel");
-        return ErrorStatus::INVALID_ARGUMENT;
-    }
-
-    if (!preparedModel->initialize()) {
-        ALOGI("failed to initialize preparedmodel");
-        callback->notify(ErrorStatus::INVALID_ARGUMENT, nullptr);
-        return ErrorStatus::NONE;
-    }
-
-    callback->notify(ErrorStatus::NONE, preparedModel);
-    return ErrorStatus::NONE;
-}
-
-Return<DeviceStatus> Driver::getStatus() {
-    ALOGI("DeviceStatus::AVAILABLE");
-    return DeviceStatus::AVAILABLE;
-}
-
-Return<void> Driver::getVersionString(getVersionString_cb cb) {
-    ALOGI("Entering %s", __func__);
-    cb(ErrorStatus::NONE, "intel_nn_hal");
-    return Void();
-}
-
-Return<void> Driver::getType(getType_cb cb) {
-    ALOGI("Entering %s", __func__);
-    cb(ErrorStatus::NONE, V1_2::DeviceType::CPU);
-    return Void();
-}
-
-Return<void> Driver::getSupportedExtensions(getSupportedExtensions_cb cb) {
-    ALOGI("Entering %s", __func__);
-    cb(ErrorStatus::NONE, {/* No extensions. */});
-    return Void();
-}
-
-Return<void> Driver::getNumberOfCacheFilesNeeded(getNumberOfCacheFilesNeeded_cb cb) {
-    ALOGI("Entering %s", __func__);
-    // Set both numbers to be 0 for cache not supported.
-    cb(ErrorStatus::NONE, /*numModelCache=*/0, /*numDataCache=*/0);
-    return Void();
-}
-
-Return<ErrorStatus> Driver::prepareModelFromCache(
-    const hidl_vec<hidl_handle>&, const hidl_vec<hidl_handle>&, const HidlToken&,
-    const sp<V1_2::IPreparedModelCallback>& callback) {
-    ALOGI("Entering %s", __func__);
-    callback->notify_1_2(ErrorStatus::GENERAL_FAILURE, nullptr);
-    return ErrorStatus::GENERAL_FAILURE;
-}
-
-Return<void> Driver::getCapabilities(getCapabilities_cb cb) {
-    ALOGI("Entering %s", __func__);
-
-    return Void();
-}
-
-Return<void> Driver::getCapabilities_1_1(getCapabilities_1_1_cb cb) {
-    ALOGI("Entering %s", __func__);
-
-    return Void();
-}
-
+// For HAL-1.2 version
 Return<void> Driver::getCapabilities_1_2(getCapabilities_1_2_cb cb) {
-    ALOGI("Entering %s", __func__);
-    if (mName.compare("CPU") == 0) {
+    ALOGV("Entering %s", __func__);
+    if (mDeviceName.compare("CPU") == 0) {
         ALOGI("CPU driver getCapabilities()");
         // Setting operandPerformance value to base value for all operand types
         Capabilities capabilities = {
@@ -167,7 +105,7 @@ Return<void> Driver::getCapabilities_1_2(getCapabilities_1_2_cb cb) {
 
         ALOGI("CPU MKLDNN driver Capabilities .execTime = 0.9f, .powerUsage = 0.9f");
         cb(ErrorStatus::NONE, capabilities);
-    } else if (mName.compare("GPU") == 0) {
+    } else if (mDeviceName.compare("GPU") == 0) {
         ALOGI("GPU driver getCapabilities()");
         Capabilities capabilities = {
             .relaxedFloat32toFloat16PerformanceScalar = {.execTime = 0.95f, .powerUsage = 0.85f},
@@ -176,9 +114,16 @@ Return<void> Driver::getCapabilities_1_2(getCapabilities_1_2_cb cb) {
 
         ALOGI("GPU clDNN driver Capabilities .execTime = 0.95f, .powerUsage = 0.85f");
         cb(ErrorStatus::NONE, capabilities);
-    }
-    // mName.compare("VPU") == 0
-    else {
+    } else if (mDeviceName.compare("GNA") == 0) {
+        ALOGI("GPU driver getCapabilities()");
+        Capabilities capabilities = {
+            .relaxedFloat32toFloat16PerformanceScalar = {.execTime = 0.8f, .powerUsage = 0.8f},
+            .relaxedFloat32toFloat16PerformanceTensor = {.execTime = 0.8f, .powerUsage = 0.8f},
+            .operandPerformance = nonExtensionOperandPerformance({0.8f, 0.8f})};
+
+        ALOGI("GPU clDNN driver Capabilities .execTime = 0.95f, .powerUsage = 0.85f");
+        cb(ErrorStatus::NONE, capabilities);
+    } else if (mDeviceName.compare("VPU") == 0) {
         ALOGI("Myriad driver getCapabilities()");
         Capabilities capabilities = {
             .relaxedFloat32toFloat16PerformanceScalar = {.execTime = 1.1f, .powerUsage = 1.1f},
@@ -187,42 +132,115 @@ Return<void> Driver::getCapabilities_1_2(getCapabilities_1_2_cb cb) {
 
         ALOGI("Myriad driver Capabilities .execTime = 1.1f, .powerUsage = 1.1f");
         cb(ErrorStatus::NONE, capabilities);
+    } else {
+        Capabilities capabilities;
+        cb(ErrorStatus::DEVICE_UNAVAILABLE, capabilities);
     }
+    ALOGV("Exiting %s", __func__);
     return Void();
 }
 
-Return<void> Driver::getSupportedOperations(const V1_0_Model& model, getSupportedOperations_cb cb) {
-    ALOGI("Entering %s", __func__);
+Return<DeviceStatus> Driver::getStatus() {
+    ALOGI("DeviceStatus::AVAILABLE");
+    return DeviceStatus::AVAILABLE;
+}
 
+Return<void> Driver::getVersionString(getVersionString_cb cb) {
+    ALOGV("Entering %s", __func__);
+    cb(ErrorStatus::NONE, "intel_nn_hal");
     return Void();
 }
 
-Return<void> Driver::getSupportedOperations_1_1(const V1_1_Model& model,
-                                                getSupportedOperations_1_1_cb cb) {
-    ALOGI("Entering %s", __func__);
+Return<void> Driver::getType(getType_cb cb) {
+    ALOGV("Entering %s", __func__);
+    cb(ErrorStatus::NONE, V1_2::DeviceType::CPU);
+    return Void();
+}
 
+Return<void> Driver::getSupportedExtensions(getSupportedExtensions_cb cb) {
+    ALOGV("Entering %s", __func__);
+    cb(ErrorStatus::NONE, {/* No extensions. */});
     return Void();
 }
 
 Return<void> Driver::getSupportedOperations_1_2(const Model& model,
                                                 getSupportedOperations_1_2_cb cb) {
-    ALOGI("Entering %s", __func__);
+    ALOGV("Entering %s", __func__);
 
     int count = model.operations.size();
     std::vector<bool> supported(count, true);
 
     if (!validateModel(model)) {
-        ALOGI("NNERR: %s failed at line no: %d\n", __func__, __LINE__);
+        ALOGE("NNERR: %s failed at line no: %d\n", __func__, __LINE__);
         cb(ErrorStatus::INVALID_ARGUMENT, supported);
         return Void();
     }
 
     for (int i = 0; i < count; i++) {
         const auto& operation = model.operations[i];
-        supported[i] = PreparedModel::isOperationSupported(operation, model);
+        supported[i] = BasePreparedModel::isOperationSupported(operation, model);
     }
     cb(ErrorStatus::NONE, supported);
+    ALOGV("Exiting %s", __func__);
     return Void();
+}
+
+static sp<BasePreparedModel> ModelFactory(const char* name, const Model& model) {
+    sp<BasePreparedModel> driverPreparedModel = NULL;
+
+    if (strcmp(name, "CPU") == 0)
+        driverPreparedModel = new CpuPreparedModel(model);
+    else if (strcmp(name, "GNA") == 0)
+        driverPreparedModel = new GnaPreparedModel(model);
+    return driverPreparedModel;
+}
+
+Return<ErrorStatus> Driver::prepareModel_1_2(const Model& model, ExecutionPreference preference,
+                                             const hidl_vec<hidl_handle>&,
+                                             const hidl_vec<hidl_handle>&, const HidlToken&,
+                                             const sp<V1_2::IPreparedModelCallback>& callback) {
+    ALOGV("Entering %s", __func__);
+
+    if (callback.get() == nullptr) {
+        ALOGE("invalid callback passed to prepareModel");
+        return ErrorStatus::INVALID_ARGUMENT;
+    }
+    if (!validateModel(model) || !validateExecutionPreference(preference)) {
+        callback->notify(ErrorStatus::INVALID_ARGUMENT, nullptr);
+        return ErrorStatus::INVALID_ARGUMENT;
+    }
+
+    // TODO: make asynchronous later
+    sp<BasePreparedModel> driverPreparedModel = ModelFactory(mDeviceName.c_str(), model);
+    if (driverPreparedModel == NULL) {
+        ALOGE("failed to create preparedmodel");
+        return ErrorStatus::INVALID_ARGUMENT;
+    }
+
+    if (!driverPreparedModel->initialize(model)) {
+        ALOGE("failed to initialize preparedmodel");
+        callback->notify(ErrorStatus::INVALID_ARGUMENT, nullptr);
+        return ErrorStatus::NONE;
+    }
+
+    callback->notify(ErrorStatus::NONE, driverPreparedModel);
+    ALOGV("Exiting %s", __func__);
+    return ErrorStatus::NONE;
+}
+
+Return<void> Driver::getNumberOfCacheFilesNeeded(getNumberOfCacheFilesNeeded_cb cb) {
+    ALOGV("Entering %s", __func__);
+    // Set both numbers to be 0 for cache not supported.
+    cb(ErrorStatus::NONE, /*numModelCache=*/0, /*numDataCache=*/0);
+    return Void();
+}
+
+Return<ErrorStatus> Driver::prepareModelFromCache(
+    const hidl_vec<hidl_handle>&, const hidl_vec<hidl_handle>&, const HidlToken&,
+    const sp<V1_2::IPreparedModelCallback>& callback) {
+    ALOGV("Entering %s", __func__);
+    callback->notify_1_2(ErrorStatus::GENERAL_FAILURE, nullptr);
+    return ErrorStatus::GENERAL_FAILURE;
 }
 
 }  // namespace nnhal

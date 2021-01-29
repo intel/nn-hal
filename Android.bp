@@ -1,4 +1,3 @@
-
 //#############################################################
 cc_library_shared {
 
@@ -9,13 +8,18 @@ cc_library_shared {
 
     srcs: [
         "Driver.cpp",
-        "PreparedModel.cpp",
+        "BasePreparedModel.cpp",
+        "utils.cpp",
+        "cpu/CpuPreparedModel.cpp",
+        "gna/GnaPreparedModel.cpp"
     ],
 
     local_include_dirs: [
         "graphAPI",
         "ngraph_creator/include",
         "ngraph_creator/operations/include",
+        "cpu",
+        "gna"
     ],
 
     include_dirs: [
@@ -88,7 +92,6 @@ cc_library_shared {
     ],
 
     static_libs: [
-        "libgraphAPI",
         "libpugixml",
         "libneuralnetworks_common",
         "libngraph_creator",
