@@ -69,7 +69,6 @@ public:
     virtual bool initializeFromCache(const hidl_vec<hidl_handle>& modelCache, const HidlToken& token) override;
 #else
     GnaPreparedModel(const Model& model) : PreparedModel("GNA", model), gnaPluginPtr(nullptr), mBuilderModel(nullptr) {
-        runtimeMetrics.reset();
     }
 	
     ~GnaPreparedModel()  {

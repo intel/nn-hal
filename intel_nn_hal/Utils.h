@@ -20,6 +20,7 @@
 
 //#define PERF_COUNTERS
 //#define CACHING
+//#define NN_DEBUG
 
 enum DebugLevel {
     L0,
@@ -376,18 +377,16 @@ typedef struct _metrics{
     void print() {
 
         auto avg_infer = 0;
+        std::stringstream outputlog;
 
         if (!infer_time.empty()) {
             avg_infer = std::accumulate(infer_time.begin(), infer_time.end(), 0) / (infer_time.size());
 
-            std::stringstream outputlog;
             outputlog << "All infer times: ";
             for (auto t : infer_time) {
                 outputlog << t << " ";
             }
             outputlog << std::endl;
-
-            std::cout << outputlog.str();
         }
 
         std::cout << std::setw(25) << " Dequant time(ms):"
@@ -404,6 +403,7 @@ typedef struct _metrics{
                    << std::setw(25)  << infer_calls
                    << std::setw(25)  << irBuild_time
                    << std::endl;
+        std::cout << "Infer times: " << outputlog.str().c_str();
     }
 } metrics;
 #endif

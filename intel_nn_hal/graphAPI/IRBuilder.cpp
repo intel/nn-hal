@@ -98,7 +98,7 @@ std::shared_ptr<InferenceEngine::ICNNNetwork> ModelBuilder::convertBuilder()
     std::shared_ptr<InferenceEngine::ICNNNetwork> cnnNetwork =
         InferenceEngine::Builder::convertToICNNNetwork(finalNetwork);
     InferenceEngine::ResponseDesc desc;
-    cnnNetwork->serialize("/data/local/tmp/network.xml", "/data/local/tmp/network.bin", &desc);
+    //cnnNetwork->serialize("/data/local/tmp/network.xml", "/data/local/tmp/network.bin", &desc);
 
     return cnnNetwork;
 }

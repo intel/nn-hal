@@ -26,8 +26,8 @@
 //#include "ExecutionBurstServer.h"
 //#include "OperationsUtils.h"
 
-#define DISABLE_ALL_QUANT
-//#define NN_DEBUG
+//#define DISABLE_ALL_QUANT
+#define NN_DEBUG
 
 namespace android {
 namespace hardware {

@@ -216,6 +216,7 @@ bool GnaPreparedModel::initialize(const hidl_vec<hidl_handle>& modelCache, const
     initializeInput();
 
     auto network = mBuilderModel->convertBuilder();
+#ifdef PERF_COUNTERS
     time_point irbuild_end = now();
     runtimeMetrics.irBuild_time = (double(millisecondsDuration(irbuild_end, irbuild_start)));
     gnaPluginPtr = new GnaNetwork(network, "GNA");
@@ -223,6 +224,11 @@ bool GnaPreparedModel::initialize(const hidl_vec<hidl_handle>& modelCache, const
     gnaPluginPtr->loadNetwork(passed_network, isDecoderNw);
     time_point gnabuild_end = now();
     runtimeMetrics.nw_load_time = (double(millisecondsDuration(gnabuild_end, irbuild_end)));
+#else
+    gnaPluginPtr = new GnaNetwork(network, "GNA");
+    InferenceEngine::CNNNetwork passed_network({network});
+    gnaPluginPtr->loadNetwork(passed_network);
+#endif
     gnaPluginPtr->queryState();
     gnaPluginPtr->reset();
 
@@ -465,10 +471,10 @@ void GnaPreparedModel::deinitialize() {
               std::cout << std::endl;
     }
     std::vector<double>::iterator min_infer_time = std::min_element(gnaPluginPtr->inferTimeGNA.begin(), gnaPluginPtr->inferTimeGNA.end());
-    VLOG(L1, "deinitialize infer times");
-    for (auto iter: gnaPluginPtr->inferTimeGNA) {
-	        VLOG(L1, "%fms  ", iter);
-    }
+    // VLOG(L1, "deinitialize infer times");
+    // for (auto iter: gnaPluginPtr->inferTimeGNA) {
+	//         VLOG(L1, "%fms  ", iter);
+    // }
     std::cout << "Minimum infer time " << gnaPluginPtr->inferTimeGNA.at(std::distance(gnaPluginPtr->inferTimeGNA.begin(), min_infer_time)) << "\n";
 #endif
     if (mBuilderModel) {
@@ -484,6 +490,7 @@ void GnaPreparedModel::deinitialize() {
     VLOG(L1, "free engine");
 }
 
+#ifdef PERF_COUNTERS
 bool quantizeToQuant8Signed(const float* inputData, int8_t* outputData, const Shape& outputShape,
                             metrics& runtime_metrics) {
     auto start = now();
@@ -542,11 +549,145 @@ bool quantizeToQuant16(const float* inputData, uint16_t* outputData, const Shape
     return true;
 }
 
+bool deQuantize_s16(const uint8_t* inputData, const uint32_t& len, const float scale,
+                const int32_t zeroPoint, float* outputData, metrics& runtime_metrics) {
+    
+    uint32_t moves = len >> 3;
+    uint32_t mod = len % 8;
+    const __m128i x0 = _mm_set1_epi16(0);
+    const __m128 m_scale = _mm_set1_ps(scale);
+
+	for ( int i = 0; i < moves; i++)
+    {
+        __m128i x = _mm_loadu_si128((__m128i*) inputData);
+        __m128i xlo = _mm_unpacklo_epi16(x, _mm_cmplt_epi16 (x, x0));
+        __m128i xhi = _mm_unpackhi_epi16(x, _mm_cmplt_epi16 (x, x0));
+        __m128 ylo = _mm_cvtepi32_ps(xlo);
+        __m128 yhi = _mm_cvtepi32_ps(xhi);
+        __m128 valueslo = _mm_mul_ps(ylo, m_scale);
+        __m128 valueshi = _mm_mul_ps(yhi, m_scale);
+
+        _mm_storeu_ps(outputData, valueslo);
+        _mm_storeu_ps(outputData + 4, valueshi);
+ 
+        outputData += 8;
+        inputData += 16;
+    }
+    return true;
+}
+
+
+template<typename T>
+bool deQuantize(const uint8_t* inputData, const uint32_t& len, const float scale,
+                const int32_t zeroPoint, float* outputData, metrics& runtime_metrics) {
+    auto start = now();
+      int32_t value;
+      const T* inputBuf = reinterpret_cast<const T*>(inputData);
+      for (int i = 0; i < len; ++i) {
+        value = *(inputBuf + i);
+        outputData[i] = static_cast<float>(scale * (value - zeroPoint));
+      }
+    auto end = now();
+    runtime_metrics.deQuant_time += (double(millisecondsDuration(end, start)));
+      return true;
+}
+#else
+bool quantizeToQuant8Signed(const float* inputData, int8_t* outputData, const Shape& outputShape) {
+    uint32_t len = getNumberOfElements(outputShape.dimensions);
+    /* for (uint32_t i = 0; i < size; ++i) {
+        outputData[i] = static_cast<int8_t>(std::max<float>(
+                -128.0f,
+                std::min<float>(127.0f, outputShape.offset +
+                                                std::round(inputData[i] / outputShape.scale))));
+    } */
+
+    uint32_t moves = len >> 2;
+    uint32_t mod = len % 8;
+    const __m128 m_scale = _mm_set1_ps(outputShape.scale);
+    const __m128 m_offset = _mm_set1_ps(outputShape.offset);
+
+	for ( int i = 0; i < moves; i++)
+    {
+        __m128 x = _mm_loadu_ps(inputData);
+        __m128 div_x = _mm_div_ps(x, m_scale);
+        __m128 add_x = _mm_add_ps(div_x, m_offset);
+        __m64 x_int = _mm_cvtps_pi8(add_x);
+         *((__m64 *) outputData) = x_int;
+        inputData += 4;
+        outputData += 4;
+    }
+
+    return true;
+}
+
+bool quantizeToQuant16(const float* inputData, uint16_t* outputData, const Shape& outputShape) {
+    uint32_t len = getNumberOfElements(outputShape.dimensions);
+    
+    uint32_t moves = len >> 2;
+    uint32_t mod = len % 8;
+    const __m128 m_scale = _mm_set1_ps(outputShape.scale);
+    const __m128 m_offset = _mm_set1_ps(outputShape.offset);
+
+	for ( int i = 0; i < moves; i++)
+    {
+        __m128 x = _mm_loadu_ps(inputData);
+        __m128 div_x = _mm_div_ps(x, m_scale);
+        __m128 add_x = _mm_add_ps(div_x, m_offset);
+        __m64 x_int = _mm_cvtps_pi16(add_x);
+         *((__m64 *) outputData) = x_int;
+        inputData += 4;
+        outputData += 4;
+    }
+    return true;
+}
+
+bool deQuantize_s16(const uint8_t* inputData, const uint32_t& len, const float scale,
+                const int32_t zeroPoint, float* outputData) {
+    
+    uint32_t moves = len >> 3;
+    uint32_t mod = len % 8;
+    const __m128i x0 = _mm_set1_epi16(0);
+    const __m128 m_scale = _mm_set1_ps(scale);
+
+	for ( int i = 0; i < moves; i++)
+    {
+        __m128i x = _mm_loadu_si128((__m128i*) inputData);
+        __m128i xlo = _mm_unpacklo_epi16(x, _mm_cmplt_epi16 (x, x0));
+        __m128i xhi = _mm_unpackhi_epi16(x, _mm_cmplt_epi16 (x, x0));
+        __m128 ylo = _mm_cvtepi32_ps(xlo);
+        __m128 yhi = _mm_cvtepi32_ps(xhi);
+        __m128 valueslo = _mm_mul_ps(ylo, m_scale);
+        __m128 valueshi = _mm_mul_ps(yhi, m_scale);
+
+        _mm_storeu_ps(outputData, valueslo);
+        _mm_storeu_ps(outputData + 4, valueshi);
+ 
+        outputData += 8;
+        inputData += 16;
+    }
+    return true;
+}
+
+
+template<typename T>
+bool deQuantize(const uint8_t* inputData, const uint32_t& len, const float scale,
+                const int32_t zeroPoint, float* outputData) {
+    int32_t value;
+    const T* inputBuf = reinterpret_cast<const T*>(inputData);
+    for (int i = 0; i < len; ++i) {
+        value = *(inputBuf + i);
+        outputData[i] = static_cast<float>(scale * (value - zeroPoint));
+    }
+    return true;
+}
+#endif
+
 void GnaPreparedModel::asyncExecute(const V1_0_Request& request, MeasureTiming measure, time_point driverStart,
                           const sp<V1_0::IExecutionCallback>& cb) {
     VLOG(L1, "Begin to executeSynchronously");
+#ifdef PERF_COUNTERS
     runtimeMetrics.infer_calls++;
-
+#endif
     time_point driverEnd, deviceStart, deviceEnd;
     if (measure == MeasureTiming::YES) deviceStart = now();
 
@@ -623,7 +764,7 @@ void GnaPreparedModel::asyncExecute(const V1_0_Request& request, MeasureTiming m
                 std::memcpy(dest, src, srcBlob->byteSize());
             }
         } else {
-            ALOGE("Index:%d not found in input layers map", %d);
+            ALOGE("Index:%d not found in input layers map", inputIndex);
         }
     }
     VLOG(L1, "Run");
@@ -670,6 +811,7 @@ void GnaPreparedModel::asyncExecute(const V1_0_Request& request, MeasureTiming m
             if (element != gnaPluginPtr->getOutputsInfo().end()) {
                 Blob::Ptr outputBlob = gnaPluginPtr->getInferRequest().GetBlob(layerName);
                 float* srcPtr = outputBlob->buffer().as<float*>();
+#ifdef PERF_COUNTERS
                 if (operand.type == OperandType::TENSOR_QUANT16_SYMM) {
                     quantizeToQuant16(srcPtr, (uint16_t*)destPtr, operand.shape(), runtimeMetrics);
                 } else if (operand.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED) {
@@ -677,6 +819,15 @@ void GnaPreparedModel::asyncExecute(const V1_0_Request& request, MeasureTiming m
                 } else if (operand.type == OperandType::TENSOR_FLOAT32) {
                     std::memcpy((uint8_t*)destPtr, outputBlob->buffer().as<uint8_t*>(), outputBlob->byteSize());
                 }
+#else
+                if (operand.type == OperandType::TENSOR_QUANT16_SYMM) {
+                    quantizeToQuant16(srcPtr, (uint16_t*)destPtr, operand.shape());
+                } else if (operand.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED) {
+                    quantizeToQuant8Signed(srcPtr, (int8_t*)destPtr, operand.shape());
+                } else if (operand.type == OperandType::TENSOR_FLOAT32) {
+                    std::memcpy((uint8_t*)destPtr, outputBlob->buffer().as<uint8_t*>(), outputBlob->byteSize());
+                }
+#endif
             } else {
                 VLOG(L1, "could not find layer:%s in index layer map", layerName.c_str());
             }
@@ -694,7 +845,7 @@ void GnaPreparedModel::asyncExecute(const V1_0_Request& request, MeasureTiming m
         driverEnd = now();
         Timing timing = {.timeOnDevice = uint64_t(microsecondsDuration(deviceEnd, deviceStart)),
                          .timeInDriver = uint64_t(microsecondsDuration(deviceEnd, deviceStart))};
-        VLOG("Driver::asyncExecute timing = %s", toString(timing).c_str());
+        VLOG(L1, "Driver::asyncExecute timing = %s", toString(timing).c_str());
         cb->notify(V1_0_ErrorStatus::NONE);
     } else {
         VLOG(L1, "MeasureTiming - No. Returning with no error");
@@ -1273,53 +1424,6 @@ bool GnaPreparedModel::operationQuantizedLSTM(const Operation& operation)
     return true;
 }
 
-/* bool deQuantize_8(const uint8_t* inputData, const uint32_t& len, const float scale,
-                const int32_t zeroPoint, float* outputData, metrics& runtime_metrics) {
-
-}
- */
-bool deQuantize_s16(const uint8_t* inputData, const uint32_t& len, const float scale,
-                const int32_t zeroPoint, float* outputData, metrics& runtime_metrics) {
-    
-    uint32_t moves = len >> 3;
-    uint32_t mod = len % 8;
-    const __m128i x0 = _mm_set1_epi16(0);
-    const __m128 m_scale = _mm_set1_ps(scale);
-
-	for ( int i = 0; i < moves; i++)
-    {
-        __m128i x = _mm_loadu_si128((__m128i*) inputData);
-        __m128i xlo = _mm_unpacklo_epi16(x, _mm_cmplt_epi16 (x, x0));
-        __m128i xhi = _mm_unpackhi_epi16(x, _mm_cmplt_epi16 (x, x0));
-        __m128 ylo = _mm_cvtepi32_ps(xlo);
-        __m128 yhi = _mm_cvtepi32_ps(xhi);
-        __m128 valueslo = _mm_mul_ps(ylo, m_scale);
-        __m128 valueshi = _mm_mul_ps(yhi, m_scale);
-
-        _mm_storeu_ps(outputData, valueslo);
-        _mm_storeu_ps(outputData + 4, valueshi);
- 
-        outputData += 8;
-        inputData += 16;
-    }
-    return true;
-}
-
-
-template<typename T>
-bool deQuantize(const uint8_t* inputData, const uint32_t& len, const float scale,
-                const int32_t zeroPoint, float* outputData, metrics& runtime_metrics) {
-    auto start = now();
-      int32_t value;
-      const T* inputBuf = reinterpret_cast<const T*>(inputData);
-      for (int i = 0; i < len; ++i) {
-        value = *(inputBuf + i);
-        outputData[i] = static_cast<float>(scale * (value - zeroPoint));
-      }
-    auto end = now();
-    runtime_metrics.deQuant_time += (double(millisecondsDuration(end, start)));
-      return true;
-}
 IRBlob::Ptr GnaPreparedModel::GetConstWeightsOperandAsTensor(uint32_t index)
 {
     dumpOperand(index);
@@ -1369,7 +1473,7 @@ IRBlob::Ptr GnaPreparedModel::GetConstWeightsOperandAsTensor(uint32_t index)
                 if (isQuantInput) {
                     blob = std::make_shared<InferenceEngine::TBlob<float>>(td);
                     blob->allocate();
-
+#ifdef PERF_COUNTERS
                     if (op.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED) {
                         deQuantize<int8_t>(buf, getNumberOfElements(op.dimensions), op.scale, op.zeroPoint, blob->buffer().as<float*>(), runtimeMetrics);
                     } else if (op.type == OperandType::TENSOR_QUANT8_SYMM, 8) {
@@ -1377,6 +1481,15 @@ IRBlob::Ptr GnaPreparedModel::GetConstWeightsOperandAsTensor(uint32_t index)
                     } else if (op.type == OperandType::TENSOR_QUANT16_SYMM) {
                         deQuantize_s16(buf, getNumberOfElements(op.dimensions), op.scale, 0, blob->buffer().as<float*>(), runtimeMetrics); // Ugly hack reverting
                     }
+#else
+                    if (op.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED) {
+                        deQuantize<int8_t>(buf, getNumberOfElements(op.dimensions), op.scale, op.zeroPoint, blob->buffer().as<float*>());
+                    } else if (op.type == OperandType::TENSOR_QUANT8_SYMM, 8) {
+                        deQuantize<int8_t>(buf, getNumberOfElements(op.dimensions), op.scale, 0, blob->buffer().as<float*>());
+                    } else if (op.type == OperandType::TENSOR_QUANT16_SYMM) {
+                        deQuantize_s16(buf, getNumberOfElements(op.dimensions), op.scale, 0, blob->buffer().as<float*>()); // Ugly hack reverting
+                    }
+#endif
                 }
                 else {
             InferenceEngine::TBlob<float>::Ptr blob =
@@ -1485,7 +1598,7 @@ IRBlob::Ptr GnaPreparedModel::GetConstOperandAsTensor(int operand_index, int ope
                 if (isQuantInput) {
                     blob = std::make_shared<InferenceEngine::TBlob<float>>(td);
                     blob->allocate();
-
+#ifdef PERF_COUNTERS
                     if (op.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED) {
                         deQuantize<int8_t>(buf, getNumberOfElements(op.dimensions), op.scale, op.zeroPoint, blob->buffer().as<float*>(), runtimeMetrics);
                     } else if (op.type == OperandType::TENSOR_QUANT8_SYMM) {
@@ -1495,7 +1608,17 @@ IRBlob::Ptr GnaPreparedModel::GetConstOperandAsTensor(int operand_index, int ope
                     } else if (op.type == OperandType::TENSOR_INT32) {
                         deQuantize<int32_t>(buf, getNumberOfElements(op.dimensions), op.scale, 0, blob->buffer().as<float*>(), runtimeMetrics);
                     }
-
+#else
+                    if (op.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED) {
+                        deQuantize<int8_t>(buf, getNumberOfElements(op.dimensions), op.scale, op.zeroPoint, blob->buffer().as<float*>());
+                    } else if (op.type == OperandType::TENSOR_QUANT8_SYMM) {
+                        deQuantize<int8_t>(buf, getNumberOfElements(op.dimensions), op.scale, 0, blob->buffer().as<float*>());
+                    } else if (op.type == OperandType::TENSOR_QUANT16_SYMM) {
+                        deQuantize_s16(buf, getNumberOfElements(op.dimensions), op.scale, 0, blob->buffer().as<float*>());
+                    } else if (op.type == OperandType::TENSOR_INT32) {
+                        deQuantize<int32_t>(buf, getNumberOfElements(op.dimensions), op.scale, 0, blob->buffer().as<float*>());
+                    }
+#endif
                 } else {
                     blob = std::make_shared<InferenceEngine::TBlob<float>>(td, (float *)buf, len);
                     blob->allocate();
@@ -1574,7 +1697,8 @@ Blob::Ptr GnaPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const 
 
                 if (isQuantInput) {
                     blob = std::make_shared<InferenceEngine::TBlob<float>>(td);
-                blob->allocate();
+                    blob->allocate();
+#ifdef PERF_COUNTERS
                     if (op.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED) {
                         deQuantize<int8_t>(buf, getNumberOfElements(op.dimensions), op.scale, op.zeroPoint, blob->buffer().as<float*>(), runtimeMetrics);
                     } else if (op.type == OperandType::TENSOR_QUANT8_SYMM) {
@@ -1582,6 +1706,15 @@ Blob::Ptr GnaPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const 
                     } else if (op.type == OperandType::TENSOR_QUANT16_SYMM) {
                         deQuantize_s16(buf, getNumberOfElements(op.dimensions), op.scale, 0, blob->buffer().as<float*>(), runtimeMetrics);
                     }
+#else
+                    if (op.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED) {
+                        deQuantize<int8_t>(buf, getNumberOfElements(op.dimensions), op.scale, op.zeroPoint, blob->buffer().as<float*>());
+                    } else if (op.type == OperandType::TENSOR_QUANT8_SYMM) {
+                        deQuantize<int8_t>(buf, getNumberOfElements(op.dimensions), op.scale, 0, blob->buffer().as<float*>());
+                    } else if (op.type == OperandType::TENSOR_QUANT16_SYMM) {
+                        deQuantize_s16(buf, getNumberOfElements(op.dimensions), op.scale, 0, blob->buffer().as<float*>());
+                    }
+#endif
                 } else {
                     blob = std::make_shared<InferenceEngine::TBlob<float>>(td, (float *)buf, len);
                     blob->allocate();

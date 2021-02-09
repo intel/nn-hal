@@ -39,6 +39,7 @@
 #include <log/log.h>
 #include "IRDocument.h"
 #include "IRLayers.h"
+#include "Utils.h"
 
 #include <fstream>
 #include <sys/stat.h>
@@ -101,14 +102,15 @@ public:
 	    ALOGI("infer request created");
     }
 
-    void loadNetwork(InferenceEngine::CNNNetwork& passed_network, bool isDecoderNw);
-
 #ifdef CACHING
+    void loadNetwork(InferenceEngine::CNNNetwork& passed_network, bool isDecoderNw);
     void importNetwork(const std::string& gnaModel, bool isDecoderNw);
 
     void exportGraph(const std::string& fileName) {
         executable_network.Export(fileName);
     }
+#else
+    void loadNetwork(InferenceEngine::CNNNetwork& passed_network);
 #endif
 
     void prepareInput();
