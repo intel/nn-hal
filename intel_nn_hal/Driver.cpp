@@ -64,6 +64,7 @@ static sp<PreparedModel> ModelFactory(const char* name, const Model& model) {
     return preparedModel;
 }
 
+#ifdef CACHING
 static sp<PreparedModel> ModelFactory(const char* name) {
     sp<PreparedModel> preparedModel = NULL;
     
@@ -72,6 +73,7 @@ static sp<PreparedModel> ModelFactory(const char* name) {
 
     return preparedModel;
 }
+#endif
 
 Return<V1_0_ErrorStatus> Driver::prepareModel(const V1_0_Model& model,
                                          const sp<V1_0::IPreparedModelCallback>& callback) {
@@ -168,7 +170,7 @@ Return<ErrorStatus> Driver::prepareModelFromCache_1_3(
     const HidlToken& token,
     const sp<V1_3::IPreparedModelCallback>& callback) {
     VLOG("Entering %s", __func__);
-	
+#ifdef CACHING
     if (callback.get() == nullptr) {
         ALOGI("invalid callback passed to prepareModel");
         return ErrorStatus::INVALID_ARGUMENT;
@@ -189,6 +191,10 @@ Return<ErrorStatus> Driver::prepareModelFromCache_1_3(
         callback->notify(V1_0_ErrorStatus::GENERAL_FAILURE, preparedModel);
         return ErrorStatus::GENERAL_FAILURE;
     }
+#else
+    callback->notify_1_2(V1_0_ErrorStatus::GENERAL_FAILURE, nullptr);
+    return ErrorStatus::GENERAL_FAILURE;
+#endif
 }
 
 Return<V1_0_ErrorStatus> Driver::prepareModelFromCache(

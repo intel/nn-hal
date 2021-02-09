@@ -44,10 +44,13 @@ class GnaPreparedModel : public PreparedModel {
     IRBuilder::ModelBuilder* mBuilderModel;
     GnaNetwork* gnaPluginPtr;
 
+#ifdef PERF_COUNTERS
     bool isDecoderNw, isEnc0Nw, isEnc1Nw;
     std::string modelNameStr;
     metrics runtimeMetrics;
+#endif
 public:
+#ifdef CACHING
     GnaPreparedModel(const Model& model) : PreparedModel("GNA", model), gnaPluginPtr(nullptr), mBuilderModel(nullptr),
                                             isDecoderNw(false), isEnc0Nw(false), isEnc1Nw(false) {
         runtimeMetrics.reset();
@@ -63,9 +66,19 @@ public:
         runtimeMetrics.print();
         deinitialize();
     }
-
-    virtual bool initialize(const hidl_vec<hidl_handle>& modelCache, const HidlToken& token) override;
     virtual bool initializeFromCache(const hidl_vec<hidl_handle>& modelCache, const HidlToken& token) override;
+#else
+    GnaPreparedModel(const Model& model) : PreparedModel("GNA", model), gnaPluginPtr(nullptr), mBuilderModel(nullptr) {
+        runtimeMetrics.reset();
+    }
+	
+    ~GnaPreparedModel()  {
+        deinitialize();
+    }
+#endif
+
+
+    virtual bool initialize(const hidl_vec<hidl_handle>& modelCache, const HidlToken& token) override;    
     virtual bool operationFullyConnected(const Operation& operation) override;
 
     virtual Blob::Ptr GetConstOperandAsTensor(int operand_index, int operation_idx) override;

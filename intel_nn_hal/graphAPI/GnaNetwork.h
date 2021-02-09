@@ -103,7 +103,13 @@ public:
 
     void loadNetwork(InferenceEngine::CNNNetwork& passed_network, bool isDecoderNw);
 
+#ifdef CACHING
     void importNetwork(const std::string& gnaModel, bool isDecoderNw);
+
+    void exportGraph(const std::string& fileName) {
+        executable_network.Export(fileName);
+    }
+#endif
 
     void prepareInput();
 
@@ -138,10 +144,6 @@ public:
     }
 
     void Infer();
-
-    void exportGraph(const std::string& fileName) {
-        executable_network.Export(fileName);
-    }
 
     ConstInputsDataMap getInputsInfo() {
         return executable_network.GetInputsInfo();

@@ -43,6 +43,7 @@ static Return<void> notify(const sp<V1_0::IExecutionCallback>& callback, const V
     return callback->notify(status);
 }
 
+#ifdef CACHING
 inline void writeNBytes(const void *ptr, uint32_t size, int fd) {
     auto ret = write(fd, static_cast<const char*>(ptr), size);
 }
@@ -67,6 +68,7 @@ inline void readNBits(T & obj, int fd) {
     auto ret= read(fd, reinterpret_cast<char *>(&tmp), nBits / 8);
     obj = * reinterpret_cast<T*>(&tmp.front());
 }
+#endif
 
 void GnaPreparedModel::initializeInput() {
     VLOG(L1, "initialize Input");
@@ -137,6 +139,7 @@ bool GnaPreparedModel::initialize(const hidl_vec<hidl_handle>& modelCache, const
     VLOG(L1, "initialize");
     bool success = false;
 
+#ifdef PERF_COUNTERS
     int lstmCount = 0;
     for (auto op: mModel.main.operations) {
         if (op.type == OperationType::FULLY_CONNECTED) {
@@ -157,6 +160,7 @@ bool GnaPreparedModel::initialize(const hidl_vec<hidl_handle>& modelCache, const
             modelNameStr = "Encoder1";
         }
     }
+#endif
 
     // Check operation supoorted or not, user may not call getOpertionSupported()
     for (const auto& operation : mModel.main.operations) {
@@ -222,6 +226,7 @@ bool GnaPreparedModel::initialize(const hidl_vec<hidl_handle>& modelCache, const
     gnaPluginPtr->queryState();
     gnaPluginPtr->reset();
 
+#ifdef CACHING
     if (modelCache.size() > 0 ) {
         // Export the graph to cache
         auto modelFd = modelCache[0]->data[0];
@@ -302,10 +307,11 @@ bool GnaPreparedModel::initialize(const hidl_vec<hidl_handle>& modelCache, const
         writeBits(static_cast<uint32_t>(hashLen), dataCacheFd);
         writeNBytes(hashStr.c_str(), hashLen, dataCacheFd);
     }
-
+#endif
     return true;
 }
 
+#ifdef CACHING
 bool GnaPreparedModel::initializeFromCache(const hidl_vec<hidl_handle>& modelCache, const HidlToken& token) {
     std::string tokenStr = getTokenString(token);
     if (tokenStr.compare(0, strlen(DECODER_TOKEN_STR), DECODER_TOKEN_STR) == 0) {
@@ -438,6 +444,7 @@ bool GnaPreparedModel::initializeFromCache(const hidl_vec<hidl_handle>& modelCac
     runtimeMetrics.nw_load_time = (double(millisecondsDuration(irBuildEnd, irBuildStart)));
     return true;
 }
+#endif
 
 // TODO: Call parent class deinitialize from here
 void GnaPreparedModel::deinitialize() {
@@ -616,7 +623,7 @@ void GnaPreparedModel::asyncExecute(const V1_0_Request& request, MeasureTiming m
                 std::memcpy(dest, src, srcBlob->byteSize());
             }
         } else {
-            std::cout << "Index:" << inputIndex << " not found in input layers" << std::endl;
+            ALOGE("Index:%d not found in input layers map", %d);
         }
     }
     VLOG(L1, "Run");

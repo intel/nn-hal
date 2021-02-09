@@ -19,6 +19,7 @@
 #include "Driver.h"
 
 //#define PERF_COUNTERS
+//#define CACHING
 
 enum DebugLevel {
     L0,
@@ -352,6 +353,7 @@ void writeBufferToFile(std::string filename,
                         const float* buf,
                         size_t length);
 
+#ifdef PERF_COUNTERS
 typedef struct _metrics{
     double deQuant_time;
     double quant_time;
@@ -404,6 +406,7 @@ typedef struct _metrics{
                    << std::endl;
     }
 } metrics;
+#endif
 
 std::string getTokenString(const HidlToken& token);
 std::string computeHashFromFd(int fd);

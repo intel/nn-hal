@@ -514,6 +514,7 @@ void writeBufferToFile(std::string filename,
     ofs.close();
 }
 
+#ifdef CACHING
 std::string getTokenString(const HidlToken& token) {
     std::string tokenStr(ANEURALNETWORKS_BYTE_SIZE_OF_CACHE_TOKEN * 2 + 1, '0');
     for (uint32_t i = 0; i < ANEURALNETWORKS_BYTE_SIZE_OF_CACHE_TOKEN; i++) {
@@ -562,6 +563,7 @@ std::string computeHashFromFd(int modelFd) {
 
     return hashString.str();
 }
+#endif
 }
 }
 }
