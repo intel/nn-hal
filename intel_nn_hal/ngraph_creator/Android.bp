@@ -1,0 +1,53 @@
+cc_library_static {
+
+    name: "libngraph_creator",
+    proprietary: true,
+    owner: "intel",
+    compile_multilib: "64",
+
+    srcs: [
+        "src/OperationsBase.cpp",
+        "src/OperationsFactory.cpp",
+        "src/NgraphNetworkCreator.cpp",
+        "src/NgraphNodes.cpp",
+        "operations/src/Add.cpp",
+        "operations/src/Concat.cpp",
+    ],
+
+    header_libs: [
+        "libngraph_headers",
+    ],
+    include_dirs: [
+        "vendor/intel/external/project-celadon/nn-hal/intel_nn_hal",
+    ],
+    local_include_dirs: [
+        "include/",
+        "operations/include/",
+    ],
+
+    cflags: [
+        "-std=c++11",
+        "-fPIE",
+        "-Wall",
+        "-Wno-unused-variable",
+        "-Wno-unused-parameter",
+        "-Wno-non-virtual-dtor",
+        "-Wno-missing-field-initializers",
+        "-Wno-error",
+        "-D_FORTIFY_SOURCE=2",
+        "-fvisibility=default",
+        "-fexceptions",
+        "-fPIC",
+    ] + [
+        "-D__ANDROID__",
+    ],
+
+    shared_libs: [
+        "liblog",
+        "libngraph",
+        "android.hardware.neuralnetworks@1.0",
+        "android.hardware.neuralnetworks@1.1",
+        "android.hardware.neuralnetworks@1.2",
+        "android.hardware.neuralnetworks@1.3",
+    ],
+}
