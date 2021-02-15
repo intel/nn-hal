@@ -45,7 +45,7 @@
 #include <log/log.h>
 #endif
 
-#define USE_NGRAPH
+//#define USE_NGRAPH
 
 namespace android {
 namespace hardware {
@@ -54,7 +54,6 @@ namespace nnhal {
 
 extern int layer_name_count;
 extern InferenceEngine::Precision g_layer_precision;
-inline size_t sizeOf(const TensorDims &dims);
 
 inline OutputPort addOutput(const IRLayer &layer, const InferenceEngine::SizeVector &dims) {
     std::string d_name = layer->name;
@@ -425,6 +424,8 @@ inline OutputPort Convolution(const OutputPort &src, const ConvolutionParams &pr
 
         size_t SH = ret->_stride[InferenceEngine::Y_AXIS];
         size_t SW = ret->_stride[InferenceEngine::X_AXIS];
+        size_t PH = ret->_padding[InferenceEngine::Y_AXIS];
+        size_t PW = ret->_padding[InferenceEngine::X_AXIS];
         size_t OC = ret->_out_depth;
 
         if (prms.padType == "valid") {
@@ -609,6 +610,8 @@ inline OutputPort Pooling(const OutputPort &inp, const Point2D &kernel, const Po
         size_t KW = ret->_kernel[InferenceEngine::X_AXIS];
         size_t SH = ret->_stride[InferenceEngine::Y_AXIS];
         size_t SW = ret->_stride[InferenceEngine::X_AXIS];
+        size_t PH = ret->_padding[InferenceEngine::Y_AXIS];
+        size_t PW = ret->_padding[InferenceEngine::X_AXIS];
 
         if (padType == "valid") {
             OHTemp = std::ceil((IH - KH + 1.f) / SH);
@@ -717,6 +720,10 @@ inline OutputPort operator*(const Vector &weights, const OutputPort &op) {
 }
 
 namespace ActivationLayer {
+extern const std::string Sigmoid;
+
+extern const std::string Tanh;
+
 extern const std::string ReLU;
 
 static IRLayer create(const OutputPort &src, const std::string &type) {
@@ -729,6 +736,18 @@ static IRLayer create(const OutputPort &src, const std::string &type) {
         prm.name = name;
         layer = std::make_shared<InferenceEngine::ReLULayer>(prm);
         layer->type = "ReLU";
+    } else if ((strncasecmp(type.c_str(), "tanh", type.size()) == 0)) {
+        InferenceEngine::LayerParams prm;
+        prm.precision = g_layer_precision;
+        prm.name = name;
+        layer = std::make_shared<InferenceEngine::TanHLayer>(prm);
+        layer->type = "TanH";
+    } else if ((strncasecmp(type.c_str(), "sigmoid", type.size()) == 0)) {
+        InferenceEngine::LayerParams prm;
+        prm.precision = g_layer_precision;
+        prm.name = name;
+        layer = std::make_shared<InferenceEngine::SigmoidLayer>(prm);
+        layer->type = "Sigmoid";
     } else {
         InferenceEngine::LayerParams prm;
         prm.precision = g_layer_precision;
@@ -760,6 +779,16 @@ static IRLayer create(const IRLayer &src, const std::string &type) {
 template <typename T>
 OutputPort ReLU(const T &src) {
     return output(ActivationLayer::create(src, ActivationLayer::ReLU));
+}
+
+template <typename T>
+OutputPort Sigmoid(const T &src) {
+    return output(ActivationLayer::create(src, ActivationLayer::Sigmoid));
+}
+
+template <typename T>
+OutputPort Tanh(const T &src) {
+    return output(ActivationLayer::create(src, ActivationLayer::Tanh));
 }
 
 namespace SplitUtil {
@@ -842,7 +871,13 @@ inline OutputPort L2Normalization(const OutputPort &src, bool isAcross, bool isS
 }
 
 inline OutputPort Reshape(const TensorDims &newDims, const OutputPort &src) {
-    if (sizeOf(src->getTensorDesc().getDims()) != sizeOf(newDims))
+    auto sizeOfTensor = [](const TensorDims& dims) {
+        size_t ret = dims[0];
+        for (int i = 1; i < dims.size(); ++i) ret *= dims[i];
+        return ret;
+    };
+
+    if (sizeOfTensor(src->getTensorDesc().getDims()) != sizeOfTensor(newDims))
         THROW("Cannot reorder different volumes");
 
     /*//first implementation
@@ -960,6 +995,12 @@ inline OutputPort operator+(const OutputPort &a, const OutputPort &b) {
 }
 
 inline OutputPort AddConst(IRDocument &doc, const OutputPort &src, const IRBlob::Ptr &biases) {
+    // this depends on the plugin, see E-mail
+    bool useScaleShift = false;
+
+    if (useScaleShift) {
+        return ScaleShiftNode(src, nullptr, biases);
+    }
     // use const layer with elment wise add
     auto constNode = Generic("Const");
     doc.add(constNode);

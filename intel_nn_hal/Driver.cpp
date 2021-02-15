@@ -16,11 +16,13 @@
 
 #define LOG_TAG "Driver"
 
-#include "Driver.h"
 #include <android-base/logging.h>
 #include <thread>
+
+#include "Driver.h"
 #include "PreparedModel.h"
 #include "ValidateHal.h"
+#include "GnaPreparedModel.h"
 
 namespace android {
 namespace hardware {
@@ -28,6 +30,7 @@ namespace neuralnetworks {
 namespace nnhal {
 
 using namespace android::nn;
+
 hidl_vec<Capabilities::OperandPerformance> nonExtensionOperandPerformance(PerformanceInfo perf) {
     using OpPerf = Capabilities::OperandPerformance;
 
@@ -45,6 +48,7 @@ hidl_vec<Capabilities::OperandPerformance> nonExtensionOperandPerformance(Perfor
 
     return ret;
 }
+
 static sp<PreparedModel> ModelFactory(const char* name, const Model& model) {
     sp<PreparedModel> preparedModel = NULL;
 
@@ -54,29 +58,53 @@ static sp<PreparedModel> ModelFactory(const char* name, const Model& model) {
         preparedModel = new VpuPreparedModel(model);
     else if (strcmp(name, "GPU") == 0)
         preparedModel = new GpuPreparedModel(model);
+    else if (strcmp(name, "GNA") == 0)
+        preparedModel = new GnaPreparedModel(model);
 
     return preparedModel;
 }
 
-Return<ErrorStatus> Driver::prepareModel(const V1_0_Model& model,
+#ifdef CACHING
+static sp<PreparedModel> ModelFactory(const char* name) {
+    sp<PreparedModel> preparedModel = NULL;
+
+    if (strcmp(name, "GNA") == 0)
+        preparedModel = new GnaPreparedModel();
+
+    return preparedModel;
+}
+#endif
+
+Return<V1_0_ErrorStatus> Driver::prepareModel(const V1_0_Model& model,
                                          const sp<V1_0::IPreparedModelCallback>& callback) {
     ALOGI("Entering %s", __func__);
 
-    return ErrorStatus::NONE;
+    return V1_0_ErrorStatus::NONE;
 }
 
-Return<ErrorStatus> Driver::prepareModel_1_1(const V1_1_Model& model,
+Return<V1_0_ErrorStatus> Driver::prepareModel_1_1(const V1_1_Model& model,
                                              ExecutionPreference preference,
                                              const sp<V1_0::IPreparedModelCallback>& callback) {
     ALOGI("Entering %s", __func__);
 
-    return ErrorStatus::NONE;
+    return V1_0_ErrorStatus::NONE;
 }
-
-Return<ErrorStatus> Driver::prepareModel_1_2(const Model& model, ExecutionPreference preference,
+Return<V1_0_ErrorStatus> Driver::prepareModel_1_2(const V1_2_Model& model,
+                                             ExecutionPreference preference,
                                              const hidl_vec<hidl_handle>&,
                                              const hidl_vec<hidl_handle>&, const HidlToken&,
                                              const sp<V1_2::IPreparedModelCallback>& callback) {
+    ALOGI("Entering %s", __func__);
+
+    return V1_0_ErrorStatus::NONE;
+}
+
+Return<ErrorStatus> Driver::prepareModel_1_3(const Model& model, ExecutionPreference preference,
+					     Priority priority,
+					     const OptionalTimePoint& deadline,
+                                             const hidl_vec<hidl_handle>& modelCache,
+                                             const hidl_vec<hidl_handle>& dataCache, const HidlToken& token,
+                                             const sp<V1_3::IPreparedModelCallback>& callback) {
     ALOGI("Entering %s", __func__);
 
     if (callback.get() == nullptr) {
@@ -84,7 +112,7 @@ Return<ErrorStatus> Driver::prepareModel_1_2(const Model& model, ExecutionPrefer
         return ErrorStatus::INVALID_ARGUMENT;
     }
     if (!validateModel(model) || !validateExecutionPreference(preference)) {
-        callback->notify(ErrorStatus::INVALID_ARGUMENT, nullptr);
+        callback->notify(V1_0_ErrorStatus::INVALID_ARGUMENT, nullptr);
         return ErrorStatus::INVALID_ARGUMENT;
     }
 
@@ -95,13 +123,13 @@ Return<ErrorStatus> Driver::prepareModel_1_2(const Model& model, ExecutionPrefer
         return ErrorStatus::INVALID_ARGUMENT;
     }
 
-    if (!preparedModel->initialize()) {
-        ALOGI("failed to initialize preparedmodel");
-        callback->notify(ErrorStatus::INVALID_ARGUMENT, nullptr);
+    if (!preparedModel->initialize(modelCache, token)) {
+        ALOGE("failed to initialize preparedmodel");
+        callback->notify(V1_0_ErrorStatus::INVALID_ARGUMENT, nullptr);
         return ErrorStatus::NONE;
     }
 
-    callback->notify(ErrorStatus::NONE, preparedModel);
+    callback->notify(V1_0_ErrorStatus::NONE, preparedModel);
     return ErrorStatus::NONE;
 }
 
@@ -112,35 +140,74 @@ Return<DeviceStatus> Driver::getStatus() {
 
 Return<void> Driver::getVersionString(getVersionString_cb cb) {
     ALOGI("Entering %s", __func__);
-    cb(ErrorStatus::NONE, "intel_nn_hal");
+    cb(V1_0_ErrorStatus::NONE, "intel_nn_hal");
     return Void();
 }
 
 Return<void> Driver::getType(getType_cb cb) {
     ALOGI("Entering %s", __func__);
-    cb(ErrorStatus::NONE, V1_2::DeviceType::CPU);
+    cb(V1_0_ErrorStatus::NONE, V1_2::DeviceType::CPU);
     return Void();
 }
 
 Return<void> Driver::getSupportedExtensions(getSupportedExtensions_cb cb) {
     ALOGI("Entering %s", __func__);
-    cb(ErrorStatus::NONE, {/* No extensions. */});
+    cb(V1_0_ErrorStatus::NONE, {/* No extensions. */});
     return Void();
 }
 
 Return<void> Driver::getNumberOfCacheFilesNeeded(getNumberOfCacheFilesNeeded_cb cb) {
     ALOGI("Entering %s", __func__);
     // Set both numbers to be 0 for cache not supported.
-    cb(ErrorStatus::NONE, /*numModelCache=*/0, /*numDataCache=*/0);
+#ifdef CACHING
+    cb(V1_0_ErrorStatus::NONE, 3, 0);
+#else
+    cb(V1_0_ErrorStatus::NONE, 0, 0);
+#endif
     return Void();
 }
 
-Return<ErrorStatus> Driver::prepareModelFromCache(
-    const hidl_vec<hidl_handle>&, const hidl_vec<hidl_handle>&, const HidlToken&,
-    const sp<V1_2::IPreparedModelCallback>& callback) {
-    ALOGI("Entering %s", __func__);
-    callback->notify_1_2(ErrorStatus::GENERAL_FAILURE, nullptr);
+Return<ErrorStatus> Driver::prepareModelFromCache_1_3(
+    const OptionalTimePoint&,
+    const hidl_vec<hidl_handle>& modelCache,
+    const hidl_vec<hidl_handle>&,
+    const HidlToken& token,
+    const sp<V1_3::IPreparedModelCallback>& callback) {
+    VLOG(L1, "Entering %s", __func__);
+#ifdef CACHING
+    if (callback.get() == nullptr) {
+        ALOGI("invalid callback passed to prepareModel");
+        return ErrorStatus::INVALID_ARGUMENT;
+    }
+
+    // TODO: make asynchronous later
+    sp<PreparedModel> preparedModel = ModelFactory(mName.c_str());
+    if (preparedModel == NULL) {
+        ALOGI("failed to create preparedmodel");
+        return ErrorStatus::INVALID_ARGUMENT;
+    }
+
+    bool success = preparedModel->initializeFromCache(modelCache, token);
+    if (success) {
+        callback->notify(V1_0_ErrorStatus::NONE, preparedModel);
+        return ErrorStatus::NONE;
+    } else {
+        callback->notify(V1_0_ErrorStatus::GENERAL_FAILURE, preparedModel);
+        return ErrorStatus::GENERAL_FAILURE;
+    }
+#else
+    callback->notify_1_2(V1_0_ErrorStatus::GENERAL_FAILURE, nullptr);
     return ErrorStatus::GENERAL_FAILURE;
+#endif
+}
+
+Return<V1_0_ErrorStatus> Driver::prepareModelFromCache(
+        const hidl_vec<hidl_handle>& modelCache,
+		const hidl_vec<hidl_handle>& dataCache,
+        const HidlToken& token,
+		const sp<V1_2::IPreparedModelCallback>& callback) {
+        ALOGI("Entering %s", __func__);
+        return V1_0_ErrorStatus::GENERAL_FAILURE;
 }
 
 Return<void> Driver::getCapabilities(getCapabilities_cb cb) {
@@ -156,6 +223,21 @@ Return<void> Driver::getCapabilities_1_1(getCapabilities_1_1_cb cb) {
 }
 
 Return<void> Driver::getCapabilities_1_2(getCapabilities_1_2_cb cb) {
+    ALOGI("Entering %s", __func__);
+    return Void();
+}
+
+Return<void> Driver::allocate(const BufferDesc& desc,
+		          const hidl_vec<sp<V1_3::IPreparedModel>>& preparedModels,
+		          const hidl_vec<BufferRole>& inputRoles,
+			  const hidl_vec<BufferRole>& outputRoles,
+	                    allocate_cb cb) {
+    ALOGI("Entering %s", __func__);
+    return Void();
+
+}
+
+Return<void> Driver::getCapabilities_1_3(getCapabilities_1_3_cb cb) {
     ALOGI("Entering %s", __func__);
     if (mName.compare("CPU") == 0) {
         ALOGI("CPU driver getCapabilities()");
@@ -177,8 +259,17 @@ Return<void> Driver::getCapabilities_1_2(getCapabilities_1_2_cb cb) {
         ALOGI("GPU clDNN driver Capabilities .execTime = 0.95f, .powerUsage = 0.85f");
         cb(ErrorStatus::NONE, capabilities);
     }
-    // mName.compare("VPU") == 0
-    else {
+    else if (mName.compare("GNA") == 0){
+       ALOGI("GNA driver getCapabilities()");
+       Capabilities capabilities = {
+            .relaxedFloat32toFloat16PerformanceScalar = {.execTime = 0.8f, .powerUsage = 0.8f},
+            .relaxedFloat32toFloat16PerformanceTensor = {.execTime = 0.8f, .powerUsage = 0.8f},
+            .operandPerformance = nonExtensionOperandPerformance({0.8f, 0.8f})};
+
+       ALOGI("GNA driver Capabilities .execTime = 0.8f, .powerUsage = 0.8f");
+       cb(ErrorStatus::NONE, capabilities);
+    } else {
+        // mName.compare("VPU") == 0
         ALOGI("Myriad driver getCapabilities()");
         Capabilities capabilities = {
             .relaxedFloat32toFloat16PerformanceScalar = {.execTime = 1.1f, .powerUsage = 1.1f},
@@ -204,11 +295,18 @@ Return<void> Driver::getSupportedOperations_1_1(const V1_1_Model& model,
     return Void();
 }
 
-Return<void> Driver::getSupportedOperations_1_2(const Model& model,
+Return<void> Driver::getSupportedOperations_1_2(const V1_2_Model& model,
                                                 getSupportedOperations_1_2_cb cb) {
     ALOGI("Entering %s", __func__);
 
-    int count = model.operations.size();
+    return Void();
+}
+
+Return<void> Driver::getSupportedOperations_1_3(const Model& model,
+                                                getSupportedOperations_1_3_cb cb) {
+    ALOGI("Entering %s", __func__);
+
+    int count = model.main.operations.size();
     std::vector<bool> supported(count, true);
 
     if (!validateModel(model)) {
@@ -218,8 +316,8 @@ Return<void> Driver::getSupportedOperations_1_2(const Model& model,
     }
 
     for (int i = 0; i < count; i++) {
-        const auto& operation = model.operations[i];
-        supported[i] = PreparedModel::isOperationSupported(operation, model);
+        const auto& operation = model.main.operations[i];
+        supported[i] = PreparedModel::isOperationSupported(operation, model, mName);
     }
     cb(ErrorStatus::NONE, supported);
     return Void();

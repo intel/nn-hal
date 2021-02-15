@@ -19,8 +19,8 @@
 
 #include <android/hardware/neuralnetworks/1.2/IPreparedModel.h>
 #include <android/hardware/neuralnetworks/1.2/types.h>
+#include <android/hardware/neuralnetworks/1.3/types.h>
 #include <android/hidl/memory/1.0/IMemory.h>
-#include <hardware/hardware.h>
 #include <hidlmemory/mapping.h>
 #include <sys/mman.h>
 #include <fstream>
@@ -28,10 +28,9 @@
 
 #include "Driver.h"
 #include "IENetwork.h"
-
-#ifdef USE_NGRAPH
-#include "create_ngraph.hpp"
-#endif
+#include "BuilderNetwork.h"
+#include "IRBuilder.h"
+#include "Utils.h"
 
 #define EXPL_PAD 1
 #define IMPL_PAD 2
@@ -44,6 +43,7 @@ namespace android {
 namespace hardware {
 namespace neuralnetworks {
 namespace nnhal {
+
 namespace {
 
 using time_point = std::chrono::steady_clock::time_point;
@@ -54,89 +54,25 @@ auto microsecondsDuration(decltype(now()) end, decltype(now()) start) {
     return std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 };
 
+auto millisecondsDuration(decltype(now()) end, decltype(now()) start) {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+};
 }  // namespace
-template <class T>
-using vec = std::vector<T>;
-typedef uint8_t* memory;
-
-// The type and dimensions of an operand.
-struct Shape {
-    OperandType type;
-    std::vector<uint32_t> dimensions;
-    float scale;
-    int32_t offset;
-};
-
-// Information we maintain about each operand during execution that
-// may change during execution.
-struct RunTimeOperandInfo {
-    // std::string name;
-    // uint32_t opIdx;
-    // void * opIdx;
-
-    // TODO Storing the type here is redundant, as it won't change during execution.
-    OperandType type;
-    // The type and dimensions of the operand.  The dimensions can
-    // change at runtime.  We include the type because it's useful
-    // to pass together with the dimension to the functions implementing
-    // the operators.
-    std::vector<uint32_t> dimensions;
-
-    float scale;
-    int32_t zeroPoint;
-    // Where the operand's data is stored.  Check the corresponding
-    // location information in the model to figure out if this points
-    // to memory we have allocated for an temporary operand.
-    uint8_t* buffer;
-    // The length of the buffer.
-    uint32_t length;
-    // Whether this is a temporary variable, a model input, a constant, etc.
-    OperandLifeTime lifetime;
-    // Keeps track of how many operations have yet to make use
-    // of this temporary variable.  When the count is decremented to 0,
-    // we free the buffer.  For non-temporary variables, this count is
-    // always 0.
-    uint32_t numberOfUsesLeft;
-
-    Shape shape() const {
-        return Shape{.type = type, .dimensions = dimensions, .scale = scale, .offset = zeroPoint};
-    }
-};
-
-// Used to keep a pointer to each of the memory pools.
-struct RunTimePoolInfo {
-    sp<IMemory> memory;
-    hidl_memory hidlMemory;
-    uint8_t* buffer;
-
-    bool set(const hidl_memory& hidlMemory);
-    bool update();
-};
-
-bool setRunTimePoolInfosFromHidlMemories(std::vector<RunTimePoolInfo>* poolInfos,
-                                         const hidl_vec<hidl_memory>& pools);
 
 // Base class used to create vpu drivers for the NN HAL.  This class
 // provides some implementation of the more common functions.
 //
 // Since these drivers simulate hardware, they must run the computations
 // on the CPU.  An actual driver would not do that.
-template <typename T_IExecutionCallback>
-;
-class PreparedModel : public V1_2::IPreparedModel {
+class PreparedModel : public V1_0::IPreparedModel {
 public:
     PreparedModel(const Model& model)
-        : mTargetDevice("CPU"),
+        : mTargetDevice("MYRIAD"),
           mModel(model),
           mNet("nnNet"),
           enginePtr(nullptr),
           mPadreq(EXPL_PAD) {
         g_layer_precision = InferenceEngine::Precision::FP16;
-#ifdef USE_NGRAPH
-        mUseNgraph =
-            isNgraphPropSet();  // TODO:Should additionally check if all the ops are supported
-        mCreateNgraph = std::make_shared<CreateNgraph>();
-#endif
     }
 
     PreparedModel(const std::string device, const Model& model)
@@ -149,78 +85,108 @@ public:
             g_layer_precision = InferenceEngine::Precision::FP32;
         else if (mTargetDevice == "MYRIAD")
             g_layer_precision = InferenceEngine::Precision::FP16;
+        else if (mTargetDevice == "GNA")
+            g_layer_precision = InferenceEngine::Precision::FP32;
         else
             g_layer_precision = InferenceEngine::Precision::UNSPECIFIED;
-#ifdef USE_NGRAPH
-        mUseNgraph = isNgraphPropSet();
-        mCreateNgraph = std::make_shared<CreateNgraph>();
-#endif
+    }
+
+    PreparedModel(const std::string device)
+        : mTargetDevice(device),
+          mNet("nnNet"),
+          enginePtr(nullptr),
+          mPadreq(EXPL_PAD) {
+        if (mTargetDevice == "CPU" || mTargetDevice == "GPU")
+            g_layer_precision = InferenceEngine::Precision::FP32;
+        else if (mTargetDevice == "MYRIAD")
+            g_layer_precision = InferenceEngine::Precision::FP16;
+        else if (mTargetDevice == "GNA")
+            g_layer_precision = InferenceEngine::Precision::FP32;
+        else
+            g_layer_precision = InferenceEngine::Precision::UNSPECIFIED;
     }
 
     ~PreparedModel() override { deinitialize(); }
-    bool initialize();
-    Return<ErrorStatus> execute(const Request& request,
+    virtual bool initialize(const hidl_vec<hidl_handle>& modelCache, const HidlToken& token);
+
+    virtual bool initializeFromCache(const hidl_vec<hidl_handle>& modelCache, const HidlToken& token);
+
+    virtual Return<V1_0_ErrorStatus> execute(const V1_0_Request& request,
                                 const sp<V1_0::IExecutionCallback>& callback) override;
-    Return<ErrorStatus> execute_1_2(const Request& request, MeasureTiming measure,
-                                    const sp<V1_2::IExecutionCallback>& callback) override;
-    Return<void> executeSynchronously(const Request& request, MeasureTiming measure,
-                                      executeSynchronously_cb cb) override;
-    Return<void> configureExecutionBurst(
-        const sp<V1_2::IBurstCallback>& callback,
-        const MQDescriptorSync<V1_2::FmqRequestDatum>& requestChannel,
-        const MQDescriptorSync<V1_2::FmqResultDatum>& resultChannel,
-        configureExecutionBurst_cb cb) override;
 
     // Return<ErrorStatus> executeBase(const Request& request, MeasureTiming measure,
     //                             const sp<T_IExecutionCallback>& callback);
-    static bool isOperationSupported(const Operation& operation, const Model& model);
-#ifdef USE_NGRAPH
-    void ConvertBlobToNHWC(InferenceEngine::TBlob<float>::Ptr blob, uint8_t* buf,
-                           std::vector<uint32_t> opDims);
-#endif
+    static bool isOperationSupported(const Operation& operation, const Model& model, const std::string& device);
 
 protected:
     void deinitialize();
     bool initializeRunTimeOperandInfo();
-    Return<ErrorStatus> executeBase(const Request& request, MeasureTiming measure,
+    virtual Return<V1_0_ErrorStatus> executeBase(const V1_0_Request& request, MeasureTiming measure,
                                     const sp<V1_0::IExecutionCallback>& callback);
-    Return<ErrorStatus> executeBase_1_2(const Request& request, MeasureTiming measure,
-                                        const sp<V1_2::IExecutionCallback>& callback);
-    void asyncExecute(const Request& request, MeasureTiming measure, time_point driverStart,
+
+    void asyncExecute(const V1_0_Request& request, MeasureTiming measure, time_point driverStart,
                       const sp<V1_0::IExecutionCallback>& callback);
-    void asyncExecute_1_2(const Request& request, MeasureTiming measure, time_point driverStart,
-                          const sp<V1_2::IExecutionCallback>& callback);
 
     bool operationAdd(const Operation& operation);
     bool operationAveragePool2D(const Operation& operation);
     bool operationConCat(const Operation& operation);
     bool operationConv2D(const Operation& operation);
     bool operationDepthwiseConv2D(const Operation& operation);
-    bool operationFullyConnected(const Operation& operation);
+    virtual bool operationFullyConnected(const Operation& operation);
     bool operationL2Normalization(const Operation& operation);
     bool operationLRN(const Operation& operation);
     bool operationMaxPool2D(const Operation& operation);
-    // bool operationLSTM(const Operation& operation);
+    bool operationLogisticSigmoid(const Operation& operation);
     bool operationMUL(const Operation& operation);
     bool operationRELU(const Operation& operation);
     bool operationRELU1(const Operation& operation);
     bool operationRELU6(const Operation& operation);
     bool operationReshape(const Operation& operation);
     bool operationSoftmax(const Operation& operation);
+    bool operationTANH(const Operation& operation);
 
-    void initializeInput();
-    bool finalizeOutput(/*RunTimeOperandInfo* output*/);
+    virtual void initializeInput();
+    virtual bool finalizeOutput(/*RunTimeOperandInfo* output*/);
 
     OutputPort handleFusion(const OutputPort& out, int32_t fusedOp);
     template <typename T>
-    T GetConstFromBuffer(const uint8_t* buf, uint32_t len);
+    T GetConstFromBuffer(const uint8_t* buf, uint32_t len) {
+    VLOG(L1, "buf: %p, len: %d", buf, len);
+    if (len != sizeof(T)) {
+        ALOGE("fix me: typeid(T).name() is %d should be %d bytes", len, sizeof(T));
+        // fix me if buffer is of type float and if float and V1_0_OperandLifeTime::CONSTANT_REFERENCE
+        nnAssert(false);
+    }
+    return *(T*)(buf);
+    }
     template <typename T>
     std::vector<T> GetConstVecFromBuffer(const uint8_t* buf, uint32_t len);
     const uint8_t* GetOperandMemory(const Model& model, uint32_t index, uint32_t& len_out);
+    //template <typename T>
+    //T ParseOperationInput(const Model& model, const Operation& operation, uint32_t index);
     template <typename T>
-    T ParseOperationInput(const Model& model, const Operation& operation, uint32_t index);
+	T ParseOperationInput(const Model& model, const Operation& operation,
+					     uint32_t index) {
+	    uint32_t inputIndex = operation.inputs[index];
+	    const auto operand = mModel.main.operands[inputIndex];
+	    VLOG(L1, "operand index = %d", inputIndex);
+	    const auto value = GetConstOperand<T>(model, inputIndex);
+	    VLOG(L1, "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
+	    VLOG(L1, "Operation input index: %d, operand index: %d", index, inputIndex);
+	    VLOG(L1, "Operation: %s", toString(operation).c_str());
+	    //printHelper<T>::print(value, toString(operand).c_str());
+	    VLOG(L1, "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
+	    return value;
+	}
+    int64_t ParseOperationInput_i8(const Model& model, const Operation& operation, uint32_t index) {
+	return ParseOperationInput<int8_t>(model, operation, index);
+    }
     template <typename T>
-    T GetConstOperand(const Model& model, uint32_t index);
+    T GetConstOperand(const Model& model, uint32_t index) {
+        uint32_t len;
+        const uint8_t* buf = GetOperandMemory(model, index, len);
+        return GetConstFromBuffer<T>(buf, len);
+    }
     template <typename T>
     std::vector<T> GetConstVecOperand(const Model& model, uint32_t index);
     virtual Blob::Ptr GetConstOperandAsTensor(int operand_index, int operation_idx);
@@ -232,19 +198,20 @@ protected:
     void SetOperandFromTensor(uint8_t* buf, uint32_t& length, Blob::Ptr infOutput);
     bool isConst(int index);
     OutputPort getPort(int index);
+    bool isOperandDataNull(int index);
 
+    //TargetDevice mTargetDevice;
     std::string mTargetDevice;
     Model mModel;
     std::vector<RunTimeOperandInfo> mOperands;
     std::vector<RunTimePoolInfo> mPoolInfos;
     IRDocument mNet;
-#ifdef USE_NGRAPH
-    std::shared_ptr<CreateNgraph> mCreateNgraph;
-    bool mUseNgraph;
-#endif
     std::vector<OutputPort> mPorts;  // typedef std::shared_ptr<Data> DataPtr;
     ExecuteNetwork* enginePtr;
     uint32_t mPadreq;
+
+    InferenceEngine::ICNNNetwork  *mCnnNetbuilder;
+    std::map<int, IRBlob::Ptr> mOpIndex2BlobMap;
 };
 
 class VpuPreparedModel : public PreparedModel {

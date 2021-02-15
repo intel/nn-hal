@@ -214,7 +214,7 @@ void IRDocument::save(std::ostream &xml_os, std::ostream &bin_os) {
         CNNLayer::Ptr inputLayer(new CNNLayer(prms));
         inputLayer->type = "Input";
         auto input_data = kvp.second->getInputData();
-        input_data->getUserObject().v_int = icnt++;
+        const_cast<UserValue&>(input_data->getUserObject()).v_int = icnt++;
         inputLayer->outData.push_back(input_data);
         saveToIR(bin_os, layers, inputLayer);
     }
@@ -222,7 +222,9 @@ void IRDocument::save(std::ostream &xml_os, std::ostream &bin_os) {
     for (auto &cnn_layer : _layers) {
         cnn_layer->userValue.v_int = ++id_cnt;
         int pcnt = 0;
-        for (auto output : cnn_layer->outData) output->getUserObject().v_int = pcnt++;
+        for (auto output : cnn_layer->outData) {
+            const_cast<UserValue&>(output->getUserObject()).v_int = pcnt++;
+        }
         saveToIR(bin_os, layers, cnn_layer);
     }
     pugi::xml_node edgesNode = root.append_child("edges");
