@@ -12,6 +12,26 @@ namespace neuralnetworks {
 namespace nnhal {
 
 // TODO: should use NNAPI_Utils:: GetConstOperand, ParseOperationInput
+static std::vector<size_t> GetConstVecOperand(const Model& model, uint32_t index) {
+    const auto op = model.operands[index];
+    uint32_t len_out = op.location.length;
+    std::vector<size_t> ret;
+    int n = len_out / sizeof(uint32_t);
+    const uint8_t* buf;
+
+    if (op.lifetime == OperandLifeTime::CONSTANT_COPY) {
+        if (op.location.poolIndex != 0) {
+            ALOGE("CONSTANT_COPY expects poolIndex to be 0");
+            // nnAssert(false);
+        }
+        buf = (const_cast<uint8_t*>(&model.operandValues[op.location.offset]));
+    }
+    for (int i = 0; i < n; i++) {
+        ret.push_back(*(uint32_t*)buf);
+        buf += sizeof(uint32_t);
+    }
+    return ret;
+}
 static int GetConstOperand(const Model& model, uint32_t index) {
     const auto op = model.operands[index];
     if (op.lifetime == OperandLifeTime::CONSTANT_COPY) {

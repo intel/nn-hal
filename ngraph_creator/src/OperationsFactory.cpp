@@ -21,6 +21,9 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(const OperationT
         case OperationType::CONCATENATION:
             mOperationsMap[type] = std::make_shared<Concat>(model);
             break;
+        case OperationType::RESHAPE:
+            mOperationsMap[type] = std::make_shared<Reshape>(model);
+            break;
         default:
             return nullptr;
     }

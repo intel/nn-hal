@@ -188,7 +188,8 @@ bool BasePreparedModel::isOperationSupported(const Operation& operation, const M
             // if(!mNgraphNwCreator->validateOperations())
             //     return false;
         } break;
-
+        case OperationType::RESHAPE:
+            break;
         default:
             ALOGI("unsupport operation %d", operation.type);
             return false;

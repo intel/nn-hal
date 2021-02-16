@@ -1,5 +1,6 @@
 #include <Add.hpp>
 #include <Concat.hpp>
+#include <Reshape.hpp>
 
 namespace android {
 namespace hardware {
