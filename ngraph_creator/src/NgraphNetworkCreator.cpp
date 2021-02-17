@@ -8,10 +8,13 @@ namespace nnhal {
 
 NgraphNetworkCreator::NgraphNetworkCreator(const Model& model, const std::string& plugin)
     : mModel(model),
-      mNgraphNodes(std::make_shared<NgraphNodes>(mModel.operands.size())),
+      mNgraphNodes(
+          std::make_shared<NgraphNodes>(mModel.operands.size(), mModel.outputIndexes.size())),
       mOpFctryInst(plugin, mNgraphNodes) {
-    ALOGD("NgraphNetworkCreator Constructed");
+    ALOGV("%s Constructed", __func__);
 }
+
+NgraphNetworkCreator::~NgraphNetworkCreator() { ALOGV("%s Destructed", __func__); }
 
 void NgraphNetworkCreator::createInputParams() {
     for (auto i : mModel.inputIndexes) {
@@ -68,10 +71,6 @@ const std::string& NgraphNetworkCreator::getNodeName(uint32_t index) {
 }
 
 std::shared_ptr<ngraph::Function> NgraphNetworkCreator::generateGraph() {
-    for (auto i : mModel.outputIndexes) {
-        ALOGD("setResultNode %d", i);
-        mNgraphNodes->setResultNode(i);
-    }
     return mNgraphNodes->generateGraph();
 }
 
