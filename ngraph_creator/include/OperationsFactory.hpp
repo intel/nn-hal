@@ -14,6 +14,7 @@ private:
 
 public:
     OperationsFactory(const std::string& plugin, std::shared_ptr<NgraphNodes> nodes);
+    ~OperationsFactory();
     std::shared_ptr<OperationsBase> getOperation(const OperationType& type, const Model& model);
 };
 

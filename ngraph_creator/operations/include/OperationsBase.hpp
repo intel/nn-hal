@@ -16,7 +16,6 @@ namespace nnhal {
 class OperationsBase {
 protected:
     Model mModel;
-    std::shared_ptr<NgraphNodes> mNgraphNodes;
     enum ConversionType { NHWC_NCHW, NCHW_NHWC };
     std::shared_ptr<ngraph::Node> transpose(ConversionType type,
                                             ngraph::Output<ngraph::Node> input);
@@ -25,6 +24,7 @@ protected:
     virtual std::shared_ptr<ngraph::Node> createNodeForPlugin(const Operation& op);
 
 public:
+    static std::shared_ptr<NgraphNodes> mNgraphNodes;
     static std::string sPluginType;
     OperationsBase(const Model& model);
     void setNgraphNodes(std::shared_ptr<NgraphNodes> nodes);

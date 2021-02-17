@@ -31,7 +31,15 @@ std::shared_ptr<ngraph::Node> Concat::createNode(const Operation& operation) {
         inputs.push_back(inputOp);
     }
 
-    return std::make_shared<ngraph::opset3::Concat>(inputs, axis);
+    std::shared_ptr<ngraph::Node> outputNode =
+        std::make_shared<ngraph::opset3::Concat>(inputs, axis);
+    const auto outputIndex = operation.outputs[0];
+    const auto op = mModel.operands[outputIndex];
+    if (op.lifetime == OperandLifeTime::MODEL_OUTPUT) {
+        outputNode = transpose(NCHW_NHWC, outputNode);
+        mNgraphNodes->setResultNode(outputIndex, outputNode);
+    }
+    return outputNode;
 }
 
 }  // namespace nnhal
