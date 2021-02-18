@@ -44,37 +44,41 @@ class GnaPreparedModel : public PreparedModel {
     IRBuilder::ModelBuilder* mBuilderModel;
     GnaNetwork* gnaPluginPtr;
 
-#ifdef PERF_COUNTERS
     bool isDecoderNw, isEnc0Nw, isEnc1Nw;
     std::string modelNameStr;
+#ifdef PERF_COUNTERS
     metrics runtimeMetrics;
 #endif
 public:
 #ifdef CACHING
-    GnaPreparedModel(const Model& model) : PreparedModel("GNA", model), gnaPluginPtr(nullptr), mBuilderModel(nullptr),
-                                            isDecoderNw(false), isEnc0Nw(false), isEnc1Nw(false) {
+    GnaPreparedModel(const Model& model) : PreparedModel("GNA", model), gnaPluginPtr(nullptr), mBuilderModel(nullptr) {
+#ifdef PERF_COUNTERS
+        isDecoderNw = isEnc0Nw = isEnc1Nw = false;
         runtimeMetrics.reset();
+#endif
     }
-	GnaPreparedModel() : PreparedModel("GNA"), gnaPluginPtr(nullptr), mBuilderModel(nullptr),
-                                            isDecoderNw(false), isEnc0Nw(false), isEnc1Nw(false) {
+	GnaPreparedModel() : PreparedModel("GNA"), gnaPluginPtr(nullptr), mBuilderModel(nullptr) {
+#ifdef PERF_COUNTERS
+        isDecoderNw = isEnc0Nw = isEnc1Nw = false
         runtimeMetrics.reset();
+#endif
     }
-    ~GnaPreparedModel()  {
-        std::string nw_name = isDecoderNw?"Decoder":isEnc0Nw?"Encoder0":"Encoder1";
-        std::cout << " ********* " << nw_name
-                    << " ***********" << std::endl;
-        runtimeMetrics.print();
-        deinitialize();
-    }
+
     virtual bool initializeFromCache(const hidl_vec<hidl_handle>& modelCache, const HidlToken& token) override;
 #else
     GnaPreparedModel(const Model& model) : PreparedModel("GNA", model), gnaPluginPtr(nullptr), mBuilderModel(nullptr) {
     }
+#endif
 
     ~GnaPreparedModel()  {
+#ifdef PERF_COUNTERS
+        std::string nw_name = isDecoderNw?"Decoder":isEnc0Nw?"Encoder0":"Encoder1";
+        std::cout << " ********* " << nw_name
+                    << " ***********" << std::endl;
+        runtimeMetrics.print();
+#endif
         deinitialize();
     }
-#endif
 
     virtual bool initialize(const hidl_vec<hidl_handle>& modelCache, const HidlToken& token) override;
     virtual bool operationFullyConnected(const Operation& operation) override;

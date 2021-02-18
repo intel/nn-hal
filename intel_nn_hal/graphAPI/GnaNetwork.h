@@ -103,14 +103,13 @@ public:
     }
 
 #ifdef CACHING
-    void loadNetwork(InferenceEngine::CNNNetwork& passed_network, bool isDecoderNw);
     void importNetwork(const std::string& gnaModel, bool isDecoderNw);
 
     void exportGraph(const std::string& fileName) {
         executable_network.Export(fileName);
     }
 #else
-    void loadNetwork(InferenceEngine::CNNNetwork& passed_network);
+    void loadNetwork(InferenceEngine::CNNNetwork& passed_network, bool isDecoderNw);
 #endif
 
     void prepareInput();

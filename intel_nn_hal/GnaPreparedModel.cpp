@@ -139,7 +139,7 @@ bool GnaPreparedModel::initialize(const hidl_vec<hidl_handle>& modelCache, const
     VLOG(L1, "initialize");
     bool success = false;
 
-#ifdef PERF_COUNTERS
+    // TODO: Remove this hack to identify the nw based on operations
     int lstmCount = 0;
     for (auto op: mModel.main.operations) {
         if (op.type == OperationType::FULLY_CONNECTED) {
@@ -160,7 +160,6 @@ bool GnaPreparedModel::initialize(const hidl_vec<hidl_handle>& modelCache, const
             modelNameStr = "Encoder1";
         }
     }
-#endif
 
     // Check operation supoorted or not, user may not call getOpertionSupported()
     for (const auto& operation : mModel.main.operations) {
@@ -227,7 +226,7 @@ bool GnaPreparedModel::initialize(const hidl_vec<hidl_handle>& modelCache, const
 #else
     gnaPluginPtr = new GnaNetwork(network, "GNA");
     InferenceEngine::CNNNetwork passed_network({network});
-    gnaPluginPtr->loadNetwork(passed_network);
+    gnaPluginPtr->loadNetwork(passed_network, isDecoderNw);
 #endif
     gnaPluginPtr->queryState();
     gnaPluginPtr->reset();
