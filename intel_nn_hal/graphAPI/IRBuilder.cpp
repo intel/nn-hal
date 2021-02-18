@@ -516,9 +516,9 @@ std::vector<std::string> ModelBuilder::createFullLstm(LstmLayer::LstmParams& par
         getBuilderNetwork()->getBuilder()->connect({outputGateAddLayerId}, {cellStateToOutputGateAddLayerId, 1});
         outputGateAddLayerId = cellStateToOutputGateAddLayerId;
     }
-    
-    // Default is to always use batched Layer Norm 
-    // Keep a flag incase we observe performance regressions 
+
+    // Default is to always use batched Layer Norm
+    // Keep a flag incase we observe performance regressions
     if(params.useLayerNorm) {
         if(!params.useBatchedLayerNorm) {
             LN::LayerNorm *inputGateLN = new LN::LayerNorm(inputGateAddLayerId, cellSize, getBuilderNetwork()->getBuilder());
@@ -546,7 +546,7 @@ std::vector<std::string> ModelBuilder::createFullLstm(LstmLayer::LstmParams& par
             cellGateAddLayerId = BatchedLN->getCGateLNId();
             outputGateAddLayerId = BatchedLN->getOGateLNId();
         }
-    }  
+    }
     // i_t = sigma(W_{xi}x_t+W_{hi}h_{t-1}+W_{ci}C_{t-1}+b_i)
     idx_t inputGateActivationFn = getBuilderNetwork()->getBuilder()->addLayer({inputGateAddLayerId}, SIGMOIDLayer(getLayerName("sigmoid")) \
                                   .setPort(Port(cellStateDims)));
