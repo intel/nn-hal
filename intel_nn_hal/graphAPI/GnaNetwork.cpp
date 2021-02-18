@@ -131,7 +131,7 @@ void GnaNetwork::importNetwork(const std::string& gnaModel, bool isDecoderNw)
     }
     else {
         gnaPluginConfig[PluginConfigParams::KEY_IDENTITY_SCALE_FACTOR] =  std::to_string(256);
-    }    
+    }
     std::string scaleFactorConfigKey_1 = GNA_CONFIG_KEY(SCALE_FACTOR) + std::string("_") + std::to_string(0);
     gnaPluginConfig[scaleFactorConfigKey_1] = std::to_string(2048);
     std::string scaleFactorConfigKey_2 = GNA_CONFIG_KEY(SCALE_FACTOR) + std::string("_") + std::to_string(1);

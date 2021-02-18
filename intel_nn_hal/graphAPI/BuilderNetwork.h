@@ -30,7 +30,7 @@ class BuilderNetwork {
         std::vector<InferenceEngine::idx_t> mConnections;
         InferenceEngine::idx_t finalMemLayerId;
         std::vector<InferenceEngine::idx_t> mOutputIds;
-    
+
     private:
         IEBuilder::Network* mBuilder;
 };
