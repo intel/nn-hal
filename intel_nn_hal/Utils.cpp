@@ -564,6 +564,51 @@ std::string computeHashFromFd(int modelFd) {
     return hashString.str();
 }
 #endif
+
+#ifdef PERF_COUNTERS
+// return GNA module frequency in MHz
+float getGnaFrequencyMHz() {
+    uint32_t eax = 1;
+    uint32_t ebx = 0;
+    uint32_t ecx = 0;
+    uint32_t edx = 0;
+    uint32_t family = 0;
+    uint32_t model = 0;
+    const uint8_t sixth_family = 6;
+    const uint8_t cannon_lake_model = 102;
+    const uint8_t gemini_lake_model = 122;
+    const uint8_t ice_lake_model = 126;
+    const uint8_t tiger_lake_model = 140;
+
+    native_cpuid(&eax, &ebx, &ecx, &edx);
+    family = (eax >> 8) & 0xF;
+
+    // model is the concatenation of two fields
+    // | extended model | model |
+    // copy extended model data
+    model = (eax >> 16) & 0xF;
+    // shift
+    model <<= 4;
+    // copy model data
+    model += (eax >> 4) & 0xF;
+
+    if (family == sixth_family) {
+        switch (model) {
+            case cannon_lake_model:
+            case ice_lake_model:
+            case tiger_lake_model:
+                return 400;
+            case gemini_lake_model:
+                return 200;
+            default:
+                return 1;
+        }
+    } else {
+        // counters not supported and we returns just default value
+        return 1;
+    }
+}
+#endif
 }
 }
 }

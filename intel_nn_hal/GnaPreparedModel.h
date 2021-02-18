@@ -44,7 +44,7 @@ class GnaPreparedModel : public PreparedModel {
     IRBuilder::ModelBuilder* mBuilderModel;
     GnaNetwork* gnaPluginPtr;
 
-    bool isDecoderNw, isEnc0Nw, isEnc1Nw;
+    bool isDecoderNw, isEnc0Nw, isEnc1Nw = false;
     std::string modelNameStr;
 #ifdef PERF_COUNTERS
     metrics runtimeMetrics;
