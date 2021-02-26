@@ -51,29 +51,29 @@ class GnaPreparedModel : public PreparedModel {
 #endif
 public:
 #ifdef CACHING
-    GnaPreparedModel(const Model& model) : PreparedModel("GNA", model), gnaPluginPtr(nullptr), mBuilderModel(nullptr) {
+    GnaPreparedModel(const Model& model) : PreparedModel("GNA", model), gnaPluginPtr(nullptr), mBuilderModel(nullptr),
+                                            isDecoderNw(false), isEnc0Nw(false), isEnc1Nw(false) {
 #ifdef PERF_COUNTERS
-        isDecoderNw = isEnc0Nw = isEnc1Nw = false;
         runtimeMetrics.reset();
 #endif
     }
-	GnaPreparedModel() : PreparedModel("GNA"), gnaPluginPtr(nullptr), mBuilderModel(nullptr) {
+	GnaPreparedModel() : PreparedModel("GNA"), gnaPluginPtr(nullptr), mBuilderModel(nullptr),
+                         isDecoderNw(false), isEnc0Nw(false), isEnc1Nw(false) {
 #ifdef PERF_COUNTERS
-        isDecoderNw = isEnc0Nw = isEnc1Nw = false
         runtimeMetrics.reset();
 #endif
     }
 
     virtual bool initializeFromCache(const hidl_vec<hidl_handle>& modelCache, const HidlToken& token) override;
 #else
-    GnaPreparedModel(const Model& model) : PreparedModel("GNA", model), gnaPluginPtr(nullptr), mBuilderModel(nullptr) {
+    GnaPreparedModel(const Model& model) : PreparedModel("GNA", model), gnaPluginPtr(nullptr), mBuilderModel(nullptr),
+                                            isDecoderNw(false), isEnc0Nw(false), isEnc1Nw(false) {
     }
 #endif
 
     ~GnaPreparedModel()  {
 #ifdef PERF_COUNTERS
-        std::string nw_name = isDecoderNw?"Decoder":isEnc0Nw?"Encoder0":"Encoder1";
-        std::cout << " ********* " << nw_name
+        std::cout << " ********* " << modelNameStr
                     << " ***********" << std::endl;
         runtimeMetrics.print();
 #endif
