@@ -108,9 +108,8 @@ public:
     void exportGraph(const std::string& fileName) {
         executable_network.Export(fileName);
     }
-#else
-    void loadNetwork(InferenceEngine::CNNNetwork& passed_network, bool isDecoderNw);
 #endif
+    void loadNetwork(InferenceEngine::CNNNetwork& passed_network, bool isDecoderNw);
 
     void prepareInput();
 

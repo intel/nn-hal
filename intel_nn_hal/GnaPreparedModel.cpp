@@ -154,10 +154,10 @@ bool GnaPreparedModel::initialize(const hidl_vec<hidl_handle>& modelCache, const
     if (!isDecoderNw) {
         if (lstmCount > 3) {
             isEnc1Nw = true;
-            modelNameStr = "Encoder0";
+            modelNameStr = "Encoder1";
         } else {
             isEnc0Nw = true;
-            modelNameStr = "Encoder1";
+            modelNameStr = "Encoder0";
         }
     }
 
@@ -311,6 +311,10 @@ bool GnaPreparedModel::initialize(const hidl_vec<hidl_handle>& modelCache, const
         const auto hashLen = strlen(hashStr.c_str());
         writeBits(static_cast<uint32_t>(hashLen), dataCacheFd);
         writeNBytes(hashStr.c_str(), hashLen, dataCacheFd);
+
+        // TODO: Remove this once model details can be obtained from application
+        writeBits(static_cast<uint32_t>(modelNameStr.length()), dataCacheFd);
+        writeNBytes(modelNameStr.c_str(), hashLen, dataCacheFd);
     }
 #endif
     return true;
@@ -318,19 +322,6 @@ bool GnaPreparedModel::initialize(const hidl_vec<hidl_handle>& modelCache, const
 
 #ifdef CACHING
 bool GnaPreparedModel::initializeFromCache(const hidl_vec<hidl_handle>& modelCache, const HidlToken& token) {
-    std::string tokenStr = getTokenString(token);
-    if (tokenStr.compare(0, strlen(DECODER_TOKEN_STR), DECODER_TOKEN_STR) == 0) {
-        isDecoderNw = true;
-        modelNameStr = "Decoder";
-    } else if(tokenStr.compare(0, strlen(ENC0_TOKEN_STR), ENC0_TOKEN_STR) == 0) {
-        isEnc0Nw = true;
-        modelNameStr = "Encoder0";
-    }
-    else if(tokenStr.compare(0, strlen(ENC1_TOKEN_STR), ENC1_TOKEN_STR) == 0) {
-        isEnc1Nw = true;
-        modelNameStr = "Encoder1";
-    }
-
     time_point irBuildStart = now();
     // Load the network from cache file
     gnaPluginPtr = new GnaNetwork(nullptr, "GNA");
@@ -342,16 +333,30 @@ bool GnaPreparedModel::initializeFromCache(const hidl_vec<hidl_handle>& modelCac
 
     // Read the Hash value
     auto dataCacheFd = modelCache[2]->data[0];
-    uint32_t hashLen = 0;
+    uint32_t hashLen = 0, modelStrLen = 0;
+
     readNBits<32>(hashLen, dataCacheFd);
     std::string storedHashString("", hashLen);
     readNBytes(&storedHashString[0], hashLen, dataCacheFd);
+    modelNameStr = tmpModelNameString;
+
+    readNBits<32>(modelStrLen, dataCacheFd);
+    std::string tmpModelNameString("", modelStrLen);
+    readNBytes(&tmpModelNameString[0], modelStrLen, dataCacheFd);
 
     if (hash.compare(0, std::string::npos, storedHashString) != 0) {
-        ALOGE("SHA256 digest does not match");
+        ALOGE("SHA512 digest does not match");
         ALOGE("Stored hash:", storedHashString.c_str());
         ALOGE("Computed hash:", hash.c_str());
         nnAssert("Model cache stored has been corrupted. Checksum does not match");
+    }
+
+    if (modelNameStr.compare(DECODER_TOKEN_STR) == 0) {
+        isDecoderNw = true;
+    } else if(modelNameStr.compare(ENC0_TOKEN_STR) == 0) {
+        isEnc0Nw = true;
+    } else if(modelNameStr.compare(ENC1_TOKEN_STR) == 0) {
+        isEnc1Nw = true;
     }
 
     dataCacheFd = modelCache[1]->data[0];
@@ -359,7 +364,6 @@ bool GnaPreparedModel::initializeFromCache(const hidl_vec<hidl_handle>& modelCac
     readBits(operandCount, dataCacheFd);
 
     mOperands.resize(operandCount);
-
     for (auto i=0; i < operandCount; i++) {
         RunTimeOperandInfo& runtimeOp = mOperands[i];
 
