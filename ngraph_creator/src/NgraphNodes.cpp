@@ -35,7 +35,7 @@ const std::string& NgraphNodes::getNodeName(size_t index) {
 std::shared_ptr<ngraph::Function> NgraphNodes::generateGraph() {
     // TODO: Remove the Dummy Concat
     // Dummy Concat to join the disconnected graph(ssd_mobilenet Obj Det with only Concat)
-    mResultNodes.push_back(std::make_shared<ngraph::opset3::Concat>(mResultNodes, 3));
+    mResultNodes.push_back(std::make_shared<ngraph::opset3::Concat>(mResultNodes, 2));
     ngraph::ParameterVector inputParams;
     inputParams.reserve(mInputParamsMap.size());
     for (auto const& temp : mInputParamsMap) inputParams.push_back(temp.second);
