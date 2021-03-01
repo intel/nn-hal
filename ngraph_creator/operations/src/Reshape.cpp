@@ -20,8 +20,6 @@ std::shared_ptr<ngraph::Node> Reshape::createNode(const Operation& operation) {
         inputOperand.lifetime != OperandLifeTime::MODEL_INPUT)
         inputOp = transpose(NCHW_NHWC, inputOp);
 
-    if (outDims.size() == 3) outDims.insert(outDims.begin(), 1);
-
     auto shapeNode = std::make_shared<ngraph::opset3::Constant>(
         ngraph::element::i64, ngraph::Shape{outDims.size()}, outDims.data());
 
@@ -32,8 +30,8 @@ std::shared_ptr<ngraph::Node> Reshape::createNode(const Operation& operation) {
     const auto outputOperand = mModel.operands[outputIndex];
     if (outputOperand.lifetime == OperandLifeTime::MODEL_OUTPUT)
         mNgraphNodes->setResultNode(outputIndex, outputNode);
-    else
-        outputNode = transpose(NHWC_NCHW, outputNode);
+    //else
+        //outputNode = transpose(NHWC_NCHW, outputNode);
     return outputNode;
 }
 }  // namespace nnhal

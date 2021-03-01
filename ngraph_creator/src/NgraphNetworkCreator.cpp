@@ -59,7 +59,11 @@ bool NgraphNetworkCreator::initializeModel() {
             ALOGE("initializeModel Failure at type %d", operation.type);
             return false;
         }
-        op->connectOperationToGraph(operation);
+        try {
+            op->connectOperationToGraph(operation);
+        } catch (const std::exception &ex) {
+            ALOGE("%s Exception !!! %s", __func__, ex.what());
+        }
     }
     ALOGD("initializeModel Success");
     return true;
@@ -71,7 +75,13 @@ const std::string& NgraphNetworkCreator::getNodeName(uint32_t index) {
 }
 
 std::shared_ptr<ngraph::Function> NgraphNetworkCreator::generateGraph() {
-    return mNgraphNodes->generateGraph();
+    std::shared_ptr<ngraph::Function> ret;
+    try {
+        ret = mNgraphNodes->generateGraph();
+    } catch (const std::exception &ex) {
+        ALOGE("%s Exception !!! %s", __func__, ex.what());
+    }
+    return ret;
 }
 
 }  // namespace nnhal
