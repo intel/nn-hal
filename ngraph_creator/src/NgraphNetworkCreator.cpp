@@ -1,3 +1,4 @@
+//#define LOG_NDEBUG 0
 #include <NgraphNetworkCreator.hpp>
 #define LOG_TAG "NgraphNetworkCreator"
 
