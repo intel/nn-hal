@@ -11,9 +11,8 @@ Concat::Concat(const Model& model) : OperationsBase(model) {}
 bool Concat::validate(const Operation& op) { return true; }
 
 std::shared_ptr<ngraph::Node> Concat::createNode(const Operation& operation) {
-    auto n = operation.inputs.size() - 1;
-    std::vector<uint32_t> axisMap = {2, 3, 1};  // NCHW = axisMap[NHWC]
-    auto axis = axisMap[ParseOperationInput(mModel, operation, n)];
+    auto n = operation.inputs.size() - 1; //0 ~ n-1: The list of n input tensors
+    auto axis = ParseOperationInput(mModel, operation, n); //n: concatenation axis
     std::vector<ngraph::Output<ngraph::Node>> inputs;
     ALOGD("createNode n %d, axis %d", n, axis);
     for (int i = 0; i < n; i++) {
@@ -31,7 +30,14 @@ std::shared_ptr<ngraph::Node> Concat::createNode(const Operation& operation) {
         inputs.push_back(inputOp);
     }
 
-    return std::make_shared<ngraph::opset3::Concat>(inputs, axis);
+    std::shared_ptr<ngraph::Node> outputNode =
+        std::make_shared<ngraph::opset3::Concat>(inputs, axis);
+    const auto outputIndex = operation.outputs[0];
+    const auto op = mModel.operands[outputIndex];
+    if (op.lifetime == OperandLifeTime::MODEL_OUTPUT) {
+        mNgraphNodes->setResultNode(outputIndex, outputNode);
+    }
+    return outputNode;
 }
 
 }  // namespace nnhal
