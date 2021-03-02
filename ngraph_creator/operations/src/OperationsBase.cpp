@@ -23,6 +23,16 @@ std::shared_ptr<ngraph::Node> OperationsBase::transpose(ConversionType type,
     return std::make_shared<ngraph::opset3::Transpose>(input, order_node);
 }
 
+std::shared_ptr<ngraph::Node> OperationsBase::toNCHW(size_t inputIndex,size_t outputIndex) {
+    auto inNode = mNgraphNodes->getOperationOutput(inputIndex).get_node_shared_ptr();
+    if(mNgraphNodes->isForcedNchw(inputIndex))
+        return inNode;
+    else {
+        mNgraphNodes->setForcedNchw(outputIndex, true);
+        return transpose(NHWC_NCHW, inNode);
+    }
+}
+
 // override createNodeForPlugin in case sPluginType specific implementation is required
 std::shared_ptr<ngraph::Node> OperationsBase::createNodeForPlugin(const Operation& op) {
     return createNode(op);
@@ -31,6 +41,10 @@ std::shared_ptr<ngraph::Node> OperationsBase::createNodeForPlugin(const Operatio
 // override connectOperationToGraph in case Operation has multiple outputs
 void OperationsBase::connectOperationToGraph(const Operation& op) {
     mNgraphNodes->setOperationOutput(op.outputs[0], createNodeForPlugin(op)->get_default_output());
+}
+
+void OperationsBase::addResultNode(size_t index, std::shared_ptr<ngraph::Node> resultNode) {
+    mNgraphNodes->setResultNode(index, resultNode);
 }
 
 OperationsBase::OperationsBase(const Model& model) : mModel(model) {}

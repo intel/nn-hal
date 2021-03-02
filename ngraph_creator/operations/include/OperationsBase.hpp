@@ -22,6 +22,8 @@ protected:
     virtual std::shared_ptr<ngraph::Node> createNode(const Operation& op) = 0;
     // override createNodeForPlugin in case sPluginType specific implementation is required
     virtual std::shared_ptr<ngraph::Node> createNodeForPlugin(const Operation& op);
+    std::shared_ptr<ngraph::Node> toNCHW(size_t inputIndex,size_t outputIndex);
+    void addResultNode(size_t index, std::shared_ptr<ngraph::Node> resultNode);
 
 public:
     static std::shared_ptr<NgraphNodes> mNgraphNodes;

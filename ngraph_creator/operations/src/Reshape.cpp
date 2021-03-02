@@ -14,11 +14,12 @@ std::shared_ptr<ngraph::Node> Reshape::createNode(const Operation& operation) {
     auto inputIndex = operation.inputs[0];
     auto inputOp = mNgraphNodes->getOperationOutput(inputIndex);
     const auto inputOperand = mModel.operands[inputIndex];
+    const auto outputIndex = operation.outputs[0];
 
-    if (inputOperand.lifetime != OperandLifeTime::CONSTANT_COPY &&
-        inputOperand.lifetime != OperandLifeTime::CONSTANT_REFERENCE &&
-        inputOperand.lifetime != OperandLifeTime::MODEL_INPUT)
+    if(mNgraphNodes->isForcedNchw(inputIndex)) {
         inputOp = transpose(NCHW_NHWC, inputOp);
+        mNgraphNodes->setForcedNchw(outputIndex, false);
+    }
 
     auto shapeNode = std::make_shared<ngraph::opset3::Constant>(
         ngraph::element::i64, ngraph::Shape{outDims.size()}, outDims.data());
@@ -26,12 +27,10 @@ std::shared_ptr<ngraph::Node> Reshape::createNode(const Operation& operation) {
     std::shared_ptr<ngraph::Node> outputNode =
         std::make_shared<ngraph::opset3::Reshape>(inputOp, shapeNode, true);
 
-    const auto outputIndex = operation.outputs[0];
     const auto outputOperand = mModel.operands[outputIndex];
     if (outputOperand.lifetime == OperandLifeTime::MODEL_OUTPUT)
-        mNgraphNodes->setResultNode(outputIndex, outputNode);
-    //else
-        //outputNode = transpose(NHWC_NCHW, outputNode);
+        addResultNode(outputIndex, outputNode);
+
     return outputNode;
 }
 }  // namespace nnhal
