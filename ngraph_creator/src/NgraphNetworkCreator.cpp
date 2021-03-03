@@ -46,12 +46,13 @@ void NgraphNetworkCreator::createInputParams() {
 
 bool NgraphNetworkCreator::validateOperations() {
     for (const auto& operation : mModel.operations) {
-        if (!mOpFctryInst.getOperation(operation.type, mModel)->validate(operation)) return false;
+        if (!mOpFctryInst.getOperation(operation.type, mModel) || !mOpFctryInst.getOperation(operation.type, mModel)->validate(operation)) return false;
     }
     return true;
 }
 
 bool NgraphNetworkCreator::initializeModel() {
+    ALOGV("%s Called", __func__);
     int index = 0;
     createInputParams();
     for (const auto& operation : mModel.operations) {
@@ -64,6 +65,7 @@ bool NgraphNetworkCreator::initializeModel() {
             op->connectOperationToGraph(operation);
         } catch (const std::exception &ex) {
             ALOGE("%s Exception !!! %s", __func__, ex.what());
+            return false;
         }
     }
     ALOGD("initializeModel Success");
@@ -76,6 +78,7 @@ const std::string& NgraphNetworkCreator::getNodeName(uint32_t index) {
 }
 
 std::shared_ptr<ngraph::Function> NgraphNetworkCreator::generateGraph() {
+    ALOGV("%s Called", __func__);
     std::shared_ptr<ngraph::Function> ret;
     try {
         ret = mNgraphNodes->generateGraph();

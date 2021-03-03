@@ -76,6 +76,7 @@ cc_library_shared {
         "libhidltransport",
         "libutils",
         "liblog",
+        "libfmq",
         "libcutils",
         "libhardware",
         "libbase",
