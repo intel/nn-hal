@@ -37,7 +37,10 @@ void NgraphNodes::setResultNode(size_t outputIndex, std::shared_ptr<ngraph::Node
 }
 
 const std::string& NgraphNodes::getNodeName(size_t index) {
-    return mOperationOutputs[index].get_node_shared_ptr()->get_name();
+    if(mNodeNames.find(index) == mNodeNames.end())
+        mNodeNames[index] = mOperationOutputs[index].get_node_shared_ptr()->get_name();
+    ALOGV("%s index %d, name %s", __func__, index, mNodeNames[index].c_str());
+    return mNodeNames[index];
 }
 
 std::shared_ptr<ngraph::Function> NgraphNodes::generateGraph() {

@@ -16,6 +16,7 @@ private:
     std::vector<bool> mForcedNchw;
     std::map<int, std::shared_ptr<ngraph::opset3::Parameter>> mInputParamsMap;
     std::vector<std::shared_ptr<ngraph::Node>> mResultNodes;
+    std::map<int, std::string> mNodeNames;
 
 public:
     NgraphNodes(size_t operandsSize, size_t resultsSize);
