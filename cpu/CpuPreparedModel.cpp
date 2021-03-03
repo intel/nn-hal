@@ -8,6 +8,7 @@
 #include <thread>
 #include "ValidateHal.h"
 #include "utils.h"
+#include "ExecutionBurstServer.h"
 
 using namespace android::nn;
 
@@ -30,7 +31,7 @@ bool CpuPreparedModel::initialize(const Model& model) {
 
     // NgraphNetworkCreator ngc(mModel, "CPU");
     if (!mNgc->validateOperations()) return false;
-    mNgc->initializeModel();  // NgraphNetworkCreator
+    if (!mNgc->initializeModel()) return false;
     auto ngraph_function = mNgc->generateGraph();
     InferenceEngine::CNNNetwork ngraph_net = InferenceEngine::CNNNetwork(ngraph_function);
     ngraph_net.serialize("/data/vendor/neuralnetworks/ngraph_ir.xml",
@@ -66,6 +67,24 @@ bool CpuPreparedModel::initialize(const Model& model) {
     return true;
 }
 
+Return<void> CpuPreparedModel::configureExecutionBurst(
+    const sp<V1_2::IBurstCallback>& callback,
+    const MQDescriptorSync<V1_2::FmqRequestDatum>& requestChannel,
+    const MQDescriptorSync<V1_2::FmqResultDatum>& resultChannel, configureExecutionBurst_cb cb) {
+    ALOGV("Entering %s", __func__);
+    const sp<V1_2::IBurstContext> burst =
+            ExecutionBurstServer::create(callback, requestChannel,
+                                         resultChannel, this);
+
+    if (burst == nullptr) {
+        cb(ErrorStatus::GENERAL_FAILURE, {});
+        ALOGI("%s GENERAL_FAILURE", __func__);
+    } else {
+        cb(ErrorStatus::NONE, burst);
+        ALOGI("%s burst created", __func__);
+    }
+    return Void();
+}
 IRBlob::Ptr CpuPreparedModel::GetConstWeightsOperandAsTensor(uint32_t index, const Model& model) {
     ALOGV("Entering %s", __func__);
     dumpOperand(index, model);

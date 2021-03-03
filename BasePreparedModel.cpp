@@ -21,7 +21,7 @@
 #include <log/log.h>
 #include <thread>
 #include "ValidateHal.h"
-
+#include "ExecutionBurstServer.h"
 #include <cutils/properties.h>
 
 #define DISABLE_ALL_QUANT
@@ -655,7 +655,7 @@ Return<void> BasePreparedModel::executeSynchronously(const Request& request, Mea
         driverEnd = now();
         Timing timing = {.timeOnDevice = uint64_t(microsecondsDuration(deviceEnd, deviceStart)),
                          .timeInDriver = uint64_t(microsecondsDuration(driverEnd, driverStart))};
-        ALOGD("Driver::executeSynchronously timing = %s", timing);
+        ALOGD("Driver::executeSynchronously timing = %s", toString(timing).c_str());
         cb(ErrorStatus::NONE, outputShapes, timing);
     } else {
         cb(ErrorStatus::NONE, outputShapes, kNoTiming);
@@ -669,8 +669,17 @@ Return<void> BasePreparedModel::configureExecutionBurst(
     const MQDescriptorSync<V1_2::FmqRequestDatum>& requestChannel,
     const MQDescriptorSync<V1_2::FmqResultDatum>& resultChannel, configureExecutionBurst_cb cb) {
     ALOGV("Entering %s", __func__);
+    const sp<V1_2::IBurstContext> burst =
+            ExecutionBurstServer::create(callback, requestChannel,
+                                         resultChannel, this);
 
-    cb(ErrorStatus::GENERAL_FAILURE, {});
+    if (burst == nullptr) {
+        cb(ErrorStatus::GENERAL_FAILURE, {});
+        ALOGI("%s GENERAL_FAILURE", __func__);
+    } else {
+        cb(ErrorStatus::NONE, burst);
+        ALOGI("%s burst created", __func__);
+    }
     return Void();
 }
 

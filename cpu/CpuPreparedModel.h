@@ -46,7 +46,11 @@ public:
                                       const Model& model) override;
     Blob::Ptr GetInOutOperandAsBlob(RunTimeOperandInfo& op, const uint8_t* buf,
                                     uint32_t& len) override;
-
+    Return<void> configureExecutionBurst(
+        const sp<V1_2::IBurstCallback>& callback,
+        const MQDescriptorSync<V1_2::FmqRequestDatum>& requestChannel,
+        const MQDescriptorSync<V1_2::FmqResultDatum>& resultChannel,
+        configureExecutionBurst_cb cb) override;
 protected:
     void deinitialize() override;
 };
