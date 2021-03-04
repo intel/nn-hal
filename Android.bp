@@ -25,6 +25,7 @@ cc_library_shared {
     include_dirs: [
         "frameworks/ml/nn/common/include",
         "frameworks/ml/nn/runtime/include",
+        "vendor/intel/external/project-celadon/nn-hal",
     ],
 
     header_libs: [
@@ -95,6 +96,7 @@ cc_library_shared {
         "libpugixml",
         "libneuralnetworks_common",
         "libngraph_creator",
+        "libmodel_manager",
     ],
 
 }
@@ -136,4 +138,53 @@ cc_binary {
     ],
 
     compile_multilib: "64",
+}
+cc_library_static {
+
+    name: "libmodel_manager",
+    proprietary: true,
+    owner: "intel",
+    compile_multilib: "64",
+
+    srcs: [
+        "ModelManager.cpp",
+    ],
+
+    header_libs: [
+        "libinference_headers",
+    ],
+    include_dirs: [
+        "vendor/intel/external/project-celadon/nn-hal",
+    ],
+    local_include_dirs: [
+        "graphAPI",
+    ],
+
+    cflags: [
+        "-std=c++11",
+        "-fPIE",
+        "-Wall",
+        "-Wno-unused-variable",
+        "-Wno-unused-parameter",
+        "-Wno-non-virtual-dtor",
+        "-Wno-missing-field-initializers",
+        "-Wno-error",
+        "-D_FORTIFY_SOURCE=2",
+        "-fvisibility=default",
+        "-fexceptions",
+        "-fPIC",
+    ] + [
+        "-D__ANDROID__",
+    ],
+
+    shared_libs: [
+        "liblog",
+        "android.hidl.memory@1.0",
+        "libhidlmemory",
+        "libhardware",
+        "android.hardware.neuralnetworks@1.0",
+        "android.hardware.neuralnetworks@1.1",
+        "android.hardware.neuralnetworks@1.2",
+        "android.hardware.neuralnetworks@1.3",
+    ],
 }

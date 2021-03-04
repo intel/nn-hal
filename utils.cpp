@@ -18,7 +18,12 @@
 
 #include <android-base/logging.h>
 #include <android/log.h>
+#include <hidlmemory/mapping.h>
 #include <log/log.h>
+#include <sys/mman.h>
+
+#include <sys/stat.h>
+#include <fstream>
 
 // inline unsigned int debugMask = ((1 << (L1 + 1)) - 1);
 
@@ -415,6 +420,125 @@ size_t sizeOfTensor(const TensorDims& dims) {
     size_t ret = dims[0];
     for (int i = 1; i < dims.size(); ++i) ret *= dims[i];
     return ret;
+}
+
+// TODO: short term, make share memory mapping and updating a utility function.
+// TODO: long term, implement mmap_fd as a hidl IMemory service.
+bool RunTimePoolInfo::set(const hidl_memory& hidlMemory) {
+    this->hidlMemory = hidlMemory;
+    auto memType = hidlMemory.name();
+    if (memType == "ashmem") {
+        memory = mapMemory(hidlMemory);
+        if (memory == nullptr) {
+            ALOGE("Can't map shared memory.");
+            return false;
+        }
+        memory->update();
+        buffer = reinterpret_cast<uint8_t*>(static_cast<void*>(memory->getPointer()));
+        if (buffer == nullptr) {
+            ALOGE("Can't access shared memory.");
+            return false;
+        }
+        return true;
+    } else if (memType == "mmap_fd") {
+        size_t size = hidlMemory.size();
+        int fd = hidlMemory.handle()->data[0];
+        int prot = hidlMemory.handle()->data[1];
+        size_t offset = getSizeFromInts(hidlMemory.handle()->data[2], hidlMemory.handle()->data[3]);
+        buffer = static_cast<uint8_t*>(mmap(nullptr, size, prot, MAP_SHARED, fd, offset));
+        if (buffer == MAP_FAILED) {
+            ALOGE("Can't mmap the file descriptor.");
+            return false;
+        }
+        return true;
+    } else {
+        ALOGE("unsupported hidl_memory type");
+        return false;
+    }
+}
+
+bool RunTimePoolInfo::unmap_mem() {
+    if (buffer) {
+        const size_t size = hidlMemory.size();
+        if (hidlMemory.name() == "mmap_fd") {
+            if (munmap(buffer, size)) {
+                VLOG(L1, "Unmap failed\n");
+                return false;
+            }
+            buffer = nullptr;
+        }
+    }
+    return true;
+}
+
+// Making sure the output data are correctly updated after execution.
+bool RunTimePoolInfo::update() {
+    auto memType = hidlMemory.name();
+    if (memType == "ashmem") {
+        memory->commit();
+        return true;
+    } else if (memType == "mmap_fd") {
+        int prot = hidlMemory.handle()->data[1];
+        if (prot & PROT_WRITE) {
+            size_t size = hidlMemory.size();
+            return msync(buffer, size, MS_SYNC) == 0;
+        }
+    }
+    // No-op for other types of memory.
+    return true;
+}
+
+int sizeOfData(OperandType type, std::vector<uint32_t> dims) {
+    int size;
+    switch (type) {
+        case OperandType::FLOAT32:
+            size = 4;
+            break;
+        case OperandType::TENSOR_FLOAT32:
+            size = 4;
+            break;
+        case OperandType::TENSOR_INT32:
+            size = 4;
+            break;
+        case OperandType::TENSOR_QUANT8_ASYMM:
+        case OperandType::INT32:
+            size = 1;
+            break;
+
+        default:
+            size = 0;
+    }
+    for (auto d : dims) size *= d;
+
+    return size;
+}
+
+void createDirs(std::string path) {
+    char delim = '/';
+    int start = 0;
+
+    auto pos = path.find(delim);
+    while (pos != std::string::npos) {
+        auto dir = path.substr(start, pos - start + 1);
+
+        struct stat sb;
+        if (!((stat(dir.c_str(), &sb) == 0) && (S_ISDIR(sb.st_mode)))) {
+            if (mkdir(dir.c_str(), 0777) != 0)
+                std::cout << "failed to create folder: " << dir << std::endl;
+        }
+        pos = path.find(delim, pos + 1);
+    }
+}
+
+void writeBufferToFile(std::string filename, const float* buf, size_t length) {
+    createDirs(filename);
+
+    std::ofstream ofs;
+    ofs.open(filename.c_str(), std::ofstream::out | std::ofstream::trunc);
+    for (auto i = 0; i < length; i++) {
+        ofs << buf[i] << "\n";
+    }
+    ofs.close();
 }
 
 }  // namespace nnhal

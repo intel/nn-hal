@@ -1,5 +1,6 @@
 #include <NgraphNodes.hpp>
 #include <OperationsFactory.hpp>
+//#include "ModelManger.h"
 
 namespace android {
 namespace hardware {
@@ -8,13 +9,13 @@ namespace nnhal {
 
 class NgraphNetworkCreator {
 private:
-    Model mModel;
+    NnapiModelInfo* mModelInfo;
     std::shared_ptr<NgraphNodes> mNgraphNodes;
     OperationsFactory mOpFctryInst;
     void createInputParams();
 
 public:
-    NgraphNetworkCreator(const Model& model, const std::string& plugin);
+    NgraphNetworkCreator(NnapiModelInfo* model, const std::string& plugin);
 
     bool validateOperations();
     bool initializeModel();

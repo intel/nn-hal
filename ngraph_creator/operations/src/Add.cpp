@@ -5,7 +5,7 @@ namespace hardware {
 namespace neuralnetworks {
 namespace nnhal {
 
-Add::Add(const Model& model) : OperationsBase(model) {}
+Add::Add(NnapiModelInfo* model) : OperationsBase(model) {}
 
 bool Add::validate(const Operation& op) { return true; }
 

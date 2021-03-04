@@ -1,4 +1,5 @@
 #include <NgraphNodes.hpp>
+static const std::string INVALID_STRING("Invalid Node");
 
 namespace android {
 namespace hardware {
