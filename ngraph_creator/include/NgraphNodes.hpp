@@ -14,7 +14,7 @@ class NgraphNodes {
 private:
     std::vector<ngraph::Output<ngraph::Node>> mOperationOutputs;
     std::vector<bool> mForcedNchw;
-    std::map<int, std::shared_ptr<ngraph::opset3::Parameter>> mInputParamsMap;
+    std::vector<std::shared_ptr<ngraph::opset3::Parameter>> mInputParams;
     std::vector<std::shared_ptr<ngraph::Node>> mResultNodes;
     std::map<int, std::string> mNodeNames;
 
@@ -22,7 +22,7 @@ public:
     NgraphNodes(size_t operandsSize, size_t resultsSize);
     ~NgraphNodes();
 
-    void addInputParam(size_t index, std::shared_ptr<ngraph::opset3::Parameter> inParam);
+    void addInputParam(std::shared_ptr<ngraph::opset3::Parameter> inParam);
     void setOperationOutput(size_t index, ngraph::Output<ngraph::Node> output);
     ngraph::Output<ngraph::Node> getOperationOutput(size_t index);
     bool isForcedNchw(size_t index);
