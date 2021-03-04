@@ -15,8 +15,8 @@ NgraphNodes::NgraphNodes(size_t operandsSize, size_t resultsSize) {
 
 NgraphNodes::~NgraphNodes() { ALOGV("%s Destructed", __func__); }
 
-void NgraphNodes::addInputParam(size_t index, std::shared_ptr<ngraph::opset3::Parameter> inParam) {
-    mInputParamsMap[index] = inParam;
+void NgraphNodes::addInputParam(std::shared_ptr<ngraph::opset3::Parameter> inParam) {
+    mInputParams.push_back(inParam);
 }
 void NgraphNodes::setOperationOutput(size_t index, ngraph::Output<ngraph::Node> output) {
     mOperationOutputs[index] = output;
@@ -47,10 +47,7 @@ std::shared_ptr<ngraph::Function> NgraphNodes::generateGraph() {
     // TODO: Remove the Dummy Concat
     // Dummy Concat to join the disconnected graph(ssd_mobilenet Obj Det with only Concat)
     mResultNodes.push_back(std::make_shared<ngraph::opset3::Concat>(mResultNodes, 2));
-    ngraph::ParameterVector inputParams;
-    inputParams.reserve(mInputParamsMap.size());
-    for (auto const& temp : mInputParamsMap) inputParams.push_back(temp.second);
-    return std::make_shared<ngraph::Function>(mResultNodes, inputParams);
+    return std::make_shared<ngraph::Function>(mResultNodes, mInputParams);
 }
 
 }  // namespace nnhal

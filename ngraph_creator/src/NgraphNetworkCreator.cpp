@@ -39,7 +39,7 @@ void NgraphNetworkCreator::createInputParams() {
                       mModel.operands[i].type);
                 inputParam = nullptr;
         }
-        mNgraphNodes->addInputParam(i, inputParam);
+        mNgraphNodes->addInputParam(inputParam);
         mNgraphNodes->setOperationOutput(i, inputParam);
     }
 }
