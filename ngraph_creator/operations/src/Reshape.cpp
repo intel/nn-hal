@@ -5,15 +5,15 @@ namespace hardware {
 namespace neuralnetworks {
 namespace nnhal {
 
-Reshape::Reshape(const Model& model) : OperationsBase(model) {}
+Reshape::Reshape(NnapiModelInfo* model) : OperationsBase(model) {}
 
 bool Reshape::validate(const Operation& op) { return true; }
 
 std::shared_ptr<ngraph::Node> Reshape::createNode(const Operation& operation) {
-    auto outDims = GetConstVecOperand(mModel, operation.inputs[1]);
+    auto outDims = mModelInfo->GetConstVecOperand<uint32_t>(operation.inputs[1]);
     auto inputIndex = operation.inputs[0];
     auto inputOp = mNgraphNodes->getOperationOutput(inputIndex);
-    const auto op = mModel.operands[inputIndex];
+    const auto op = mModelInfo->getOperand(inputIndex);
 
     if (op.lifetime != OperandLifeTime::CONSTANT_COPY &&
         op.lifetime != OperandLifeTime::CONSTANT_REFERENCE &&

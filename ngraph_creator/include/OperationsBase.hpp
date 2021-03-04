@@ -1,12 +1,13 @@
 #pragma once
 
-#include <Driver.h>
-#include <Temp.h>  //TODO: Remove this once NNAPI_Utils is ready
+//#include <Driver.h>
 #include <android/log.h>
 #include <log/log.h>
 #include <NgraphNodes.hpp>
 #include <ngraph/ngraph.hpp>
 #include <ngraph/opsets/opset3.hpp>
+
+#include <ModelManager.h>
 
 namespace android {
 namespace hardware {
@@ -15,7 +16,7 @@ namespace nnhal {
 
 class OperationsBase {
 protected:
-    Model mModel;
+    std::shared_ptr<NnapiModelInfo> mModelInfo;
     std::shared_ptr<NgraphNodes> mNgraphNodes;
     enum ConversionType { NHWC_NCHW, NCHW_NHWC };
     std::shared_ptr<ngraph::Node> transpose(ConversionType type,
@@ -26,7 +27,7 @@ protected:
 
 public:
     static std::string sPluginType;
-    OperationsBase(const Model& model);
+    OperationsBase(NnapiModelInfo* model);
     void setNgraphNodes(std::shared_ptr<NgraphNodes> nodes);
     virtual bool validate(const Operation& op);
     // override connectOperationToGraph in case Operation has multiple outputs

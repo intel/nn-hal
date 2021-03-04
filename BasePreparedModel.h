@@ -30,6 +30,7 @@
 #include "Driver.h"
 #include "IENetwork.h"
 #include "utils.h"
+#include "ModelManager.h"
 
 using ::android::hardware::MQDescriptorSync;
 using ::android::hidl::memory::V1_0::IMemory;
@@ -57,65 +58,24 @@ template <class T>
 using vec = std::vector<T>;
 typedef uint8_t* memory;
 
-// The type and dimensions of an operand.
-struct Shape {
-    OperandType type;
-    std::vector<uint32_t> dimensions;
-    float scale;
-    int32_t offset;
-};
-
-// Information we maintain about each operand during execution that
-// may change during execution.
-struct RunTimeOperandInfo {
-    OperandType type;
-    std::vector<uint32_t> dimensions;
-    float scale;
-    int32_t zeroPoint;
-    uint8_t* buffer;
-    uint32_t length;
-    OperandLifeTime lifetime;
-    uint32_t numberOfUsesLeft;
-    Operand::ExtraParams extraParams;
-    Shape shape() const {
-        return {
-            .type = type,
-            .dimensions = dimensions,
-            .scale = scale,
-            .offset = zeroPoint,
-        };
-    }
-};
-
-// Used to keep a pointer to each of the memory pools.
-struct RunTimePoolInfo {
-    sp<IMemory> memory;
-    hidl_memory hidlMemory;
-    uint8_t* buffer;
-
-    bool set(const hidl_memory& hidlMemory);
-    bool update();
-};
-
-bool setRunTimePoolInfosFromHidlMemories(std::vector<RunTimePoolInfo>* poolInfos,
-                                         const hidl_vec<hidl_memory>& pools);
-
 class BasePreparedModel : public V1_2::IPreparedModel {
 public:
     BasePreparedModel(const Model& model)
-        : mTargetDevice("CPU"), mModel(model), mEnginePtr(nullptr) {
+        : mTargetDevice("CPU"), mEnginePtr(nullptr) {
         g_layer_precision = InferenceEngine::Precision::FP16;
-        mNgc = std::make_shared<NgraphNetworkCreator>(mModel, mTargetDevice);
+        mModelInfo = std::make_shared<NnapiModelInfo>(model);
+        mNgc = std::make_shared<NgraphNetworkCreator>(mModelInfo.get(), mTargetDevice);
     }
     BasePreparedModel(const std::string device, const Model& model)
-        : mTargetDevice(device), mModel(model), mEnginePtr(nullptr) {
+        : mTargetDevice(device), mEnginePtr(nullptr) {
         if (mTargetDevice == "CPU" || mTargetDevice == "GPU")
             g_layer_precision = InferenceEngine::Precision::FP32;
         else if (mTargetDevice == "MYRIAD")
             g_layer_precision = InferenceEngine::Precision::FP16;
         else
             g_layer_precision = InferenceEngine::Precision::UNSPECIFIED;
-        mNgc = std::make_shared<NgraphNetworkCreator>(mModel, mTargetDevice);
+        mModelInfo = std::make_shared<NnapiModelInfo>(model);
+        mNgc = std::make_shared<NgraphNetworkCreator>(mModelInfo.get(), mTargetDevice);
     }
 
     virtual ~BasePreparedModel() { deinitialize(); }
@@ -134,27 +94,8 @@ public:
 
     static bool isOperationSupported(const Operation& operation, const Model& model);
     virtual bool initialize(const Model& model);
-    template <typename T>
-    T ParseOperationInput(const Model& model, const Operation& operation, uint32_t index);
-    template <typename T>
-    std::vector<T> GetConstVecOperand(const Model& model, uint32_t index);  // for reshape
-
 protected:
     virtual void deinitialize();
-    bool initializeRunTimeOperandInfo();
-    template <typename T>
-    T GetConstOperand(const Model& model, uint32_t index);
-
-    template <typename T>
-    T GetConstFromBuffer(const uint8_t* buf, uint32_t len);
-    template <typename T>
-    std::vector<T> GetConstVecFromBuffer(const uint8_t* buf, uint32_t len);
-    const uint8_t* GetOperandMemory(const Model& model, uint32_t index, uint32_t& len_out);
-    virtual Blob::Ptr GetConstWeightsOperandAsTensor(uint32_t index, const Model& model);
-    virtual Blob::Ptr GetConstOperandAsTensor(int operand_index, int operation_idx,
-                                              const Model& model);
-    virtual Blob::Ptr GetInOutOperandAsBlob(RunTimeOperandInfo& op, const uint8_t* buf,
-                                            uint32_t& len);
     template <typename T_IExecutionCallback>
     Return<ErrorStatus> executeBase(const Request& request, MeasureTiming measure,
                                     const sp<T_IExecutionCallback>& callback);
@@ -164,7 +105,7 @@ protected:
 
     std::shared_ptr<NgraphNetworkCreator> mNgc;
     std::string mTargetDevice;
-    Model mModel;
+    std::shared_ptr<NnapiModelInfo> mModelInfo;
     std::vector<RunTimeOperandInfo> mOperands;
     std::vector<RunTimePoolInfo> mPoolInfos;
     ExecuteNetwork* mEnginePtr;

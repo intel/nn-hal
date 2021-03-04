@@ -41,11 +41,11 @@ public:
     ~CpuPreparedModel() { deinitialize(); }
 
     bool initialize(const Model& model) override;
-    Blob::Ptr GetConstWeightsOperandAsTensor(uint32_t index, const Model& model) override;
-    Blob::Ptr GetConstOperandAsTensor(int operand_index, int operation_idx,
-                                      const Model& model) override;
-    Blob::Ptr GetInOutOperandAsBlob(RunTimeOperandInfo& op, const uint8_t* buf,
-                                    uint32_t& len) override;
+//    Blob::Ptr GetConstWeightsOperandAsTensor(uint32_t index, const Model& model) override;
+//    Blob::Ptr GetConstOperandAsTensor(int operand_index, int operation_idx,
+//                                      const Model& model) override;
+//    Blob::Ptr GetInOutOperandAsBlob(RunTimeOperandInfo& op, const uint8_t* buf,
+//                                    uint32_t& len) override;
 
 protected:
     void deinitialize() override;

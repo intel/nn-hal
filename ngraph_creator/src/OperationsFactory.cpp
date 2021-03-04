@@ -10,7 +10,7 @@ OperationsFactory::OperationsFactory(const std::string& plugin, std::shared_ptr<
     OperationsBase::sPluginType = plugin;
 }
 std::shared_ptr<OperationsBase> OperationsFactory::getOperation(const OperationType& type,
-                                                                const Model& model) {
+                                                                NnapiModelInfo* model) {
     auto opIter = mOperationsMap.find(type);
     if (opIter != mOperationsMap.end()) return opIter->second;
 
