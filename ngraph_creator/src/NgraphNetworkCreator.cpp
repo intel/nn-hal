@@ -56,7 +56,12 @@ bool NgraphNetworkCreator::initializeModel() {
             ALOGE("initializeModel Failure at type %d", operation.type);
             return false;
         }
-        op->connectOperationToGraph(operation);
+        try {
+            op->connectOperationToGraph(operation);
+        } catch (const std::exception &ex) {
+            ALOGE("%s Exception !!! %s", __func__, ex.what());
+            return false;
+        }
     }
     ALOGD("initializeModel Success");
     return true;

@@ -5,7 +5,7 @@ namespace android {
 namespace hardware {
 namespace neuralnetworks {
 namespace nnhal {
-NgraphNodes::NgraphNodes(size_t size) { mOperationOutputs.reserve(size); }
+NgraphNodes::NgraphNodes(size_t size) { mOperationOutputs.resize(size); }
 
 void NgraphNodes::addInputParam(size_t index, std::shared_ptr<ngraph::opset3::Parameter> inParam) {
     mInputParamsMap[index] = inParam;

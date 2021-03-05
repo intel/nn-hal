@@ -163,11 +163,11 @@ Blob::Ptr NnapiModelInfo::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const ui
                 blob->allocate();
                 return blob;
             } else {
-                if (inputDims.size() != 4) {
+                //if (inputDims.size() != 4) {
                     InferenceEngine::TBlob<float>::Ptr blob =
                         std::make_shared<InferenceEngine::TBlob<float>>(td, (float*)buf);
                     return blob;
-                } else {
+                /*} else {
                     InferenceEngine::TBlob<float>::Ptr blob =
                         std::make_shared<InferenceEngine::TBlob<float>>(td);
                     blob->allocate();
@@ -196,7 +196,7 @@ Blob::Ptr NnapiModelInfo::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const ui
                     }
 
                     return blob;
-                }
+                }*/
             }
         } else if (op.lifetime == OperandLifeTime::MODEL_OUTPUT) {
             ALOGD("Create output blob !!!!");

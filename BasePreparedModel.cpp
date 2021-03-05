@@ -259,66 +259,46 @@ Return<void> BasePreparedModel::executeSynchronously(const Request& request, Mea
         return Void();
     }
 
-    auto inOutData = [this, &requestPoolInfos](const std::vector<uint32_t>& indexes,
-                                               const hidl_vec<RequestArgument>& arguments,
-                                               bool inputFromRequest, ExecuteNetwork* enginePtr) {
-        // do memcpy for input data
-        for (size_t i = 0; i < indexes.size(); i++) {
-            RunTimeOperandInfo& operand = mOperands[indexes[i]];
-            const RequestArgument& arg = arguments[i];
-            auto poolIndex = arg.location.poolIndex;
-            nnAssert(poolIndex < requestPoolInfos.size());
-            auto& r = requestPoolInfos[poolIndex];
-            if (arg.dimensions.size() > 0) {
-                // It's the responsibility of the caller to validate that
-                // from.dimensions only modifies the dimensions that were
-                // unspecified in the model.  That's the case in SampleDriver.cpp
-                // with the call to validateRequest().
-                operand.dimensions = arg.dimensions;
-            }
-            operand.buffer = r.buffer + arg.location.offset;  // r.getBuffer()
-            operand.length = arg.location.length;  // sizeOfData(operand.type, operand.dimensions);
-            ALOGI("Copy request input/output to model input/output");
-            if (inputFromRequest) {
-                auto inputBlob = mModelInfo->GetInOutOperandAsBlob(
-                    operand, const_cast<uint8_t*>(r.buffer + arg.location.offset),
-                    operand.length);  // if not doing memcpy
-                ALOGD("Copy inputBlob for mNgc->getNodeName([%d])->name %s", indexes[i],
-                      mNgc->getNodeName(indexes[i]).c_str());
-                auto destBlob = enginePtr->getBlob(mNgc->getNodeName(indexes[i]));
-                uint8_t* dest = destBlob->buffer().as<uint8_t*>();
-                uint8_t* src = inputBlob->buffer().as<uint8_t*>();
-                std::memcpy(dest, src, inputBlob->byteSize());
-            } else {
-                ALOGD("copyData from IE to Android blob for mNgc->getNodeName([%d])->name %s",
-                      indexes[i], mNgc->getNodeName(indexes[i]).c_str());
-                auto srcBlob = enginePtr->getBlob(mNgc->getNodeName(indexes[i]));
-                auto outputBlob = mModelInfo->GetInOutOperandAsBlob(
-                    operand, const_cast<uint8_t*>(r.buffer + arg.location.offset),
-                    operand.length);  // if not doing memcpy
-                uint8_t* dest = outputBlob->buffer().as<uint8_t*>();
-                uint8_t* src = srcBlob->buffer().as<uint8_t*>();
-                std::memcpy(dest, src, outputBlob->byteSize());
-            }
-        }
-    };
+    for (size_t i = 0; i < request.inputs.size(); i++) {
+        auto inIndex = mModelInfo->getModelInputIndex(i);
+        auto srcBlob = mModelInfo->getBlobFromMemoryPoolIn(request, i);
+
+            ALOGD("Found input index: %d layername : %s", inIndex, mNgc->getNodeName(inIndex).c_str());
+            auto destBlob = mEnginePtr->getBlob(mNgc->getNodeName(inIndex));
+            uint8_t* dest = destBlob->buffer().as<uint8_t*>();
+            uint8_t* src = srcBlob->buffer().as<uint8_t*>();
+            std::memcpy(dest, src, srcBlob->byteSize());
+    }
 
     ALOGI("pass request inputs buffer to network/model respectively");
 
-    inOutData(mModelInfo->getModelInputIndexes(), request.inputs, true, mEnginePtr);
+    //inOutData(mModelInfo->getModelInputIndexes(), request.inputs, true, mEnginePtr);
     ALOGD("Run");
 
     mEnginePtr->Infer();
 
     ALOGI("pass request outputs buffer to network/model respectively");
-    inOutData(mModelInfo->getModelOutputIndexes(), request.outputs, false, mEnginePtr);
+    //inOutData(mModelInfo->getModelOutputIndexes(), request.outputs, false, mEnginePtr);
+
+    for (size_t i = 0; i < request.outputs.size(); i++) {
+        auto outIndex = mModelInfo->getModelOutputIndex(i);
+        ALOGI("OutputIndex: %d", outIndex);
+        void* destPtr = mModelInfo->getBlobFromMemoryPoolOut(request, i);
+
+            ALOGD("Found output index: %d layername : %s", outIndex, mNgc->getNodeName(outIndex).c_str());
+            auto srcBlob = mEnginePtr->getBlob(mNgc->getNodeName(outIndex));
+            std::memcpy((uint8_t*)destPtr, srcBlob->buffer().as<uint8_t*>(), srcBlob->byteSize());
+            float* a = static_cast<float*>(destPtr);
+            ALOGD("########### -- %f", *a);
+    }
+    if (!mModelInfo->updateRequestPoolInfos()) {
+        ALOGE("Failed to update the request pool infos");
+        cb(ErrorStatus::GENERAL_FAILURE, {}, kNoTiming);
+        return Void();
+    }
 
     if (measure == MeasureTiming::YES) deviceEnd = now();
 
-    ALOGI("update shared memories");
-    for (auto runtimeInfo : requestPoolInfos) {
-        runtimeInfo.update();
-    }
 
     InferenceEngine::TBlob<float>::Ptr outBlob =
         mEnginePtr->getBlob(mNgc->getNodeName(mModelInfo->getModelOutputIndex(0)));

@@ -21,9 +21,10 @@ std::shared_ptr<ngraph::Node> Reshape::createNode(const Operation& operation) {
         inputOp = transpose(NCHW_NHWC, inputOp);
 
     if (outDims.size() == 3) outDims.insert(outDims.begin(), 1);
+    VLOGDIMS(L3, outDims, "Reshape::createNode dims");
 
     auto shapeNode = std::make_shared<ngraph::opset3::Constant>(
-        ngraph::element::i64, ngraph::Shape{outDims.size()}, outDims.data());
+        ngraph::element::i32, ngraph::Shape{outDims.size()}, outDims.data());
 
     auto reshape = std::make_shared<ngraph::opset3::Reshape>(inputOp, shapeNode, true);
 
