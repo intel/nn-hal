@@ -32,7 +32,7 @@ void OperationsBase::connectOperationToGraph(const Operation& op) {
     mNgraphNodes->setOperationOutput(op.outputs[0], createNodeForPlugin(op)->get_default_output());
 }
 
-OperationsBase::OperationsBase(NnapiModelInfo* model) : mModelInfo(model) {}
+OperationsBase::OperationsBase(std::shared_ptr<NnapiModelInfo> model) : mModelInfo(model) {}
 
 void OperationsBase::setNgraphNodes(std::shared_ptr<NgraphNodes> nodes) { mNgraphNodes = nodes; }
 

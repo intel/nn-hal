@@ -14,7 +14,7 @@ private:
 
 public:
     OperationsFactory(const std::string& plugin, std::shared_ptr<NgraphNodes> nodes);
-    std::shared_ptr<OperationsBase> getOperation(const OperationType& type, NnapiModelInfo* model);
+    std::shared_ptr<OperationsBase> getOperation(const OperationType& type, std::shared_ptr<NnapiModelInfo> model);
 };
 
 }  // namespace nnhal

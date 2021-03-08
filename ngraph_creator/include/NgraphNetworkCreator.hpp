@@ -9,13 +9,13 @@ namespace nnhal {
 
 class NgraphNetworkCreator {
 private:
-    NnapiModelInfo* mModelInfo;
+    std::shared_ptr<NnapiModelInfo> mModelInfo;
     std::shared_ptr<NgraphNodes> mNgraphNodes;
     OperationsFactory mOpFctryInst;
     void createInputParams();
 
 public:
-    NgraphNetworkCreator(NnapiModelInfo* model, const std::string& plugin);
+    NgraphNetworkCreator(std::shared_ptr<NnapiModelInfo> model, const std::string& plugin);
 
     bool validateOperations();
     bool initializeModel();

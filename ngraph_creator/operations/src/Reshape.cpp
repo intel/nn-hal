@@ -5,7 +5,7 @@ namespace hardware {
 namespace neuralnetworks {
 namespace nnhal {
 
-Reshape::Reshape(NnapiModelInfo* model) : OperationsBase(model) {}
+Reshape::Reshape(std::shared_ptr<NnapiModelInfo> model) : OperationsBase(model) {}
 
 bool Reshape::validate(const Operation& op) { return true; }
 

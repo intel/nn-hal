@@ -7,7 +7,7 @@ namespace nnhal {
 
 class Concat : public OperationsBase {
 public:
-    Concat(NnapiModelInfo* model);
+    Concat(std::shared_ptr<NnapiModelInfo> model);
     bool validate(const Operation& op) override;
     std::shared_ptr<ngraph::Node> createNode(const Operation& operation) override;
 };

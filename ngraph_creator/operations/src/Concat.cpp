@@ -6,7 +6,7 @@ namespace hardware {
 namespace neuralnetworks {
 namespace nnhal {
 
-Concat::Concat(NnapiModelInfo* model) : OperationsBase(model) {}
+Concat::Concat(std::shared_ptr<NnapiModelInfo> model) : OperationsBase(model) {}
 
 bool Concat::validate(const Operation& op) { return true; }
 

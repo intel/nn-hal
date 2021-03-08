@@ -6,7 +6,7 @@ namespace hardware {
 namespace neuralnetworks {
 namespace nnhal {
 
-NgraphNetworkCreator::NgraphNetworkCreator(NnapiModelInfo* model, const std::string& plugin)
+NgraphNetworkCreator::NgraphNetworkCreator(std::shared_ptr<NnapiModelInfo> model, const std::string& plugin)
     : mModelInfo(model),
       mNgraphNodes(std::make_shared<NgraphNodes>(mModelInfo->getModel().operands.size())),
       mOpFctryInst(plugin, mNgraphNodes) {

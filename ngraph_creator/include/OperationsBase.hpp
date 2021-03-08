@@ -27,7 +27,7 @@ protected:
 
 public:
     static std::string sPluginType;
-    OperationsBase(NnapiModelInfo* model);
+    OperationsBase(std::shared_ptr<NnapiModelInfo> model);
     void setNgraphNodes(std::shared_ptr<NgraphNodes> nodes);
     virtual bool validate(const Operation& op);
     // override connectOperationToGraph in case Operation has multiple outputs

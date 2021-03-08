@@ -64,7 +64,7 @@ public:
         : mTargetDevice("CPU"), mEnginePtr(nullptr) {
         g_layer_precision = InferenceEngine::Precision::FP16;
         mModelInfo = std::make_shared<NnapiModelInfo>(model);
-        mNgc = std::make_shared<NgraphNetworkCreator>(mModelInfo.get(), mTargetDevice);
+        mNgc = std::make_shared<NgraphNetworkCreator>(mModelInfo, mTargetDevice);
     }
     BasePreparedModel(const std::string device, const Model& model)
         : mTargetDevice(device), mEnginePtr(nullptr) {
@@ -75,7 +75,7 @@ public:
         else
             g_layer_precision = InferenceEngine::Precision::UNSPECIFIED;
         mModelInfo = std::make_shared<NnapiModelInfo>(model);
-        mNgc = std::make_shared<NgraphNetworkCreator>(mModelInfo.get(), mTargetDevice);
+        mNgc = std::make_shared<NgraphNetworkCreator>(mModelInfo, mTargetDevice);
     }
 
     virtual ~BasePreparedModel() { deinitialize(); }

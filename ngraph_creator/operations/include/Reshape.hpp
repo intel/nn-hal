@@ -7,7 +7,7 @@ namespace nnhal {
 
 class Reshape : public OperationsBase {
 public:
-    Reshape(NnapiModelInfo* model);
+    Reshape(std::shared_ptr<NnapiModelInfo> model);
     bool validate(const Operation& op) override;
     std::shared_ptr<ngraph::Node> createNode(const Operation& operation) override;
 };
