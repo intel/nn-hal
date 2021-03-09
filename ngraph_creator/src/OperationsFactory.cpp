@@ -1,13 +1,20 @@
 #include <OperationsFactory.hpp>
+#define LOG_TAG "OperationsFactory"
 
 namespace android {
 namespace hardware {
 namespace neuralnetworks {
 namespace nnhal {
 
-OperationsFactory::OperationsFactory(const std::string& plugin, std::shared_ptr<NgraphNodes> nodes)
-    : mNgraphNodes(nodes) {
+OperationsFactory::OperationsFactory(const std::string& plugin,
+                                     std::shared_ptr<NgraphNodes> nodes) {
     OperationsBase::sPluginType = plugin;
+    OperationsBase::mNgraphNodes = nodes;
+    ALOGV("%s Constructed", __func__);
+}
+OperationsFactory::~OperationsFactory() {
+    OperationsBase::mNgraphNodes.reset();
+    ALOGV("%s Destructed & reset", __func__);
 }
 std::shared_ptr<OperationsBase> OperationsFactory::getOperation(const OperationType& type,
                                                                 const Model& model) {
@@ -27,7 +34,6 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(const OperationT
         default:
             return nullptr;
     }
-    mOperationsMap[type]->setNgraphNodes(mNgraphNodes);
     return mOperationsMap[type];
 }
 

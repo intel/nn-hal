@@ -15,6 +15,7 @@ private:
 
 public:
     NgraphNetworkCreator(const Model& model, const std::string& plugin);
+    ~NgraphNetworkCreator();
 
     bool validateOperations();
     bool initializeModel();

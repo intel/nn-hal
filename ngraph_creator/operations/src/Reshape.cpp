@@ -13,21 +13,25 @@ std::shared_ptr<ngraph::Node> Reshape::createNode(const Operation& operation) {
     auto outDims = GetConstVecOperand(mModel, operation.inputs[1]);
     auto inputIndex = operation.inputs[0];
     auto inputOp = mNgraphNodes->getOperationOutput(inputIndex);
-    const auto op = mModel.operands[inputIndex];
+    const auto inputOperand = mModel.operands[inputIndex];
+    const auto outputIndex = operation.outputs[0];
 
-    if (op.lifetime != OperandLifeTime::CONSTANT_COPY &&
-        op.lifetime != OperandLifeTime::CONSTANT_REFERENCE &&
-        op.lifetime != OperandLifeTime::MODEL_INPUT)
+    if (mNgraphNodes->isForcedNchw(inputIndex)) {
         inputOp = transpose(NCHW_NHWC, inputOp);
-
-    if (outDims.size() == 3) outDims.insert(outDims.begin(), 1);
+        mNgraphNodes->setForcedNchw(outputIndex, false);
+    }
 
     auto shapeNode = std::make_shared<ngraph::opset3::Constant>(
         ngraph::element::i64, ngraph::Shape{outDims.size()}, outDims.data());
 
-    auto reshape = std::make_shared<ngraph::opset3::Reshape>(inputOp, shapeNode, true);
+    std::shared_ptr<ngraph::Node> outputNode =
+        std::make_shared<ngraph::opset3::Reshape>(inputOp, shapeNode, true);
 
-    return transpose(NHWC_NCHW, reshape);
+    const auto outputOperand = mModel.operands[outputIndex];
+    if (outputOperand.lifetime == OperandLifeTime::MODEL_OUTPUT)
+        addResultNode(outputIndex, outputNode);
+
+    return outputNode;
 }
 }  // namespace nnhal
 }  // namespace neuralnetworks

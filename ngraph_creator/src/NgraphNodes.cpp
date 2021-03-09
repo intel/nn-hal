@@ -1,13 +1,22 @@
+//#define LOG_NDEBUG 0
 #include <NgraphNodes.hpp>
+#define LOG_TAG "NgraphNodes"
 
 namespace android {
 namespace hardware {
 namespace neuralnetworks {
 namespace nnhal {
-NgraphNodes::NgraphNodes(size_t size) { mOperationOutputs.reserve(size); }
+NgraphNodes::NgraphNodes(size_t operandsSize, size_t resultsSize) {
+    mOperationOutputs.resize(operandsSize);
+    mForcedNchw.assign(operandsSize, false);
+    mResultNodes.reserve(resultsSize);
+    ALOGV("%s Constructed operandsSize %d, resultsSize %d", __func__, operandsSize, resultsSize);
+}
 
-void NgraphNodes::addInputParam(size_t index, std::shared_ptr<ngraph::opset3::Parameter> inParam) {
-    mInputParamsMap[index] = inParam;
+NgraphNodes::~NgraphNodes() { ALOGV("%s Destructed", __func__); }
+
+void NgraphNodes::addInputParam(std::shared_ptr<ngraph::opset3::Parameter> inParam) {
+    mInputParams.push_back(inParam);
 }
 void NgraphNodes::setOperationOutput(size_t index, ngraph::Output<ngraph::Node> output) {
     mOperationOutputs[index] = output;
@@ -15,37 +24,26 @@ void NgraphNodes::setOperationOutput(size_t index, ngraph::Output<ngraph::Node> 
 ngraph::Output<ngraph::Node> NgraphNodes::getOperationOutput(size_t index) {
     return mOperationOutputs[index];
 }
+bool NgraphNodes::isForcedNchw(size_t index) { return mForcedNchw[index]; }
+void NgraphNodes::setForcedNchw(size_t index, bool flag) { mForcedNchw[index] = flag; }
 
-void NgraphNodes::setResultNode(size_t outputIndex) {
-    // TODO: Construct this similar to other operations
-    ngraph::AxisVector order = {0, 2, 3, 1};  // NCHW_NHWC
-    const auto order_node =
-        ngraph::opset3::Constant::create(ngraph::element::i64, ngraph::Shape{order.size()}, order);
-    std::shared_ptr<ngraph::Node> resultNode =
-        std::make_shared<ngraph::opset3::Transpose>(mOperationOutputs[outputIndex], order_node);
-    mResultsMap[outputIndex] = resultNode;
+void NgraphNodes::setResultNode(size_t outputIndex, std::shared_ptr<ngraph::Node> resultNode) {
+    ALOGD("setResultNode %d", outputIndex);
+    mResultNodes.push_back(resultNode);
 }
 
 const std::string& NgraphNodes::getNodeName(size_t index) {
-    // The getNodeName is expected to be called only for Inputs and Outputs.
-    // Hence, scan through mInputParamsMap and mResultsMap to identify a valid node name.
-    if (mResultsMap.find(index) != mResultsMap.end()) return mResultsMap[index]->get_name();
-    if (mInputParamsMap.find(index) != mInputParamsMap.end())
-        return mInputParamsMap[index]->get_name();
-    return INVALID_STRING;
+    if (mNodeNames.find(index) == mNodeNames.end())
+        mNodeNames[index] = mOperationOutputs[index].get_node_shared_ptr()->get_name();
+    ALOGV("%s index %d, name %s", __func__, index, mNodeNames[index].c_str());
+    return mNodeNames[index];
 }
 
 std::shared_ptr<ngraph::Function> NgraphNodes::generateGraph() {
-    std::vector<std::shared_ptr<ngraph::Node>> resultNodes;
-    resultNodes.reserve(mResultsMap.size());
-    for (auto const& temp : mResultsMap) resultNodes.push_back(temp.second);
     // TODO: Remove the Dummy Concat
     // Dummy Concat to join the disconnected graph(ssd_mobilenet Obj Det with only Concat)
-    resultNodes.push_back(std::make_shared<ngraph::opset3::Concat>(resultNodes, 3));
-    ngraph::ParameterVector inputParams;
-    inputParams.reserve(mInputParamsMap.size());
-    for (auto const& temp : mInputParamsMap) inputParams.push_back(temp.second);
-    return std::make_shared<ngraph::Function>(resultNodes, inputParams);
+    mResultNodes.push_back(std::make_shared<ngraph::opset3::Concat>(mResultNodes, 2));
+    return std::make_shared<ngraph::Function>(mResultNodes, mInputParams);
 }
 
 }  // namespace nnhal
