@@ -6,9 +6,9 @@
 #include <log/log.h>
 #include <fstream>
 #include <thread>
+#include "ExecutionBurstServer.h"
 #include "ValidateHal.h"
 #include "utils.h"
-#include "ExecutionBurstServer.h"
 
 using namespace android::nn;
 
@@ -73,8 +73,7 @@ Return<void> CpuPreparedModel::configureExecutionBurst(
     const MQDescriptorSync<V1_2::FmqResultDatum>& resultChannel, configureExecutionBurst_cb cb) {
     ALOGV("Entering %s", __func__);
     const sp<V1_2::IBurstContext> burst =
-            ExecutionBurstServer::create(callback, requestChannel,
-                                         resultChannel, this);
+        ExecutionBurstServer::create(callback, requestChannel, resultChannel, this);
 
     if (burst == nullptr) {
         cb(ErrorStatus::GENERAL_FAILURE, {});

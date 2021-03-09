@@ -11,8 +11,8 @@ Concat::Concat(const Model& model) : OperationsBase(model) {}
 bool Concat::validate(const Operation& op) { return true; }
 
 std::shared_ptr<ngraph::Node> Concat::createNode(const Operation& operation) {
-    auto n = operation.inputs.size() - 1; //0 ~ n-1: The list of n input tensors
-    auto axis = ParseOperationInput(mModel, operation, n); //n: concatenation axis
+    auto n = operation.inputs.size() - 1;                   // 0 ~ n-1: The list of n input tensors
+    auto axis = ParseOperationInput(mModel, operation, n);  // n: concatenation axis
     std::vector<ngraph::Output<ngraph::Node>> inputs;
     const auto outputIndex = operation.outputs[0];
     ALOGD("createNode n %d, axis %d", n, axis);
@@ -21,7 +21,7 @@ std::shared_ptr<ngraph::Node> Concat::createNode(const Operation& operation) {
         auto inputOp = mNgraphNodes->getOperationOutput(inputIndex);
         const auto op = mModel.operands[inputIndex];
         ALOGD("createNode inputIndex %d, lifetime %d", inputIndex, op.lifetime);
-        if(mNgraphNodes->isForcedNchw(inputIndex)) {
+        if (mNgraphNodes->isForcedNchw(inputIndex)) {
             inputOp = transpose(NCHW_NHWC, inputOp);
             mNgraphNodes->setForcedNchw(outputIndex, false);
         }

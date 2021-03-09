@@ -23,9 +23,9 @@ std::shared_ptr<ngraph::Node> OperationsBase::transpose(ConversionType type,
     return std::make_shared<ngraph::opset3::Transpose>(input, order_node);
 }
 
-std::shared_ptr<ngraph::Node> OperationsBase::toNCHW(size_t inputIndex,size_t outputIndex) {
+std::shared_ptr<ngraph::Node> OperationsBase::toNCHW(size_t inputIndex, size_t outputIndex) {
     auto inNode = mNgraphNodes->getOperationOutput(inputIndex).get_node_shared_ptr();
-    if(mNgraphNodes->isForcedNchw(inputIndex))
+    if (mNgraphNodes->isForcedNchw(inputIndex))
         return inNode;
     else {
         mNgraphNodes->setForcedNchw(outputIndex, true);
