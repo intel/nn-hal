@@ -18,11 +18,11 @@
 
 #include <android-base/logging.h>
 #include <android/log.h>
+#include <cutils/properties.h>
 #include <log/log.h>
 #include <thread>
-#include "ValidateHal.h"
 #include "ExecutionBurstServer.h"
-#include <cutils/properties.h>
+#include "ValidateHal.h"
 
 #define DISABLE_ALL_QUANT
 #define LOG_TAG "BasePreparedModel"
@@ -670,8 +670,7 @@ Return<void> BasePreparedModel::configureExecutionBurst(
     const MQDescriptorSync<V1_2::FmqResultDatum>& resultChannel, configureExecutionBurst_cb cb) {
     ALOGV("Entering %s", __func__);
     const sp<V1_2::IBurstContext> burst =
-            ExecutionBurstServer::create(callback, requestChannel,
-                                         resultChannel, this);
+        ExecutionBurstServer::create(callback, requestChannel, resultChannel, this);
 
     if (burst == nullptr) {
         cb(ErrorStatus::GENERAL_FAILURE, {});

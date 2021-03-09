@@ -16,7 +16,7 @@ std::shared_ptr<ngraph::Node> Reshape::createNode(const Operation& operation) {
     const auto inputOperand = mModel.operands[inputIndex];
     const auto outputIndex = operation.outputs[0];
 
-    if(mNgraphNodes->isForcedNchw(inputIndex)) {
+    if (mNgraphNodes->isForcedNchw(inputIndex)) {
         inputOp = transpose(NCHW_NHWC, inputOp);
         mNgraphNodes->setForcedNchw(outputIndex, false);
     }

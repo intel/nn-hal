@@ -51,6 +51,7 @@ public:
         const MQDescriptorSync<V1_2::FmqRequestDatum>& requestChannel,
         const MQDescriptorSync<V1_2::FmqResultDatum>& resultChannel,
         configureExecutionBurst_cb cb) override;
+
 protected:
     void deinitialize() override;
 };
