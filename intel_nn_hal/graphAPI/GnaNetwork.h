@@ -61,7 +61,9 @@ inline std::ostream & operator << (std::ostream &out, const std::vector<T> &vec)
     return out << "]";
 }
 
-class GnaNetwork
+using BaseOp = ::android::hardware::neuralnetworks::nnhal::BaseOp;
+
+class GnaNetwork : public BaseOp
 {
     //InferenceEnginePluginPtr enginePtr;
     std::shared_ptr<ICNNNetwork> network;
@@ -81,6 +83,7 @@ public:
     std::vector<double> inferTime;
     std::vector<double> inferTimeGNA;
     std::map<std::string, InferenceEngineProfileInfo> totalPerfCounters;
+    bool isCpuOp() { return false; }
 
     std::vector<InferenceEngine::Blob::Ptr> ptrInputBlobs;
     GnaNetwork() : network(nullptr){}

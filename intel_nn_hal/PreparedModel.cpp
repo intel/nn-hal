@@ -835,6 +835,9 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
                 break;
             case OperationType::FULLY_CONNECTED:
                 break;
+            case OperationType::DEQUANTIZE:
+                VLOG(L1, "Supporting DEQUantize !!!!");
+                break;
             default:
                 VLOG(L1, "OP (%d) not supported", operation.type);
                 return false;
