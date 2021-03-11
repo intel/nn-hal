@@ -9,6 +9,7 @@
 #include <sys/mman.h>
 #include <fstream>
 #include <string>
+#include <utility>
 #include <android-base/logging.h>
 #include <android/log.h>
 #include <log/log.h>
@@ -22,7 +23,7 @@
 
 //#define PERF_COUNTERS
 //#define CACHING
-//#define NN_DEBUG
+#define NN_DEBUG
 
 enum DebugLevel {
     L0,
@@ -183,6 +184,65 @@ namespace android {
 namespace hardware {
 namespace neuralnetworks {
 namespace nnhal {
+
+class BaseOp {
+    public:
+        virtual bool isCpuOp() = 0;
+        
+        virtual float* run() {
+            return nullptr;
+        };
+
+        virtual std::string getLayerName() { return "";}
+        virtual ~BaseOp() {}
+
+        //TODO: Use Blob::Ptr to make it generic
+        virtual bool setInputData(uint8_t* dataPtr, uint32_t len) {
+            return false;
+        }
+
+        virtual std::tuple<float*, int32_t> getOutputData() {
+            return std::make_pair(nullptr, 0);
+        }
+};
+
+class OpContainer {
+    std::vector<BaseOp*> opsVec;
+    float* output = nullptr;
+    bool targetCpu = false;
+
+    public:
+
+        OpContainer(bool cpu) : targetCpu(cpu) {}
+
+        void addOperation(BaseOp* op) {
+            opsVec.push_back(op);
+        }
+
+        float* run() {
+            VLOG(L1, "%s", __func__);
+            for (auto op: opsVec) {
+                output = op->run();
+            }
+
+            return output;
+        }
+
+        BaseOp* getCpuOpFromLayerName(std::string layer) {
+            for (auto op: opsVec) {
+                VLOG(L1, "%s searching layername:%s", op->getLayerName().c_str());
+                if (!layer.compare(op->getLayerName())) {
+                    VLOG(L1, "%s searching layername:%s SUCCESS", op->getLayerName().c_str());
+                    return op;
+                }
+            }
+
+            return nullptr;
+        }
+
+        bool isCpuGraph() { return targetCpu; }
+
+};
 
 template <class T>
 using vec = std::vector<T>;
