@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Temp.h>  //TODO: Remove this once NNAPI_Utils is ready
+#include <log/log.h>
 #include <cstdio>
 #include <ngraph/ngraph.hpp>
 #include <ngraph/opsets/opset3.hpp>

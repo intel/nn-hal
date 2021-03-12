@@ -1,5 +1,10 @@
+#pragma once
+
 #include <NgraphNodes.hpp>
+#include "ModelManager.h"
+#include "OperationsBase.hpp"
 #include <OperationsFactory.hpp>
+#include <ngraph/node.hpp>
 
 namespace android {
 namespace hardware {
@@ -8,15 +13,15 @@ namespace nnhal {
 
 class NgraphNetworkCreator {
 private:
-    Model mModel;
-    std::vector<std::shared_ptr<OperationsBase>> mOperations;
+    std::shared_ptr<NnapiModelInfo> mModelInfo;
+    std::vector<std::shared_ptr<OperationsBase>> mOperationNodes;
     std::shared_ptr<NgraphNodes> mNgraphNodes;
-    OperationsFactory mOpFctryInst;
+    OperationsFactory mOpFactoryInstance;
     void createInputParams();
     bool initializeModel();
 
 public:
-    NgraphNetworkCreator(const Model& model, const std::string& plugin);
+    NgraphNetworkCreator(std::shared_ptr<NnapiModelInfo> modelInfo, const std::string& plugin);
     ~NgraphNetworkCreator();
     void getSupportedOperations(std::vector<bool>& supportedOperations);
     bool validateOperations();

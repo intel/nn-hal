@@ -92,7 +92,7 @@ enum PaddingScheme {
 #define VLOGDIMS(l, d, header)                                                          \
     do {                                                                                \
         auto size = (d).size();                                                         \
-        ALOGI(l, "%s: vectors {%d, %d, %d, %d}", header, (d)[0], size > 1 ? (d)[1] : 0, \
+        ALOGI("%s: vectors {%d, %d, %d, %d}", header, (d)[0], size > 1 ? (d)[1] : 0, \
               size > 2 ? (d)[2] : 0, size > 3 ? (d)[3] : 0);                            \
     } while (0)
 

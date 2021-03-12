@@ -6,17 +6,18 @@ namespace hardware {
 namespace neuralnetworks {
 namespace nnhal {
 
-Reshape::Reshape(const Operation& op) : OperationsBase(op) {
-    mDefaultOutputIndex = mNnapiOp.outputs[0];
+Reshape::Reshape(int operationIndex) : OperationsBase(operationIndex) {
+    mDefaultOutputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
 }
 
 bool Reshape::validate() { return true; }
 
 std::shared_ptr<ngraph::Node> Reshape::createNode() {
-    auto outDims = GetConstVecOperand(*sModel, mNnapiOp.inputs[1]);
-    auto inputIndex = mNnapiOp.inputs[0];
+    const auto& dimsOperandIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 1);
+    auto outDims = sModelInfo->GetConstVecOperand<int32_t>(dimsOperandIndex);
+    VLOGDIMS(L3, outDims, "Reshape::createNode dims");
+    auto inputIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 0);
     auto inputOp = mNgraphNodes->getOperationOutput(inputIndex);
-    const auto inputOperand = sModel->operands[inputIndex];
     ALOGV("%s outDims.size=%d", __func__, outDims.size());
 
     if (mNgraphNodes->isForcedNchw(inputIndex)) {
@@ -25,12 +26,12 @@ std::shared_ptr<ngraph::Node> Reshape::createNode() {
     }
 
     auto shapeNode = std::make_shared<ngraph::opset3::Constant>(
-        ngraph::element::i64, ngraph::Shape{outDims.size()}, outDims.data());
+        ngraph::element::i32, ngraph::Shape{outDims.size()}, outDims.data());
 
     std::shared_ptr<ngraph::Node> outputNode =
         std::make_shared<ngraph::opset3::Reshape>(inputOp, shapeNode, true);
 
-    const auto outputOperand = sModel->operands[mDefaultOutputIndex];
+    const auto outputOperand = sModelInfo->getOperand(mDefaultOutputIndex);
     if (outputOperand.lifetime == OperandLifeTime::MODEL_OUTPUT)
         addResultNode(mDefaultOutputIndex, outputNode);
 

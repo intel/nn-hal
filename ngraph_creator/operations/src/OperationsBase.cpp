@@ -7,7 +7,7 @@ namespace nnhal {
 
 std::string OperationsBase::sPluginType;
 std::shared_ptr<NgraphNodes> OperationsBase::mNgraphNodes;
-Model* OperationsBase::sModel;
+std::shared_ptr<NnapiModelInfo> OperationsBase::sModelInfo;
 
 std::shared_ptr<ngraph::Node> OperationsBase::transpose(ConversionType type,
                                                         ngraph::Output<ngraph::Node> input) {
@@ -47,7 +47,7 @@ void OperationsBase::addResultNode(size_t index, std::shared_ptr<ngraph::Node> r
     mNgraphNodes->setResultNode(index, resultNode);
 }
 
-OperationsBase::OperationsBase(const Operation& op) : mNnapiOp(op) { mDefaultOutputIndex = 0; }
+OperationsBase::OperationsBase(int operationIndex) : mNnapiOperationIndex(operationIndex) { mDefaultOutputIndex = 0; }
 
 void OperationsBase::setNgraphNodes(std::shared_ptr<NgraphNodes> nodes) { mNgraphNodes = nodes; }
 

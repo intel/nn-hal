@@ -8,6 +8,8 @@
 #include <ngraph/ngraph.hpp>
 #include <ngraph/opsets/opset3.hpp>
 
+#include "ModelManager.h"
+
 namespace android {
 namespace hardware {
 namespace neuralnetworks {
@@ -17,7 +19,7 @@ class OperationsBase {
 protected:
     enum ConversionType { NHWC_NCHW, NCHW_NHWC };
     uint32_t mDefaultOutputIndex;
-    const Operation& mNnapiOp;
+    int mNnapiOperationIndex;
     std::shared_ptr<ngraph::Node> transpose(ConversionType type,
                                             ngraph::Output<ngraph::Node> input);
     virtual std::shared_ptr<ngraph::Node> createNode() = 0;
@@ -27,10 +29,10 @@ protected:
     void addResultNode(size_t index, std::shared_ptr<ngraph::Node> resultNode);
 
 public:
-    static Model* sModel;
+    static std::shared_ptr<NnapiModelInfo> sModelInfo;
     static std::shared_ptr<NgraphNodes> mNgraphNodes;
     static std::string sPluginType;
-    OperationsBase(const Operation& op);
+    OperationsBase(int operationIndex);
     void setNgraphNodes(std::shared_ptr<NgraphNodes> nodes);
     virtual bool validate();
     // override connectOperationToGraph in case Operation has multiple outputs
