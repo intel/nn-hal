@@ -10,12 +10,13 @@ cc_library_shared {
         "Driver.cpp",
         "BasePreparedModel.cpp",
         "utils.cpp",
+        "IENetwork.cpp",
+        "ModelManager.cpp",
         "cpu/CpuPreparedModel.cpp",
         "gna/GnaPreparedModel.cpp"
     ],
 
     local_include_dirs: [
-        "graphAPI",
         "ngraph_creator/include",
         "ngraph_creator/operations/include",
         "cpu",
@@ -128,12 +129,15 @@ cc_binary {
     shared_libs: [
         "libhidlbase",
         "libhidltransport",
+        "libhidlmemory",
         "libutils",
         "liblog",
         "libcutils",
         "libhardware",
         "android.hardware.neuralnetworks@1.2",
         "android.hardware.neuralnetworks@1.2-generic-impl",
+        "android.hidl.allocator@1.0",
+        "android.hidl.memory@1.0",
     ],
 
     compile_multilib: "64",

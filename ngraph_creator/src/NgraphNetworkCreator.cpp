@@ -63,7 +63,10 @@ void NgraphNetworkCreator::getSupportedOperations(std::vector<bool>& supportedOp
 
 bool NgraphNetworkCreator::validateOperations() {
     for (int i = 0; i < mModel.operations.size(); i++) {
-        if (!mOperations[i] || !mOperations[i]->validate()) return false;
+        if (!mOperations[i] || !mOperations[i]->validate()) {
+            ALOGE("%s index %d, type %d not supported", __func__, i, mModel.operations[i].type);
+            return false;
+        }
     }
     return true;
 }
@@ -96,7 +99,7 @@ std::shared_ptr<ngraph::Function> NgraphNetworkCreator::generateGraph() {
     ALOGV("%s Called", __func__);
     std::shared_ptr<ngraph::Function> ret;
     try {
-        ret = mNgraphNodes->generateGraph();
+        if (initializeModel()) ret = mNgraphNodes->generateGraph();
     } catch (const std::exception& ex) {
         ALOGE("%s Exception !!! %s", __func__, ex.what());
     }

@@ -13,13 +13,13 @@ private:
     std::shared_ptr<NgraphNodes> mNgraphNodes;
     OperationsFactory mOpFctryInst;
     void createInputParams();
+    bool initializeModel();
 
 public:
     NgraphNetworkCreator(const Model& model, const std::string& plugin);
     ~NgraphNetworkCreator();
     void getSupportedOperations(std::vector<bool>& supportedOperations);
     bool validateOperations();
-    bool initializeModel();
 
     const std::string& getNodeName(uint32_t index);
 
