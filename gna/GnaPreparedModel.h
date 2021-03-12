@@ -19,9 +19,6 @@
 
 #include <android/hardware/neuralnetworks/1.2/IPreparedModel.h>
 #include <android/hardware/neuralnetworks/1.2/types.h>
-#include <android/hidl/memory/1.0/IMemory.h>
-#include <hardware/hardware.h>
-#include <hidlmemory/mapping.h>
 #include <sys/mman.h>
 #include <fstream>
 #include <string>
@@ -41,11 +38,11 @@ public:
     ~GnaPreparedModel() { deinitialize(); }
 
     bool initialize(const Model& model) override;
-    Blob::Ptr GetConstWeightsOperandAsTensor(uint32_t index, const Model& model) override;
-    Blob::Ptr GetConstOperandAsTensor(int operand_index, int operation_idx,
-                                      const Model& model) override;
-    Blob::Ptr GetInOutOperandAsBlob(RunTimeOperandInfo& op, const uint8_t* buf,
-                                    uint32_t& len) override;
+    Return<void> configureExecutionBurst(
+        const sp<V1_2::IBurstCallback>& callback,
+        const MQDescriptorSync<V1_2::FmqRequestDatum>& requestChannel,
+        const MQDescriptorSync<V1_2::FmqResultDatum>& resultChannel,
+        configureExecutionBurst_cb cb) override;
 
 protected:
     void deinitialize() override;

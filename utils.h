@@ -17,14 +17,25 @@
 #define UTILS_H
 
 #include <android-base/logging.h>
+#include <android/hidl/memory/1.0/IMemory.h>
 #include <android/log.h>
+#include <hardware/hardware.h>
+#include <hidlmemory/mapping.h>
 #include <log/log.h>
+#include <sys/mman.h>
+
+#include <sys/stat.h>
+#include <fstream>
 #include "Driver.h"
 #include "IENetwork.h"
+// May be move these out of utils??
+#include "ie_blob.h"
+#include "ie_common.h"
 
 // unsigned int debugMask = ((1 << (L1 + 1)) - 1);
 
 // extern unsigned int debugMask  = ((1 << (L1 + 1)) - 1);
+using ::android::hidl::memory::V1_0::IMemory;
 
 namespace android {
 namespace hardware {
@@ -215,22 +226,52 @@ enum PaddingScheme {
 #define EXP_MASK_F32 0x7F800000U
 #define EXP_MASK_F16 0x7C00U
 
-struct GenConvParams {
-    int groups = 1;
-    std::vector<float> weightsBuf;
-    std::vector<size_t> weightsDims;
-    std::vector<float> biasesBuf;
-    std::vector<size_t> biasesDims;
-    size_t weightsSize;
-    std::vector<size_t> strides;
-    std::vector<std::ptrdiff_t> pads_begin;
-    std::vector<std::ptrdiff_t> pads_end;
-    std::vector<size_t> dilations;
-    const char* pad_type;
-};
-
 template <class T>
 using vec = std::vector<T>;
+
+typedef InferenceEngine::SizeVector TensorDims;
+typedef InferenceEngine::Blob IRBlob;
+
+// The type and dimensions of an operand.
+struct Shape {
+    OperandType type;
+    std::vector<uint32_t> dimensions;
+    float scale;
+    int32_t offset;
+};
+
+// Information we maintain about each operand during execution that
+// may change during execution.
+struct RunTimeOperandInfo {
+    OperandType type;
+    std::vector<uint32_t> dimensions;
+    float scale;
+    int32_t zeroPoint;
+    uint8_t* buffer;
+    uint32_t length;
+    OperandLifeTime lifetime;
+    uint32_t numberOfUsesLeft;
+    Operand::ExtraParams extraParams;
+    Shape shape() const {
+        return {
+            .type = type,
+            .dimensions = dimensions,
+            .scale = scale,
+            .offset = zeroPoint,
+        };
+    }
+};
+
+// Used to keep a pointer to each of the memory pools.
+struct RunTimePoolInfo {
+    sp<IMemory> memory;
+    hidl_memory hidlMemory;
+    uint8_t* buffer;
+
+    bool set(const hidl_memory& hidlMemory);
+    bool update();
+    bool unmap_mem();
+};
 
 template <typename T>
 struct printHelper {
@@ -310,6 +351,14 @@ template <typename T>
 T getOperandConstVal(const Model& model, const Operand& operand) {
     const T* data = reinterpret_cast<const T*>(&model.operandValues[operand.location.offset]);
     return data[0];
+}
+
+int sizeOfData(OperandType type, std::vector<uint32_t> dims);
+
+void writeBufferToFile(std::string filename, const float* buf, size_t length);
+template <typename T, typename S>
+std::shared_ptr<T> As(const std::shared_ptr<S>& src) {
+    return std::static_pointer_cast<T>(src);
 }
 
 }  // namespace nnhal
