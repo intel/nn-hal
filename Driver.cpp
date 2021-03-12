@@ -176,10 +176,9 @@ Return<void> Driver::getSupportedOperations_1_2(const Model& model,
         return Void();
     }
 
-    for (int i = 0; i < count; i++) {
-        const auto& operation = model.operations[i];
-        supported[i] = BasePreparedModel::isOperationSupported(operation, model);
-    }
+    NgraphNetworkCreator ngraphCreatorInst(model, mDeviceName.c_str());
+    ngraphCreatorInst.getSupportedOperations(supported);
+
     cb(ErrorStatus::NONE, supported);
     ALOGV("Exiting %s", __func__);
     return Void();

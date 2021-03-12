@@ -17,7 +17,7 @@ NgraphNetworkCreator::NgraphNetworkCreator(const Model& model, const std::string
     for (const auto& operation : mModel.operations) {
         auto opInstance = mOpFctryInst.getOperation(operation);
         if (opInstance == nullptr) {
-            ALOGE("%s Unsupported Operation type %d", __func__, operation.type);
+            ALOGV("%s Unsupported Operation type %d", __func__, operation.type);
         }
         mOperations[operationIndex++] = opInstance;
     }
@@ -47,6 +47,17 @@ void NgraphNetworkCreator::createInputParams() {
         }
         mNgraphNodes->addInputParam(inputParam);
         mNgraphNodes->setOutputAtOperandIndex(i, inputParam);
+    }
+}
+
+void NgraphNetworkCreator::getSupportedOperations(std::vector<bool>& supportedOperations) {
+    for (int i = 0; i < mModel.operations.size(); i++) {
+        if (!mOperations[i] || !mOperations[i]->validate())
+            supportedOperations[i] = false;
+        else
+            supportedOperations[i] = true;
+        ALOGD("%s index %d, type %d, supported : %d", __func__, i, mModel.operations[i].type,
+              static_cast<int>(supportedOperations[i]));
     }
 }
 
