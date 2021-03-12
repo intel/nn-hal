@@ -7,6 +7,7 @@ namespace nnhal {
 
 std::string OperationsBase::sPluginType;
 std::shared_ptr<NgraphNodes> OperationsBase::mNgraphNodes;
+Model* OperationsBase::sModel;
 
 std::shared_ptr<ngraph::Node> OperationsBase::transpose(ConversionType type,
                                                         ngraph::Output<ngraph::Node> input) {
@@ -34,24 +35,23 @@ std::shared_ptr<ngraph::Node> OperationsBase::toNCHW(size_t inputIndex, size_t o
 }
 
 // override createNodeForPlugin in case sPluginType specific implementation is required
-std::shared_ptr<ngraph::Node> OperationsBase::createNodeForPlugin(const Operation& op) {
-    return createNode(op);
-}
+std::shared_ptr<ngraph::Node> OperationsBase::createNodeForPlugin() { return createNode(); }
 
 // override connectOperationToGraph in case Operation has multiple outputs
-void OperationsBase::connectOperationToGraph(const Operation& op) {
-    mNgraphNodes->setOperationOutput(op.outputs[0], createNodeForPlugin(op)->get_default_output());
+void OperationsBase::connectOperationToGraph() {
+    mNgraphNodes->setOutputAtOperandIndex(mDefaultOutputIndex,
+                                          createNodeForPlugin()->get_default_output());
 }
 
 void OperationsBase::addResultNode(size_t index, std::shared_ptr<ngraph::Node> resultNode) {
     mNgraphNodes->setResultNode(index, resultNode);
 }
 
-OperationsBase::OperationsBase(const Model& model) : mModel(model) {}
+OperationsBase::OperationsBase(const Operation& op) : mNnapiOp(op) { mDefaultOutputIndex = 0; }
 
 void OperationsBase::setNgraphNodes(std::shared_ptr<NgraphNodes> nodes) { mNgraphNodes = nodes; }
 
-bool OperationsBase::validate(const Operation& op) { return true; }
+bool OperationsBase::validate() { return true; }
 
 }  // namespace nnhal
 }  // namespace neuralnetworks

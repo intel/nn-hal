@@ -9,6 +9,7 @@ namespace nnhal {
 class NgraphNetworkCreator {
 private:
     Model mModel;
+    std::vector<std::shared_ptr<OperationsBase>> mOperations;
     std::shared_ptr<NgraphNodes> mNgraphNodes;
     OperationsFactory mOpFctryInst;
     void createInputParams();

@@ -12,10 +12,14 @@ namespace nnhal {
 
 class NgraphNodes {
 private:
-    std::vector<ngraph::Output<ngraph::Node>> mOperationOutputs;
+    std::vector<ngraph::Output<ngraph::Node>> mOutputAtOperandIndex;
+    // mForcedNchw flag tracks whether a forced conversion to NCHW has been done at ngraph_creator
+    // in the path to current Operand.
     std::vector<bool> mForcedNchw;
     std::vector<std::shared_ptr<ngraph::opset3::Parameter>> mInputParams;
     std::vector<std::shared_ptr<ngraph::Node>> mResultNodes;
+    // mNodeNames are only populated when requested, as only Inputs and Result NodeNames are
+    // required.
     std::map<int, std::string> mNodeNames;
 
 public:
@@ -23,7 +27,7 @@ public:
     ~NgraphNodes();
 
     void addInputParam(std::shared_ptr<ngraph::opset3::Parameter> inParam);
-    void setOperationOutput(size_t index, ngraph::Output<ngraph::Node> output);
+    void setOutputAtOperandIndex(size_t index, ngraph::Output<ngraph::Node> output);
     ngraph::Output<ngraph::Node> getOperationOutput(size_t index);
     bool isForcedNchw(size_t index);
     void setForcedNchw(size_t index, bool flag);

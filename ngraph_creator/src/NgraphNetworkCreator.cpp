@@ -11,7 +11,16 @@ NgraphNetworkCreator::NgraphNetworkCreator(const Model& model, const std::string
     : mModel(model),
       mNgraphNodes(
           std::make_shared<NgraphNodes>(mModel.operands.size(), mModel.outputIndexes.size())),
-      mOpFctryInst(plugin, mNgraphNodes) {
+      mOpFctryInst(plugin, mModel, mNgraphNodes) {
+    mOperations.resize(mModel.operations.size());
+    int operationIndex = 0;
+    for (const auto& operation : mModel.operations) {
+        auto opInstance = mOpFctryInst.getOperation(operation);
+        if (opInstance == nullptr) {
+            ALOGE("%s Unsupported Operation type %d", __func__, operation.type);
+        }
+        mOperations[operationIndex++] = opInstance;
+    }
     ALOGV("%s Constructed", __func__);
 }
 
@@ -22,10 +31,7 @@ void NgraphNetworkCreator::createInputParams() {
         std::shared_ptr<ngraph::opset3::Parameter> inputParam;
         auto& origDims = mModel.operands[i].dimensions;
         std::vector<size_t> dims(origDims.begin(), origDims.end());
-        if (dims.size() == 3) {  // TODO:Handle other dims size too
-            ALOGI("createInputParams converting operand %d to 4D", i);
-            dims.insert(dims.begin(), 1);
-        }
+        ALOGI("createInputParams operand %d dims.size(%d)", i, dims.size());
         switch (mModel.operands[i].type) {
             case OperandType::FLOAT32:
             case OperandType::TENSOR_FLOAT32:
@@ -40,31 +46,27 @@ void NgraphNetworkCreator::createInputParams() {
                 inputParam = nullptr;
         }
         mNgraphNodes->addInputParam(inputParam);
-        mNgraphNodes->setOperationOutput(i, inputParam);
+        mNgraphNodes->setOutputAtOperandIndex(i, inputParam);
     }
 }
 
 bool NgraphNetworkCreator::validateOperations() {
-    for (const auto& operation : mModel.operations) {
-        if (!mOpFctryInst.getOperation(operation.type, mModel) ||
-            !mOpFctryInst.getOperation(operation.type, mModel)->validate(operation))
-            return false;
+    for (int i = 0; i < mModel.operations.size(); i++) {
+        if (!mOperations[i] || !mOperations[i]->validate()) return false;
     }
     return true;
 }
 
 bool NgraphNetworkCreator::initializeModel() {
     ALOGV("%s Called", __func__);
-    int index = 0;
     createInputParams();
-    for (const auto& operation : mModel.operations) {
-        auto op = mOpFctryInst.getOperation(operation.type, mModel);
-        if (op == nullptr) {
-            ALOGE("initializeModel Failure at type %d", operation.type);
+    for (int i = 0; i < mModel.operations.size(); i++) {
+        if (mOperations[i] == nullptr) {
+            ALOGE("initializeModel Failure at type %d", mModel.operations[i].type);
             return false;
         }
         try {
-            op->connectOperationToGraph(operation);
+            mOperations[i]->connectOperationToGraph();
         } catch (const std::exception& ex) {
             ALOGE("%s Exception !!! %s", __func__, ex.what());
             return false;
@@ -75,7 +77,7 @@ bool NgraphNetworkCreator::initializeModel() {
 }
 
 const std::string& NgraphNetworkCreator::getNodeName(uint32_t index) {
-    ALOGD("getNodeName %d", index);
+    ALOGV("getNodeName %d", index);
     return mNgraphNodes->getNodeName(index);
 }
 

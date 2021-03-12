@@ -9,13 +9,12 @@ namespace nnhal {
 
 class OperationsFactory {
 private:
-    std::map<OperationType, std::shared_ptr<OperationsBase>> mOperationsMap;
     std::shared_ptr<NgraphNodes> mNgraphNodes;
 
 public:
-    OperationsFactory(const std::string& plugin, std::shared_ptr<NgraphNodes> nodes);
+    OperationsFactory(const std::string& plugin, Model& model, std::shared_ptr<NgraphNodes> nodes);
     ~OperationsFactory();
-    std::shared_ptr<OperationsBase> getOperation(const OperationType& type, const Model& model);
+    std::shared_ptr<OperationsBase> getOperation(const Operation& op);
 };
 
 }  // namespace nnhal

@@ -6,9 +6,10 @@ namespace hardware {
 namespace neuralnetworks {
 namespace nnhal {
 
-OperationsFactory::OperationsFactory(const std::string& plugin,
+OperationsFactory::OperationsFactory(const std::string& plugin, Model& model,
                                      std::shared_ptr<NgraphNodes> nodes) {
     OperationsBase::sPluginType = plugin;
+    OperationsBase::sModel = &model;
     OperationsBase::mNgraphNodes = nodes;
     ALOGV("%s Constructed", __func__);
 }
@@ -16,25 +17,19 @@ OperationsFactory::~OperationsFactory() {
     OperationsBase::mNgraphNodes.reset();
     ALOGV("%s Destructed & reset", __func__);
 }
-std::shared_ptr<OperationsBase> OperationsFactory::getOperation(const OperationType& type,
-                                                                const Model& model) {
-    auto opIter = mOperationsMap.find(type);
-    if (opIter != mOperationsMap.end()) return opIter->second;
-
-    switch (type) {
+std::shared_ptr<OperationsBase> OperationsFactory::getOperation(const Operation& op) {
+    switch (op.type) {
         case OperationType::ADD:
-            mOperationsMap[type] = std::make_shared<Add>(model);
-            break;
+            return std::make_shared<Add>(op);
         case OperationType::CONCATENATION:
-            mOperationsMap[type] = std::make_shared<Concat>(model);
-            break;
+            return std::make_shared<Concat>(op);
         case OperationType::RESHAPE:
-            mOperationsMap[type] = std::make_shared<Reshape>(model);
-            break;
+            return std::make_shared<Reshape>(op);
         default:
-            return nullptr;
+            ALOGE("%s Cannot identify OperationType %d", __func__, op.type);
+            break;
     }
-    return mOperationsMap[type];
+    return nullptr;
 }
 
 }  // namespace nnhal
