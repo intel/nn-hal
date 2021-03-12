@@ -31,11 +31,15 @@ bool GnaPreparedModel::initialize(const Model &model) {
         ALOGE("Failed to initialize Model runtime parameters!!");
         return false;
     }
-    mNgc = std::make_shared<NgraphNetworkCreator>(model, mTargetDevice);
+    mNgc = std::make_shared<NgraphNetworkCreator>(mModelInfo, mTargetDevice);
 
     if (!mNgc->validateOperations()) return false;
     ALOGI("Generating IR Graph");
     auto ngraph_function = mNgc->generateGraph();
+    if (ngraph_function == nullptr) {
+        ALOGE("%s ngraph generation failed", __func__);
+        return false;
+    }
     auto ngraph_net = std::make_shared<InferenceEngine::CNNNetwork>(ngraph_function);
     ngraph_net->serialize("/data/vendor/neuralnetworks/ngraph_ir.xml",
                          "/data/vendor/neuralnetworks/ngraph_ir.bin");

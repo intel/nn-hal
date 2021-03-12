@@ -20,7 +20,7 @@ using Blob = InferenceEngine::Blob;
 // Utility class that provides functions and methods around NNAPI Model
 class NnapiModelInfo {
 public:
-    NnapiModelInfo(const Model& model) { mModel = model; }
+    NnapiModelInfo(const Model& model) : mModel(model) {}
 
     bool initRuntimeInfo() {
         mPoolInfos.resize(mModel.pools.size());
@@ -36,11 +36,13 @@ public:
         return true;
     }
     // Copy model input indices to a seperate vector
-    auto getModelInputIndexes() { return mModel.inputIndexes; }
+    const auto& getModelInputIndexes() { return mModel.inputIndexes; }
 
     uint32_t getModelInputIndex(uint32_t index) { return mModel.inputIndexes[index]; }
 
     uint32_t getModelOutputIndex(uint32_t index) { return mModel.outputIndexes[index]; }
+
+    size_t getModelOutputsSize() { return mModel.outputIndexes.size(); }
 
     // Index into the operand vector
     OperandLifeTime getOperandLifetime(uint32_t operandIdx) {
@@ -61,12 +63,27 @@ public:
         return GetConstFromBuffer<T>(buf, len);
     }
 
-    const std::vector<Operation> getOperations() {
+    const auto& getOperations() {
         ALOGD("%s", __func__);
         return mModel.operations;
     }
+    const auto& getOperationOutput(int operationIndex, uint32_t outputIndex) {
+        ALOGD("%s", __func__);
+        return mModel.operations[operationIndex].outputs[outputIndex];
+    }
+    const auto& getOperationInput(int operationIndex, uint32_t inputIndex) {
+        ALOGD("%s", __func__);
+        return mModel.operations[operationIndex].inputs[inputIndex];
+    }
+    size_t getOperationInputsSize(int operationIndex) { return mModel.operations[operationIndex].inputs.size(); }
 
-    const Operand getOperand(int index) { return mModel.operands[index]; }
+    size_t getOperationsSize() { return mModel.operations.size(); }
+
+    const auto& getOperationType(int index) { return mModel.operations[index].type; }
+
+    const Operand& getOperand(int index) { return mModel.operands[index]; }
+
+    size_t getOperandsSize() { return mModel.operands.size(); }
 
     RunTimeOperandInfo& getRuntimeOperand(uint32_t index) {
         return mOperands[mModel.inputIndexes[index]];
@@ -90,13 +107,13 @@ public:
     IRBlob::Ptr GetConstWeightsOperandAsTensor(uint32_t index);  // Redundant
 
     template <typename T>
-    T ParseOperationInput(const Operation& operation, uint32_t index) {
-        uint32_t inputIndex = operation.inputs[index];
+    T ParseOperationInput(int operationIndex, uint32_t index) {
+        uint32_t inputIndex = mModel.operations[operationIndex].inputs[index];
         const auto operand = mModel.operands[inputIndex];
         const auto value = GetConstOperand<T>(inputIndex);
         VLOG(L1, "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
         VLOG(L1, "Operation input index: %d, operand index: %d", index, inputIndex);
-        VLOG(L1, "Operation: %s", toString(operation).c_str());
+        VLOG(L1, "Operation: %s", toString(mModel.operations[operationIndex]).c_str());
         printHelper<T>::print(value, toString(operand).c_str());
         VLOG(L1, "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
 

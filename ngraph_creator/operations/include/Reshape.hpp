@@ -1,3 +1,5 @@
+#pragma once
+
 #include <OperationsBase.hpp>
 
 namespace android {
@@ -7,7 +9,7 @@ namespace nnhal {
 
 class Reshape : public OperationsBase {
 public:
-    Reshape(const Operation& op);
+    Reshape(int operationIndex);
     bool validate() override;
     std::shared_ptr<ngraph::Node> createNode() override;
 };

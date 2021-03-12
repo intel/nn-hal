@@ -111,14 +111,14 @@ const uint8_t* NnapiModelInfo::GetOperandMemory(int index, uint32_t& lenOut) {
     const auto op = mModel.operands[index];
     lenOut = op.location.length;
     if (op.lifetime == OperandLifeTime::CONSTANT_COPY) {
-        // ALOGD("operand lifetime OperandLifeTime::CONSTANT_COPY");
+         ALOGV("operand lifetime OperandLifeTime::CONSTANT_COPY");
         if (op.location.poolIndex != 0) {
             // ALOGE("CONSTANT_COPY expects poolIndex to be 0");
             nnAssert(false);
         }
         return (const_cast<uint8_t*>(&mModel.operandValues[op.location.offset]));
     } else if (op.lifetime == OperandLifeTime::CONSTANT_REFERENCE) {
-        // ALOGD("operand lifetime OperandLifeTime::CONSTANT_REFERENCE");
+         ALOGV("operand lifetime OperandLifeTime::CONSTANT_REFERENCE");
         auto poolIndex = op.location.poolIndex;
         auto& r = mPoolInfos[poolIndex];
         return (const_cast<uint8_t*>(r.buffer + op.location.offset));

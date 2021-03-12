@@ -7,19 +7,20 @@ namespace hardware {
 namespace neuralnetworks {
 namespace nnhal {
 
-NgraphNetworkCreator::NgraphNetworkCreator(const Model& model, const std::string& plugin)
-    : mModel(model),
+NgraphNetworkCreator::NgraphNetworkCreator(std::shared_ptr<NnapiModelInfo> modelInfo, const std::string& plugin)
+    : mModelInfo(modelInfo),
       mNgraphNodes(
-          std::make_shared<NgraphNodes>(mModel.operands.size(), mModel.outputIndexes.size())),
-      mOpFctryInst(plugin, mModel, mNgraphNodes) {
-    mOperations.resize(mModel.operations.size());
-    int operationIndex = 0;
-    for (const auto& operation : mModel.operations) {
-        auto opInstance = mOpFctryInst.getOperation(operation);
-        if (opInstance == nullptr) {
-            ALOGV("%s Unsupported Operation type %d", __func__, operation.type);
+          std::make_shared<NgraphNodes>(mModelInfo->getOperandsSize(), mModelInfo->getModelOutputsSize())),
+      mOpFactoryInstance(plugin, mModelInfo, mNgraphNodes) {
+    auto nnapiOperationsSize = mModelInfo->getOperationsSize();
+    mOperationNodes.resize(nnapiOperationsSize);
+    for (int index = 0; index < nnapiOperationsSize; index++) {
+        const auto& nnapiOperationType = mModelInfo->getOperationType(index);
+        auto operationNode = mOpFactoryInstance.getOperation(index, nnapiOperationType);
+        if (operationNode == nullptr) {
+            ALOGV("%s Unsupported Operation type %d", __func__, nnapiOperationType);
         }
-        mOperations[operationIndex++] = opInstance;
+        mOperationNodes[index] = operationNode;
     }
     ALOGV("%s Constructed", __func__);
 }
@@ -27,22 +28,22 @@ NgraphNetworkCreator::NgraphNetworkCreator(const Model& model, const std::string
 NgraphNetworkCreator::~NgraphNetworkCreator() { ALOGV("%s Destructed", __func__); }
 
 void NgraphNetworkCreator::createInputParams() {
-    for (auto i : mModel.inputIndexes) {
+    for (auto i : mModelInfo->getModelInputIndexes()) {
         std::shared_ptr<ngraph::opset3::Parameter> inputParam;
-        auto& origDims = mModel.operands[i].dimensions;
-        std::vector<size_t> dims(origDims.begin(), origDims.end());
+        auto& nnapiOperand = mModelInfo->getOperand(i);
+        auto& dims = nnapiOperand.dimensions;
         ALOGI("createInputParams operand %d dims.size(%d)", i, dims.size());
-        switch (mModel.operands[i].type) {
+        switch (nnapiOperand.type) {
             case OperandType::FLOAT32:
             case OperandType::TENSOR_FLOAT32:
                 inputParam = std::make_shared<ngraph::opset3::Parameter>(
                     ngraph::element::f32, ngraph::Shape(dims.begin(), dims.end()));
                 ALOGV("createInputParams created inputIndex %d, type %d", i,
-                      mModel.operands[i].type);
+                      nnapiOperand.type);
                 break;
             default:
                 ALOGE("createInputParams Failure at inputIndex %d, type %d", i,
-                      mModel.operands[i].type);
+                      nnapiOperand.type);
                 inputParam = nullptr;
         }
         mNgraphNodes->addInputParam(inputParam);
@@ -51,20 +52,20 @@ void NgraphNetworkCreator::createInputParams() {
 }
 
 void NgraphNetworkCreator::getSupportedOperations(std::vector<bool>& supportedOperations) {
-    for (int i = 0; i < mModel.operations.size(); i++) {
-        if (!mOperations[i] || !mOperations[i]->validate())
+    for (int i = 0; i < mModelInfo->getOperationsSize(); i++) {
+        if (!mOperationNodes[i] || !mOperationNodes[i]->validate())
             supportedOperations[i] = false;
         else
             supportedOperations[i] = true;
-        ALOGD("%s index %d, type %d, supported : %d", __func__, i, mModel.operations[i].type,
+        ALOGD("%s index %d, type %d, supported : %d", __func__, i, mModelInfo->getOperationType(i),
               static_cast<int>(supportedOperations[i]));
     }
 }
 
 bool NgraphNetworkCreator::validateOperations() {
-    for (int i = 0; i < mModel.operations.size(); i++) {
-        if (!mOperations[i] || !mOperations[i]->validate()) {
-            ALOGE("%s index %d, type %d not supported", __func__, i, mModel.operations[i].type);
+    for (int i = 0; i < mModelInfo->getOperationsSize(); i++) {
+        if (!mOperationNodes[i] || !mOperationNodes[i]->validate()) {
+            ALOGE("%s index %d, type %d not supported", __func__, i, mModelInfo->getOperationType(i));
             return false;
         }
     }
@@ -74,13 +75,13 @@ bool NgraphNetworkCreator::validateOperations() {
 bool NgraphNetworkCreator::initializeModel() {
     ALOGV("%s Called", __func__);
     createInputParams();
-    for (int i = 0; i < mModel.operations.size(); i++) {
-        if (mOperations[i] == nullptr) {
-            ALOGE("initializeModel Failure at type %d", mModel.operations[i].type);
+    for (int i = 0; i < mModelInfo->getOperationsSize(); i++) {
+        if (mOperationNodes[i] == nullptr) {
+            ALOGE("initializeModel Failure at type %d", mModelInfo->getOperationType(i));
             return false;
         }
         try {
-            mOperations[i]->connectOperationToGraph();
+            mOperationNodes[i]->connectOperationToGraph();
         } catch (const std::exception& ex) {
             ALOGE("%s Exception !!! %s", __func__, ex.what());
             return false;

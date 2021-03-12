@@ -17,6 +17,7 @@ cc_library_static {
 
     header_libs: [
         "libngraph_headers",
+        "libinference_headers",
     ],
     include_dirs: [
         "vendor/intel/external/project-celadon/nn-hal",
@@ -46,9 +47,13 @@ cc_library_static {
     shared_libs: [
         "liblog",
         "libngraph",
+        "libhidlmemory",
+        "libhardware",
         "android.hardware.neuralnetworks@1.0",
         "android.hardware.neuralnetworks@1.1",
         "android.hardware.neuralnetworks@1.2",
         "android.hardware.neuralnetworks@1.3",
+        "android.hidl.allocator@1.0",
+        "android.hidl.memory@1.0",
     ],
 }

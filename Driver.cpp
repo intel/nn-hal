@@ -23,6 +23,7 @@
 #include "BasePreparedModel.h"
 #include "CpuPreparedModel.h"
 #include "GnaPreparedModel.h"
+#include "ModelManager.h"
 #include "ValidateHal.h"
 
 namespace android {
@@ -176,7 +177,9 @@ Return<void> Driver::getSupportedOperations_1_2(const Model& model,
         return Void();
     }
 
-    NgraphNetworkCreator ngraphCreatorInst(model, mDeviceName.c_str());
+
+    auto modelInfo = std::make_shared<NnapiModelInfo>(model);
+    NgraphNetworkCreator ngraphCreatorInst(modelInfo, mDeviceName.c_str());
     ngraphCreatorInst.getSupportedOperations(supported);
 
     cb(ErrorStatus::NONE, supported);
