@@ -4,6 +4,7 @@
 #include "ie_network.hpp"
 #include "BuilderNetwork.h"
 #include "IRLayerNorm.h"
+#include "Utils.h"
 
 namespace android
 {
@@ -36,6 +37,7 @@ using CONCATLayer = InferenceEngine::Builder::ConcatLayer;
 using SPLITLayer = InferenceEngine::Builder::SplitLayer;
 using RESHAPELayer = InferenceEngine::Builder::ReshapeLayer;
 using PERMUTELayer = InferenceEngine::Builder::PermuteLayer;
+using SCALESHIFTLayer = InferenceEngine::Builder::ScaleShiftLayer;
 
 static void dumpDimensions(const std::string str, const InferenceEngine::SizeVector& dim)
 {
@@ -94,11 +96,12 @@ std::shared_ptr<InferenceEngine::ICNNNetwork> ModelBuilder::convertBuilder()
 {
     // ModelBuilder *Modelbuilder = ModelBuilder::getInstance();
     // IEBuilder::Network* builder = getBuilderNetwork();
+    VLOG(L1, "About to call builder build..");
     auto finalNetwork = getBuilderNetwork()->getBuilder()->build();
     std::shared_ptr<InferenceEngine::ICNNNetwork> cnnNetwork =
-        InferenceEngine::Builder::convertToICNNNetwork(finalNetwork);
+    InferenceEngine::Builder::convertToICNNNetwork(finalNetwork);
     InferenceEngine::ResponseDesc desc;
-    //cnnNetwork->serialize("/data/local/tmp/network.xml", "/data/local/tmp/network.bin", &desc);
+    cnnNetwork->serialize("/tmp/network.xml", "/tmp/network.bin", &desc);
 
     return cnnNetwork;
 }
@@ -313,13 +316,14 @@ std::vector<std::string> ModelBuilder::createFullLstm(LstmLayer::LstmParams& par
     }
 
     const LstmLayer::LstmCellData *zero_bias = nullptr;
-    idx_t i2iLayerId, i2fLayerId, i2cLayerId, i2oLayerId;
-    idx_t inputGateNormLayerId, forgetGateNormLayerId, cellGateNormLayerId, outputGateNormLayerId, ConstInLayer = 0;
+    idx_t i2iLayerId = 12345, i2fLayerId = 12346, i2cLayerId = 12347, i2oLayerId = 12348;
+    idx_t inputGateNormLayerId = 12349, forgetGateNormLayerId = 13456, cellGateNormLayerId = 13457, outputGateNormLayerId = 13568, ConstInLayer = 13894;
     if (!params.useLayerNorm)
     {
-
-        // i2i = W_{xi}x_t + b_i
-        i2iLayerId = createFullyConnectedLayer(inputLayerId, params.input2inputWeights, params.inputGateBias, cellSize);
+        if (!lstmDesc.cifgEnabled) {
+            // i2i = W_{xi}x_t + b_i
+            i2iLayerId = createFullyConnectedLayer(inputLayerId, params.input2inputWeights, params.inputGateBias, cellSize);
+        }
 
         // i2f = W_{xf}x_t + b_f
         i2fLayerId = createFullyConnectedLayer(inputLayerId, params.input2ForgetWeights, params.forgetGateBias, cellSize);
@@ -332,8 +336,10 @@ std::vector<std::string> ModelBuilder::createFullLstm(LstmLayer::LstmParams& par
     }
     else
     {
-        // i2i = W_{xi}x_t
-        i2iLayerId = createFullyConnectedLayerNoBias(inputLayerId, params.input2inputWeights, cellSize);
+        if (!lstmDesc.cifgEnabled) {
+            // i2i = W_{xi}x_t
+            i2iLayerId = createFullyConnectedLayerNoBias(inputLayerId, params.input2inputWeights, cellSize);
+        }
 
         // i2f = W_{xf}x_t
         i2fLayerId = createFullyConnectedLayerNoBias(inputLayerId, params.input2ForgetWeights, cellSize);
@@ -346,8 +352,10 @@ std::vector<std::string> ModelBuilder::createFullLstm(LstmLayer::LstmParams& par
     }
 
     // r2i = W_{hi}h_{t-1}
-
-    idx_t r2iLayerId = createFullyConnectedLayerNoBias(h_t_1Id, params.recurrant2inputWeights, cellSize);
+    idx_t r2iLayerId = 11234;
+    if (!lstmDesc.cifgEnabled) {
+        r2iLayerId = createFullyConnectedLayerNoBias(h_t_1Id, params.recurrant2inputWeights, cellSize);
+    }
 
     // r2f = W_{hf}h_{t-1}
     idx_t weightsId =  getBuilderNetwork()->getBuilder()->addLayer(CONSTLayer("weights").setData(params.recurrant2ForgetWeights.data));
@@ -379,18 +387,24 @@ std::vector<std::string> ModelBuilder::createFullLstm(LstmLayer::LstmParams& par
     FCLayer(getLayerName("affinetransform")) \
     .setOutputNum(cellSize));
 
-    idx_t c2iLayerId, c2fLayerId, cellstateToInputGateAddLayerId, cellStateToForgetGateAddLayerId, cellStateToOutputGateAddLayerId;
+    idx_t c2iLayerId = 10236, c2fLayerId = 10237, cellstateToInputGateAddLayerId = 10235, cellStateToForgetGateAddLayerId = 10238, cellStateToOutputGateAddLayerId = 10234;
     if (lstmDesc.peepholeEnabled)
     {
-        //c2i = W_{ci}C_{t-1}
-        weightsId =  getBuilderNetwork()->getBuilder()->addLayer(CONSTLayer("weights").setData(params.cell2InputWeights.data));
-        if (params.recurrant2OutputWeights.lifeTime == (int)V1_0_OperandLifeTime::SUBGRAPH_INPUT)
-        {
-            mBlob2LayerIdxMap[params.cell2InputWeights.data] = weightsId;
+        if (!lstmDesc.cifgEnabled) {
+            //c2i = W_{ci}C_{t-1}
+            weightsId =  getBuilderNetwork()->getBuilder()->addLayer(CONSTLayer("weights").setData(params.cell2InputWeights.data));
+            if (params.recurrant2OutputWeights.lifeTime == (int)V1_0_OperandLifeTime::SUBGRAPH_INPUT)
+            {
+                mBlob2LayerIdxMap[params.cell2InputWeights.data] = weightsId;
+            }
+            c2iLayerId = getBuilderNetwork()->getBuilder()->addLayer({{c_t_1Id}, {weightsId}}, \
+            FCLayer(getLayerName("affinetransform")) \
+            .setOutputNum(cellSize));
+
+            ELTWISELayer c2iGateSumLayer = ELTWISELayer(getLayerName("add"));
+            c2iGateSumLayer.setEltwiseType(ELTWISELayer::SUM);
+            cellstateToInputGateAddLayerId = getBuilderNetwork()->getBuilder()->addLayer(c2iGateSumLayer);
         }
-        idx_t c2iLayerId = getBuilderNetwork()->getBuilder()->addLayer({{c_t_1Id}, {weightsId}}, \
-        FCLayer(getLayerName("affinetransform")) \
-        .setOutputNum(cellSize));
 
         //c2f = W_{cf}C_{t-1}
         weightsId =  getBuilderNetwork()->getBuilder()->addLayer(CONSTLayer("weights").setData(params.cell2ForgetWeights.data));
@@ -398,27 +412,26 @@ std::vector<std::string> ModelBuilder::createFullLstm(LstmLayer::LstmParams& par
         {
             mBlob2LayerIdxMap[params.cell2ForgetWeights.data] = weightsId;
         }
-        idx_t c2fLayerId = getBuilderNetwork()->getBuilder()->addLayer({{c_t_1Id}, {weightsId}}, \
+        c2fLayerId = getBuilderNetwork()->getBuilder()->addLayer({{c_t_1Id}, {weightsId}}, \
         FCLayer(getLayerName("affinetransform")) \
         .setOutputNum(cellSize));
 
-        ELTWISELayer c2iGateSumLayer = ELTWISELayer(getLayerName("add"));
-        c2iGateSumLayer.setEltwiseType(ELTWISELayer::SUM);
-        idx_t cellstateToInputGateAddLayerId = getBuilderNetwork()->getBuilder()->addLayer(c2iGateSumLayer);
-
         ELTWISELayer c2fGateSumLayer = ELTWISELayer(getLayerName("add"));
         c2fGateSumLayer.setEltwiseType(ELTWISELayer::SUM);
-        idx_t cellStateToForgetGateAddLayerId = getBuilderNetwork()->getBuilder()->addLayer(c2fGateSumLayer);
+        cellStateToForgetGateAddLayerId = getBuilderNetwork()->getBuilder()->addLayer(c2fGateSumLayer);
 
         ELTWISELayer c2oGateSumLayer = ELTWISELayer(getLayerName("add"));
         c2oGateSumLayer.setEltwiseType(ELTWISELayer::SUM);
-        idx_t cellStateToOutputGateAddLayerId = getBuilderNetwork()->getBuilder()->addLayer(c2oGateSumLayer);
+        cellStateToOutputGateAddLayerId = getBuilderNetwork()->getBuilder()->addLayer(c2oGateSumLayer);
     }
 
     // Eltwise sum layer
-    ELTWISELayer inputGateSumLayer = ELTWISELayer(getLayerName("add"));
-    inputGateSumLayer.setEltwiseType(ELTWISELayer::SUM);
-    idx_t inputGateAddLayerId = getBuilderNetwork()->getBuilder()->addLayer(inputGateSumLayer);
+    idx_t inputGateAddLayerId = -1;
+    if (!lstmDesc.cifgEnabled) {
+        ELTWISELayer inputGateSumLayer = ELTWISELayer(getLayerName("add"));
+        inputGateSumLayer.setEltwiseType(ELTWISELayer::SUM);
+        inputGateAddLayerId = getBuilderNetwork()->getBuilder()->addLayer(inputGateSumLayer);
+    }
 
     ELTWISELayer forgetGateSumLayer = ELTWISELayer(getLayerName("add"));
     forgetGateSumLayer.setEltwiseType(ELTWISELayer::SUM);
@@ -471,20 +484,25 @@ std::vector<std::string> ModelBuilder::createFullLstm(LstmLayer::LstmParams& par
                                  .setMaxValue(lstmDesc.clippingThresholdProjState));
     }
 
+    VLOG(L1, "%s before Input gate connections", __func__);
     // input gate connections
     //W_{xi}x_t+W_{hi}h_{t-1}+b_i
-    getBuilderNetwork()->getBuilder()->connect({i2iLayerId}, {inputGateAddLayerId, 0});
-    getBuilderNetwork()->getBuilder()->connect({r2iLayerId}, {inputGateAddLayerId, 1});
-    if (lstmDesc.peepholeEnabled)
-    {
-        //W_{xi}x_t+W_{hi}h_{t-1}+W_{ci}C_{t-1}
-        getBuilderNetwork()->getBuilder()->connect({c2iLayerId}, {cellstateToInputGateAddLayerId, 0});
-        getBuilderNetwork()->getBuilder()->connect({inputGateAddLayerId}, {cellstateToInputGateAddLayerId, 1});
-        inputGateAddLayerId = cellstateToInputGateAddLayerId;
+    if (!lstmDesc.cifgEnabled) {
+        getBuilderNetwork()->getBuilder()->connect({i2iLayerId}, {inputGateAddLayerId, 0});
+        getBuilderNetwork()->getBuilder()->connect({r2iLayerId}, {inputGateAddLayerId, 1});
+        if (lstmDesc.peepholeEnabled)
+        {
+            //W_{xi}x_t+W_{hi}h_{t-1}+W_{ci}C_{t-1}
+            getBuilderNetwork()->getBuilder()->connect({c2iLayerId}, {cellstateToInputGateAddLayerId, 0});
+            getBuilderNetwork()->getBuilder()->connect({inputGateAddLayerId}, {cellstateToInputGateAddLayerId, 1});
+            inputGateAddLayerId = cellstateToInputGateAddLayerId;
+        }
     }
-     // forget gate connections
+
+    // forget gate connections
     getBuilderNetwork()->getBuilder()->connect({i2fLayerId}, {forgetGateAddLayerId, 0});
     getBuilderNetwork()->getBuilder()->connect({r2fLayerId}, {forgetGateAddLayerId, 1});
+
     if (lstmDesc.peepholeEnabled)
     {
         // W_{xf}x_t+W_{hf}h_{t-1}+W_{cf}C_{t-1}+b_f
@@ -521,9 +539,11 @@ std::vector<std::string> ModelBuilder::createFullLstm(LstmLayer::LstmParams& par
     // Keep a flag incase we observe performance regressions
     if(params.useLayerNorm) {
         if(!params.useBatchedLayerNorm) {
-            LN::LayerNorm *inputGateLN = new LN::LayerNorm(inputGateAddLayerId, cellSize, getBuilderNetwork()->getBuilder());
-            inputGateNormLayerId = inputGateLN->addLayerNorm(params.inputLayerNormWeights.data, params.inputGateBias.data);
-            inputGateAddLayerId = inputGateNormLayerId;
+            if (!lstmDesc.cifgEnabled) {
+                LN::LayerNorm *inputGateLN = new LN::LayerNorm(inputGateAddLayerId, cellSize, getBuilderNetwork()->getBuilder());
+                inputGateNormLayerId = inputGateLN->addLayerNorm(params.inputLayerNormWeights.data, params.inputGateBias.data);
+                inputGateAddLayerId = inputGateNormLayerId;
+            }
 
             LN::LayerNorm *forgetGateLN = new LN::LayerNorm(forgetGateAddLayerId, cellSize, getBuilderNetwork()->getBuilder());
             forgetGateNormLayerId = forgetGateLN->addLayerNorm(params.forgetLayerNormWeights.data, params.forgetGateBias.data);
@@ -538,8 +558,15 @@ std::vector<std::string> ModelBuilder::createFullLstm(LstmLayer::LstmParams& par
             outputGateAddLayerId = outputGateNormLayerId;
         }
         else {
-            LN::BatchedLayerNorm *BatchedLN = new LN::BatchedLayerNorm(inputGateAddLayerId, forgetGateAddLayerId, cellGateAddLayerId, outputGateAddLayerId,
+            LN::BatchedLayerNorm *BatchedLN = nullptr;
+            if (!lstmDesc.cifgEnabled) {
+                BatchedLN = new LN::BatchedLayerNorm(inputGateAddLayerId, forgetGateAddLayerId, cellGateAddLayerId, outputGateAddLayerId,
+                                                                            cellSize, getBuilderNetwork()->getBuilder(), "norm");
+            } else {
+                BatchedLN = new LN::BatchedLayerNorm(-1, forgetGateAddLayerId, cellGateAddLayerId, outputGateAddLayerId,
                                                                          cellSize, getBuilderNetwork()->getBuilder(), "norm");
+            }
+
             idx_t LNid = BatchedLN->addBatchedLayerNorm(params);
             inputGateAddLayerId = BatchedLN->getIGateLNId();
             forgetGateAddLayerId = BatchedLN->getFGateLNId();
@@ -547,12 +574,44 @@ std::vector<std::string> ModelBuilder::createFullLstm(LstmLayer::LstmParams& par
             outputGateAddLayerId = BatchedLN->getOGateLNId();
         }
     }
-    // i_t = sigma(W_{xi}x_t+W_{hi}h_{t-1}+W_{ci}C_{t-1}+b_i)
-    idx_t inputGateActivationFn = getBuilderNetwork()->getBuilder()->addLayer({inputGateAddLayerId}, SIGMOIDLayer(getLayerName("sigmoid")) \
-                                  .setPort(Port(cellStateDims)));
+
     // f_t = sigma(W_{xf}x_t+W_{hf}h_{t-1}+b_f)
     idx_t forgetGateActivationFn = getBuilderNetwork()->getBuilder()->addLayer({forgetGateAddLayerId}, SIGMOIDLayer(getLayerName("sigmoid")) \
-                                   .setPort(Port(cellStateDims)));
+                                    .setPort(Port(cellStateDims)));
+
+    // i_t = sigma(W_{xi}x_t+W_{hi}h_{t-1}+W_{ci}C_{t-1}+b_i)
+    idx_t inputGateActivationFn = 123456;
+    if (!lstmDesc.cifgEnabled) {
+        inputGateActivationFn = getBuilderNetwork()->getBuilder()->addLayer({inputGateAddLayerId}, SIGMOIDLayer(getLayerName("sigmoid")) \
+                                    .setPort(Port(cellStateDims)));
+    } else {
+        // i_t = (1 - f_t)
+        InferenceEngine::TensorDesc td(InferenceEngine::Precision::FP32, cellStateDims, InferenceEngine::Layout::NC);
+        InferenceEngine::TBlob<float>::Ptr blob1 = std::make_shared<InferenceEngine::TBlob<float>>(td);
+        blob1->allocate();
+
+        float* blob1DataPtr = blob1->buffer().as<float*>();
+        for (auto i =0; i < blob1->size(); i++)  {
+            blob1DataPtr[i] = -1;
+        }
+
+        InferenceEngine::TBlob<float>::Ptr blob2 = std::make_shared<InferenceEngine::TBlob<float>>(td);
+        blob2->allocate();
+        float* blob2DataPtr = blob2->buffer().as<float*>();
+        for (auto i =0; i < blob2->size(); i++)  {
+            blob2DataPtr[i] = 1;
+        }
+
+        idx_t scaleShiftLayerId = getBuilderNetwork()->getBuilder()->addLayer({forgetGateActivationFn}, SCALESHIFTLayer(getLayerName("cifg-layer")));
+        idx_t negOneLayerId = getBuilderNetwork()->getBuilder()->addLayer(CONSTLayer("negative-one").setData(blob1));
+        idx_t oneLayerId = getBuilderNetwork()->getBuilder()->addLayer(CONSTLayer("one").setData(blob2));
+
+        getBuilderNetwork()->getBuilder()->connect({negOneLayerId}, {scaleShiftLayerId, 1});
+        getBuilderNetwork()->getBuilder()->connect({oneLayerId}, {scaleShiftLayerId, 2});
+
+        inputGateActivationFn = scaleShiftLayerId;
+    }
+
     // g(W_{xc}x_t+W_{hc}h_{t-1}+b_c)
     idx_t cellGateTanhFn = getBuilderNetwork()->getBuilder()->addLayer({cellGateAddLayerId}, TANHLayer(getLayerName("tanh")) \
                            .setPort(Port(cellStateDims)));
