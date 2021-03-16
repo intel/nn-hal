@@ -824,20 +824,20 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
             case OperationType::QUANTIZED_LSTM:
             case OperationType::LSTM:
                 // yet to add support for CIFG
-                if (isOperandDataNull(operation.inputs[1]) ||
-                    isOperandDataNull(operation.inputs[5]) ||
-                    isOperandDataNull(operation.inputs[12]))
-                {
-                    VLOG(L1, "Lstm CIFG implementation not ready yet");
-                    return false;
-                }
+                // if (isOperandDataNull(operation.inputs[1]) ||
+                //     isOperandDataNull(operation.inputs[5]) ||
+                //     isOperandDataNull(operation.inputs[12]))
+                // {
+                //     VLOG(L1, "Lstm CIFG implementation not ready yet");
+                //     return false;
+                // }
 
                 break;
             case OperationType::FULLY_CONNECTED:
                 break;
-            case OperationType::DEQUANTIZE:
-                VLOG(L1, "Supporting DEQUantize !!!!");
-                break;
+            // case OperationType::DEQUANTIZE:
+            //     VLOG(L1, "Supporting DEQUantize !!!!");
+            //     break;
             default:
                 VLOG(L1, "OP (%d) not supported", operation.type);
                 return false;

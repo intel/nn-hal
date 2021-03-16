@@ -190,8 +190,10 @@ bool GnaPreparedModel::constructGNAGraph(std::pair<int, int> indices) {
     mBuilderModel = new IRBuilder::ModelBuilder();
     mBuilderModel->initializeBuilder();
 
+    VLOG(L1, "Indices we are constructing the graph with from:%d to:%d", std::get<0>(indices), std::get<1>(indices));
+
     time_point irbuild_start = now();
-    for (size_t i=std::get<0>(indices); i <= std::get<1>(indices); ++i) {
+    for (size_t i=std::get<0>(indices); i < std::get<1>(indices); ++i) {
         auto operation = mModel.main.operations[i];
 
         VLOG(L1, "get operation %d ready to add", operation.type);
@@ -199,23 +201,29 @@ bool GnaPreparedModel::constructGNAGraph(std::pair<int, int> indices) {
         switch (operation.type) {
            case OperationType::QUANTIZED_LSTM:
                 success = operationQuantizedLSTM(operation);
+                VLOG(L1, "Returning after creating quant lstm node");
                 break;
 
            case OperationType::LSTM:
                 success = operationLSTM(operation);
+                VLOG(L1, "Returning after creating lstm node");
                 break;
 
             case OperationType::FULLY_CONNECTED:
                 success = operationFullyConnected(operation);
+                VLOG(L1, "Returning after creating quant FC node");
                 break;
 
             default:
                 VLOG(L1, "unsupported operation %d", operation.type);
                 return false;
         }
+
         if (success == false) {
             VLOG(L1, "failed to convert operation %d", operation.type);
             return false;
+        } else {
+            VLOG(L1, "Successfully built an operation of type: %d", operation.type);
         }
     }
 
@@ -345,7 +353,6 @@ OpContainer* GnaPreparedModel::constructCpuGraph(std::pair<int, int> indices) {
         BaseOp* cpuOperation = nullptr;
         bool success = false;
 
-        VLOG(L1, "%s get operation %d ready to add", __func__, operation.type);
         dumpOperation(operation);
         switch (operation.type) {
            case OperationType::DEQUANTIZE:
@@ -370,12 +377,10 @@ OpContainer* GnaPreparedModel::constructCpuGraph(std::pair<int, int> indices) {
         }
     }
 
-    VLOG(L1, "Returning ... %s", __func__);
     return subgraphOps;
 }
 
 BaseOp* GnaPreparedModel::getCpuOpFromLayerName(std::string layer) {
-    VLOG(L1, "%s", __func__);
     BaseOp* ptrOp = nullptr;
     for (auto container: mNwManager) {
         if (container->isCpuGraph()) {
@@ -1046,7 +1051,7 @@ Blob::Ptr GnaPreparedModel::getBlobFromMemoryPool(uint32_t index, const V1_0_Req
     auto& r = mRuntimeRequestPoolInfos[poolIndex];
 
     if (arg.dimensions.size() > 0) {
-            // It's the responsibility of the caller to validate that
+            // It's the responsibility of the cal
             // from.dimensions only modifies the dimensions that were
             // unspecified in the model.main.  That's the case in SampleDriver.cpp
             // with the call to validateRequest().
@@ -1083,7 +1088,6 @@ Blob::Ptr GnaPreparedModel::getBlobFromMemoryPool(uint32_t index, const V1_0_Req
 }
 
 void GnaPreparedModel::executeGnaGraph() {
-    VLOG(L1, "%s", __func__);
 #ifdef PERF_COUNTERS
     auto gna_t0 = Time::now();
     gnaPluginPtr->Infer();
@@ -1107,7 +1111,6 @@ void GnaPreparedModel::executeGnaGraph() {
 }
 
 bool GnaPreparedModel::updateMemoryAfterGNAGraphExecution(const V1_0_Request& request) {
-    VLOG(L1, "%s", __func__);
     auto reqOutputs = request.outputs;
     for (auto i =0; i < mModelOutputIndices.size(); i++) {
         auto index = mModelOutputIndices[i];
@@ -1139,10 +1142,13 @@ bool GnaPreparedModel::updateMemoryAfterGNAGraphExecution(const V1_0_Request& re
                 }
 #else
                 if (operand.type == OperandType::TENSOR_QUANT16_SYMM) {
+                    VLOG(L1, "Quantizing to TENSOR_QUANT16_SYMM");
                     quantizeToQuant16(srcPtr, (uint16_t*)destPtr, operand.shape());
                 } else if (operand.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED) {
+                    VLOG(L1, "Quantizing to TENSOR_QUANT8_ASYMM_SIGNED");
                     quantizeToQuant8Signed(srcPtr, (int8_t*)destPtr, operand.shape());
                 } else if (operand.type == OperandType::TENSOR_FLOAT32) {
+                    VLOG(L1, "Copying FLOAT32 ....");
                     std::memcpy((uint8_t*)destPtr, outputBlob->buffer().as<uint8_t*>(), outputBlob->byteSize());
                 }
 #endif
@@ -1249,7 +1255,7 @@ void GnaPreparedModel::asyncExecute(const V1_0_Request& request, MeasureTiming m
         if (iter != mInputPorts.end()) {
             std::string layerName = iter->second.layerName;
             RunTimeOperandInfo& operandInfo = getOperandFromMemoryPool(index, request);
- 
+
             if (iter->second.cpuLayer) {
                 VLOG(L1, "Copying input to CPU layer of name: %s", layerName.c_str());
                 auto layerPtr = getCpuOpFromLayerName(layerName);
@@ -1261,6 +1267,7 @@ void GnaPreparedModel::asyncExecute(const V1_0_Request& request, MeasureTiming m
                 layerPtr->setInputData(static_cast<uint8_t*>(operandInfo.buffer),
                                         operandInfo.length);
             } else if (iter->second.memoryLayer) {
+                VLOG(L1, "Setting memory state for layername:", layerName.c_str());
                 gnaPluginPtr->setMemoryState(layerName, srcBlob);
             } else {
                 // Make sure the layername is present in inputinfo from the layer
@@ -1581,6 +1588,16 @@ bool GnaPreparedModel::operationLSTM(const Operation& operation)
         isOperandDataNull(operation.inputs[12])) {
         lstmDescription.append("Cifg");
         lstmDesc.cifgEnabled = true;
+
+        VLOG(L1, "CIFG enabled !!!!!!!!");
+
+        if (isOperandDataNull(operation.inputs[20])) {
+            VLOG(L1, "Input 20 is null!!!!");
+        }
+
+        if (isOperandDataNull(operation.inputs[26])) {
+            VLOG(L1, "Input 26 is null!!!!");
+        }
     } else {
         lstmDescription.append("noCifg");
     }
@@ -1620,8 +1637,16 @@ bool GnaPreparedModel::operationLSTM(const Operation& operation)
     params.cellState.data = getIRBlobFromOperand(operation.inputs[19], 19);
     params.cellState.lifeTime = getV1_0_OperandLifeTime(operation.inputs[19]);
 
-    params.input2inputWeights.data     = getIRBlobFromOperand(operation.inputs[1], 1);
-    params.input2inputWeights.lifeTime = getV1_0_OperandLifeTime(operation.inputs[1]);
+    if (!lstmDesc.cifgEnabled) {
+        params.input2inputWeights.data     = getIRBlobFromOperand(operation.inputs[1], 1);
+        params.input2inputWeights.lifeTime = getV1_0_OperandLifeTime(operation.inputs[1]);
+
+        params.recurrant2inputWeights.data     = getIRBlobFromOperand(operation.inputs[5], 5);
+        params.recurrant2inputWeights.lifeTime     = getV1_0_OperandLifeTime(operation.inputs[5]);
+
+        params.inputGateBias.data = getIRBlobFromOperand(operation.inputs[12], 12);
+        params.inputGateBias.lifeTime = getV1_0_OperandLifeTime(operation.inputs[12]);
+    }
 
     params.input2ForgetWeights.data     = getIRBlobFromOperand(operation.inputs[2], 2);
     params.input2ForgetWeights.lifeTime    = getV1_0_OperandLifeTime(operation.inputs[2]);
@@ -1631,9 +1656,6 @@ bool GnaPreparedModel::operationLSTM(const Operation& operation)
 
     params.input2OutputWeights.data     = getIRBlobFromOperand(operation.inputs[4], 4);
     params.input2OutputWeights.lifeTime     = getV1_0_OperandLifeTime(operation.inputs[4]);
-
-    params.recurrant2inputWeights.data     = getIRBlobFromOperand(operation.inputs[5], 5);
-    params.recurrant2inputWeights.lifeTime     = getV1_0_OperandLifeTime(operation.inputs[5]);
 
     params.recurrant2ForgetWeights.data     = getIRBlobFromOperand(operation.inputs[6], 6);
     params.recurrant2ForgetWeights.lifeTime     = getV1_0_OperandLifeTime(operation.inputs[6]);
@@ -1652,9 +1674,6 @@ bool GnaPreparedModel::operationLSTM(const Operation& operation)
 
     params.cell2OutputWeights.data  = getIRBlobFromOperand(operation.inputs[11], 11);
     params.cell2OutputWeights.lifeTime  = getV1_0_OperandLifeTime(operation.inputs[11]);
-
-    params.inputGateBias.data = getIRBlobFromOperand(operation.inputs[12], 12);
-    params.inputGateBias.lifeTime = getV1_0_OperandLifeTime(operation.inputs[12]);
 
     params.forgetGateBias.data   = getIRBlobFromOperand(operation.inputs[13], 13);
     params.forgetGateBias.lifeTime   = getV1_0_OperandLifeTime(operation.inputs[13]);
@@ -1775,9 +1794,7 @@ bool GnaPreparedModel::operationQuantizedLSTM(const Operation& operation)
     }
 
     params.useLayerNorm = true;
-
-
-    VLOG(L1, "Lstm cell description %s", lstmDescription.c_str());
+    params.useBatchedLayerNorm = true;
 
     params.input.data = getIRBlobFromOperand(operation.inputs[0], 0);
     params.input.lifeTime = getV1_0_OperandLifeTime(operation.inputs[0]);
@@ -1842,8 +1859,13 @@ bool GnaPreparedModel::operationQuantizedLSTM(const Operation& operation)
     }
 
     if (params.useLayerNorm) {
-        params.inputLayerNormWeights.data      = GetConstOperandAsTensor(operation.inputs[20], 20);
-        params.inputLayerNormWeights.lifeTime = getV1_0_OperandLifeTime(operation.inputs[20]);
+        if (!lstmDesc.cifgEnabled) {
+            params.inputLayerNormWeights.data      = GetConstOperandAsTensor(operation.inputs[20], 20);
+            params.inputLayerNormWeights.lifeTime = getV1_0_OperandLifeTime(operation.inputs[20]);
+
+            params.scaleInputGateLayerNorm.data = GetConstOperandAsTensor(operation.inputs[26], 26);
+            params.scaleInputGateLayerNorm.lifeTime = getV1_0_OperandLifeTime(operation.inputs[26]);
+        }
 
         params.forgetLayerNormWeights.data     = GetConstOperandAsTensor(operation.inputs[21], 21);
         params.forgetLayerNormWeights.lifeTime = getV1_0_OperandLifeTime(operation.inputs[21]);
@@ -1854,9 +1876,6 @@ bool GnaPreparedModel::operationQuantizedLSTM(const Operation& operation)
         params.outputLayerNormWeights.data     = GetConstOperandAsTensor(operation.inputs[23], 23);
         params.outputLayerNormWeights.lifeTime = getV1_0_OperandLifeTime(operation.inputs[23]);
 
-        params.scaleInputGateLayerNorm.data = GetConstOperandAsTensor(operation.inputs[26], 26);
-        params.scaleInputGateLayerNorm.lifeTime = getV1_0_OperandLifeTime(operation.inputs[26]);
-
         params.scaleForgetGateLayerNorm.data = GetConstOperandAsTensor(operation.inputs[27], 27);
         params.scaleForgetGateLayerNorm.lifeTime = getV1_0_OperandLifeTime(operation.inputs[27]);
 
@@ -1865,8 +1884,6 @@ bool GnaPreparedModel::operationQuantizedLSTM(const Operation& operation)
 
         params.scaleOutputGateLayerNorm.data = GetConstOperandAsTensor(operation.inputs[29], 29);
         params.scaleOutputGateLayerNorm.lifeTime = getV1_0_OperandLifeTime(operation.inputs[29]);
-
-
     }
 
     params.zeroPointHiddenLayer = PARAM_I32(30);
@@ -1894,12 +1911,10 @@ bool GnaPreparedModel::operationQuantizedLSTM(const Operation& operation)
             mInputPorts.emplace(std::make_pair(operation.inputs[0], LayerInfo(inLayers[0], false)));
         }
     }
-
     return true;
 }
 
 BaseOp* GnaPreparedModel::operationDequantize(const Operation& operation) {
-    VLOG(L1, "%s", __func__);
     static int count = 0;
     std::string name = "dequantize-cpu-" + std::to_string(count++);
 
@@ -1944,8 +1959,6 @@ BaseOp* GnaPreparedModel::operationDequantize(const Operation& operation) {
     //mOutputToLayerMap[operation.outputs[0]] = name;
     mOutputToLayerMap.emplace(std::make_pair(operation.outputs[0],
                                             LayerInfo(name, false, true)));
-
-    VLOG(L1, "%s exiting", __func__);
     return dequantOp;
 }
 
@@ -2075,7 +2088,6 @@ IRBlob::Ptr GnaPreparedModel::GetConstOperandAsTensor(int operand_index, int ope
             op.type == OperandType::TENSOR_QUANT8_SYMM ||
             op.type == OperandType::TENSOR_QUANT16_SYMM ||
             op.type == OperandType::TENSOR_INT32) {
-        VLOG(L1, "__func__ Quant input");
         isQuantInput = true;
     }
     uint32_t len;
