@@ -394,15 +394,18 @@ bool PreparedModel::initializeRunTimeOperandInfo() {
             case OperandType::TENSOR_INT32:
                 to.type = from.type;
                 break;
-	    case OperandType::TENSOR_QUANT8_SYMM:
-                to.type = from.type;
-                break;
-	    case OperandType::TENSOR_QUANT8_ASYMM_SIGNED:
-                to.type = from.type;
-		break;
-	    case OperandType::TENSOR_QUANT16_SYMM:
-                to.type = from.type;
-		break;
+            case OperandType::TENSOR_QUANT8_SYMM:
+                    to.type = from.type;
+                    break;
+            case OperandType::TENSOR_QUANT8_ASYMM_SIGNED:
+                    to.type = from.type;
+            break;
+            case OperandType::TENSOR_QUANT16_SYMM:
+                    to.type = from.type;
+            break;
+            case OperandType::FLOAT16:
+                    to.type = from.type;
+            break;
             case OperandType::TENSOR_QUANT8_ASYMM:
                 ALOGE("OperandType::TENSOR_QUANT8_ASYMM is not supported");
                 break;
@@ -823,21 +826,23 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
         switch (operation.type) {
             case OperationType::QUANTIZED_LSTM:
             case OperationType::LSTM:
-                // yet to add support for CIFG
-                // if (isOperandDataNull(operation.inputs[1]) ||
-                //     isOperandDataNull(operation.inputs[5]) ||
-                //     isOperandDataNull(operation.inputs[12]))
-                // {
-                //     VLOG(L1, "Lstm CIFG implementation not ready yet");
-                //     return false;
-                // }
-
+                VLOG(L1, "Supporting LSTM !!!!");
                 break;
-            case OperationType::FULLY_CONNECTED:
-                break;
-            // case OperationType::DEQUANTIZE:
-            //     VLOG(L1, "Supporting DEQUantize !!!!");
+            // case OperationType::FULLY_CONNECTED:
             //     break;
+            case OperationType::DEQUANTIZE:
+                VLOG(L1, "Supporting Dequantize !!!!");
+                break;
+            case OperationType::QUANTIZE:
+                {
+                    VLOG(L1, "Supporting Quantize !!!!");
+                    // auto operandDetails = model.main.operands[operation.inputs[0]];
+                    // if (operandDetails.type != OperandType::FLOAT32) {
+                    //     VLOG(L1, "Input of type FLOAT16 is not supported");
+                    //     return false;
+                    // }
+                }
+                break;
             default:
                 VLOG(L1, "OP (%d) not supported", operation.type);
                 return false;

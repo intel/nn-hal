@@ -189,20 +189,24 @@ class BaseOp {
     public:
         virtual bool isCpuOp() = 0;
         
-        virtual float* run() {
-            return nullptr;
+        virtual bool run() {
+            return false;
         };
 
         virtual std::string getLayerName() { return "";}
         virtual ~BaseOp() {}
 
         //TODO: Use Blob::Ptr to make it generic
-        virtual bool setInputData(uint8_t* dataPtr, uint32_t len) {
+        virtual bool setInputData(void* dataPtr, uint32_t len) {
             return false;
         }
 
-        virtual std::tuple<float*, int32_t> getOutputData() {
+        virtual std::tuple<void*, int32_t> getOutputData() {
             return std::make_pair(nullptr, 0);
+        }
+
+        virtual void setScaleAndZp(float scaleFactor, int32_t zp) {
+
         }
 };
 
@@ -219,13 +223,13 @@ class OpContainer {
             opsVec.push_back(op);
         }
 
-        float* run() {
+        bool run() {
             VLOG(L1, "%s", __func__);
             for (auto op: opsVec) {
-                output = op->run();
+                op->run(); // TODO: FIX
             }
 
-            return output;
+            return true;
         }
 
         BaseOp* getCpuOpFromLayerName(std::string layer) {
@@ -259,6 +263,15 @@ struct Shape {
     int32_t offset;
 };
 
+enum class DataType {
+    UINT32,
+    FLOAT32,
+    INT8,
+    UINT8,
+    UINT16,
+    INT16
+};
+
 // Information we maintain about each operand during execution that
 // may change during execution.
 struct RunTimeOperandInfo {
@@ -289,6 +302,8 @@ struct RunTimeOperandInfo {
     // we free the buffer.  For non-temporary variables, this count is
     // always 0.
     uint32_t numberOfUsesLeft;
+    DataType inputDataType;
+    DataType outDataType;
 
     Shape shape() const {
         return Shape{.type = type, .dimensions = dimensions, .scale = scale, .offset = zeroPoint};
