@@ -10,7 +10,8 @@
 #include <chrono>
 #include <xmmintrin.h>
 #include <immintrin.h>
-#include "CpuOps.h"
+#include "Dequantize.h"
+#include "Quantize.h"
 
 using namespace std::chrono;
 
@@ -348,7 +349,7 @@ OpContainer* GnaPreparedModel::constructCpuGraph(std::pair<int, int> indices) {
     OpContainer* subgraphOps = new OpContainer(true);
 
     VLOG(L1, "Index start:%d end:%d", std::get<0>(indices), std::get<1>(indices));
-    for (size_t i=std::get<0>(indices); i < std::get<1>(indices); ++i) {
+    for (size_t i=std::get<0>(indices); i <= std::get<1>(indices); ++i) {
         auto operation = mModel.main.operations[i];
         BaseOp* cpuOperation = nullptr;
         bool success = false;
@@ -362,6 +363,16 @@ OpContainer* GnaPreparedModel::constructCpuGraph(std::pair<int, int> indices) {
                 }
                 subgraphOps->addOperation(cpuOperation);
                 VLOG(L1, "Exiting addOperation !!!!");
+                success = true;
+                break;
+
+            case OperationType::QUANTIZE:
+                cpuOperation = operationQuantize(operation);
+                if (!cpuOperation) {
+                    VLOG(L1, "Failed to create Quantize operation !!!!");
+                }
+                subgraphOps->addOperation(cpuOperation);
+                VLOG(L1, "Exiting addOperation for Quantize!!!!");
                 success = true;
                 break;
 
@@ -448,6 +459,9 @@ bool GnaPreparedModel::initialize(const hidl_vec<hidl_handle>& modelCache, const
             case OperationType::DEQUANTIZE:
                 success = true;
                 break;
+            case OperationType::QUANTIZE:
+                success = true;
+                break;
             default:
                 break;
         }
@@ -470,8 +484,6 @@ bool GnaPreparedModel::initialize(const hidl_vec<hidl_handle>& modelCache, const
 
             if (curOpOnCpu != prevOpCpu) {
                 subgraphs.push_back(std::make_pair(startIndex, i-1));
-                startIndex = i;
-
                 if (prevOpCpu) {
                     VLOG(L1, "Index range: %d %d CPU", startIndex, i-1);
                     cpuTarget.push_back(true);
@@ -479,16 +491,17 @@ bool GnaPreparedModel::initialize(const hidl_vec<hidl_handle>& modelCache, const
                     VLOG(L1, "Index range: %d %d GNA", startIndex, i-1);
                     cpuTarget.push_back(false);
                 }
+                startIndex = i;
             }
             prevOpCpu = curOpOnCpu;
         }
     }
-    subgraphs.push_back(std::make_pair(startIndex, mModel.main.operations.size()));
+    subgraphs.push_back(std::make_pair(startIndex, mModel.main.operations.size()-1));
     if (prevOpCpu) {
-        VLOG(L1, "Index range: %d %d CPU", startIndex, mModel.main.operations.size());
+        VLOG(L1, "Index range: %d %d CPU", startIndex, mModel.main.operations.size()-1);
         cpuTarget.push_back(true);
     } else {
-        VLOG(L1, "Index range: %d %d GNA", startIndex, mModel.main.operations.size());
+        VLOG(L1, "Index range: %d %d GNA", startIndex, mModel.main.operations.size()-1);
         cpuTarget.push_back(false);
     }
 
@@ -1084,6 +1097,7 @@ Blob::Ptr GnaPreparedModel::getBlobFromMemoryPool(uint32_t index, const V1_0_Req
     operand.buffer = r.buffer + arg.location.offset;
     operand.length = arg.location.length;
 
+    VLOG(L1, "%s ptr:%p length:%d", __func__, operand.buffer, operand.length);
     return operand;
 }
 
@@ -1188,11 +1202,12 @@ bool GnaPreparedModel::updateMemoryAfterCPUGraphExecution(const V1_0_Request& re
                 // Blob::Ptr outputBlob = gnaPluginPtr->getInferRequest().GetBlob(layerName);
                 // float* srcPtr = outputBlob->buffer().as<float*>();
                 VLOG(L1, "Got layer:%s from cpu layers for index:%d", layerName.c_str(), index);
-                auto[srcPtr, outputLen] = layerPtr->getOutputData();
+                auto[srcPtrVoid, outputLen] = layerPtr->getOutputData();
+                // float* srcPtr = static_cast<float*>(srcPtrVoid);
 
-                VLOG(L1, "Copying output.. Output len:%d", outputLen);
-                for(auto i =0; i < 4; i++)
-                    VLOG(L1, "Copying output at index:%d is :%f", i, srcPtr[i]);
+                // VLOG(L1, "Copying output.. Output len:%d", outputLen);
+                // for(auto i =0; i < 4; i++)
+                //     VLOG(L1, "Copying output at index:%d is :%f", i, srcPtr[i]);
 
 #ifdef PERF_COUNTERS
                 if (operand.type == OperandType::TENSOR_QUANT16_SYMM) {
@@ -1205,13 +1220,13 @@ bool GnaPreparedModel::updateMemoryAfterCPUGraphExecution(const V1_0_Request& re
 #else
                 if (operand.type == OperandType::TENSOR_QUANT16_SYMM) {
                     VLOG(L1, "Copying output.. TENSOR_QUANT16_SYMM");
-                    quantizeToQuant16(srcPtr, (uint16_t*)destPtr, operand.shape());
+                    std::memcpy((uint8_t*)destPtr, (uint8_t*)srcPtrVoid, outputLen*sizeof(uint16_t));
                 } else if (operand.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED) {
                     VLOG(L1, "Copying output.. TENSOR_QUANT8_ASYMM_SIGNED");
-                    quantizeToQuant8Signed(srcPtr, (int8_t*)destPtr, operand.shape());
+                    std::memcpy((uint8_t*)destPtr, (uint8_t*)srcPtrVoid, outputLen*sizeof(uint8_t));
                 } else if (operand.type == OperandType::TENSOR_FLOAT32) {
                     VLOG(L1, "Copying output.. TENSOR_FLOAT32");
-                    std::memcpy((uint8_t*)destPtr, (uint8_t*)srcPtr, outputLen*sizeof(float));
+                    std::memcpy((uint8_t*)destPtr, (uint8_t*)srcPtrVoid, outputLen*sizeof(float));
                 }
 #endif
             } else {
@@ -1249,7 +1264,6 @@ void GnaPreparedModel::asyncExecute(const V1_0_Request& request, MeasureTiming m
 
     for (auto index : mlayerInputIndices) {
         auto inputIndex = mModelInputIndices[index];
-        auto srcBlob = getBlobFromMemoryPool(index, request);
 
         auto iter = mInputPorts.find(inputIndex);
         if (iter != mInputPorts.end()) {
@@ -1264,26 +1278,31 @@ void GnaPreparedModel::asyncExecute(const V1_0_Request& request, MeasureTiming m
                     nnAssert(false);
                 }
 
-                layerPtr->setInputData(static_cast<uint8_t*>(operandInfo.buffer),
-                                        operandInfo.length);
-            } else if (iter->second.memoryLayer) {
-                VLOG(L1, "Setting memory state for layername:", layerName.c_str());
-                gnaPluginPtr->setMemoryState(layerName, srcBlob);
+                auto length = getNumberOfElements(operandInfo.shape().dimensions);
+                layerPtr->setInputData(operandInfo.buffer,
+                                            length);
             } else {
-                // Make sure the layername is present in inputinfo from the layer
-                auto iter2 = std::find_if(gnaPluginPtr->inputInfo.begin(),
-                            gnaPluginPtr->inputInfo.end(),
-                            [layerName](const std::pair<std::string, InputInfo::Ptr>& elem){
-                                return (elem.first == layerName);
-                            });
-                if (iter2 == gnaPluginPtr->inputInfo.end()) {
-                    nnAssert("Input index does not have a input layer");
-                }
+                auto srcBlob = getBlobFromMemoryPool(index, request);
 
-                auto destBlob = gnaPluginPtr->getInferRequest().GetBlob(layerName);
-                uint8_t* dest = destBlob->buffer().as<uint8_t*>();
-                uint8_t* src = srcBlob->buffer().as<uint8_t*>();
-                std::memcpy(dest, src, srcBlob->byteSize());
+                if (iter->second.memoryLayer) {
+                    VLOG(L1, "Setting memory state for layername:", layerName.c_str());
+                    gnaPluginPtr->setMemoryState(layerName, srcBlob);
+                } else {
+                    // Make sure the layername is present in inputinfo from the layer
+                    auto iter2 = std::find_if(gnaPluginPtr->inputInfo.begin(),
+                                gnaPluginPtr->inputInfo.end(),
+                                [layerName](const std::pair<std::string, InputInfo::Ptr>& elem){
+                                    return (elem.first == layerName);
+                                });
+                    if (iter2 == gnaPluginPtr->inputInfo.end()) {
+                        nnAssert("Input index does not have a input layer");
+                    }
+
+                    auto destBlob = gnaPluginPtr->getInferRequest().GetBlob(layerName);
+                    uint8_t* dest = destBlob->buffer().as<uint8_t*>();
+                    uint8_t* src = srcBlob->buffer().as<uint8_t*>();
+                    std::memcpy(dest, src, srcBlob->byteSize());
+                }
             }
         } else {
             ALOGE("Index:%d not found in input layers map", inputIndex);
@@ -1317,6 +1336,7 @@ void GnaPreparedModel::asyncExecute(const V1_0_Request& request, MeasureTiming m
             }
 
             opcontainer->run();
+            VLOG(L1, "Run complete");
             updateMemoryAfterCPUGraphExecution(request);
         } else {
             VLOG(L1, "Executing GNA Graph");
@@ -1951,6 +1971,9 @@ BaseOp* GnaPreparedModel::operationDequantize(const Operation& operation) {
             break;
     }
 
+    RunTimeOperandInfo& outputOp = mOperands[operation.outputs[0]];
+    outputOp.outDataType = DataType::FLOAT32;
+
     //if (static_cast<int>(operandDetails.lifetime) == static_cast<int>(OperandLifeTime::SUBGRAPH_INPUT)) {
         mInputPorts.emplace(std::make_pair(operation.inputs[0],
                                             LayerInfo(name, false, true)));
@@ -1960,6 +1983,60 @@ BaseOp* GnaPreparedModel::operationDequantize(const Operation& operation) {
     mOutputToLayerMap.emplace(std::make_pair(operation.outputs[0],
                                             LayerInfo(name, false, true)));
     return dequantOp;
+}
+
+BaseOp* GnaPreparedModel::operationQuantize(const Operation& operation) {
+    static int count = 0;
+    std::string name = "quantize-cpu-" + std::to_string(count++);
+    RunTimeOperandInfo& inputOp = mOperands[operation.inputs[0]];
+
+    auto operandDetails = mModel.main.operands[operation.inputs[0]];
+    if ( (static_cast<int>(operandDetails.lifetime) == static_cast<int>(OperandLifeTime::CONSTANT_COPY)) ||
+         (static_cast<int>(operandDetails.lifetime) == static_cast<int>(OperandLifeTime::CONSTANT_REFERENCE))) {
+       VLOG(L1, "Quantize Op input is of type const !!!!! Revaluate NW");
+        nnAssert(false);
+    }
+
+    bool isFp16 = false;
+    if (operandDetails.type == OperandType::FLOAT16)
+        isFp16 = true;
+
+    auto OutOperandDetails = mModel.main.operands[operation.outputs[0]];
+    BaseOp* quantOp = nullptr;
+    float   scaleFactor = OutOperandDetails.scale;
+    int32_t zp = OutOperandDetails.zeroPoint;
+    RunTimeOperandInfo& outputOp = mOperands[operation.outputs[0]];
+
+    switch(OutOperandDetails.type) {
+        case OperandType::TENSOR_QUANT8_ASYMM:
+            VLOG(L1, "Quantize op for TENSOR_QUANT8_ASYMM");
+            if (isFp16)
+                quantOp = new QuantizeOp<_Float16, uint8_t>(name, scaleFactor, zp);
+            else
+                quantOp = new QuantizeOp<float, uint8_t>(name, scaleFactor, zp);
+            break;
+        case OperandType::TENSOR_QUANT8_ASYMM_SIGNED:
+            VLOG(L1, "Quantize op for TENSOR_QUANT8_ASYMM_SIGNED");
+            if (isFp16)
+                quantOp = new QuantizeOp<_Float16, int8_t>(name, scaleFactor, zp);
+            else
+                quantOp = new QuantizeOp<float, int8_t>(name, scaleFactor, zp);
+            break;
+        default:
+            VLOG(L1, "Unsupported tensor type");
+            nnAssert(false);
+            break;
+    }
+
+    //if (static_cast<int>(operandDetails.lifetime) == static_cast<int>(OperandLifeTime::SUBGRAPH_INPUT)) {
+        mInputPorts.emplace(std::make_pair(operation.inputs[0],
+                                            LayerInfo(name, false, true)));
+    //}
+
+    //mOutputToLayerMap[operation.outputs[0]] = name;
+    mOutputToLayerMap.emplace(std::make_pair(operation.outputs[0],
+                                            LayerInfo(name, false, true)));
+    return quantOp;
 }
 
 IRBlob::Ptr GnaPreparedModel::GetConstWeightsOperandAsTensor(uint32_t index)
