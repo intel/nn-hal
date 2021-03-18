@@ -27,7 +27,7 @@ NgraphNetworkCreator::NgraphNetworkCreator(std::shared_ptr<NnapiModelInfo> model
 
 NgraphNetworkCreator::~NgraphNetworkCreator() { ALOGV("%s Destructed", __func__); }
 
-void NgraphNetworkCreator::createInputParams() {
+bool NgraphNetworkCreator::createInputParams() {
     for (auto i : mModelInfo->getModelInputIndexes()) {
         std::shared_ptr<ngraph::opset3::Parameter> inputParam;
         auto& nnapiOperand = mModelInfo->getOperand(i);
@@ -45,10 +45,12 @@ void NgraphNetworkCreator::createInputParams() {
                 ALOGE("createInputParams Failure at inputIndex %d, type %d", i,
                       nnapiOperand.type);
                 inputParam = nullptr;
+                return false;
         }
         mNgraphNodes->addInputParam(inputParam);
         mNgraphNodes->setOutputAtOperandIndex(i, inputParam);
     }
+    return true;
 }
 
 void NgraphNetworkCreator::getSupportedOperations(std::vector<bool>& supportedOperations) {
@@ -74,7 +76,7 @@ bool NgraphNetworkCreator::validateOperations() {
 
 bool NgraphNetworkCreator::initializeModel() {
     ALOGV("%s Called", __func__);
-    createInputParams();
+    if (!createInputParams()) return false;
     for (int i = 0; i < mModelInfo->getOperationsSize(); i++) {
         if (mOperationNodes[i] == nullptr) {
             ALOGE("initializeModel Failure at type %d", mModelInfo->getOperationType(i));

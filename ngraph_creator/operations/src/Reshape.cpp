@@ -1,3 +1,4 @@
+//#define LOG_NDEBUG 0
 #include <Reshape.hpp>
 #define LOG_TAG "Reshape"
 
@@ -10,7 +11,19 @@ Reshape::Reshape(int operationIndex) : OperationsBase(operationIndex) {
     mDefaultOutputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
 }
 
-bool Reshape::validate() { return true; }
+bool Reshape::validate() {
+    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) {
+        return false;
+    }
+    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) {
+        return false;
+    }
+    if (!checkInputOperandType(1, (int32_t)OperandType::TENSOR_INT32)) {
+        return false;
+    }
+    ALOGV("%s PASSED", __func__);
+    return true;
+}
 
 std::shared_ptr<ngraph::Node> Reshape::createNode() {
     const auto& dimsOperandIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 1);
