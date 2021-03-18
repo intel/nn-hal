@@ -49,6 +49,10 @@ public:
         auto tmpOperand = mModel.operands[operandIdx];
         return tmpOperand.lifetime;
     }
+    OperandType getOperandType(uint32_t operandIdx) {
+        auto tmpOperand = mModel.operands[operandIdx];
+        return tmpOperand.type;
+    }
 
     bool isOperandLifeTimeTemp(uint32_t operandIdx) {
         if (getOperandLifetime(operandIdx) == OperandLifeTime::TEMPORARY_VARIABLE) return true;

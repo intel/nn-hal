@@ -1,3 +1,4 @@
+//#define LOG_NDEBUG 0
 #include <Concat.hpp>
 #define LOG_TAG "Concat"
 
@@ -10,11 +11,23 @@ Concat::Concat(int operationIndex) : OperationsBase(operationIndex) {
     mDefaultOutputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
 }
 
-bool Concat::validate() { return true; }
+bool Concat::validate() {
+    // Check Output type
+    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) {
+        return false;
+    }
+    // check concatenation axis
+    auto n = sModelInfo->getOperationInputsSize(mNnapiOperationIndex) - 1;          // 0 ~ n-1: The list of n input tensors
+    if (!checkInputOperandType(n, (int32_t)OperandType::INT32)) {
+        return false;
+    }
+    ALOGV("%s PASSED", __func__);
+    return true;
+}
 
 std::shared_ptr<ngraph::Node> Concat::createNode() {
-    auto n = sModelInfo->getOperationInputsSize(mNnapiOperationIndex) - 1;                    // 0 ~ n-1: The list of n input tensors
-    auto axis = sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, n);// n: concatenation axis
+    auto n = sModelInfo->getOperationInputsSize(mNnapiOperationIndex) - 1;          // 0 ~ n-1: The list of n input tensors
+    auto axis = sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, n); // n: concatenation axis
     std::vector<ngraph::Output<ngraph::Node>> inputs;
     ALOGD("createNode n %d, axis %d", n, axis);
     for (int i = 0; i < n; i++) {

@@ -28,6 +28,11 @@ protected:
     std::shared_ptr<ngraph::Node> toNCHW(size_t inputIndex, size_t outputIndex);
     void addResultNode(size_t index, std::shared_ptr<ngraph::Node> resultNode);
 
+    // helper functions
+    bool checkOperandType(uint32_t operandIndex, const int32_t expectedOperandType, const std::string& strLogInfo = "Operand");
+    bool checkOutputOperandType(uint32_t index, const int32_t expectedOperandType);
+    bool checkInputOperandType(uint32_t index, const int32_t expectedOperandType);
+
 public:
     static std::shared_ptr<NnapiModelInfo> sModelInfo;
     static std::shared_ptr<NgraphNodes> mNgraphNodes;

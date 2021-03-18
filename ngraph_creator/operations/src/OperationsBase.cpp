@@ -53,6 +53,24 @@ void OperationsBase::setNgraphNodes(std::shared_ptr<NgraphNodes> nodes) { mNgrap
 
 bool OperationsBase::validate() { return true; }
 
+bool OperationsBase::checkOperandType(uint32_t operandIndex, const int32_t expectedOperandType, const std::string& strLogInfo) {
+    const auto operandType = (int32_t)sModelInfo->getOperandType(operandIndex);
+    if (operandType != expectedOperandType) {
+        ALOGE("OperationIndex %d %s Index %d type %d invalid", mNnapiOperationIndex, strLogInfo.c_str(), operandIndex, operandType);
+        return false;
+    }
+    ALOGV("OperationIndex %d %s Index %d type %d PASSED", mNnapiOperationIndex, strLogInfo.c_str(), operandIndex, operandType);
+    return true;
+}
+bool OperationsBase::checkOutputOperandType(uint32_t index, const int32_t expectedOperandType) {
+    const auto& operandIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, index);
+    return checkOperandType(operandIndex, expectedOperandType, "Output");
+}
+bool OperationsBase::checkInputOperandType(uint32_t index, const int32_t expectedOperandType) {
+    const auto& operandIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, index);
+    return checkOperandType(operandIndex, expectedOperandType, "Input");
+}
+
 }  // namespace nnhal
 }  // namespace neuralnetworks
 }  // namespace hardware
