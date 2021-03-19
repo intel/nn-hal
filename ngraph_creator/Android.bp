@@ -11,6 +11,8 @@ cc_library_static {
         "src/NgraphNodes.cpp",
         "operations/src/Add.cpp",
         "operations/src/Concat.cpp",
+        "operations/src/Conv_2d.cpp",
+        "operations/src/Depthwise_Conv_2d.cpp",
         "operations/src/Reshape.cpp",
         "operations/src/OperationsBase.cpp",
     ],

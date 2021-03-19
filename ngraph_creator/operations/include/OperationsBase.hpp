@@ -1,9 +1,9 @@
 #pragma once
 
 #include <Driver.h>
-#include <Temp.h>  //TODO: Remove this once NNAPI_Utils is ready
 #include <android/log.h>
 #include <log/log.h>
+#include <NgraphHelper.hpp>
 #include <NgraphNodes.hpp>
 #include <ngraph/ngraph.hpp>
 #include <ngraph/opsets/opset3.hpp>
@@ -17,7 +17,7 @@ namespace nnhal {
 
 class OperationsBase {
 protected:
-    enum ConversionType { NHWC_NCHW, NCHW_NHWC };
+    enum ConversionType { NHWC_NCHW, NCHW_NHWC, IHWO_OIHW, OHWI_OIHW, NHC_NCH, NCH_NHC };
     uint32_t mDefaultOutputIndex;
     int mNnapiOperationIndex;
     std::shared_ptr<ngraph::Node> transpose(ConversionType type,
@@ -32,6 +32,17 @@ protected:
     bool checkOperandType(uint32_t operandIndex, const int32_t expectedOperandType, const std::string& strLogInfo = "Operand");
     bool checkOutputOperandType(uint32_t index, const int32_t expectedOperandType);
     bool checkInputOperandType(uint32_t index, const int32_t expectedOperandType);
+    const vec<uint32_t> getInputOperandDimensions(uint32_t inputIndex);
+    template <typename T> std::shared_ptr<ngraph::Node> getInputNode(uint32_t inputIndex) {
+        auto operandIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, inputIndex);
+        if (sModelInfo->isOperandLifeTimeConst(operandIndex)) {
+            auto operandValues = sModelInfo->GetConstVecOperand<T>(operandIndex);
+            auto operandDims = getInputOperandDimensions(inputIndex);
+            return std::make_shared<ngraph::opset3::Constant>(
+                ngraph::element::f32, toNgraphShape(operandDims), operandValues);
+        } else
+            return mNgraphNodes->getOperationOutput(operandIndex).get_node_shared_ptr();
+    }
 
 public:
     static std::shared_ptr<NnapiModelInfo> sModelInfo;
