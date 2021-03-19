@@ -20,7 +20,7 @@
 #include "IRBuilder.h"
 #include "Driver.h"
 
-#define PERF_COUNTERS
+//#define PERF_COUNTERS
 //#define CACHING
 //#define NN_DEBUG
 
