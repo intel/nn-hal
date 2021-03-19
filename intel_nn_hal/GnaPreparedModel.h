@@ -43,6 +43,7 @@ class GnaPreparedModel : public PreparedModel {
 
     IRBuilder::ModelBuilder* mBuilderModel;
     GnaNetwork* gnaPluginPtr;
+    std::vector<IRBlob::Ptr> mModelIRBlobs; /*intermediate IRBlobs to be deallocated after network is loaded into the Plugin */
 
     bool isDecoderNw, isEnc0Nw, isEnc1Nw = false;
     std::string modelNameStr;

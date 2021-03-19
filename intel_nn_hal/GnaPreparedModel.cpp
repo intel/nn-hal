@@ -229,6 +229,9 @@ bool GnaPreparedModel::initialize(const hidl_vec<hidl_handle>& modelCache, const
     InferenceEngine::CNNNetwork passed_network({network});
     gnaPluginPtr->loadNetwork(passed_network, isDecoderNw);
 #endif
+    for (auto item:mModelIRBlobs) {
+        item->deallocate();
+    }
     gnaPluginPtr->queryState();
     gnaPluginPtr->reset();
 
@@ -318,6 +321,13 @@ bool GnaPreparedModel::initialize(const hidl_vec<hidl_handle>& modelCache, const
         writeNBytes(modelNameStr.c_str(), hashLen, dataCacheFd);
     }
 #endif
+    for (auto runtimeInfo : mPoolInfos) {
+        runtimeInfo.update();
+    }
+    for (auto runtimeInfo : mPoolInfos) {
+        runtimeInfo.unmap_mem();
+    }
+
     return true;
 }
 
@@ -1625,32 +1635,32 @@ IRBlob::Ptr GnaPreparedModel::GetConstWeightsOperandAsTensor(uint32_t index)
         TensorDesc td(InferenceEngine::Precision::FP32, permuteDims(inputDims, order), layout);
         if (inputDims.size() != 4) {
             InferenceEngine::TBlob<float>::Ptr blob = nullptr;
-                if (isQuantInput) {
-                    blob = std::make_shared<InferenceEngine::TBlob<float>>(td);
-                    blob->allocate();
+            if (isQuantInput) {
+                blob = std::make_shared<InferenceEngine::TBlob<float>>(td);
+                blob->allocate();
 #ifdef PERF_COUNTERS
-                    if (op.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED) {
-                        deQuantize((int8_t*)buf, getNumberOfElements(op.dimensions), op.scale, op.zeroPoint, blob->buffer().as<float*>(), runtimeMetrics);
-                    } else if (op.type == OperandType::TENSOR_QUANT8_SYMM, 8) {
-                        deQuantize((int8_t*)buf, getNumberOfElements(op.dimensions), op.scale, 0, blob->buffer().as<float*>(), runtimeMetrics);
-                    } else if (op.type == OperandType::TENSOR_QUANT16_SYMM) {
-                        deQuantize((int16_t*)buf, getNumberOfElements(op.dimensions), op.scale, 0, blob->buffer().as<float*>(), runtimeMetrics);
-                    }
+                if (op.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED) {
+                    deQuantize((int8_t*)buf, getNumberOfElements(op.dimensions), op.scale, op.zeroPoint, blob->buffer().as<float*>(), runtimeMetrics);
+                } else if (op.type == OperandType::TENSOR_QUANT8_SYMM, 8) {
+                    deQuantize((int8_t*)buf, getNumberOfElements(op.dimensions), op.scale, 0, blob->buffer().as<float*>(), runtimeMetrics);
+                } else if (op.type == OperandType::TENSOR_QUANT16_SYMM) {
+                    deQuantize((int16_t*)buf, getNumberOfElements(op.dimensions), op.scale, 0, blob->buffer().as<float*>(), runtimeMetrics);
+                }
 #else
-                    if (op.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED) {
-                        deQuantize((int8_t*)buf, getNumberOfElements(op.dimensions), op.scale, op.zeroPoint, blob->buffer().as<float*>());
-                    } else if (op.type == OperandType::TENSOR_QUANT8_SYMM, 8) {
-                        deQuantize((int8_t*)buf, getNumberOfElements(op.dimensions), op.scale, 0, blob->buffer().as<float*>());
-                    } else if (op.type == OperandType::TENSOR_QUANT16_SYMM) {
-                        deQuantize((int16_t*)buf, getNumberOfElements(op.dimensions), op.scale, 0, blob->buffer().as<float*>());
-                    }
+                if (op.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED) {
+                    deQuantize((int8_t*)buf, getNumberOfElements(op.dimensions), op.scale, op.zeroPoint, blob->buffer().as<float*>());
+                } else if (op.type == OperandType::TENSOR_QUANT8_SYMM, 8) {
+                    deQuantize((int8_t*)buf, getNumberOfElements(op.dimensions), op.scale, 0, blob->buffer().as<float*>());
+                } else if (op.type == OperandType::TENSOR_QUANT16_SYMM) {
+                    deQuantize((int16_t*)buf, getNumberOfElements(op.dimensions), op.scale, 0, blob->buffer().as<float*>());
+                }
 #endif
-                }
-                else {
-            InferenceEngine::TBlob<float>::Ptr blob =
-                                std::make_shared<InferenceEngine::TBlob<float>>(td, (float *)buf, len);
-            blob->allocate();
-                }
+            }
+            else {
+                InferenceEngine::TBlob<float>::Ptr blob =
+                            std::make_shared<InferenceEngine::TBlob<float>>(td, (float *)buf, len);
+                blob->allocate();
+            }
             return blob;
         } else {
             InferenceEngine::TBlob<float>::Ptr blob =
@@ -1762,7 +1772,7 @@ IRBlob::Ptr GnaPreparedModel::GetConstOperandAsTensor(int operand_index, int ope
                         deQuantize((int16_t*)buf, getNumberOfElements(op.dimensions), op.scale, 0, blob->buffer().as<float*>(), runtimeMetrics);
                     } else if (op.type == OperandType::TENSOR_INT32) {
                         deQuantize((int32_t*)buf, getNumberOfElements(op.dimensions), op.scale, 0, blob->buffer().as<float*>(), runtimeMetrics);
-                    }
+                    }   
 #else
                     if (op.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED) {
                         deQuantize((int8_t*)buf, getNumberOfElements(op.dimensions), op.scale, op.zeroPoint, blob->buffer().as<float*>());
@@ -1773,10 +1783,15 @@ IRBlob::Ptr GnaPreparedModel::GetConstOperandAsTensor(int operand_index, int ope
                     } else if (op.type == OperandType::TENSOR_INT32) {
                         deQuantize((int32_t*)buf, getNumberOfElements(op.dimensions), op.scale, 0, blob->buffer().as<float*>());
                     }
+                
 #endif
                 } else {
                     blob = std::make_shared<InferenceEngine::TBlob<float>>(td, (float *)buf, len);
                     blob->allocate();
+                }
+                if (op.lifetime == V1_0_OperandLifeTime::CONSTANT_COPY || op.lifetime == V1_0_OperandLifeTime::CONSTANT_REFERENCE) {
+                    mModelIRBlobs.push_back(blob);
+                    buf = nullptr;
                 }
                 return blob;
             } else {
@@ -1804,6 +1819,10 @@ IRBlob::Ptr GnaPreparedModel::GetConstOperandAsTensor(int operand_index, int ope
                             }
                         }
                     }
+                }
+                if (op.lifetime == V1_0_OperandLifeTime::CONSTANT_COPY || op.lifetime == V1_0_OperandLifeTime::CONSTANT_REFERENCE) {
+                    mModelIRBlobs.push_back(blob);
+                    buf = nullptr;
                 }
                 return blob;
             }
