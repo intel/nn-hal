@@ -25,6 +25,10 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(int operationInd
             return std::make_shared<Concat>(operationIndex);
         case OperationType::RESHAPE:
             return std::make_shared<Reshape>(operationIndex);
+        case OperationType::CONV_2D:
+            return std::make_shared<Conv_2d>(operationIndex);
+        case OperationType::DEPTHWISE_CONV_2D:
+            return std::make_shared<Depthwise_Conv_2d>(operationIndex);
         default:
             ALOGE("%s Cannot identify OperationType %d", __func__, operationType);
             break;

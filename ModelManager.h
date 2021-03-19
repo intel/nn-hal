@@ -58,6 +58,11 @@ public:
         if (getOperandLifetime(operandIdx) == OperandLifeTime::TEMPORARY_VARIABLE) return true;
         return false;
     }
+    bool isOperandLifeTimeConst(uint32_t operandIdx) {
+        if (getOperandLifetime(operandIdx) == OperandLifeTime::CONSTANT_COPY ||
+            getOperandLifetime(operandIdx) == OperandLifeTime::CONSTANT_REFERENCE) return true;
+        return false;
+    }
 
     template <typename T>
     T GetConstOperand(uint32_t index) {
@@ -68,15 +73,12 @@ public:
     }
 
     const auto& getOperations() {
-        ALOGD("%s", __func__);
         return mModel.operations;
     }
     const auto& getOperationOutput(int operationIndex, uint32_t outputIndex) {
-        ALOGD("%s", __func__);
         return mModel.operations[operationIndex].outputs[outputIndex];
     }
     const auto& getOperationInput(int operationIndex, uint32_t inputIndex) {
-        ALOGD("%s", __func__);
         return mModel.operations[operationIndex].inputs[inputIndex];
     }
     size_t getOperationInputsSize(int operationIndex) { return mModel.operations[operationIndex].inputs.size(); }

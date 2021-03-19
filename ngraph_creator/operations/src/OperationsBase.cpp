@@ -18,6 +18,19 @@ std::shared_ptr<ngraph::Node> OperationsBase::transpose(ConversionType type,
             break;
         case NCHW_NHWC:
             order = {0, 2, 3, 1};
+            break;
+        case IHWO_OIHW:
+            order = {3, 0, 1, 2};
+            break;
+        case OHWI_OIHW:
+            order = {0, 3, 1, 2};
+            break;
+        case NHC_NCH:
+            order = {0, 2, 1};
+            break;
+        case NCH_NHC:
+            order = {0, 1, 2};
+            break;
     }
     const auto order_node =
         ngraph::opset3::Constant::create(ngraph::element::i64, ngraph::Shape{order.size()}, order);
@@ -69,6 +82,11 @@ bool OperationsBase::checkOutputOperandType(uint32_t index, const int32_t expect
 bool OperationsBase::checkInputOperandType(uint32_t index, const int32_t expectedOperandType) {
     const auto& operandIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, index);
     return checkOperandType(operandIndex, expectedOperandType, "Input");
+}
+const vec<uint32_t> OperationsBase::getInputOperandDimensions(uint32_t inputIndex) {
+    const auto& operandIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, inputIndex);
+    const auto& operand = sModelInfo->getOperand(operandIndex);
+    return operand.dimensions;
 }
 
 }  // namespace nnhal
