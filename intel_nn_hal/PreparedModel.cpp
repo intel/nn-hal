@@ -136,7 +136,7 @@ bool setRunTimePoolInfosFromHidlMemories(std::vector<RunTimePoolInfo>* poolInfos
 static bool setInfoAndAllocateIfNeeded(RunTimeOperandInfo* info, const Shape& shape) {
     // For user-provided model output operands, the parameters must match the Shape
     // calculated from the preparation step.
-    if (info->lifetime == V1_0_OperandLifeTime::SUBGRAPH_OUTPUT) {
+    if (info->lifetime == V1_3_OperandLifeTime::SUBGRAPH_OUTPUT) {
         if (info->type != shape.type || info->dimensions != shape.dimensions) {
             LOG(ERROR) << "Invalid type or dimensions for model output";
             return false;
@@ -151,7 +151,7 @@ static bool setInfoAndAllocateIfNeeded(RunTimeOperandInfo* info, const Shape& sh
     info->dimensions = shape.dimensions;
     info->scale = shape.scale;
     info->zeroPoint = shape.offset;
-    if (info->lifetime == V1_0_OperandLifeTime::TEMPORARY_VARIABLE && info->buffer == nullptr) {
+    if (info->lifetime == V1_3_OperandLifeTime::TEMPORARY_VARIABLE && info->buffer == nullptr) {
         uint32_t length = sizeOfData(info->type, info->dimensions);
         info->buffer = new uint8_t[length];
         if (info->buffer == nullptr) {
@@ -210,7 +210,7 @@ std::vector<T> PreparedModel::GetConstVecFromBuffer(const uint8_t* buf, uint32_t
 
 bool PreparedModel::isOperandDataNull(int index) {
     const auto op = mModel.main.operands[index];
-    if (op.lifetime == V1_0_OperandLifeTime::NO_VALUE) {
+    if (op.lifetime == V1_3_OperandLifeTime::NO_VALUE) {
         VLOG(L1, "index %d has life time NO_VALUE", index);
         return true;
     }
@@ -222,24 +222,24 @@ const uint8_t* PreparedModel::GetOperandMemory(const Model& model, uint32_t inde
                                                uint32_t& len_out) {
     const auto op = model.main.operands[index];
     len_out = op.location.length;
-    if (op.lifetime == V1_0_OperandLifeTime::CONSTANT_COPY) {
+    if (op.lifetime == V1_3_OperandLifeTime::CONSTANT_COPY) {
         if (op.location.poolIndex != 0) {
             ALOGE("CONSTANT_COPY expects poolIndex to be 0");
             nnAssert(false);
         }
-        VLOG(L1, "operand lifetime V1_0_OperandLifeTime::CONSTANT_COPY");
+        VLOG(L1, "operand lifetime V1_3_OperandLifeTime::CONSTANT_COPY");
         return (const_cast<uint8_t*>(&model.operandValues[op.location.offset]));
         // to.numberOfUsesLeft = 0;
-    } else if (op.lifetime == V1_0_OperandLifeTime::CONSTANT_REFERENCE) {
-        VLOG(L1, "operand lifetime V1_0_OperandLifeTime::CONSTANT_REFERENCE");
+    } else if (op.lifetime == V1_3_OperandLifeTime::CONSTANT_REFERENCE) {
+        VLOG(L1, "operand lifetime V1_3_OperandLifeTime::CONSTANT_REFERENCE");
         auto poolIndex = op.location.poolIndex;
         // nnAssert(poolIndex < mPoolInfos.size()); //aks fix me
         auto& r = mPoolInfos[poolIndex];
         return (const_cast<uint8_t*>(r.buffer + op.location.offset));
-    } else if (op.lifetime == V1_0_OperandLifeTime::SUBGRAPH_INPUT ||
-               op.lifetime == V1_0_OperandLifeTime::SUBGRAPH_OUTPUT ||
-               op.lifetime == V1_0_OperandLifeTime::NO_VALUE) {
-        VLOG(L1, "operand lifetime V1_0_OperandLifeTime::SUBGRAPH_INPUT||SUBGRAPH_OUTPUT||NO_VALUE");
+    } else if (op.lifetime == V1_3_OperandLifeTime::SUBGRAPH_INPUT ||
+               op.lifetime == V1_3_OperandLifeTime::SUBGRAPH_OUTPUT ||
+               op.lifetime == V1_3_OperandLifeTime::NO_VALUE) {
+        VLOG(L1, "operand lifetime V1_3_OperandLifeTime::SUBGRAPH_INPUT||SUBGRAPH_OUTPUT||NO_VALUE");
 
         if (op.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED ||
             op.type == OperandType::TENSOR_QUANT8_SYMM ||
@@ -250,8 +250,8 @@ const uint8_t* PreparedModel::GetOperandMemory(const Model& model, uint32_t inde
         len_out = sizeOfData(op.type, op.dimensions);
         }
         return nullptr;
-    } else if (op.lifetime == V1_0_OperandLifeTime::TEMPORARY_VARIABLE) {
-        VLOG(L1, "operand lifetime V1_0_OperandLifeTime::TEMPORARY_VARIABLE");
+    } else if (op.lifetime == V1_3_OperandLifeTime::TEMPORARY_VARIABLE) {
+        VLOG(L1, "operand lifetime V1_3_OperandLifeTime::TEMPORARY_VARIABLE");
         VLOG(L1, "operand is expected to be const, but lifetime is %d", op.lifetime);
         len_out = sizeOfData(op.type, op.dimensions);
         // nnAssert(false);
@@ -291,7 +291,7 @@ OutputPort PreparedModel::getPort(int index) {
         nnAssert(false);
     }
     const auto op = mModel.main.operands[index];
-    if (op.lifetime == V1_0_OperandLifeTime::SUBGRAPH_INPUT) {
+    if (op.lifetime == V1_3_OperandLifeTime::SUBGRAPH_INPUT) {
         VLOG(L1, "Model input operand\n");
         std::ostringstream operandName;
         operandName << "input" << index;
@@ -339,16 +339,16 @@ OutputPort PreparedModel::getPort(int index) {
 
         return mPorts[index];
     }
-    if (op.lifetime == V1_0_OperandLifeTime::SUBGRAPH_OUTPUT) {
+    if (op.lifetime == V1_3_OperandLifeTime::SUBGRAPH_OUTPUT) {
         VLOG(L1, "Model output expected as input, not possible");
         nnAssert(false);
     }
-    if (op.lifetime == V1_0_OperandLifeTime::NO_VALUE) {
+    if (op.lifetime == V1_3_OperandLifeTime::NO_VALUE) {
         VLOG(L1, "port is expected to be allocated for this as output from other layer");
         nnAssert(false);
     }
-    if (op.lifetime == V1_0_OperandLifeTime::TEMPORARY_VARIABLE) {
-        VLOG(L1, "getport V1_0_OperandLifeTime::TEMPORARY_VARIABLE\n");
+    if (op.lifetime == V1_3_OperandLifeTime::TEMPORARY_VARIABLE) {
+        VLOG(L1, "getport V1_3_OperandLifeTime::TEMPORARY_VARIABLE\n");
         if (!mPorts[index]) nnAssert(false);
         VLOG(L1, "mPorts[%d] already allocated\n", index);
         return mPorts[index];
@@ -417,16 +417,16 @@ bool PreparedModel::initializeRunTimeOperandInfo() {
         to.length = from.location.length;
         to.lifetime = from.lifetime;
         switch (from.lifetime) {
-            case V1_0_OperandLifeTime::TEMPORARY_VARIABLE:
+            case V1_3_OperandLifeTime::TEMPORARY_VARIABLE:
                 to.buffer = nullptr;
                 to.length = sizeOfData(to.type, to.dimensions);
                 to.numberOfUsesLeft = from.numberOfConsumers;
                 break;
-            case V1_0_OperandLifeTime::CONSTANT_COPY:
+            case V1_3_OperandLifeTime::CONSTANT_COPY:
                 to.buffer = const_cast<uint8_t*>(&mModel.operandValues[from.location.offset]);
                 to.numberOfUsesLeft = 0;
                 break;
-            case V1_0_OperandLifeTime::CONSTANT_REFERENCE: {
+            case V1_3_OperandLifeTime::CONSTANT_REFERENCE: {
                 auto poolIndex = from.location.poolIndex;
                 nnAssert(poolIndex < mPoolInfos.size());
                 auto& r = mPoolInfos[poolIndex];
@@ -434,9 +434,9 @@ bool PreparedModel::initializeRunTimeOperandInfo() {
                 to.numberOfUsesLeft = 0;
                 break;
             }
-            case V1_0_OperandLifeTime::SUBGRAPH_INPUT:
-            case V1_0_OperandLifeTime::SUBGRAPH_OUTPUT:
-            case V1_0_OperandLifeTime::NO_VALUE:
+            case V1_3_OperandLifeTime::SUBGRAPH_INPUT:
+            case V1_3_OperandLifeTime::SUBGRAPH_OUTPUT:
+            case V1_3_OperandLifeTime::NO_VALUE:
                 to.buffer = nullptr;
                 to.numberOfUsesLeft = 0;
                 break;
@@ -816,7 +816,7 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
 
         auto isOperandDataNull = [&] (int index) {
             const auto op = model.main.operands[index];
-            if (op.lifetime == V1_0_OperandLifeTime::NO_VALUE) {
+            if (op.lifetime == V1_3_OperandLifeTime::NO_VALUE) {
                 VLOG(L1, "index %d has life time NO_VALUE", index);
                 return true;
             }
@@ -828,8 +828,8 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
             case OperationType::LSTM:
                 VLOG(L1, "Supporting LSTM !!!!");
                 break;
-            // case OperationType::FULLY_CONNECTED:
-            //     break;
+            case OperationType::FULLY_CONNECTED:
+                break;
             case OperationType::DEQUANTIZE:
                 VLOG(L1, "Supporting Dequantize !!!!");
                 break;
@@ -1257,8 +1257,8 @@ bool PreparedModel::isConst(int index) {
     VLOG(L1, "Operand index: %d", index);
     const auto op = mModel.main.operands[index];
     VLOG(L1, " %s", toString(op).c_str());
-    bool ret = (op.lifetime == V1_0_OperandLifeTime::CONSTANT_COPY ||
-                op.lifetime == V1_0_OperandLifeTime::CONSTANT_REFERENCE);
+    bool ret = (op.lifetime == V1_3_OperandLifeTime::CONSTANT_COPY ||
+                op.lifetime == V1_3_OperandLifeTime::CONSTANT_REFERENCE);
     VLOG(L1, "%s", ret ? "Const" : "Non-Const");
     VLOG(L1, "---------------------------------------------");
     return ret;
@@ -2697,7 +2697,7 @@ Blob::Ptr VpuPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const 
                                                   uint32_t& len) {
     if (op.type == OperandType::TENSOR_FLOAT32 || op.type == OperandType::FLOAT32) {
 #ifndef MYRIAD_FP16  // Myriad supports FP32 only for network input/output
-        if (op.lifetime == V1_0_OperandLifeTime::SUBGRAPH_INPUT) {
+        if (op.lifetime == V1_3_OperandLifeTime::SUBGRAPH_INPUT) {
             VLOG(L1, "Create input blob !!!!");
             vec<unsigned int> order;
             Layout layout;
@@ -2757,7 +2757,7 @@ Blob::Ptr VpuPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const 
                     return blob;
                 }
             }
-        } else if (op.lifetime == V1_0_OperandLifeTime::SUBGRAPH_OUTPUT) {
+        } else if (op.lifetime == V1_3_OperandLifeTime::SUBGRAPH_OUTPUT) {
             VLOG(L1, "Create output blob");
             vec<unsigned int> order;
             Layout layout;
@@ -2785,7 +2785,7 @@ Blob::Ptr VpuPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const 
 
 #else  // FP16 support if Myriad does not support FP32 for network input/output
 
-        if (op.lifetime == V1_0_OperandLifeTime::SUBGRAPH_INPUT) {
+        if (op.lifetime == V1_3_OperandLifeTime::SUBGRAPH_INPUT) {
             // todo: create a readOnly blob that accepts const pointers
             // InferenceEngine::TBlob<short>::Ptr blob =
             // std::make_shared<InferenceEngine::TBlob<short>>(td);
@@ -2828,7 +2828,7 @@ Blob::Ptr VpuPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const 
             }
 
             return blob;
-        } else if (op.lifetime == V1_0_OperandLifeTime::SUBGRAPH_OUTPUT) {
+        } else if (op.lifetime == V1_3_OperandLifeTime::SUBGRAPH_OUTPUT) {
             vec<unsigned int> order;
             Layout layout;
             if (op.dimensions.size() == 4) {
@@ -3057,7 +3057,7 @@ IRBlob::Ptr CpuPreparedModel::GetConstOperandAsTensor(int operand_idx, int opera
 Blob::Ptr CpuPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const uint8_t* buf,
                                                   uint32_t& len) {
     if (op.type == OperandType::TENSOR_FLOAT32 || op.type == OperandType::FLOAT32) {
-        if (op.lifetime == V1_0_OperandLifeTime::SUBGRAPH_INPUT) {
+        if (op.lifetime == V1_3_OperandLifeTime::SUBGRAPH_INPUT) {
             VLOG(L1, "Create input blob !!!!");
             vec<unsigned int> order;
             Layout layout;
@@ -3117,7 +3117,7 @@ Blob::Ptr CpuPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const 
                     return blob;
                 }
             }
-        } else if (op.lifetime == V1_0_OperandLifeTime::SUBGRAPH_OUTPUT) {
+        } else if (op.lifetime == V1_3_OperandLifeTime::SUBGRAPH_OUTPUT) {
             VLOG(L1, "Create output blob !!!!");
             vec<unsigned int> order;
             Layout layout;
@@ -3245,7 +3245,7 @@ Blob::Ptr GpuPreparedModel::GetConstOperandAsTensor(int operand_idx, int operati
 Blob::Ptr GpuPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const uint8_t* buf,
                                                   uint32_t& len) {
     if (OperandType::TENSOR_FLOAT32 == op.type || OperandType::FLOAT32 == op.type) {
-        if (op.lifetime == V1_0_OperandLifeTime::SUBGRAPH_INPUT) {
+        if (op.lifetime == V1_3_OperandLifeTime::SUBGRAPH_INPUT) {
             vec<unsigned int> order;
             Layout layout;
 
@@ -3304,7 +3304,7 @@ Blob::Ptr GpuPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const 
                     return blob;
                 }
             }
-        } else if (op.lifetime == V1_0_OperandLifeTime::SUBGRAPH_OUTPUT) {
+        } else if (op.lifetime == V1_3_OperandLifeTime::SUBGRAPH_OUTPUT) {
             vec<unsigned int> order;
             Layout layout;
 

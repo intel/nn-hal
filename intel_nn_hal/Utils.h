@@ -23,7 +23,7 @@
 
 //#define PERF_COUNTERS
 //#define CACHING
-#define NN_DEBUG
+//#define NN_DEBUG
 
 enum DebugLevel {
     L0,
@@ -186,6 +186,9 @@ namespace neuralnetworks {
 namespace nnhal {
 
 class BaseOp {
+    std::vector<uint32_t> mOutputIndices;
+    std::vector<uint32_t> mInputIndices;
+
     public:
         virtual bool isCpuOp() = 0;
         
@@ -205,8 +208,22 @@ class BaseOp {
             return std::make_pair(nullptr, 0);
         }
 
-        virtual void setScaleAndZp(float scaleFactor, int32_t zp) {
+        virtual void setOutputIndices(std::vector<uint32_t> indices) {
+            for (auto in: indices)
+                mOutputIndices.push_back(in);
+        }
 
+        virtual std::vector<uint32_t> getOutputIndices() {
+            return mOutputIndices;
+        }
+
+        virtual void setInputIndices(std::vector<uint32_t> indices) {
+            for (auto in: indices)
+                mInputIndices.push_back(in);
+        }
+
+        virtual std::vector<uint32_t> getInputIndices() {
+            return mInputIndices;
         }
 };
 
@@ -226,17 +243,42 @@ class OpContainer {
         bool run() {
             VLOG(L1, "%s", __func__);
             for (auto op: opsVec) {
-                op->run(); // TODO: FIX
+                op->run();
             }
 
             return true;
         }
 
-        BaseOp* getCpuOpFromLayerName(std::string layer) {
+        std::vector<uint32_t> getOutputIndices() {
+            std::vector<uint32_t> indices;
             for (auto op: opsVec) {
-                VLOG(L1, "%s searching layername:%s", op->getLayerName().c_str());
-                if (!layer.compare(op->getLayerName())) {
-                    VLOG(L1, "%s searching layername:%s SUCCESS", op->getLayerName().c_str());
+                auto indexVec = op->getOutputIndices();
+
+                for (auto index: indexVec)
+                    indices.push_back(index);
+            }
+
+            return indices;
+        }
+
+        std::vector<uint32_t> getInputIndices() {
+            std::vector<uint32_t> indices;
+            for (auto op: opsVec) {
+                auto indexVec = op->getInputIndices();
+
+                for (auto index: indexVec)
+                    indices.push_back(index);
+            }
+
+            return indices;
+        }
+
+        BaseOp* getCpuOpFromLayerName(std::string layer) {
+            VLOG(L1, "%s layer name:%s", __func__, layer.c_str());
+            for (auto op: opsVec) {
+                VLOG(L1, "comparing with layername:%s", op->getLayerName().c_str());
+                if (layer.compare(op->getLayerName()) == 0) {
+                    VLOG(L1, "searching layername:%s SUCCESS", op->getLayerName().c_str());
                     return op;
                 }
             }
@@ -272,6 +314,12 @@ enum class DataType {
     INT16
 };
 
+enum class DeviceType {
+    CPU,
+    GNA,
+    None
+};
+
 // Information we maintain about each operand during execution that
 // may change during execution.
 struct RunTimeOperandInfo {
@@ -296,7 +344,7 @@ struct RunTimeOperandInfo {
     // The length of the buffer.
     uint32_t length;
     // Whether this is a temporary variable, a model input, a constant, etc.
-    V1_0_OperandLifeTime lifetime;
+    V1_3_OperandLifeTime lifetime;
     // Keeps track of how many operations have yet to make use
     // of this temporary variable.  When the count is decremented to 0,
     // we free the buffer.  For non-temporary variables, this count is

@@ -76,6 +76,18 @@ inline void readNBits(T & obj, int fd) {
 void GnaPreparedModel::initializeInput() {
     VLOG(L1, "initialize Input");
 
+    std::string inputString;
+    for (auto i=0; i < mModel.main.inputIndexes.size(); i++) {
+        inputString += " " + std::to_string(mModel.main.inputIndexes[i]);
+    }
+    VLOG(L1,"Input index string... %s", inputString.c_str());
+
+    std::string outString;
+    for (auto i=0; i < mModel.main.outputIndexes.size(); i++) {
+        outString += " " + std::to_string(mModel.main.outputIndexes[i]);
+    }
+    VLOG(L1,"Output index string... %s", outString.c_str());
+
     /* copy weights, biases ..etc */
     for (auto i=0; i < mModel.main.inputIndexes.size(); i++) {
         auto curIndex = mModel.main.inputIndexes[i];
@@ -87,12 +99,11 @@ void GnaPreparedModel::initializeInput() {
                                         return (elem.first == curIndex);
                                     });
         if (itr != mInputPorts.end()) {
+            VLOG(L1, ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Input index: %d", curIndex);
             mlayerInputIndices.push_back(i);
         } else {
-            //nnAssert("Cannot set data to non-input layers during infer request");
-            // These layers are outputs of cpu / gna graph
-            // Data has to be filled by looking at output ports
-            mlayerIntermediateIndices.push_back(i);
+            VLOG(L1, "Could not find the model input index:%d", curIndex);
+            nnAssert(false);
         }
     }
 
@@ -190,11 +201,12 @@ bool GnaPreparedModel::constructGNAGraph(std::pair<int, int> indices) {
 
     mBuilderModel = new IRBuilder::ModelBuilder();
     mBuilderModel->initializeBuilder();
+    gnaPluginPtr = new GnaNetwork();
 
     VLOG(L1, "Indices we are constructing the graph with from:%d to:%d", std::get<0>(indices), std::get<1>(indices));
 
     time_point irbuild_start = now();
-    for (size_t i=std::get<0>(indices); i < std::get<1>(indices); ++i) {
+    for (size_t i=std::get<0>(indices); i <= std::get<1>(indices); ++i) {
         auto operation = mModel.main.operations[i];
 
         VLOG(L1, "get operation %d ready to add", operation.type);
@@ -238,7 +250,8 @@ bool GnaPreparedModel::constructGNAGraph(std::pair<int, int> indices) {
     time_point gnabuild_end = now();
     runtimeMetrics.nw_load_time = (double(millisecondsDuration(gnabuild_end, irbuild_end)));
 #else
-    gnaPluginPtr = new GnaNetwork(network, "GNA");
+    //gnaPluginPtr = new GnaNetwork(network, "GNA"); // Why are we doing this??
+    gnaPluginPtr->setNetwork(network);
     InferenceEngine::CNNNetwork passed_network({network});
     gnaPluginPtr->loadNetwork(passed_network, isDecoderNw);
 #endif
@@ -396,11 +409,13 @@ BaseOp* GnaPreparedModel::getCpuOpFromLayerName(std::string layer) {
     for (auto container: mNwManager) {
         if (container->isCpuGraph()) {
             ptrOp = container->getCpuOpFromLayerName(layer);
+            if (ptrOp)
+                return ptrOp;
         }
     }
 
-    if (!ptrOp)
-        VLOG(L1, "Failed to find cpu layer for layer name: %s", layer.c_str());
+    // if (!ptrOp)
+    //     VLOG(L1, "Failed to find cpu layer for layer name: %s", layer.c_str());
 
     return ptrOp;
 }
@@ -1097,7 +1112,6 @@ Blob::Ptr GnaPreparedModel::getBlobFromMemoryPool(uint32_t index, const V1_0_Req
     operand.buffer = r.buffer + arg.location.offset;
     operand.length = arg.location.length;
 
-    VLOG(L1, "%s ptr:%p length:%d", __func__, operand.buffer, operand.length);
     return operand;
 }
 
@@ -1120,11 +1134,13 @@ void GnaPreparedModel::executeGnaGraph() {
         gnaPluginPtr->totalPerfCounters[pair.first].realTime_uSec += pair.second.realTime_uSec;
     }
 #else
+        VLOG(L1, "%s", __func__);
         gnaPluginPtr->Infer();
 #endif
 }
 
-bool GnaPreparedModel::updateMemoryAfterGNAGraphExecution(const V1_0_Request& request) {
+bool GnaPreparedModel::updateMemoryAfterGraphExecution(const V1_0_Request& request) {
+    VLOG(L1, "%s", __func__);
     auto reqOutputs = request.outputs;
     for (auto i =0; i < mModelOutputIndices.size(); i++) {
         auto index = mModelOutputIndices[i];
@@ -1140,35 +1156,68 @@ bool GnaPreparedModel::updateMemoryAfterGNAGraphExecution(const V1_0_Request& re
         auto elementIdx = mOutputToLayerMap.find(index);
         if (elementIdx != mOutputToLayerMap.end()) {
             auto layerName = elementIdx->second.layerName;
-
-            // Check if the layername is present in the output map
-            auto element = gnaPluginPtr->getOutputsInfo().find(layerName);
-            if (element != gnaPluginPtr->getOutputsInfo().end()) {
-                Blob::Ptr outputBlob = gnaPluginPtr->getInferRequest().GetBlob(layerName);
-                float* srcPtr = outputBlob->buffer().as<float*>();
-#ifdef PERF_COUNTERS
-                if (operand.type == OperandType::TENSOR_QUANT16_SYMM) {
-                    quantizeToQuant16(srcPtr, (uint16_t*)destPtr, operand.shape(), runtimeMetrics);
-                } else if (operand.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED) {
-                    quantizeToQuant8Signed(srcPtr, (int8_t*)destPtr, operand.shape(), runtimeMetrics);
-                } else if (operand.type == OperandType::TENSOR_FLOAT32) {
-                    std::memcpy((uint8_t*)destPtr, outputBlob->buffer().as<uint8_t*>(), outputBlob->byteSize());
+            if (elementIdx->second.execDevice == DeviceType::GNA) {
+                VLOG(L1, "Index:%d is available on GNA graph layer name:%s", index, layerName.c_str());
+                // TODO: Is this check needed???
+                auto element = gnaPluginPtr->getOutputsInfo().find(layerName);
+                if (element != gnaPluginPtr->getOutputsInfo().end()) {
+                    Blob::Ptr outputBlob = gnaPluginPtr->getInferRequest().GetBlob(layerName);
+                    float* srcPtr = outputBlob->buffer().as<float*>();
+    #ifdef PERF_COUNTERS
+                    if (operand.type == OperandType::TENSOR_QUANT16_SYMM) {
+                        quantizeToQuant16(srcPtr, (uint16_t*)destPtr, operand.shape(), runtimeMetrics);
+                    } else if (operand.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED) {
+                        quantizeToQuant8Signed(srcPtr, (int8_t*)destPtr, operand.shape(), runtimeMetrics);
+                    } else if (operand.type == OperandType::TENSOR_FLOAT32) {
+                        std::memcpy((uint8_t*)destPtr, outputBlob->buffer().as<uint8_t*>(), outputBlob->byteSize());
+                    }
+    #else
+                    if (operand.type == OperandType::TENSOR_QUANT16_SYMM) {
+                        VLOG(L1, "Quantizing to TENSOR_QUANT16_SYMM");
+                        quantizeToQuant16(srcPtr, (uint16_t*)destPtr, operand.shape());
+                    } else if (operand.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED) {
+                        VLOG(L1, "Quantizing to TENSOR_QUANT8_ASYMM_SIGNED");
+                        quantizeToQuant8Signed(srcPtr, (int8_t*)destPtr, operand.shape());
+                    } else if (operand.type == OperandType::TENSOR_FLOAT32) {
+                        VLOG(L1, "Copying FLOAT32 ....");
+                        std::memcpy((uint8_t*)destPtr, outputBlob->buffer().as<uint8_t*>(), outputBlob->byteSize());
+                    }
+    #endif
+                } else {
+                    VLOG(L1, "could not find layer:%s in index layer map", layerName.c_str());
+                    return false;
                 }
-#else
-                if (operand.type == OperandType::TENSOR_QUANT16_SYMM) {
-                    VLOG(L1, "Quantizing to TENSOR_QUANT16_SYMM");
-                    quantizeToQuant16(srcPtr, (uint16_t*)destPtr, operand.shape());
-                } else if (operand.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED) {
-                    VLOG(L1, "Quantizing to TENSOR_QUANT8_ASYMM_SIGNED");
-                    quantizeToQuant8Signed(srcPtr, (int8_t*)destPtr, operand.shape());
-                } else if (operand.type == OperandType::TENSOR_FLOAT32) {
-                    VLOG(L1, "Copying FLOAT32 ....");
-                    std::memcpy((uint8_t*)destPtr, outputBlob->buffer().as<uint8_t*>(), outputBlob->byteSize());
-                }
-#endif
             } else {
-                VLOG(L1, "could not find layer:%s in index layer map", layerName.c_str());
-                return false;
+                VLOG(L1, "Index:%d is available on CPU graph layer name:%s", index, layerName.c_str());
+                auto layerPtr = getCpuOpFromLayerName(layerName);
+                // Check if the layername is present in the output map
+                if (layerPtr) {
+                    VLOG(L1, "Got layer:%s from cpu layers for index:%d", layerName.c_str(), index);
+                    auto[srcPtrVoid, outputLen] = layerPtr->getOutputData();
+    #ifdef PERF_COUNTERS
+                    if (operand.type == OperandType::TENSOR_QUANT16_SYMM) {
+                        quantizeToQuant16(srcPtr, (uint16_t*)destPtr, operand.shape(), runtimeMetrics);
+                    } else if (operand.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED) {
+                        quantizeToQuant8Signed(srcPtr, (int8_t*)destPtr, operand.shape(), runtimeMetrics);
+                    } else if (operand.type == OperandType::TENSOR_FLOAT32) {
+                        std::memcpy((uint8_t*)destPtr, (uint8_t*)srcPtr, outputLen*4);
+                    }
+    #else
+                    if (operand.type == OperandType::TENSOR_QUANT16_SYMM) {
+                        VLOG(L1, "Copying output.. TENSOR_QUANT16_SYMM");
+                        std::memcpy((uint8_t*)destPtr, (uint8_t*)srcPtrVoid, outputLen*sizeof(uint16_t));
+                    } else if (operand.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED) {
+                        VLOG(L1, "Copying output.. TENSOR_QUANT8_ASYMM_SIGNED");
+                        std::memcpy((uint8_t*)destPtr, (uint8_t*)srcPtrVoid, outputLen*sizeof(uint8_t));
+                    } else if (operand.type == OperandType::TENSOR_FLOAT32) {
+                        VLOG(L1, "Copying output.. TENSOR_FLOAT32");
+                        std::memcpy((uint8_t*)destPtr, (uint8_t*)srcPtrVoid, outputLen*sizeof(float));
+                    }
+    #endif
+                } else {
+                    VLOG(L1, "%s Failed to find the CPU layer by name: %s", __func__, layerName.c_str());
+                    return false;
+                }
             }
         } else {
             VLOG(L1, "could not find index:%d in output map", index);
@@ -1242,6 +1291,72 @@ bool GnaPreparedModel::updateMemoryAfterCPUGraphExecution(const V1_0_Request& re
     return true;
 }
 
+bool GnaPreparedModel::updateMemoryAfterCPUGraphExecution(const V1_0_Request& request, uint32_t index) {
+    VLOG(L1, "%s", __func__);
+    uint32_t i =0;
+    for (i =0; i < mModelOutputIndices.size(); i++) {
+        if (mModelOutputIndices[i] == index)
+            break;
+    }
+
+    auto reqOutputs = request.outputs;
+    RunTimeOperandInfo& operand = mOperands[index];
+    const RequestArgument& arg = reqOutputs[i];
+    auto poolIndex = arg.location.poolIndex;
+    nnAssert(poolIndex < mRuntimeRequestPoolInfos.size());
+    auto& r = mRuntimeRequestPoolInfos[poolIndex];
+
+    void* destPtr = r.buffer + arg.location.offset;
+
+    // Get the name of the layer from which we want to copy the data
+    auto elementIdx = mOutputToLayerMap.find(index);
+    if (elementIdx != mOutputToLayerMap.end()) {
+        auto layerName = elementIdx->second.layerName;
+        auto layerPtr = getCpuOpFromLayerName(layerName);
+        // Check if the layername is present in the output map
+        if (layerPtr) {
+            // Blob::Ptr outputBlob = gnaPluginPtr->getInferRequest().GetBlob(layerName);
+            // float* srcPtr = outputBlob->buffer().as<float*>();
+            VLOG(L1, "Got layer:%s from cpu layers for index:%d", layerName.c_str(), index);
+            auto[srcPtrVoid, outputLen] = layerPtr->getOutputData();
+            // float* srcPtr = static_cast<float*>(srcPtrVoid);
+
+            // VLOG(L1, "Copying output.. Output len:%d", outputLen);
+            // for(auto i =0; i < 4; i++)
+            //     VLOG(L1, "Copying output at index:%d is :%f", i, srcPtr[i]);
+
+#ifdef PERF_COUNTERS
+            if (operand.type == OperandType::TENSOR_QUANT16_SYMM) {
+                quantizeToQuant16(srcPtr, (uint16_t*)destPtr, operand.shape(), runtimeMetrics);
+            } else if (operand.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED) {
+                quantizeToQuant8Signed(srcPtr, (int8_t*)destPtr, operand.shape(), runtimeMetrics);
+            } else if (operand.type == OperandType::TENSOR_FLOAT32) {
+                std::memcpy((uint8_t*)destPtr, (uint8_t*)srcPtr, outputLen*4);
+            }
+#else
+            if (operand.type == OperandType::TENSOR_QUANT16_SYMM) {
+                VLOG(L1, "Copying output.. TENSOR_QUANT16_SYMM");
+                std::memcpy((uint8_t*)destPtr, (uint8_t*)srcPtrVoid, outputLen*sizeof(uint16_t));
+            } else if (operand.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED) {
+                VLOG(L1, "Copying output.. TENSOR_QUANT8_ASYMM_SIGNED");
+                std::memcpy((uint8_t*)destPtr, (uint8_t*)srcPtrVoid, outputLen*sizeof(uint8_t));
+            } else if (operand.type == OperandType::TENSOR_FLOAT32) {
+                VLOG(L1, "Copying output.. TENSOR_FLOAT32");
+                std::memcpy((uint8_t*)destPtr, (uint8_t*)srcPtrVoid, outputLen*sizeof(float));
+            }
+#endif
+        } else {
+            VLOG(L1, "%s Failed to find the CPU layer by name: %s", __func__, layerName.c_str());
+            return false;
+        }
+    } else {
+        VLOG(L1, "could not find index:%d in output map", index);
+        return false;
+    }
+
+    return true;
+}
+
 void GnaPreparedModel::asyncExecute(const V1_0_Request& request, MeasureTiming measure, time_point driverStart,
                           const sp<V1_0::IExecutionCallback>& cb) {
     VLOG(L1, "Begin to executeSynchronously");
@@ -1264,14 +1379,12 @@ void GnaPreparedModel::asyncExecute(const V1_0_Request& request, MeasureTiming m
 
     for (auto index : mlayerInputIndices) {
         auto inputIndex = mModelInputIndices[index];
-
         auto iter = mInputPorts.find(inputIndex);
         if (iter != mInputPorts.end()) {
             std::string layerName = iter->second.layerName;
             RunTimeOperandInfo& operandInfo = getOperandFromMemoryPool(index, request);
-
-            if (iter->second.cpuLayer) {
-                VLOG(L1, "Copying input to CPU layer of name: %s", layerName.c_str());
+            if (iter->second.execDevice == DeviceType::CPU) {
+                VLOG(L1, "-------- Copying input index:%d to CPU layer of name: %s",inputIndex, layerName.c_str());
                 auto layerPtr = getCpuOpFromLayerName(layerName);
                 if (!layerPtr) {
                     VLOG(L1, "Failed to find the CPU layer by name: %s", layerName.c_str());
@@ -1282,8 +1395,8 @@ void GnaPreparedModel::asyncExecute(const V1_0_Request& request, MeasureTiming m
                 layerPtr->setInputData(operandInfo.buffer,
                                             length);
             } else {
+                VLOG(L1, "-------- Copying input index:%d to GNA layer of name: %s",inputIndex, layerName.c_str());
                 auto srcBlob = getBlobFromMemoryPool(index, request);
-
                 if (iter->second.memoryLayer) {
                     VLOG(L1, "Setting memory state for layername:", layerName.c_str());
                     gnaPluginPtr->setMemoryState(layerName, srcBlob);
@@ -1310,43 +1423,123 @@ void GnaPreparedModel::asyncExecute(const V1_0_Request& request, MeasureTiming m
     }
     VLOG(L1, "Run");
 
+    auto isInputIndexIntermediateOutput = [&](uint32_t index) -> bool {
+        if ((mIntermediateLayerMap.find(index) != mIntermediateLayerMap.end())) {
+            auto elem = mIntermediateLayerMap.at(index);
+
+            if ((elem.inDevice == DeviceType::None) || (elem.outDevice == DeviceType::None)) {
+                VLOG(L1, "One of the nodes is marked as device type none.. input layer:%s output layer:%s",
+                        elem.inLayerName.c_str(), elem.outLayerName.c_str());
+                return false;
+            }
+
+            if ((elem.inDevice == elem.outDevice)) {
+                VLOG(L1, "Intermediate node with graph.. So no need for any copy!!!! input layer:%s output layer:%s",
+                        elem.inLayerName.c_str(), elem.outLayerName.c_str());
+                return false;
+            }
+
+            VLOG(L1, "Intermediate node not witin graph.. So need to copy!!!! input layer:%s output layer:%s",
+                        elem.inLayerName.c_str(), elem.outLayerName.c_str());
+            return true;
+        }
+
+        return false;
+    };
+
     for (auto opcontainer: mNwManager) {
         if (opcontainer->isCpuGraph()) {
-            VLOG(L1, "Executing CPU Graph");
+            VLOG(L1, ">>>>>>>>>>>>>>>>>>> Executing CPU Graph");
+            std::vector<uint32_t> inputsIndex = opcontainer->getInputIndices();
+            for(auto inputInd : inputsIndex) {
+                VLOG(L1, "Is Index:%d intermediate graph", inputInd);
+                if (isInputIndexIntermediateOutput(inputInd)) {
+                    VLOG(L1, "Index:%d is intermediate index whose output is from GNA graph", inputInd);
+                    auto elementIdx = mIntermediateLayerMap.find(inputInd);
+                    if (elementIdx != mIntermediateLayerMap.end()) {
+                        auto gnaLayerName = elementIdx->second.outLayerName;
+                        auto cpuLayerName = elementIdx->second.inLayerName;
+                        VLOG(L1, "Finding layer name:%s in GNA inputs", gnaLayerName.c_str());
 
-            // At this point all inputs to CpuGraph if are coming from application,
-            // They are already copied.. Take care of inputs that are coming from GnaGraph
-            for (auto index : mlayerIntermediateIndices) {
-                VLOG(L1, "Index:%d is intermediate index whose output is from GNA graph");
-
-                auto elementIdx = mOutputToLayerMap.find(index);
-                if (elementIdx != mOutputToLayerMap.end()) {
-                    auto layerName = elementIdx->second.layerName;
-
-                    // Check if the layername is present in the output map
-                    auto element = gnaPluginPtr->getOutputsInfo().find(layerName);
-                    if (element != gnaPluginPtr->getOutputsInfo().end()) {
-                        Blob::Ptr srcBlob = gnaPluginPtr->getInferRequest().GetBlob(layerName);
-                        BaseOp* op = opcontainer->getCpuOpFromLayerName(layerName);
-                        op->setInputData(srcBlob->buffer().as<uint8_t*>(), srcBlob->size());
+                        // Check if the layername is present in the output map
+                        auto element = gnaPluginPtr->getOutputsInfo().find(gnaLayerName);
+                        if (element != gnaPluginPtr->getOutputsInfo().end()) {
+                            Blob::Ptr srcBlob = gnaPluginPtr->getInferRequest().GetBlob(gnaLayerName);
+                            BaseOp* op = opcontainer->getCpuOpFromLayerName(cpuLayerName);
+                            op->setInputData(srcBlob->buffer().as<uint8_t*>(), srcBlob->size());
+                        } else {
+                            VLOG(L1, "We have a missing input to cpugraph!!");
+                        }
                     } else {
-                        VLOG(L1, "We have a missing input to cpugraph!!");
+                        VLOG(L1, "No intermediate node output to be copied...");
                     }
                 }
             }
 
             opcontainer->run();
-            VLOG(L1, "Run complete");
-            updateMemoryAfterCPUGraphExecution(request);
+            VLOG(L1, "<<<<<<<<<<<<<<<<<< Executing CPU Graph Done!!!!");
+            // std::vector<uint32_t> outputIndices = opcontainer->getOutputIndices();
+            // for(auto i: outputIndices){
+            //     auto iter = std::find(mModelOutputIndices.begin(), mModelOutputIndices.end(), i);
+            //     if (iter != mModelOutputIndices.end()){
+            //         VLOG(L1, "Found index:%d as output index of the model", i);
+            //         updateMemoryAfterCPUGraphExecution(request, i);
+            //     }
+            // }
         } else {
-            VLOG(L1, "Executing GNA Graph");
-            executeGnaGraph();
-            if (!updateMemoryAfterGNAGraphExecution(request)) {
-                VLOG(L1, "Failed to update memory after GNA graph execution!!!!!");
-                nnAssert(false);
+            VLOG(L1, ">>>>>>>>>>>>>>>>>> Executing GNA Graph");
+            std::vector<uint32_t> inputsIndex = opcontainer->getInputIndices();
+            for(auto inputInd : inputsIndex) {
+                // TODO: We need to also search for SUBGRAPH_OUTPUT as well..
+                if (isInputIndexIntermediateOutput(inputInd)) {
+                    VLOG(L1, "Index:%d is intermediate index whose output is from CPU graph", inputInd);
+                    auto elementIdx = mIntermediateLayerMap.find(inputInd);
+                    if (elementIdx != mIntermediateLayerMap.end()) {
+                        auto cpuLayerName = elementIdx->second.outLayerName;
+                        auto gnaLayerName = elementIdx->second.inLayerName;
+                        VLOG(L1, "layer name for intermediate output.. %s", cpuLayerName.c_str());
+                        auto cpuLayerPtr = getCpuOpFromLayerName(cpuLayerName);
+                        if (!cpuLayerPtr) {
+                            VLOG(L1, "Could not find the layer name in cpu layers %s", cpuLayerName.c_str());
+                            nnAssert(false);
+                        }
+                        auto[srcMemoryPtr, srcLen] = cpuLayerPtr->getOutputData();
+                        
+                        // Make sure the layername is present in inputinfo from the layer
+                        auto iter2 = std::find_if(gnaPluginPtr->inputInfo.begin(),
+                                    gnaPluginPtr->inputInfo.end(),
+                                    [gnaLayerName](const std::pair<std::string, InputInfo::Ptr>& elem){
+                                        return (elem.first == gnaLayerName);
+                                    });
+                        if (iter2 == gnaPluginPtr->inputInfo.end()) {
+                            VLOG(L1, "Could not find the layername:%s in GNA layer inputs", cpuLayerName.c_str());
+                            nnAssert(false);
+                        }
+
+                        VLOG(L1, "Copying output.. Output len:%d", outputLen);
+                        for(auto i =0; i < 4; i++)
+                            VLOG(L1, "Copying output at index:%d is :%f", i, static_cast<float*>(srcMemoryPtr[i]));
+
+                        auto destBlob = gnaPluginPtr->getInferRequest().GetBlob(gnaLayerName);
+                        uint8_t* dest = destBlob->buffer().as<uint8_t*>();
+                        std::memcpy(dest, static_cast<uint8_t*>(srcMemoryPtr), srcLen);
+                    } else {
+                        VLOG(L1, "Index  %d is not in output index map", index);
+                    }
+                }
             }
+
+            executeGnaGraph();
+            VLOG(L1, "<<<<<<<<<<<<<<<<<< Executing GNA Graph Done!!!!");
+            // if (!updateMemoryAfterGNAGraphExecution(request)) {
+            //     VLOG(L1, "Failed to update memory after GNA graph execution!!!!!");
+            //     nnAssert(false);
+            // }
         }
     }
+
+    VLOG(L1, "Graph execution complete... Update runtime memory");
+    updateMemoryAfterGraphExecution(request);
 
     VLOG(L1, "update shared memories");
     for (auto runtimeInfo : mRuntimeRequestPoolInfos) {
@@ -1402,7 +1595,7 @@ Return<V1_0_ErrorStatus> GnaPreparedModel::executeBase(const V1_0_Request& reque
 bool GnaPreparedModel::operationFullyConnected(const Operation& operation) {
     VLOG(L1, "OperationType::FULLY_CONNECTED");
 
-    auto getV1_0_OperandLifeTime = [&](uint32_t idx) {
+    auto getV1_3_OperandLifeTime = [&](uint32_t idx) {
         const auto op = mModel.main.operands[idx];
         return (int)op.lifetime;
     };
@@ -1411,7 +1604,7 @@ bool GnaPreparedModel::operationFullyConnected(const Operation& operation) {
         const auto op = mModel.main.operands[idx];
 
         auto blob = GetConstOperandAsTensor(idx, offset);
-        if (op.lifetime == V1_0_OperandLifeTime::SUBGRAPH_INPUT)
+        if (op.lifetime == V1_3_OperandLifeTime::SUBGRAPH_INPUT)
         {
             mOpIndex2BlobMap[idx] = blob;
             VLOG(L1, "blob idx=%d (model_input) ptr=%p", idx, blob.get());
@@ -1420,24 +1613,14 @@ bool GnaPreparedModel::operationFullyConnected(const Operation& operation) {
         return blob;
     };
 
-    // for (auto i=0; i < operation.inputs.size(); i++) {
-    //     auto idx = operation.inputs[i];
-    //     const auto op = mModel.main.operands[idx];
-    //     VLOG(L1, "idx=%d lifetime=%d", idx, op.lifetime);
-    // }
-
-    // for (auto i=0; i < operation.outputs.size(); i++) {
-    //     VLOG(L1, "output index = %d", operation.outputs[i]);
-    // }
-
     IRBuilder::BuilderFCLayer::FCParams params;
     auto input = getIRBlobFromOperand(operation.inputs[0], 0);
 
     params.weights.data = getIRBlobFromOperand(operation.inputs[1], 1);
-    params.weights.lifeTime = getV1_0_OperandLifeTime(operation.inputs[1]);
+    params.weights.lifeTime = getV1_3_OperandLifeTime(operation.inputs[1]);
 
     params.bias.data = getIRBlobFromOperand(operation.inputs[2], 2);
-    params.bias.lifeTime = getV1_0_OperandLifeTime(operation.inputs[2]);
+    params.bias.lifeTime = getV1_3_OperandLifeTime(operation.inputs[2]);
 
     auto inputDims = input->getTensorDesc().getDims();
     for (auto i = 0; i < inputDims.size(); i++) VLOG(L1, "input dims[%d] = %d ", i, inputDims[i]);
@@ -1474,19 +1657,37 @@ bool GnaPreparedModel::operationFullyConnected(const Operation& operation) {
     std::string outputLayerName = "output-FC";
     outputLayerName += std::to_string(count++);
 
-    VLOG(L1, "OperandLifeTime.... %d", getV1_0_OperandLifeTime(operation.outputs[0]));
-    //if (getV1_0_OperandLifeTime(operation.outputs[0]) == (int)V1_0_OperandLifeTime::SUBGRAPH_OUTPUT) {
+    VLOG(L1, "OperandLifeTime.... %d", getV1_3_OperandLifeTime(operation.outputs[0]));
+    //if (getV1_3_OperandLifeTime(operation.outputs[0]) == (int)V1_3_OperandLifeTime::SUBGRAPH_OUTPUT) {
         VLOG(L1, "Adding output layer to FC....");
         auto fcLayerId = mBuilderModel->getBuilderNetwork()->mConnections.back();
         mBuilderModel->getBuilderNetwork()->getBuilder()->addLayer({fcLayerId},
                 InferenceEngine::Builder::OutputLayer("output-FC-" + std::to_string(count)));
-        //mOutputToLayerMap[operation.outputs[0]] = outputLayerName;
-        mOutputToLayerMap.emplace(std::make_pair(operation.outputs[0],
-                                                 LayerInfo(inLayers[0], false)));
+        // mOutputToLayerMap.emplace(std::make_pair(operation.outputs[0],
+        //                                          LayerInfo(inLayers[0], false)));
     //}
 
+    if (getV1_3_OperandLifeTime(operation.outputs[0]) == (int)V1_3_OperandLifeTime::SUBGRAPH_OUTPUT) {
+        VLOG(L1, "Output is SUBGRAPH_OUTPUT.. Adding index:%d to output layer", operation.outputs[0]);
+        mOutputToLayerMap.emplace(std::make_pair(operation.outputs[0], LayerInfo(inLayers[0], false)));
+    }
+
+    // TODO: Fix this code with CTS tests
     if (inLayers.size() != 0) {
-        mInputPorts.emplace(std::make_pair(operation.inputs[0], LayerInfo(inLayers[0], false)));
+        if (getV1_3_OperandLifeTime(operation.inputs[0]) == (int)V1_3_OperandLifeTime::SUBGRAPH_INPUT) {
+            VLOG(L1, "Input is SUBGRAPH_INPUT.. Adding index:%d to input layer name:%s", operation.inputs[0], inLayers[0].c_str());
+            mInputPorts.emplace(std::make_pair(operation.inputs[0], LayerInfo(inLayers[0], false)));
+        } else {
+            VLOG(L1, "Input is TEMPORARY INPUT.. Adding index:%d to intermediate layers name:%s", operation.inputs[0], inLayers[0].c_str());
+            if (mIntermediateLayerMap.find(operation.inputs[0]) != mIntermediateLayerMap.end()) {
+                auto& halLayer = mIntermediateLayerMap.at(operation.inputs[0]);
+                halLayer.setInputNode(outputLayerName, DeviceType::GNA);
+            } else {
+                mIntermediateLayerMap.emplace(std::make_pair(operation.inputs[0],
+                                                            HalLayerInfo(outputLayerName, DeviceType::CPU,
+                                                                         "", DeviceType::None, false)));
+            }
+        }
     }
 
     /*
@@ -1574,7 +1775,7 @@ bool GnaPreparedModel::operationLSTM(const Operation& operation)
 {
     IRBuilder::LstmLayer::LstmParams  params;
 
-    auto getV1_0_OperandLifeTime = [&](uint32_t idx) {
+    auto getV1_3_OperandLifeTime = [&](uint32_t idx) {
         const auto op = mModel.main.operands[idx];
         return (int)op.lifetime;
     };
@@ -1583,7 +1784,7 @@ bool GnaPreparedModel::operationLSTM(const Operation& operation)
         const auto op = mModel.main.operands[idx];
 
         auto blob = GetConstOperandAsTensor(idx, offset);
-        if (op.lifetime == V1_0_OperandLifeTime::SUBGRAPH_INPUT)
+        if (op.lifetime == V1_3_OperandLifeTime::SUBGRAPH_INPUT)
         {
             mOpIndex2BlobMap[idx] = blob;
             VLOG(L1, "blob idx=%d (model_input) ptr=%p", idx, blob.get());
@@ -1649,13 +1850,13 @@ bool GnaPreparedModel::operationLSTM(const Operation& operation)
     VLOG(L1, "Lstm cell description %s", lstmDescription.c_str());
 
     params.input.data = getIRBlobFromOperand(operation.inputs[0], 0);
-    params.input.lifeTime = getV1_0_OperandLifeTime(operation.inputs[0]);
+    params.input.lifeTime = getV1_3_OperandLifeTime(operation.inputs[0]);
 
     params.outputState.data = getIRBlobFromOperand(operation.inputs[18], 18);
-    params.outputState.lifeTime = getV1_0_OperandLifeTime(operation.inputs[18]);
+    params.outputState.lifeTime = getV1_3_OperandLifeTime(operation.inputs[18]);
 
     params.cellState.data = getIRBlobFromOperand(operation.inputs[19], 19);
-    params.cellState.lifeTime = getV1_0_OperandLifeTime(operation.inputs[19]);
+    params.cellState.lifeTime = getV1_3_OperandLifeTime(operation.inputs[19]);
 
     if (!lstmDesc.cifgEnabled) {
         params.input2inputWeights.data     = getIRBlobFromOperand(operation.inputs[1], 1);
@@ -1668,62 +1869,53 @@ bool GnaPreparedModel::operationLSTM(const Operation& operation)
         params.inputGateBias.lifeTime = getV1_0_OperandLifeTime(operation.inputs[12]);
     }
 
-    params.input2ForgetWeights.data     = getIRBlobFromOperand(operation.inputs[2], 2);
-    params.input2ForgetWeights.lifeTime    = getV1_0_OperandLifeTime(operation.inputs[2]);
-
-    params.input2CellWeights.data     = getIRBlobFromOperand(operation.inputs[3], 3);
-    params.input2CellWeights.lifeTime     = getV1_0_OperandLifeTime(operation.inputs[3]);
-
-    params.input2OutputWeights.data     = getIRBlobFromOperand(operation.inputs[4], 4);
-    params.input2OutputWeights.lifeTime     = getV1_0_OperandLifeTime(operation.inputs[4]);
-
     params.recurrant2ForgetWeights.data     = getIRBlobFromOperand(operation.inputs[6], 6);
-    params.recurrant2ForgetWeights.lifeTime     = getV1_0_OperandLifeTime(operation.inputs[6]);
+    params.recurrant2ForgetWeights.lifeTime     = getV1_3_OperandLifeTime(operation.inputs[6]);
 
     params.recurrant2CellWeights.data     = getIRBlobFromOperand(operation.inputs[7], 7);
-    params.recurrant2CellWeights.lifeTime     = getV1_0_OperandLifeTime(operation.inputs[7]);
+    params.recurrant2CellWeights.lifeTime     = getV1_3_OperandLifeTime(operation.inputs[7]);
 
     params.recurrant2OutputWeights.data     = getIRBlobFromOperand(operation.inputs[8], 8);
-    params.recurrant2OutputWeights.lifeTime     = getV1_0_OperandLifeTime(operation.inputs[8]);
+    params.recurrant2OutputWeights.lifeTime     = getV1_3_OperandLifeTime(operation.inputs[8]);
 
     params.cell2InputWeights.data     = getIRBlobFromOperand(operation.inputs[9], 9);
-    params.cell2InputWeights.lifeTime     = getV1_0_OperandLifeTime(operation.inputs[9]);
+    params.cell2InputWeights.lifeTime     = getV1_3_OperandLifeTime(operation.inputs[9]);
 
     params.cell2ForgetWeights.data     = getIRBlobFromOperand(operation.inputs[10], 10);
-    params.cell2ForgetWeights.lifeTime     = getV1_0_OperandLifeTime(operation.inputs[10]);
+    params.cell2ForgetWeights.lifeTime     = getV1_3_OperandLifeTime(operation.inputs[10]);
 
     params.cell2OutputWeights.data  = getIRBlobFromOperand(operation.inputs[11], 11);
-    params.cell2OutputWeights.lifeTime  = getV1_0_OperandLifeTime(operation.inputs[11]);
+    params.cell2OutputWeights.lifeTime  = getV1_3_OperandLifeTime(operation.inputs[11]);
 
     params.forgetGateBias.data   = getIRBlobFromOperand(operation.inputs[13], 13);
-    params.forgetGateBias.lifeTime   = getV1_0_OperandLifeTime(operation.inputs[13]);
+    params.forgetGateBias.lifeTime   = getV1_3_OperandLifeTime(operation.inputs[13]);
 
     params.cellBias.data = getIRBlobFromOperand(operation.inputs[14], 14);
-    params.cellBias.lifeTime = getV1_0_OperandLifeTime(operation.inputs[14]);
+    params.cellBias.lifeTime = getV1_3_OperandLifeTime(operation.inputs[14]);
 
     params.outputGateBias.data    = getIRBlobFromOperand(operation.inputs[15], 15);
-    params.outputGateBias.lifeTime    = getV1_0_OperandLifeTime(operation.inputs[15]);
+    params.outputGateBias.lifeTime    = getV1_3_OperandLifeTime(operation.inputs[15]);
 
     if (lstmDesc.projectionLayerEnabled) {
         params.projectionWeights.data       = getIRBlobFromOperand(operation.inputs[16], 16);
-        params.projectionWeights.lifeTime       = getV1_0_OperandLifeTime(operation.inputs[16]);
+        params.projectionWeights.lifeTime       = getV1_3_OperandLifeTime(operation.inputs[16]);
 
         params.projectionBias.data    = getIRBlobFromOperand(operation.inputs[17], 17);
-        params.projectionBias.lifeTime    = getV1_0_OperandLifeTime(operation.inputs[17]);
+        params.projectionBias.lifeTime    = getV1_3_OperandLifeTime(operation.inputs[17]);
     }
 
     if (params.useLayerNorm) {
         params.inputLayerNormWeights.data      = GetConstOperandAsTensor(operation.inputs[23], 23);
-        params.inputLayerNormWeights.lifeTime = getV1_0_OperandLifeTime(operation.inputs[23]);
+        params.inputLayerNormWeights.lifeTime = getV1_3_OperandLifeTime(operation.inputs[23]);
 
         params.forgetLayerNormWeights.data     = GetConstOperandAsTensor(operation.inputs[24], 24);
-        params.forgetLayerNormWeights.lifeTime = getV1_0_OperandLifeTime(operation.inputs[24]);
+        params.forgetLayerNormWeights.lifeTime = getV1_3_OperandLifeTime(operation.inputs[24]);
 
         params.cellLayerNormWeights.data       = GetConstOperandAsTensor(operation.inputs[25], 25);
-        params.cellLayerNormWeights.lifeTime = getV1_0_OperandLifeTime(operation.inputs[25]);
+        params.cellLayerNormWeights.lifeTime = getV1_3_OperandLifeTime(operation.inputs[25]);
 
         params.outputLayerNormWeights.data     = GetConstOperandAsTensor(operation.inputs[26], 26);
-        params.outputLayerNormWeights.lifeTime = getV1_0_OperandLifeTime(operation.inputs[26]);
+        params.outputLayerNormWeights.lifeTime = getV1_3_OperandLifeTime(operation.inputs[26]);
     }
 
     params.activationFunction = PARAM_I32(20);
@@ -1731,24 +1923,73 @@ bool GnaPreparedModel::operationLSTM(const Operation& operation)
     std::vector<std::string> memoryLayers, inLayers;
     auto outputLayerNames = mBuilderModel->createFullLstm(params, lstmDesc, memoryLayers, inLayers);
 
-    // mOutputToLayerMap[operation.outputs[0]] = outputLayerNames[0];
-    // mOutputToLayerMap[operation.outputs[1]] = outputLayerNames[1];
-    // mOutputToLayerMap[operation.outputs[2]] = outputLayerNames[0];
-
-    mOutputToLayerMap.emplace(std::make_pair(operation.outputs[0],
-                                            LayerInfo(outputLayerNames[0], false)));
-    mOutputToLayerMap.emplace(std::make_pair(operation.outputs[1],
-                                            LayerInfo(outputLayerNames[1], false)));
-    mOutputToLayerMap.emplace(std::make_pair(operation.outputs[2],
-                                            LayerInfo(outputLayerNames[0], false)));
-
-    if (memoryLayers.size() > 0) {
-        mInputPorts.emplace(std::make_pair(operation.inputs[18], LayerInfo(memoryLayers[0], true)));
-        mInputPorts.emplace(std::make_pair(operation.inputs[19], LayerInfo(memoryLayers[1], true)));
-
-        if (inLayers.size() > 0) {
-            mInputPorts.emplace(std::make_pair(operation.inputs[0], LayerInfo(inLayers[0], false)));
+        auto addIndexToLayerMap = [&](uint32_t index, std::string name, bool memory, bool input) {
+        auto operandDetails = mModel.main.operands[index];
+        if (input) {
+            if (operandDetails.lifetime == V1_3_OperandLifeTime::SUBGRAPH_INPUT) {
+                VLOG(L1, "Adding index:%d layer:%s to inputs layer map", index, name.c_str());
+                mInputPorts.emplace(std::make_pair(index, LayerInfo(name, memory, DeviceType::GNA)));
+            } else if (static_cast<int>(operandDetails.lifetime) == static_cast<int>(OperandLifeTime::TEMPORARY_VARIABLE)) {
+                VLOG(L1, "Adding index:%d layer:%s to temporary layer (input) map", index, name.c_str());
+                if (mIntermediateLayerMap.find(index) != mIntermediateLayerMap.end()) {
+                    auto& halLayer = mIntermediateLayerMap.at(index);
+                    halLayer.setInputNode(name, DeviceType::GNA);
+                } else {
+                    mIntermediateLayerMap.emplace(std::make_pair(index,
+                                                            HalLayerInfo(name, DeviceType::GNA,
+                                                                         "", DeviceType::None, memory)));
+                }
+            }
+        } else {
+            if (operandDetails.lifetime == V1_3_OperandLifeTime::SUBGRAPH_OUTPUT) {
+                VLOG(L1, "Adding index:%d layer:%s to outputs layer map", index, name.c_str());
+                mOutputToLayerMap.emplace(std::make_pair(index, LayerInfo(name, memory, DeviceType::GNA)));
+            } else if (static_cast<int>(operandDetails.lifetime) == static_cast<int>(OperandLifeTime::TEMPORARY_VARIABLE)) {
+                VLOG(L1, "Adding index:%d layer:%s to temporary layer (output) map", index, name.c_str());
+                if (mIntermediateLayerMap.find(index) != mIntermediateLayerMap.end()) {
+                    auto& halLayer = mIntermediateLayerMap.at(index);
+                    halLayer.setOutputNode(name, DeviceType::GNA);
+                } else {
+                    mIntermediateLayerMap.emplace(std::make_pair(index, HalLayerInfo("", DeviceType::None,
+                                                                                    name, DeviceType::GNA, memory)));
+                }
+            }
         }
+    };
+
+    addIndexToLayerMap(operation.outputs[0], outputLayerNames[0], false, false);
+    addIndexToLayerMap(operation.outputs[1], outputLayerNames[1], false, false);
+    addIndexToLayerMap(operation.outputs[2], outputLayerNames[0], false, false);
+    addIndexToLayerMap(operation.inputs[18], memoryLayers[0], true, true);
+    addIndexToLayerMap(operation.inputs[19], memoryLayers[1], true, true);
+    
+    // if (inLayers.size() > 0) {
+    //     VLOG(L1, "LSTM layer has input layer!!.. Adding input");
+    //     addIndexToLayerMap(operation.inputs[0], inLayers[0], true, true);
+    // } else {
+    //     VLOG(L1, "LSTM layer has no input layer!!.. Adding input layer to intermediate layer index");
+    //     addIndexToLayerMap(operation.inputs[0], "", true, true);
+    // }
+
+    // mOutputToLayerMap.emplace(std::make_pair(operation.outputs[0],
+    //                                         LayerInfo(outputLayerNames[0], false)));
+    // mOutputToLayerMap.emplace(std::make_pair(operation.outputs[1],
+    //                                         LayerInfo(outputLayerNames[1], false)));
+    // mOutputToLayerMap.emplace(std::make_pair(operation.outputs[2],
+    //                                         LayerInfo(outputLayerNames[0], false)));
+
+    // if (memoryLayers.size() > 0) {
+    //     mInputPorts.emplace(std::make_pair(operation.inputs[18], LayerInfo(memoryLayers[0], true)));
+    //     mInputPorts.emplace(std::make_pair(operation.inputs[19], LayerInfo(memoryLayers[1], true)));
+
+    //     if (inLayers.size() > 0) {
+    //         mInputPorts.emplace(std::make_pair(operation.inputs[0], LayerInfo(inLayers[0], false)));
+    //     }
+    // }
+
+    if (gnaPluginPtr) {
+        gnaPluginPtr->setInputIndices({operation.inputs[18], operation.inputs[19], operation.inputs[0]});
+        gnaPluginPtr->setOutputIndices({operation.outputs[0], operation.outputs[1], operation.outputs[2]});
     }
 
     return true;
@@ -1758,7 +1999,7 @@ bool GnaPreparedModel::operationQuantizedLSTM(const Operation& operation)
 {
     IRBuilder::LstmLayer::QuantLstmParams  params;
 
-    auto getV1_0_OperandLifeTime = [&](uint32_t idx) {
+    auto getV1_3_OperandLifeTime = [&](uint32_t idx) {
         const auto op = mModel.main.operands[idx];
         return (int)op.lifetime;
     };
@@ -1767,7 +2008,7 @@ bool GnaPreparedModel::operationQuantizedLSTM(const Operation& operation)
         const auto op = mModel.main.operands[idx];
 
         auto blob = GetConstOperandAsTensor(idx, offset);
-        if (op.lifetime == V1_0_OperandLifeTime::SUBGRAPH_INPUT)
+        if (op.lifetime == V1_3_OperandLifeTime::SUBGRAPH_INPUT)
         {
             mOpIndex2BlobMap[idx] = blob;
         }
@@ -1817,93 +2058,95 @@ bool GnaPreparedModel::operationQuantizedLSTM(const Operation& operation)
     params.useBatchedLayerNorm = true;
 
     params.input.data = getIRBlobFromOperand(operation.inputs[0], 0);
-    params.input.lifeTime = getV1_0_OperandLifeTime(operation.inputs[0]);
+    params.input.lifeTime = getV1_3_OperandLifeTime(operation.inputs[0]);
 
     params.outputState.data = getIRBlobFromOperand(operation.inputs[18], 18);
-    params.outputState.lifeTime = getV1_0_OperandLifeTime(operation.inputs[18]);
+    params.outputState.lifeTime = getV1_3_OperandLifeTime(operation.inputs[18]);
 
     params.cellState.data = getIRBlobFromOperand(operation.inputs[19], 19);
-    params.cellState.lifeTime = getV1_0_OperandLifeTime(operation.inputs[19]);
+    params.cellState.lifeTime = getV1_3_OperandLifeTime(operation.inputs[19]);
 
-    params.input2inputWeights.data     = getIRBlobFromOperand(operation.inputs[1], 1);
-    params.input2inputWeights.lifeTime = getV1_0_OperandLifeTime(operation.inputs[1]);
+    if (!lstmDesc.cifgEnabled) {
+        params.input2inputWeights.data     = getIRBlobFromOperand(operation.inputs[1], 1);
+        params.input2inputWeights.lifeTime = getV1_3_OperandLifeTime(operation.inputs[1]);
+
+        params.recurrant2inputWeights.data     = getIRBlobFromOperand(operation.inputs[5], 5);
+        params.recurrant2inputWeights.lifeTime     = getV1_3_OperandLifeTime(operation.inputs[5]);
+
+        params.inputGateBias.data = getIRBlobFromOperand(operation.inputs[12], 12);
+        params.inputGateBias.lifeTime = getV1_3_OperandLifeTime(operation.inputs[12]);
+    }
 
     params.input2ForgetWeights.data     = getIRBlobFromOperand(operation.inputs[2], 2);
-    params.input2ForgetWeights.lifeTime    = getV1_0_OperandLifeTime(operation.inputs[2]);
+    params.input2ForgetWeights.lifeTime    = getV1_3_OperandLifeTime(operation.inputs[2]);
 
     params.input2CellWeights.data     = getIRBlobFromOperand(operation.inputs[3], 3);
-    params.input2CellWeights.lifeTime     = getV1_0_OperandLifeTime(operation.inputs[3]);
+    params.input2CellWeights.lifeTime     = getV1_3_OperandLifeTime(operation.inputs[3]);
 
     params.input2OutputWeights.data     = getIRBlobFromOperand(operation.inputs[4], 4);
-    params.input2OutputWeights.lifeTime     = getV1_0_OperandLifeTime(operation.inputs[4]);
-
-    params.recurrant2inputWeights.data     = getIRBlobFromOperand(operation.inputs[5], 5);
-    params.recurrant2inputWeights.lifeTime     = getV1_0_OperandLifeTime(operation.inputs[5]);
+    params.input2OutputWeights.lifeTime     = getV1_3_OperandLifeTime(operation.inputs[4]);
 
     params.recurrant2ForgetWeights.data     = getIRBlobFromOperand(operation.inputs[6], 6);
-    params.recurrant2ForgetWeights.lifeTime     = getV1_0_OperandLifeTime(operation.inputs[6]);
+    params.recurrant2ForgetWeights.lifeTime     = getV1_3_OperandLifeTime(operation.inputs[6]);
 
     params.recurrant2CellWeights.data     = getIRBlobFromOperand(operation.inputs[7], 7);
-    params.recurrant2CellWeights.lifeTime     = getV1_0_OperandLifeTime(operation.inputs[7]);
+    params.recurrant2CellWeights.lifeTime     = getV1_3_OperandLifeTime(operation.inputs[7]);
 
     params.recurrant2OutputWeights.data     = getIRBlobFromOperand(operation.inputs[8], 8);
-    params.recurrant2OutputWeights.lifeTime     = getV1_0_OperandLifeTime(operation.inputs[8]);
+    params.recurrant2OutputWeights.lifeTime     = getV1_3_OperandLifeTime(operation.inputs[8]);
 
     params.cell2InputWeights.data     = getIRBlobFromOperand(operation.inputs[9], 9);
-    params.cell2InputWeights.lifeTime     = getV1_0_OperandLifeTime(operation.inputs[9]);
+    params.cell2InputWeights.lifeTime     = getV1_3_OperandLifeTime(operation.inputs[9]);
 
     params.cell2ForgetWeights.data     = getIRBlobFromOperand(operation.inputs[10], 10);
-    params.cell2ForgetWeights.lifeTime     = getV1_0_OperandLifeTime(operation.inputs[10]);
+    params.cell2ForgetWeights.lifeTime     = getV1_3_OperandLifeTime(operation.inputs[10]);
 
     params.cell2OutputWeights.data  = getIRBlobFromOperand(operation.inputs[11], 11);
-    params.cell2OutputWeights.lifeTime  = getV1_0_OperandLifeTime(operation.inputs[11]);
-
-    params.inputGateBias.data = getIRBlobFromOperand(operation.inputs[12], 12);
-    params.inputGateBias.lifeTime = getV1_0_OperandLifeTime(operation.inputs[12]);
+    params.cell2OutputWeights.lifeTime  = getV1_3_OperandLifeTime(operation.inputs[11]);
 
     params.forgetGateBias.data   = getIRBlobFromOperand(operation.inputs[13], 13);
-    params.forgetGateBias.lifeTime   = getV1_0_OperandLifeTime(operation.inputs[13]);
+    params.forgetGateBias.lifeTime   = getV1_3_OperandLifeTime(operation.inputs[13]);
 
     params.cellBias.data = getIRBlobFromOperand(operation.inputs[14], 14);
-    params.cellBias.lifeTime = getV1_0_OperandLifeTime(operation.inputs[14]);
+    params.cellBias.lifeTime = getV1_3_OperandLifeTime(operation.inputs[14]);
 
     params.outputGateBias.data    = getIRBlobFromOperand(operation.inputs[15], 15);
-    params.outputGateBias.lifeTime    = getV1_0_OperandLifeTime(operation.inputs[15]);
+    params.outputGateBias.lifeTime    = getV1_3_OperandLifeTime(operation.inputs[15]);
 
     if (lstmDesc.projectionLayerEnabled) {
         params.projectionWeights.data       = getIRBlobFromOperand(operation.inputs[16], 16);
-        params.projectionWeights.lifeTime       = getV1_0_OperandLifeTime(operation.inputs[16]);
+        params.projectionWeights.lifeTime       = getV1_3_OperandLifeTime(operation.inputs[16]);
 
         params.projectionBias.data    = getIRBlobFromOperand(operation.inputs[17], 17);
-        params.projectionBias.lifeTime    = getV1_0_OperandLifeTime(operation.inputs[17]);
+        params.projectionBias.lifeTime    = getV1_3_OperandLifeTime(operation.inputs[17]);
     }
 
     if (params.useLayerNorm) {
         if (!lstmDesc.cifgEnabled) {
             params.inputLayerNormWeights.data      = GetConstOperandAsTensor(operation.inputs[20], 20);
-            params.inputLayerNormWeights.lifeTime = getV1_0_OperandLifeTime(operation.inputs[20]);
+            params.inputLayerNormWeights.lifeTime = getV1_3_OperandLifeTime(operation.inputs[20]);
 
             params.scaleInputGateLayerNorm.data = GetConstOperandAsTensor(operation.inputs[26], 26);
-            params.scaleInputGateLayerNorm.lifeTime = getV1_0_OperandLifeTime(operation.inputs[26]);
+            params.scaleInputGateLayerNorm.lifeTime = getV1_3_OperandLifeTime(operation.inputs[26]);
         }
 
         params.forgetLayerNormWeights.data     = GetConstOperandAsTensor(operation.inputs[21], 21);
-        params.forgetLayerNormWeights.lifeTime = getV1_0_OperandLifeTime(operation.inputs[21]);
+        params.forgetLayerNormWeights.lifeTime = getV1_3_OperandLifeTime(operation.inputs[21]);
 
         params.cellLayerNormWeights.data       = GetConstOperandAsTensor(operation.inputs[22], 22);
-        params.cellLayerNormWeights.lifeTime = getV1_0_OperandLifeTime(operation.inputs[22]);
+        params.cellLayerNormWeights.lifeTime = getV1_3_OperandLifeTime(operation.inputs[22]);
 
         params.outputLayerNormWeights.data     = GetConstOperandAsTensor(operation.inputs[23], 23);
-        params.outputLayerNormWeights.lifeTime = getV1_0_OperandLifeTime(operation.inputs[23]);
+        params.outputLayerNormWeights.lifeTime = getV1_3_OperandLifeTime(operation.inputs[23]);
 
         params.scaleForgetGateLayerNorm.data = GetConstOperandAsTensor(operation.inputs[27], 27);
-        params.scaleForgetGateLayerNorm.lifeTime = getV1_0_OperandLifeTime(operation.inputs[27]);
+        params.scaleForgetGateLayerNorm.lifeTime = getV1_3_OperandLifeTime(operation.inputs[27]);
 
         params.scaleCellGateLayerNorm.data = GetConstOperandAsTensor(operation.inputs[28], 28);
-        params.scaleCellGateLayerNorm.lifeTime = getV1_0_OperandLifeTime(operation.inputs[28]);
+        params.scaleCellGateLayerNorm.lifeTime = getV1_3_OperandLifeTime(operation.inputs[28]);
 
         params.scaleOutputGateLayerNorm.data = GetConstOperandAsTensor(operation.inputs[29], 29);
-        params.scaleOutputGateLayerNorm.lifeTime = getV1_0_OperandLifeTime(operation.inputs[29]);
+        params.scaleOutputGateLayerNorm.lifeTime = getV1_3_OperandLifeTime(operation.inputs[29]);
     }
 
     params.zeroPointHiddenLayer = PARAM_I32(30);
@@ -1912,31 +2155,90 @@ bool GnaPreparedModel::operationQuantizedLSTM(const Operation& operation)
     std::vector<std::string> memoryLayers, inLayers;
     auto outputLayerNames = mBuilderModel->createFullLstm(params, lstmDesc, memoryLayers, inLayers);
 
-    // mOutputToLayerMap[operation.outputs[0]] = outputLayerNames[0];
-    // mOutputToLayerMap[operation.outputs[1]] = outputLayerNames[1];
-    // mOutputToLayerMap[operation.outputs[2]] = outputLayerNames[0];
-
-    mOutputToLayerMap.emplace(std::make_pair(operation.outputs[0],
-                                            LayerInfo(outputLayerNames[0], false)));
-    mOutputToLayerMap.emplace(std::make_pair(operation.outputs[1],
-                                            LayerInfo(outputLayerNames[1], false)));
-    mOutputToLayerMap.emplace(std::make_pair(operation.outputs[2],
-                                            LayerInfo(outputLayerNames[0], false)));
-
-    if (memoryLayers.size() > 0) {
-        mInputPorts.emplace(std::make_pair(operation.inputs[18], LayerInfo(memoryLayers[0], true)));
-        mInputPorts.emplace(std::make_pair(operation.inputs[19], LayerInfo(memoryLayers[1], true)));
-
-        if (inLayers.size() > 0) {
-            mInputPorts.emplace(std::make_pair(operation.inputs[0], LayerInfo(inLayers[0], false)));
+    auto addIndexToLayerMap = [&](uint32_t index, std::string name, bool memory, bool input) {
+        auto operandDetails = mModel.main.operands[index];
+        if (input) {
+            if (operandDetails.lifetime == V1_3_OperandLifeTime::SUBGRAPH_INPUT) {
+                VLOG(L1, "Adding index:%d layer:%s to inputs layer map", index, name.c_str());
+                mInputPorts.emplace(std::make_pair(index, LayerInfo(name, memory, DeviceType::GNA)));
+            } else if (static_cast<int>(operandDetails.lifetime) == static_cast<int>(OperandLifeTime::TEMPORARY_VARIABLE)) {
+                VLOG(L1, "Adding index:%d layer:%s to temporary layer (input) map", index, name.c_str());
+                if (mIntermediateLayerMap.find(index) != mIntermediateLayerMap.end()) {
+                    auto& halLayer = mIntermediateLayerMap.at(index);
+                    halLayer.setInputNode(name, DeviceType::GNA);
+                } else {
+                    mIntermediateLayerMap.emplace(std::make_pair(index,
+                                                            HalLayerInfo(name, DeviceType::GNA,
+                                                                         "", DeviceType::None, memory)));
+                }
+            }
+        } else {
+            if (operandDetails.lifetime == V1_3_OperandLifeTime::SUBGRAPH_OUTPUT) {
+                VLOG(L1, "Adding index:%d layer:%s to outputs layer map", index, name.c_str());
+                mOutputToLayerMap.emplace(std::make_pair(index, LayerInfo(name, memory, DeviceType::GNA)));
+            } else if (static_cast<int>(operandDetails.lifetime) == static_cast<int>(OperandLifeTime::TEMPORARY_VARIABLE)) {
+                VLOG(L1, "Adding index:%d layer:%s to temporary layer (output) map", index, name.c_str());
+                if (mIntermediateLayerMap.find(index) != mIntermediateLayerMap.end()) {
+                    auto& halLayer = mIntermediateLayerMap.at(index);
+                    halLayer.setOutputNode(name, DeviceType::GNA);
+                } else {
+                    mIntermediateLayerMap.emplace(std::make_pair(index, HalLayerInfo("", DeviceType::None,
+                                                                                     name, DeviceType::GNA, false)));
+                }
+            }
         }
+    };
+
+    addIndexToLayerMap(operation.outputs[0], outputLayerNames[0], false, false);
+    addIndexToLayerMap(operation.outputs[1], outputLayerNames[1], false, false);
+    addIndexToLayerMap(operation.outputs[2], outputLayerNames[0], false, false);
+    addIndexToLayerMap(operation.inputs[18], memoryLayers[0], true, true);
+    addIndexToLayerMap(operation.inputs[19], memoryLayers[1], true, true);
+    
+    if (inLayers.size() > 0) {
+        VLOG(L1, "LSTM layer has input layer!!.. Adding input");
+        addIndexToLayerMap(operation.inputs[0], inLayers[0], false, true);
+    } else {
+        VLOG(L1, "LSTM layer has no input layer!!.. Adding input layer to intermediate layer index");
+        addIndexToLayerMap(operation.inputs[0], "", false, true);
     }
+
+    // mOutputToLayerMap.emplace(std::make_pair(operation.outputs[0],
+    //                                         LayerInfo(outputLayerNames[0], false)));
+    // mOutputToLayerMap.emplace(std::make_pair(operation.outputs[1],
+    //                                         LayerInfo(outputLayerNames[1], false)));
+    // mOutputToLayerMap.emplace(std::make_pair(operation.outputs[2],
+    //                                         LayerInfo(outputLayerNames[0], false)));
+
+    // if (memoryLayers.size() > 0) {
+    //     mInputPorts.emplace(std::make_pair(operation.inputs[18], LayerInfo(memoryLayers[0], true)));
+    //     mInputPorts.emplace(std::make_pair(operation.inputs[19], LayerInfo(memoryLayers[1], true)));
+
+    //     if (inLayers.size() > 0) {
+    //         mInputPorts.emplace(std::make_pair(operation.inputs[0], LayerInfo(inLayers[0], false)));
+    //     }
+    // }
+
+    // auto operandDetails = mModel.main.operands[operation.inputs[0]];
+    // if ((static_cast<int>(operandDetails.lifetime) == static_cast<int>(OperandLifeTime::TEMPORARY_VARIABLE))) {
+    //     mlayerIntermediateIndices.push_back(operation.inputs[0]);
+    // }
+
+    if (gnaPluginPtr) {
+        gnaPluginPtr->setInputIndices({operation.inputs[18], operation.inputs[19], operation.inputs[0]});
+        gnaPluginPtr->setOutputIndices({operation.outputs[0], operation.outputs[1], operation.outputs[2]});
+    }
+
+    VLOG(L1, ">>>>>>>>>>>>>>>>>>>>>>>>>>>>> Input indices for lstm: %d %d %d", operation.inputs[18],
+                                                                    operation.inputs[19],
+                                                                    operation.inputs[0]);
     return true;
 }
 
 BaseOp* GnaPreparedModel::operationDequantize(const Operation& operation) {
     static int count = 0;
     std::string name = "dequantize-cpu-" + std::to_string(count++);
+    uint32_t inputIndex = operation.inputs[0], outIndex = operation.outputs[0];
 
     auto operandDetails = mModel.main.operands[operation.inputs[0]];
     if ( (static_cast<int>(operandDetails.lifetime) == static_cast<int>(OperandLifeTime::CONSTANT_COPY)) ||
@@ -1973,24 +2275,43 @@ BaseOp* GnaPreparedModel::operationDequantize(const Operation& operation) {
 
     RunTimeOperandInfo& outputOp = mOperands[operation.outputs[0]];
     outputOp.outDataType = DataType::FLOAT32;
+    if (static_cast<int>(operandDetails.lifetime) == (int)V1_3_OperandLifeTime::SUBGRAPH_INPUT) {
+        mInputPorts.emplace(std::make_pair(inputIndex, LayerInfo(name, false, DeviceType::CPU)));
+    } else if (static_cast<int>(operandDetails.lifetime) == static_cast<int>(OperandLifeTime::TEMPORARY_VARIABLE)) {
+        if (mIntermediateLayerMap.find(inputIndex) != mIntermediateLayerMap.end()) {
+            auto& halLayer = mIntermediateLayerMap.at(inputIndex);
+            halLayer.setInputNode(name, DeviceType::CPU);
+        } else {
+            mIntermediateLayerMap.emplace(std::make_pair(inputIndex,
+                                                        HalLayerInfo(name, DeviceType::CPU, "", DeviceType::None, false)));
+        }
+    }
 
-    //if (static_cast<int>(operandDetails.lifetime) == static_cast<int>(OperandLifeTime::SUBGRAPH_INPUT)) {
-        mInputPorts.emplace(std::make_pair(operation.inputs[0],
-                                            LayerInfo(name, false, true)));
-    //}
+    dequantOp->setOutputIndices({outIndex});
+    dequantOp->setInputIndices({inputIndex});
 
-    //mOutputToLayerMap[operation.outputs[0]] = name;
-    mOutputToLayerMap.emplace(std::make_pair(operation.outputs[0],
-                                            LayerInfo(name, false, true)));
+    if (static_cast<int>(OutOperandDetails.lifetime) == (int)V1_3_OperandLifeTime::SUBGRAPH_OUTPUT) {
+        mOutputToLayerMap.emplace(std::make_pair(outIndex, LayerInfo(name, false, DeviceType::CPU)));
+    } else if (static_cast<int>(OutOperandDetails.lifetime) == static_cast<int>(OperandLifeTime::TEMPORARY_VARIABLE)) {
+        if (mIntermediateLayerMap.find(inputIndex) != mIntermediateLayerMap.end()) {
+            auto& halLayer = mIntermediateLayerMap.at(inputIndex);
+            halLayer.setOutputNode(name, DeviceType::CPU);
+        } else {
+            mIntermediateLayerMap.emplace(std::make_pair(inputIndex,
+                                                        HalLayerInfo("", DeviceType::None, name, DeviceType::CPU, false)));
+        }
+    }
+    
     return dequantOp;
 }
 
 BaseOp* GnaPreparedModel::operationQuantize(const Operation& operation) {
     static int count = 0;
     std::string name = "quantize-cpu-" + std::to_string(count++);
-    RunTimeOperandInfo& inputOp = mOperands[operation.inputs[0]];
+    uint32_t inputIndex = operation.inputs[0], outIndex = operation.outputs[0];
+    RunTimeOperandInfo& inputOp = mOperands[inputIndex];
 
-    auto operandDetails = mModel.main.operands[operation.inputs[0]];
+    auto operandDetails = mModel.main.operands[inputIndex];
     if ( (static_cast<int>(operandDetails.lifetime) == static_cast<int>(OperandLifeTime::CONSTANT_COPY)) ||
          (static_cast<int>(operandDetails.lifetime) == static_cast<int>(OperandLifeTime::CONSTANT_REFERENCE))) {
        VLOG(L1, "Quantize Op input is of type const !!!!! Revaluate NW");
@@ -2001,11 +2322,11 @@ BaseOp* GnaPreparedModel::operationQuantize(const Operation& operation) {
     if (operandDetails.type == OperandType::FLOAT16)
         isFp16 = true;
 
-    auto OutOperandDetails = mModel.main.operands[operation.outputs[0]];
+    auto OutOperandDetails = mModel.main.operands[outIndex];
     BaseOp* quantOp = nullptr;
     float   scaleFactor = OutOperandDetails.scale;
     int32_t zp = OutOperandDetails.zeroPoint;
-    RunTimeOperandInfo& outputOp = mOperands[operation.outputs[0]];
+    RunTimeOperandInfo& outputOp = mOperands[outIndex];
 
     switch(OutOperandDetails.type) {
         case OperandType::TENSOR_QUANT8_ASYMM:
@@ -2028,14 +2349,35 @@ BaseOp* GnaPreparedModel::operationQuantize(const Operation& operation) {
             break;
     }
 
-    //if (static_cast<int>(operandDetails.lifetime) == static_cast<int>(OperandLifeTime::SUBGRAPH_INPUT)) {
-        mInputPorts.emplace(std::make_pair(operation.inputs[0],
-                                            LayerInfo(name, false, true)));
-    //}
+    if (static_cast<int>(operandDetails.lifetime) == (int)V1_3_OperandLifeTime::SUBGRAPH_INPUT) {
+        mInputPorts.emplace(std::make_pair(inputIndex, LayerInfo(name, false, DeviceType::CPU)));
+    } else if(static_cast<int>(operandDetails.lifetime) == static_cast<int>(OperandLifeTime::TEMPORARY_VARIABLE)) {
+        if (mIntermediateLayerMap.find(inputIndex) != mIntermediateLayerMap.end()) {
+            auto& halLayer = mIntermediateLayerMap.at(inputIndex);
+            halLayer.setInputNode(name, DeviceType::CPU);
+        } else {
+            mIntermediateLayerMap.emplace(std::make_pair(inputIndex,
+                                                        HalLayerInfo(name, DeviceType::CPU, "", DeviceType::None, false)));
+        }
+    }
 
-    //mOutputToLayerMap[operation.outputs[0]] = name;
-    mOutputToLayerMap.emplace(std::make_pair(operation.outputs[0],
-                                            LayerInfo(name, false, true)));
+    quantOp->setOutputIndices({outIndex});
+    quantOp->setInputIndices({inputIndex});
+
+    if (static_cast<int>(OutOperandDetails.lifetime) == (int)V1_3_OperandLifeTime::SUBGRAPH_OUTPUT) {
+        VLOG(L1, "+++++++ Add Output index (SUBGRAPH_OUTPUT) to OutputToLayerMap for quantize: %d", outIndex);
+        mOutputToLayerMap.emplace(std::make_pair(outIndex, LayerInfo(name, false, DeviceType::CPU)));
+    } else if (static_cast<int>(OutOperandDetails.lifetime) == static_cast<int>(OperandLifeTime::TEMPORARY_VARIABLE)) {
+        VLOG(L1, "+++++++ Add Output index (TEMPORARY) to IntermediateLayerMap for quantize: %d", outIndex);
+        if (mIntermediateLayerMap.find(outIndex) != mIntermediateLayerMap.end()) {
+            auto& halLayer = mIntermediateLayerMap.at(outIndex);
+            halLayer.setOutputNode(name, DeviceType::CPU);
+        } else {
+            mIntermediateLayerMap.emplace(std::make_pair(outIndex,
+                                                        HalLayerInfo("", DeviceType::None, name, DeviceType::CPU, false)));
+        }
+    }
+
     return quantOp;
 }
 
@@ -2294,7 +2636,7 @@ Blob::Ptr GnaPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const 
     }
 
     if (op.type == OperandType::TENSOR_FLOAT32 || op.type == OperandType::FLOAT32 || isQuantInput)  {
-        if (op.lifetime == V1_0_OperandLifeTime::SUBGRAPH_INPUT) {
+        if (op.lifetime == V1_3_OperandLifeTime::SUBGRAPH_INPUT) {
             if (buf == nullptr)
                 VLOG(L1, "SUBGRAPH_INPUT buf is NULL !!!!!!!!!!!!!!!");
 
@@ -2372,7 +2714,7 @@ Blob::Ptr GnaPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const 
                 }
                 return blob;
             }
-        } else if (op.lifetime == V1_0_OperandLifeTime::SUBGRAPH_OUTPUT) {
+        } else if (op.lifetime == V1_3_OperandLifeTime::SUBGRAPH_OUTPUT) {
             if (buf == nullptr)
                 VLOG(L1, "SUBGRAPH_OUTPUT buf is NULL !!!!!!!!!!!!!!!");
 
