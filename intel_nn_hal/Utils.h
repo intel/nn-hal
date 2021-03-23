@@ -225,6 +225,8 @@ class BaseOp {
         virtual std::vector<uint32_t> getInputIndices() {
             return mInputIndices;
         }
+
+        virtual void cleanup() {}
 };
 
 class OpContainer {
@@ -241,7 +243,6 @@ class OpContainer {
         }
 
         bool run() {
-            VLOG(L1, "%s", __func__);
             for (auto op: opsVec) {
                 op->run();
             }
@@ -274,16 +275,19 @@ class OpContainer {
         }
 
         BaseOp* getCpuOpFromLayerName(std::string layer) {
-            VLOG(L1, "%s layer name:%s", __func__, layer.c_str());
             for (auto op: opsVec) {
-                VLOG(L1, "comparing with layername:%s", op->getLayerName().c_str());
                 if (layer.compare(op->getLayerName()) == 0) {
-                    VLOG(L1, "searching layername:%s SUCCESS", op->getLayerName().c_str());
                     return op;
                 }
             }
 
             return nullptr;
+        }
+
+        virtual void cleanup() {
+            for (auto op: opsVec) {
+                op->cleanup();
+            }
         }
 
         bool isCpuGraph() { return targetCpu; }
