@@ -31,16 +31,41 @@ class GnaPreparedModel : public PreparedModel {
     struct LayerInfo {
         std::string layerName;
         bool memoryLayer;
-        bool cpuLayer;
+        DeviceType execDevice;
 
-        LayerInfo(std::string layer, bool memory):layerName(layer),memoryLayer(memory), cpuLayer(false){}
-        LayerInfo(std::string layer, bool memory, bool cpu):layerName(layer),memoryLayer(memory), cpuLayer(cpu){}
+        LayerInfo(std::string layer, bool memory):layerName(layer),memoryLayer(memory), execDevice(DeviceType::GNA){}
+        LayerInfo(std::string layer, bool memory, DeviceType device):layerName(layer),memoryLayer(memory), execDevice(device){}
+    };
+
+    struct HalLayerInfo {
+        std::string inLayerName;
+        std::string outLayerName;
+        bool memoryLayer;
+        DeviceType inDevice;
+        DeviceType outDevice;
+
+        HalLayerInfo(std::string inLayer, DeviceType inDev,
+                     std::string outLayer, DeviceType outDev,
+                     bool memory):inLayerName(inLayer), inDevice(inDev),
+                                  outLayerName(outLayer), outDevice(outDev),
+                                  memoryLayer(memory){}
+    
+        void setInputNode(std::string inLayer, DeviceType dev) {
+            inLayerName = inLayer;
+            inDevice = dev;
+        }
+
+        void setOutputNode(std::string outLayer, DeviceType dev) {
+            outLayerName = outLayer;
+            inDevice = dev;
+        }
     };
 
     std::map<uint32_t, LayerInfo> mInputPorts;
     std::map<uint32_t, LayerInfo> mOutputToLayerMap;
+    std::map<uint32_t, HalLayerInfo> mIntermediateLayerMap;
     std::vector<uint32_t> mlayerInputIndices; /* to be filled during the infer call. Need to optimize */
-    std::vector<uint32_t> mlayerIntermediateIndices;
+    //std::vector<uint32_t> mlayerIntermediateIndices;
     std::vector<uint32_t> mModelInputIndices;
     std::vector<uint32_t> mModelOutputIndices;
 
@@ -122,7 +147,10 @@ protected:
     BaseOp* getCpuOpFromLayerName(std::string layer);
 
     bool updateMemoryAfterCPUGraphExecution(const V1_0_Request& request);
+    bool updateMemoryAfterCPUGraphExecution(const V1_0_Request& request, uint32_t index);
     bool updateMemoryAfterGNAGraphExecution(const V1_0_Request& request);
+    bool updateMemoryAfterGraphExecution(const V1_0_Request& request);
+
 
     std::vector<RunTimePoolInfo> mRuntimeRequestPoolInfos;
 

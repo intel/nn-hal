@@ -73,6 +73,8 @@ class GnaNetwork : public BaseOp
     InferRequest inferRequest;
     ResponseDesc resp;
     std::vector<InferenceEngine::MemoryState> memoryStates;
+    std::vector<uint32_t> mOutputIndices;
+    std::vector<uint32_t> mInputIndices;
 
 public:
     InputsDataMap inputInfo = {};
@@ -113,6 +115,12 @@ public:
     }
 #endif
     void loadNetwork(InferenceEngine::CNNNetwork& passed_network, bool isDecoderNw);
+    void setNetwork(std::shared_ptr<ICNNNetwork> curr_network) {
+        if (curr_network) {
+            InferenceEngine::CNNNetwork cnnnetwork({curr_network});
+            network = curr_network;
+        }
+    }
 
     void prepareInput();
 
@@ -154,5 +162,23 @@ public:
 
     ConstOutputsDataMap getOutputsInfo() {
         return executable_network.GetOutputsInfo();
+    }
+
+    virtual void setOutputIndices(std::vector<uint32_t> indices) {
+        for (auto in: indices)
+            mOutputIndices.push_back(in);
+    }
+
+    virtual std::vector<uint32_t> getOutputIndices() {
+        return mOutputIndices;
+    }
+
+    virtual void setInputIndices(std::vector<uint32_t> indices) {
+        for (auto in: indices)
+            mInputIndices.push_back(in);
+    }
+
+    virtual std::vector<uint32_t> getInputIndices() {
+        return mInputIndices;
     }
 };
