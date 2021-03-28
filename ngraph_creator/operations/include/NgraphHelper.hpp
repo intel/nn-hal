@@ -18,7 +18,8 @@ static ngraph::Shape toNgraphShape(const std::vector<uint32_t>& dimensions) {
     return shapeVec;
 }
 
-static std::shared_ptr<ngraph::Node> applyActivation(std::shared_ptr<ngraph::Node> inputNode, int32_t activationFn) {
+static std::shared_ptr<ngraph::Node> applyActivation(std::shared_ptr<ngraph::Node> inputNode,
+                                                     int32_t activationFn) {
     std::shared_ptr<ngraph::Node> activationNode = nullptr;
     switch (activationFn) {
         case (int32_t)FusedActivationFunc::NONE:

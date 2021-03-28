@@ -111,14 +111,14 @@ const uint8_t* NnapiModelInfo::GetOperandMemory(int index, uint32_t& lenOut) {
     const auto op = mModel.operands[index];
     lenOut = op.location.length;
     if (op.lifetime == OperandLifeTime::CONSTANT_COPY) {
-         ALOGV("operand lifetime OperandLifeTime::CONSTANT_COPY");
+        ALOGV("operand lifetime OperandLifeTime::CONSTANT_COPY");
         if (op.location.poolIndex != 0) {
             // ALOGE("CONSTANT_COPY expects poolIndex to be 0");
             nnAssert(false);
         }
         return (const_cast<uint8_t*>(&mModel.operandValues[op.location.offset]));
     } else if (op.lifetime == OperandLifeTime::CONSTANT_REFERENCE) {
-         ALOGV("operand lifetime OperandLifeTime::CONSTANT_REFERENCE");
+        ALOGV("operand lifetime OperandLifeTime::CONSTANT_REFERENCE");
         auto poolIndex = op.location.poolIndex;
         auto& r = mPoolInfos[poolIndex];
         return (const_cast<uint8_t*>(r.buffer + op.location.offset));
@@ -166,9 +166,9 @@ Blob::Ptr NnapiModelInfo::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const ui
                 blob->allocate();
                 return blob;
             } else {
-                    InferenceEngine::TBlob<float>::Ptr blob =
+                InferenceEngine::TBlob<float>::Ptr blob =
                     std::make_shared<InferenceEngine::TBlob<float>>(td, (float*)buf, len);
-                    return blob;
+                return blob;
             }
         } else if (op.lifetime == OperandLifeTime::MODEL_OUTPUT) {
             ALOGD("Create output blob !!!!");
@@ -311,8 +311,8 @@ IRBlob::Ptr NnapiModelInfo::GetConstWeightsOperandAsTensor(uint32_t index) {
                 return blob;
             } else {
                 InferenceEngine::TBlob<float>::Ptr blob =
-                std::make_shared<InferenceEngine::TBlob<float>>(td, (float*)buf, len);
-            return blob;
+                    std::make_shared<InferenceEngine::TBlob<float>>(td, (float*)buf, len);
+                return blob;
             }
         }
     } else if (op.type == OperandType::TENSOR_INT32) {

@@ -7,10 +7,11 @@ namespace hardware {
 namespace neuralnetworks {
 namespace nnhal {
 
-NgraphNetworkCreator::NgraphNetworkCreator(std::shared_ptr<NnapiModelInfo> modelInfo, const std::string& plugin)
+NgraphNetworkCreator::NgraphNetworkCreator(std::shared_ptr<NnapiModelInfo> modelInfo,
+                                           const std::string& plugin)
     : mModelInfo(modelInfo),
-      mNgraphNodes(
-          std::make_shared<NgraphNodes>(mModelInfo->getOperandsSize(), mModelInfo->getModelOutputsSize())),
+      mNgraphNodes(std::make_shared<NgraphNodes>(mModelInfo->getOperandsSize(),
+                                                 mModelInfo->getModelOutputsSize())),
       mOpFactoryInstance(plugin, mModelInfo, mNgraphNodes) {
     auto nnapiOperationsSize = mModelInfo->getOperationsSize();
     mOperationNodes.resize(nnapiOperationsSize);
@@ -38,12 +39,10 @@ bool NgraphNetworkCreator::createInputParams() {
             case OperandType::TENSOR_FLOAT32:
                 inputParam = std::make_shared<ngraph::opset3::Parameter>(
                     ngraph::element::f32, ngraph::Shape(dims.begin(), dims.end()));
-                ALOGV("createInputParams created inputIndex %d, type %d", i,
-                      nnapiOperand.type);
+                ALOGV("createInputParams created inputIndex %d, type %d", i, nnapiOperand.type);
                 break;
             default:
-                ALOGE("createInputParams Failure at inputIndex %d, type %d", i,
-                      nnapiOperand.type);
+                ALOGE("createInputParams Failure at inputIndex %d, type %d", i, nnapiOperand.type);
                 inputParam = nullptr;
                 return false;
         }
@@ -67,7 +66,8 @@ void NgraphNetworkCreator::getSupportedOperations(std::vector<bool>& supportedOp
 bool NgraphNetworkCreator::validateOperations() {
     for (int i = 0; i < mModelInfo->getOperationsSize(); i++) {
         if (!mOperationNodes[i] || !mOperationNodes[i]->validate()) {
-            ALOGE("%s index %d, type %d not supported", __func__, i, mModelInfo->getOperationType(i));
+            ALOGE("%s index %d, type %d not supported", __func__, i,
+                  mModelInfo->getOperationType(i));
             return false;
         }
     }

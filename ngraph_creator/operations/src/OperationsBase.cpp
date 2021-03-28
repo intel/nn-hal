@@ -60,19 +60,24 @@ void OperationsBase::addResultNode(size_t index, std::shared_ptr<ngraph::Node> r
     mNgraphNodes->setResultNode(index, resultNode);
 }
 
-OperationsBase::OperationsBase(int operationIndex) : mNnapiOperationIndex(operationIndex) { mDefaultOutputIndex = 0; }
+OperationsBase::OperationsBase(int operationIndex) : mNnapiOperationIndex(operationIndex) {
+    mDefaultOutputIndex = 0;
+}
 
 void OperationsBase::setNgraphNodes(std::shared_ptr<NgraphNodes> nodes) { mNgraphNodes = nodes; }
 
 bool OperationsBase::validate() { return true; }
 
-bool OperationsBase::checkOperandType(uint32_t operandIndex, const int32_t expectedOperandType, const std::string& strLogInfo) {
+bool OperationsBase::checkOperandType(uint32_t operandIndex, const int32_t expectedOperandType,
+                                      const std::string& strLogInfo) {
     const auto operandType = (int32_t)sModelInfo->getOperandType(operandIndex);
     if (operandType != expectedOperandType) {
-        ALOGE("OperationIndex %d %s Index %d type %d invalid", mNnapiOperationIndex, strLogInfo.c_str(), operandIndex, operandType);
+        ALOGE("OperationIndex %d %s Index %d type %d invalid", mNnapiOperationIndex,
+              strLogInfo.c_str(), operandIndex, operandType);
         return false;
     }
-    ALOGV("OperationIndex %d %s Index %d type %d PASSED", mNnapiOperationIndex, strLogInfo.c_str(), operandIndex, operandType);
+    ALOGV("OperationIndex %d %s Index %d type %d PASSED", mNnapiOperationIndex, strLogInfo.c_str(),
+          operandIndex, operandType);
     return true;
 }
 bool OperationsBase::checkOutputOperandType(uint32_t index, const int32_t expectedOperandType) {

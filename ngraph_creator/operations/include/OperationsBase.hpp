@@ -29,11 +29,13 @@ protected:
     void addResultNode(size_t index, std::shared_ptr<ngraph::Node> resultNode);
 
     // helper functions
-    bool checkOperandType(uint32_t operandIndex, const int32_t expectedOperandType, const std::string& strLogInfo = "Operand");
+    bool checkOperandType(uint32_t operandIndex, const int32_t expectedOperandType,
+                          const std::string& strLogInfo = "Operand");
     bool checkOutputOperandType(uint32_t index, const int32_t expectedOperandType);
     bool checkInputOperandType(uint32_t index, const int32_t expectedOperandType);
     const vec<uint32_t> getInputOperandDimensions(uint32_t inputIndex);
-    template <typename T> std::shared_ptr<ngraph::Node> getInputNode(uint32_t inputIndex) {
+    template <typename T>
+    std::shared_ptr<ngraph::Node> getInputNode(uint32_t inputIndex) {
         auto operandIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, inputIndex);
         if (sModelInfo->isOperandLifeTimeConst(operandIndex)) {
             auto operandValues = sModelInfo->GetConstVecOperand<T>(operandIndex);

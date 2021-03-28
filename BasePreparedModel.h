@@ -61,8 +61,7 @@ public:
     BasePreparedModel(const Model& model) : mTargetDevice("CPU") {
         mModelInfo = std::make_shared<NnapiModelInfo>(model);
     }
-    BasePreparedModel(const std::string device, const Model& model)
-        : mTargetDevice(device) {
+    BasePreparedModel(const std::string device, const Model& model) : mTargetDevice(device) {
         mModelInfo = std::make_shared<NnapiModelInfo>(model);
     }
 
@@ -86,7 +85,7 @@ public:
 
     std::shared_ptr<NgraphNetworkCreator> getNgraphNwCreator() { return mNgc; }
 
-     std::shared_ptr<IIENetwork> getPlugin() { return mPlugin; }
+    std::shared_ptr<IIENetwork> getPlugin() { return mPlugin; }
 
 protected:
     virtual void deinitialize();

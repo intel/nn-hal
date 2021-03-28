@@ -107,7 +107,6 @@ void asyncExecute(const Request& request, MeasureTiming measure, BasePreparedMod
         return;
     }
 
-
     for (size_t i = 0; i < request.inputs.size(); i++) {
         auto inIndex = modelInfo->getModelInputIndex(i);
         auto srcBlob = modelInfo->getBlobFromMemoryPoolIn(request, i);
@@ -134,7 +133,6 @@ void asyncExecute(const Request& request, MeasureTiming measure, BasePreparedMod
         auto srcBlob = plugin->getBlob(outputNodeName);
         std::memcpy((uint8_t*)destPtr, srcBlob->buffer().as<uint8_t*>(), srcBlob->byteSize());
         writeBufferToFile(outputNodeName, srcBlob->buffer().as<float*>(), srcBlob->size());
-
     }
 
     if (!modelInfo->updateRequestPoolInfos()) {
@@ -171,13 +169,9 @@ static std::tuple<ErrorStatus, hidl_vec<V1_2::OutputShape>, Timing> executeSynch
         return {ErrorStatus::GENERAL_FAILURE, {}, kNoTiming};
     }
 
-
     for (size_t i = 0; i < request.inputs.size(); i++) {
         auto inIndex = modelInfo->getModelInputIndex(i);
         auto srcBlob = modelInfo->getBlobFromMemoryPoolIn(request, i);
-
-
-
 
         const std::string& inputNodeName = ngraphNw->getNodeName(inIndex);
         ALOGD("Input index: %d layername : %s", inIndex, inputNodeName.c_str());
@@ -186,7 +180,6 @@ static std::tuple<ErrorStatus, hidl_vec<V1_2::OutputShape>, Timing> executeSynch
         uint8_t* src = srcBlob->buffer().as<uint8_t*>();
         std::memcpy(dest, src, srcBlob->byteSize());
         writeBufferToFile(inputNodeName, srcBlob->buffer().as<float*>(), srcBlob->size());
-
     }
 
     ALOGD("Run");
@@ -198,16 +191,11 @@ static std::tuple<ErrorStatus, hidl_vec<V1_2::OutputShape>, Timing> executeSynch
         ALOGI("OutputIndex: %d", outIndex);
         void* destPtr = modelInfo->getBlobFromMemoryPoolOut(request, i);
 
-
-
-
-
         const std::string& outputNodeName = ngraphNw->getNodeName(outIndex);
         ALOGD("Output index: %d layername : %s", outIndex, outputNodeName.c_str());
         auto srcBlob = plugin->getBlob(outputNodeName);
         std::memcpy((uint8_t*)destPtr, srcBlob->buffer().as<uint8_t*>(), srcBlob->byteSize());
         writeBufferToFile(outputNodeName, srcBlob->buffer().as<float*>(), srcBlob->size());
-
     }
 
     if (!modelInfo->updateRequestPoolInfos()) {
@@ -233,7 +221,7 @@ Return<void> BasePreparedModel::executeSynchronously(const Request& request, Mea
 
     if (!validateRequest(request, mModelInfo->getModel())) {
         cb(ErrorStatus::INVALID_ARGUMENT, {}, kNoTiming);
-        return  Void();
+        return Void();
     }
     auto [status, outputShapes, timing] =
         executeSynchronouslyBase(request, measure, this, driverStart);

@@ -60,7 +60,8 @@ public:
     }
     bool isOperandLifeTimeConst(uint32_t operandIdx) {
         if (getOperandLifetime(operandIdx) == OperandLifeTime::CONSTANT_COPY ||
-            getOperandLifetime(operandIdx) == OperandLifeTime::CONSTANT_REFERENCE) return true;
+            getOperandLifetime(operandIdx) == OperandLifeTime::CONSTANT_REFERENCE)
+            return true;
         return false;
     }
 
@@ -72,16 +73,16 @@ public:
         return GetConstFromBuffer<T>(buf, len);
     }
 
-    const auto& getOperations() {
-        return mModel.operations;
-    }
+    const auto& getOperations() { return mModel.operations; }
     const auto& getOperationOutput(int operationIndex, uint32_t outputIndex) {
         return mModel.operations[operationIndex].outputs[outputIndex];
     }
     const auto& getOperationInput(int operationIndex, uint32_t inputIndex) {
         return mModel.operations[operationIndex].inputs[inputIndex];
     }
-    size_t getOperationInputsSize(int operationIndex) { return mModel.operations[operationIndex].inputs.size(); }
+    size_t getOperationInputsSize(int operationIndex) {
+        return mModel.operations[operationIndex].inputs.size();
+    }
 
     size_t getOperationsSize() { return mModel.operations.size(); }
 

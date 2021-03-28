@@ -1,10 +1,10 @@
 #pragma once
 
 #include <NgraphNodes.hpp>
-#include "ModelManager.h"
-#include "OperationsBase.hpp"
 #include <OperationsFactory.hpp>
 #include <ngraph/node.hpp>
+#include "ModelManager.h"
+#include "OperationsBase.hpp"
 
 namespace android {
 namespace hardware {

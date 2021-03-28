@@ -13,20 +13,19 @@ Conv_2d::Conv_2d(int operationIndex) : OperationsBase(operationIndex) {
 
 bool Conv_2d::validate() {
     // Check Output type
-    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32))
-        return false;
+    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) return false;
 
     for (int i = 0; i <= 2; i++) {
         // Check input/filter/bias operands(0/1/2) are of type TENSOR_FLOAT32
-        if (!checkInputOperandType(i, (int32_t)OperandType::TENSOR_FLOAT32))
-            return false;
+        if (!checkInputOperandType(i, (int32_t)OperandType::TENSOR_FLOAT32)) return false;
     }
 
     // Check Input, Filter Dimension size
     const auto& inputDimensionsSize = getInputOperandDimensions(0).size();
     const auto& filterDimensionsSize = getInputOperandDimensions(1).size();
     if (inputDimensionsSize != 4 || filterDimensionsSize != 4) {
-        ALOGE("%s Invalid dimensions size for input(%d) or filter(%d)", __func__, inputDimensionsSize, filterDimensionsSize);
+        ALOGE("%s Invalid dimensions size for input(%d) or filter(%d)", __func__,
+              inputDimensionsSize, filterDimensionsSize);
         return false;
     }
 
@@ -38,8 +37,7 @@ bool Conv_2d::validate() {
             // All inputs except index 10 should be INT32
             // index 10 should be BOOL
             if (i == 10) {
-                if (!checkInputOperandType(i, (int32_t)OperandType::BOOL))
-                    return false;
+                if (!checkInputOperandType(i, (int32_t)OperandType::BOOL)) return false;
             } else if (!checkInputOperandType(i, (int32_t)OperandType::INT32))
                 return false;
         }
@@ -49,8 +47,7 @@ bool Conv_2d::validate() {
             // All inputs except index 7 should be INT32
             // index 7 should be BOOL
             if (i == 7) {
-                if (!checkInputOperandType(i, (int32_t)OperandType::BOOL))
-                    return false;
+                if (!checkInputOperandType(i, (int32_t)OperandType::BOOL)) return false;
             } else if (!checkInputOperandType(i, (int32_t)OperandType::INT32))
                 return false;
         }
@@ -66,7 +63,6 @@ bool Conv_2d::validate() {
 std::shared_ptr<ngraph::Node> Conv_2d::createNode() {
     const auto& inputsSize = sModelInfo->getOperationInputsSize(mNnapiOperationIndex);
     ALOGD("%s inputsSize %d", __func__, inputsSize);
-
 
     int32_t padding_left, padding_right;
     int32_t padding_top, padding_bottom;
@@ -109,9 +105,11 @@ std::shared_ptr<ngraph::Node> Conv_2d::createNode() {
 
         switch (inputsSize) {
             case 13:
-                dilation_height_factor = sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 12);
+                dilation_height_factor =
+                    sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 12);
             case 12:
-                dilation_width_factor = sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 11);
+                dilation_width_factor =
+                    sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 11);
             case 11:
                 layout = sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 10);
             default:
@@ -122,7 +120,7 @@ std::shared_ptr<ngraph::Node> Conv_2d::createNode() {
 
         auto_pad = ngraph::op::PadType::EXPLICIT;
     } else if (inputsSize == 7 ||
-              (inputsSize <= 10 && checkInputOperandType(7, (int32_t)OperandType::BOOL))) {
+               (inputsSize <= 10 && checkInputOperandType(7, (int32_t)OperandType::BOOL))) {
         // Implicit Padding if 7 to 10 inputs present and index 7 is BOOL.
         padding_scheme = sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 3);
 
@@ -132,9 +130,11 @@ std::shared_ptr<ngraph::Node> Conv_2d::createNode() {
         activationFn = sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 6);
         switch (inputsSize) {
             case 10:
-                dilation_height_factor = sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 9);
+                dilation_height_factor =
+                    sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 9);
             case 9:
-                dilation_width_factor = sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 8);
+                dilation_width_factor =
+                    sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 8);
             case 8:
                 layout = sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 7);
             default:
@@ -169,14 +169,15 @@ std::shared_ptr<ngraph::Node> Conv_2d::createNode() {
     auto inputIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 0);
     if (mNgraphNodes->isForcedNchw(inputIndex)) {
         if (useNchw) {
-            ALOGI("%s Forced NCHW done already but NCHW flag set at operationIndex %d", __func__, mNnapiOperationIndex);
+            ALOGI("%s Forced NCHW done already but NCHW flag set at operationIndex %d", __func__,
+                  mNnapiOperationIndex);
             inputNode = transpose(NCHW_NHWC, inputNode);
             mNgraphNodes->setForcedNchw(mDefaultOutputIndex, false);
         } else {
-            //Already forced NCHW, propogate the flag
+            // Already forced NCHW, propogate the flag
             mNgraphNodes->setForcedNchw(mDefaultOutputIndex, true);
         }
-    } else if (!useNchw) {  //No conversion needed if useNchw set
+    } else if (!useNchw) {  // No conversion needed if useNchw set
         inputNode = transpose(NHWC_NCHW, inputNode);
         mNgraphNodes->setForcedNchw(mDefaultOutputIndex, true);
         ALOGD("%s Forced NCHW conversion at operationIndex %d", __func__, mNnapiOperationIndex);
@@ -187,20 +188,19 @@ std::shared_ptr<ngraph::Node> Conv_2d::createNode() {
     pads_end = {padding_right, padding_bottom};
     dilations = {(size_t)dilation_width_factor, (size_t)dilation_height_factor};
     auto convNode = std::make_shared<ngraph::opset3::Convolution>(
-        inputNode, filterNode, ngraph::Strides(strides),
-        ngraph::CoordinateDiff(pads_begin), ngraph::CoordinateDiff(pads_end),
-        ngraph::Strides(dilations), auto_pad);
+        inputNode, filterNode, ngraph::Strides(strides), ngraph::CoordinateDiff(pads_begin),
+        ngraph::CoordinateDiff(pads_end), ngraph::Strides(dilations), auto_pad);
 
     auto biasNode = getInputNode<float>(2);
     auto biasDimensions = getInputOperandDimensions(2);
     std::vector<uint32_t> shape(convNode->get_shape().size(), 1);
     shape[1] = biasDimensions[0];
-    auto shapeNode = std::make_shared<ngraph::opset3::Constant>(
-        ngraph::element::i32, ngraph::Shape{shape.size()}, shape);
+    auto shapeNode = std::make_shared<ngraph::opset3::Constant>(ngraph::element::i32,
+                                                                ngraph::Shape{shape.size()}, shape);
     biasNode = std::make_shared<ngraph::opset3::Reshape>(biasNode, shapeNode, true);
 
-    std::shared_ptr<ngraph::Node> outputNode = std::make_shared<ngraph::opset3::Add>(convNode, biasNode,
-                                                     ngraph::op::AutoBroadcastType::NUMPY);
+    std::shared_ptr<ngraph::Node> outputNode = std::make_shared<ngraph::opset3::Add>(
+        convNode, biasNode, ngraph::op::AutoBroadcastType::NUMPY);
     outputNode = applyActivation(outputNode, activationFn);
 
     const auto outputLifetime = sModelInfo->getOperandLifetime(mDefaultOutputIndex);
