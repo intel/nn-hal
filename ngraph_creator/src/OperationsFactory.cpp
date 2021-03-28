@@ -6,7 +6,8 @@ namespace hardware {
 namespace neuralnetworks {
 namespace nnhal {
 
-OperationsFactory::OperationsFactory(const std::string& plugin, std::shared_ptr<NnapiModelInfo> modelInfo,
+OperationsFactory::OperationsFactory(const std::string& plugin,
+                                     std::shared_ptr<NnapiModelInfo> modelInfo,
                                      std::shared_ptr<NgraphNodes> nodes) {
     OperationsBase::sPluginType = plugin;
     OperationsBase::sModelInfo = modelInfo;
@@ -17,7 +18,8 @@ OperationsFactory::~OperationsFactory() {
     OperationsBase::mNgraphNodes.reset();
     ALOGV("%s Destructed & reset", __func__);
 }
-std::shared_ptr<OperationsBase> OperationsFactory::getOperation(int operationIndex, const OperationType& operationType) {
+std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
+    int operationIndex, const OperationType& operationType) {
     switch (operationType) {
         case OperationType::ADD:
             return std::make_shared<Add>(operationIndex);

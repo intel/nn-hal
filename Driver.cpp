@@ -177,7 +177,6 @@ Return<void> Driver::getSupportedOperations_1_2(const Model& model,
         return Void();
     }
 
-
     auto modelInfo = std::make_shared<NnapiModelInfo>(model);
     NgraphNetworkCreator ngraphCreatorInst(modelInfo, mDeviceName.c_str());
     ngraphCreatorInst.getSupportedOperations(supported);

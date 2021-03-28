@@ -89,11 +89,11 @@ enum PaddingScheme {
         if (debugMask & (1 << l)) ALOGI("[%s] " x, __FUNCTION__, ##__VA_ARGS__); \
     } while (0)
 
-#define VLOGDIMS(l, d, header)                                                          \
-    do {                                                                                \
-        auto size = (d).size();                                                         \
+#define VLOGDIMS(l, d, header)                                                       \
+    do {                                                                             \
+        auto size = (d).size();                                                      \
         ALOGI("%s: vectors {%d, %d, %d, %d}", header, (d)[0], size > 1 ? (d)[1] : 0, \
-              size > 2 ? (d)[2] : 0, size > 3 ? (d)[3] : 0);                            \
+              size > 2 ? (d)[2] : 0, size > 3 ? (d)[3] : 0);                         \
     } while (0)
 
 #define dumpOperand(index, model)                               \

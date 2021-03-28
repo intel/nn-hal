@@ -21,7 +21,6 @@ void CpuPreparedModel::deinitialize() {
     ALOGV("Entering %s", __func__);
     mModelInfo->unmapRuntimeMemPools();
 
-
     ALOGV("Exiting %s", __func__);
 }
 
@@ -42,7 +41,7 @@ bool CpuPreparedModel::initialize(const Model& model) {
     }
     auto ngraph_net = std::make_shared<InferenceEngine::CNNNetwork>(ngraph_function);
     ngraph_net->serialize("/data/vendor/neuralnetworks/ngraph_ir.xml",
-                         "/data/vendor/neuralnetworks/ngraph_ir.bin");
+                          "/data/vendor/neuralnetworks/ngraph_ir.bin");
     mPlugin = std::make_shared<IENetwork>(ngraph_net);
     mPlugin->loadNetwork();
 
