@@ -106,21 +106,12 @@ std::shared_ptr<InferenceEngine::ICNNNetwork> ModelBuilder::convertBuilder()
     return cnnNetwork;
 }
 
-/*OutputPort ModelBuilder::createAdd(BuilderFCLayer::FCParams& params, IRBlob::Ptr input,
-                                  std::vector<std::string>& inputLayerNames)
-{*/
-
-
-OutputPort ModelBuilder::createFC(BuilderFCLayer::FCParams& params, IRBlob::Ptr input,
+std::string ModelBuilder::createFC(BuilderFCLayer::FCParams& params, IRBlob::Ptr input,
                                   std::vector<std::string>& inputLayerNames)
 {
-    auto inputDims = input->getTensorDesc().getDims();
+    auto inputDims = params.input.data->getTensorDesc().getDims();
     auto weightDims = params.weights.data->getTensorDesc().getDims();
     auto outputDims = weightDims[1] * weightDims[0]/inputDims[1];
-
-    //dumpDimensions("FCLayer", inputDims);
-    //dumpDimensions("FCLayer", weightDims);
-    //std::cout << "output dimensions: " << outputDims << std::endl;
 
     auto getLayerName = [&](std::string layerName) -> std::string
     {
@@ -129,9 +120,23 @@ OutputPort ModelBuilder::createFC(BuilderFCLayer::FCParams& params, IRBlob::Ptr 
         return strName;
     };
 
-    auto inLayerName = getLayerName("input");
-    idx_t inputLayerId = getBuilderNetwork()->getBuilder()->addLayer(INLayer(inLayerName) \
-                         .setPort(Port({inputDims})));
+    idx_t inputLayerId;
+    // Does not consider CONST layer.. Should we??
+    if (params.input.lifeTime == (int)V1_0_OperandLifeTime::SUBGRAPH_INPUT) {
+        auto inLayerName = getLayerName("input");
+        inputLayerId = getBuilderNetwork()->getBuilder()->addLayer(INLayer(inLayerName) \
+                            .setPort(Port({inputDims})));
+        inputLayerNames.push_back(inLayerName);
+    } else {
+        if (getBuilderNetwork()->mConnections.empty()) {
+            auto inLayerName = getLayerName("input");
+            inputLayerId = getBuilderNetwork()->getBuilder()->addLayer(INLayer(inLayerName) \
+                                .setPort(Port({inputDims})));
+            inputLayerNames.push_back(inLayerName);
+        } else {
+            inputLayerId = getBuilderNetwork()->mConnections.back();
+        }
+    }
 
     idx_t weightsId =  getBuilderNetwork()->getBuilder()->addLayer(CONSTLayer("weights") \
                        .setData(params.weights.data));
@@ -148,22 +153,10 @@ OutputPort ModelBuilder::createFC(BuilderFCLayer::FCParams& params, IRBlob::Ptr 
 
     auto layer_name = getLayerName("fully-connected");
     idx_t FCLayerId = getBuilderNetwork()->getBuilder()->addLayer({{inputLayerId}, {weightsId}, {biasId}}, \
-    FCLayer(layer_name) \
-    .setOutputNum(outputDims));
-    if(!getBuilderNetwork()->mConnections.empty())
-    {
-        auto prev_layerID = getBuilderNetwork()->mConnections.back();
-        getBuilderNetwork()->getBuilder()->connect({prev_layerID}, {FCLayerId});
-    }
-
-    OutputPort data;
-    InferenceEngine::SizeVector dims = {1, outputDims};
+    FCLayer(layer_name).setOutputNum(outputDims));
     getBuilderNetwork()->mConnections.push_back(FCLayerId);
-    InferenceEngine::TensorDesc td(g_layer_precision, dims, InferenceEngine::Layout::NC);
-    data = std::make_shared<InferenceEngine::Data>(layer_name, td);
 
-    inputLayerNames.push_back(inLayerName);
-    return data;
+    return layer_name;
 }
 
 IRBlob::Ptr ModelBuilder::generateBlobwithData(InferenceEngine::SizeVector dims, InferenceEngine::Layout layout, std::vector<std::vector<float>> data_to_set)
@@ -484,7 +477,6 @@ std::vector<std::string> ModelBuilder::createFullLstm(LstmLayer::LstmParams& par
                                  .setMaxValue(lstmDesc.clippingThresholdProjState));
     }
 
-    VLOG(L1, "%s before Input gate connections", __func__);
     // input gate connections
     //W_{xi}x_t+W_{hi}h_{t-1}+b_i
     if (!lstmDesc.cifgEnabled) {

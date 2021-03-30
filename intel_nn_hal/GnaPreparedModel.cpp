@@ -1181,7 +1181,6 @@ bool GnaPreparedModel::updateMemoryAfterGraphExecution(const V1_0_Request& reque
 }
 
 bool GnaPreparedModel::updateMemoryAfterCPUGraphExecution(const V1_0_Request& request) {
-    VLOG(L1, "%s", __func__);
     auto reqOutputs = request.outputs;
     for (auto i =0; i < mModelOutputIndices.size(); i++) {
         auto index = mModelOutputIndices[i];
@@ -1537,14 +1536,14 @@ bool GnaPreparedModel::operationFullyConnected(const Operation& operation) {
         if (op.lifetime == V1_3_OperandLifeTime::SUBGRAPH_INPUT)
         {
             mOpIndex2BlobMap[idx] = blob;
-            VLOG(L1, "blob idx=%d (model_input) ptr=%p", idx, blob.get());
         }
 
         return blob;
     };
 
     IRBuilder::BuilderFCLayer::FCParams params;
-    auto input = getIRBlobFromOperand(operation.inputs[0], 0);
+    params.input.data = getIRBlobFromOperand(operation.inputs[0], 0);
+    params.input.lifeTime = getV1_3_OperandLifeTime(operation.inputs[0]);
 
     params.weights.data = getIRBlobFromOperand(operation.inputs[1], 1);
     params.weights.lifeTime = getV1_3_OperandLifeTime(operation.inputs[1]);
@@ -1552,8 +1551,8 @@ bool GnaPreparedModel::operationFullyConnected(const Operation& operation) {
     params.bias.data = getIRBlobFromOperand(operation.inputs[2], 2);
     params.bias.lifeTime = getV1_3_OperandLifeTime(operation.inputs[2]);
 
-    auto inputDims = input->getTensorDesc().getDims();
-    for (auto i = 0; i < inputDims.size(); i++) VLOG(L1, "input dims[%d] = %d ", i, inputDims[i]);
+    auto inputDims = params.input.data->getTensorDesc().getDims();
+    IRBlob::Ptr input = nullptr;
 
     auto weightsDims = params.weights.data->getTensorDesc().getDims();
     for (auto i = 0; i < weightsDims.size(); i++)
@@ -1563,8 +1562,6 @@ bool GnaPreparedModel::operationFullyConnected(const Operation& operation) {
 
     // input is [batch_size, input_size], weights is [num_unit, input_size]
     // nnAssert(inputDims[1] == weightsDims[1]);
-
-    nnAssert(inputDims.size() >= 2);
     nnAssert(weightsDims.size() == 2);
     uint32_t numInputElements = sizeOfTensor(inputDims);
     uint32_t num_units = weightsDims[0];
@@ -1573,61 +1570,53 @@ bool GnaPreparedModel::operationFullyConnected(const Operation& operation) {
     nnAssert(biasDims[0] == num_units);
     nnAssert(input_size * batch_size == numInputElements);
 
-    const auto newInputDims = input->getTensorDesc().getDims();
-
-
     if (mBuilderModel == nullptr) {
         VLOG(L1, "mBuilder = nullptr !!!");
         // ASSERT
     }
 
     std::vector<std::string> inLayers;
-    mPorts[operation.outputs[0]] = mBuilderModel->createFC(params, input, inLayers);
+    std::string fcLayerName = mBuilderModel->createFC(params, nullptr, inLayers);
+
+    // Create an OUTPUT layer for FC.
     static int count = 0;
     std::string outputLayerName = "output-FC";
     outputLayerName += std::to_string(count++);
 
 	auto fcLayerId = mBuilderModel->getBuilderNetwork()->mConnections.back();
-	mBuilderModel->getBuilderNetwork()->getBuilder()->addLayer({fcLayerId},
-	InferenceEngine::Builder::OutputLayer("output-FC-" + std::to_string(count)));
-
-    if (getV1_3_OperandLifeTime(operation.outputs[0]) == (int)V1_3_OperandLifeTime::SUBGRAPH_OUTPUT) {
-        mOutputToLayerMap.emplace(std::make_pair(operation.outputs[0], LayerInfo(inLayers[0], false)));
-    }
+	mBuilderModel->getBuilderNetwork()->getBuilder()->addLayer({fcLayerId}, InferenceEngine::Builder::OutputLayer(outputLayerName));
 
     // TODO: Fix this code with CTS tests
     if (inLayers.size() != 0) {
         if (getV1_3_OperandLifeTime(operation.inputs[0]) == (int)V1_3_OperandLifeTime::SUBGRAPH_INPUT) {
             mInputPorts.emplace(std::make_pair(operation.inputs[0], LayerInfo(inLayers[0], false)));
-        } else {
+        } else if (getV1_3_OperandLifeTime(operation.inputs[0]) == (int)V1_3_OperandLifeTime::TEMPORARY_VARIABLE) {
             if (mIntermediateLayerMap.find(operation.inputs[0]) != mIntermediateLayerMap.end()) {
                 auto& halLayer = mIntermediateLayerMap.at(operation.inputs[0]);
-                halLayer.setInputNode(outputLayerName, DeviceType::GNA);
+                halLayer.setInputNode(inLayers[0], DeviceType::GNA);
             } else {
                 mIntermediateLayerMap.emplace(std::make_pair(operation.inputs[0],
-                                                            HalLayerInfo(outputLayerName, DeviceType::CPU,
+                                                            HalLayerInfo(inLayers[0], DeviceType::GNA,
                                                                          "", DeviceType::None, false)));
             }
         }
     }
 
-    /*
-        //FIX ME : Work around since input size indims[0] != output nodes (wdims[0])
-        auto dims = permuteDims(weights->getTensorDesc().getDims(), {0, 1});
-        dims[0] = indims[0];
-        weights->getTensorDesc().setDims(dims);
-        //WA end
-    */
-
-    //builder_FC_create()
-
-    //auto out = weights * input + bias;
-
-    //mPorts[operation.outputs[0]] = handleFusion(out, PARAM_I32(3));
+    if (getV1_3_OperandLifeTime(operation.outputs[0]) == (int)V1_3_OperandLifeTime::SUBGRAPH_OUTPUT) {
+        mOutputToLayerMap.emplace(std::make_pair(operation.outputs[0], LayerInfo(fcLayerName, false, DeviceType::GNA)));
+    } else if (static_cast<int>(getV1_3_OperandLifeTime(operation.outputs[0])) == static_cast<int>(OperandLifeTime::TEMPORARY_VARIABLE)) {
+        if (mIntermediateLayerMap.find(operation.outputs[0]) != mIntermediateLayerMap.end()) {
+            auto& halLayer = mIntermediateLayerMap.at(operation.outputs[0]);
+            halLayer.setOutputNode(fcLayerName, DeviceType::GNA);
+        } else {
+            mIntermediateLayerMap.emplace(std::make_pair(operation.outputs[0], HalLayerInfo("", DeviceType::None,
+                                                                            fcLayerName, DeviceType::GNA, false)));
+        }
+    }
 
     VLOG(L1, "----------------------------------------------");
     VLOGDIMS(L1, inputDims, "inputs dims");
-    VLOGDIMS(L1, newInputDims, "newInput dims");
+    //VLOGDIMS(L1, newInputDims, "newInput dims");
     VLOGDIMS(L1, weightsDims, "weights dims");
     VLOG(L1, "----------------------------------------------");
 
@@ -1844,7 +1833,7 @@ bool GnaPreparedModel::operationLSTM(const Operation& operation)
     std::vector<std::string> memoryLayers, inLayers;
     auto outputLayerNames = mBuilderModel->createFullLstm(params, lstmDesc, memoryLayers, inLayers);
 
-        auto addIndexToLayerMap = [&](uint32_t index, std::string name, bool memory, bool input) {
+    auto addIndexToLayerMap = [&](uint32_t index, std::string name, bool memory, bool input) {
         auto operandDetails = mModel.main.operands[index];
         if (input) {
             if (operandDetails.lifetime == V1_3_OperandLifeTime::SUBGRAPH_INPUT) {

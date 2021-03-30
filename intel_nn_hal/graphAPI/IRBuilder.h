@@ -26,6 +26,7 @@ struct ParamsData
 };
 struct FCParams
 {
+    ParamsData input;
     ParamsData weights;
     ParamsData bias;
 };
@@ -118,7 +119,7 @@ public:
     int check4LayerData(IRBlob::Ptr blob);
     void initializeBuilder();
 
-    OutputPort createFC(BuilderFCLayer::FCParams& params, IRBlob::Ptr input,
+    std::string createFC(BuilderFCLayer::FCParams& params, IRBlob::Ptr input,
                         std::vector<std::string>& inputLayerNames);
 
     IRBlob::Ptr generateBlobwithData(InferenceEngine::SizeVector dims,
