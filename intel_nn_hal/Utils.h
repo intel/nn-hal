@@ -23,7 +23,7 @@
 
 //#define PERF_COUNTERS
 //#define CACHING
-//#define NN_DEBUG
+#define NN_DEBUG
 
 enum DebugLevel {
     L0,
