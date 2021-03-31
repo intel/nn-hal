@@ -15,7 +15,7 @@ namespace nnhal {
 bool IENetwork::loadNetwork() {
     ALOGD("%s", __func__);
 
-    InferenceEngine::Core ie;
+    InferenceEngine::Core ie(std::string("/vendor/etc/openvino/plugins.xml"));
     std::map<std::string, std::string> config;
 
     if (mNetwork) {
