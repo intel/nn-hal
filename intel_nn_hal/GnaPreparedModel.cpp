@@ -12,6 +12,7 @@
 #include <immintrin.h>
 #include "Dequantize.h"
 #include "Quantize.h"
+#include "EmbeddingLookup.h"
 
 using namespace std::chrono;
 
@@ -345,7 +346,6 @@ OpContainer* GnaPreparedModel::constructCpuGraph(std::pair<int, int> indices) {
                     VLOG(L1, "Failed to create dequantize operation !!!!");
                 }
                 subgraphOps->addOperation(cpuOperation);
-                VLOG(L1, "Exiting addOperation !!!!");
                 success = true;
                 break;
 
@@ -355,10 +355,16 @@ OpContainer* GnaPreparedModel::constructCpuGraph(std::pair<int, int> indices) {
                     VLOG(L1, "Failed to create Quantize operation !!!!");
                 }
                 subgraphOps->addOperation(cpuOperation);
-                VLOG(L1, "Exiting addOperation for Quantize!!!!");
                 success = true;
                 break;
-
+            case OperationType::EMBEDDING_LOOKUP:
+                cpuOperation = operationEmbeddingLookup(operation);
+                if (!cpuOperation) {
+                    VLOG(L1, "Failed to create Embedding Lookup operation !!!!");
+                }
+                subgraphOps->addOperation(cpuOperation);
+                success = true;
+                break;
             default:
                 VLOG(L1, "unsupported operation %d", operation.type);
                 break;
@@ -396,23 +402,26 @@ bool GnaPreparedModel::initialize(const hidl_vec<hidl_handle>& modelCache, const
 
     // TODO: Remove this hack to identify the nw based on operations
     int lstmCount = 0;
+    bool hasFC = false;
     for (auto op: mModel.main.operations) {
         if (op.type == OperationType::FULLY_CONNECTED) {
-            isDecoderNw = true;
-            modelNameStr = "Decoder";
-            break;
+            hasFC = true;
         } else if (op.type == OperationType::QUANTIZED_LSTM) {
             lstmCount++;
         }
     }
 
-    if (!isDecoderNw) {
+    if (!hasFC) {
+        isEnc0Nw = true;
+        modelNameStr = "Encoder0";
+    }
+    else {
         if (lstmCount > 3) {
             isEnc1Nw = true;
             modelNameStr = "Encoder1";
         } else {
-            isEnc0Nw = true;
-            modelNameStr = "Encoder0";
+            isDecoderNw = true;
+            modelNameStr = "Decoder";
         }
     }
 
@@ -447,6 +456,9 @@ bool GnaPreparedModel::initialize(const hidl_vec<hidl_handle>& modelCache, const
             case OperationType::QUANTIZE:
                 success = true;
                 break;
+            case OperationType::EMBEDDING_LOOKUP:
+                success = true;
+                break;
             default:
                 break;
         }
@@ -459,6 +471,7 @@ bool GnaPreparedModel::initialize(const hidl_vec<hidl_handle>& modelCache, const
     std::vector<bool> cpuTarget;
     int startIndex = 0;
     bool prevOpCpu = false;
+
     for (size_t i =0; i < mModel.main.operations.size(); i++) {
         auto op = mModel.main.operations[i];
         if (i == 0) {
@@ -468,7 +481,7 @@ bool GnaPreparedModel::initialize(const hidl_vec<hidl_handle>& modelCache, const
             bool curOpOnCpu = isCpuOp(op);
 
             if (curOpOnCpu != prevOpCpu) {
-                subgraphs.push_back(std::make_pair(startIndex, i-1));
+                subgraphs.push_back(std::make_pair(startIndex, i - 1));
                 if (prevOpCpu) {
                     cpuTarget.push_back(true);
                 } else {
@@ -1320,14 +1333,15 @@ void GnaPreparedModel::asyncExecute(const V1_0_Request& request, MeasureTiming m
             std::string layerName = iter->second.layerName;
             RunTimeOperandInfo& operandInfo = getOperandFromMemoryPool(index, request);
             if (iter->second.execDevice == DeviceType::CPU) {
-                auto layerPtr = getCpuOpFromLayerName(layerName);
-                if (!layerPtr) {
+                auto OpPtr = getCpuOpFromLayerName(layerName);
+
+                if (!OpPtr) {
                     VLOG(L1, "Failed to find the CPU layer by name: %s", layerName.c_str());
                     nnAssert(false);
                 }
 
                 auto length = getNumberOfElements(operandInfo.shape().dimensions);
-                layerPtr->setInputData(operandInfo.buffer,
+                OpPtr->setInputData(inputIndex, operandInfo.buffer,
                                             length);
             } else {
                 auto srcBlob = getBlobFromMemoryPool(index, request);
@@ -1381,7 +1395,6 @@ void GnaPreparedModel::asyncExecute(const V1_0_Request& request, MeasureTiming m
                     if (elementIdx != mIntermediateLayerMap.end()) {
                         auto gnaLayerName = elementIdx->second.outLayerName;
                         auto cpuLayerName = elementIdx->second.inLayerName;
-
                         RunTimeOperandInfo& op = mOperands[inputInd];
                         // Check if the layername is present in the output map
                         auto element = gnaPluginPtr->getOutputsInfo().find(gnaLayerName);
@@ -1391,22 +1404,21 @@ void GnaPreparedModel::asyncExecute(const V1_0_Request& request, MeasureTiming m
                             ptrsToDelete.emplace_back(destPtr);
 
                             if (op.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED) {
+                                float * opGetBlob = srcBlob->buffer().as<float*>();
                                 quantizeToQuant8Signed(srcBlob->buffer().as<float*>(),
                                                         (int8_t*)destPtr, op.shape());
                             } else {
                                 VLOG(L1, "op type for copying to CPU is different from TENSOR_QUANT8_ASYMM_SIGNED !!!!");
 								nnAssert(false);
                             }
-
                             BaseOp* op = opcontainer->getCpuOpFromLayerName(cpuLayerName);
-                            op->setInputData(destPtr, srcBlob->size());
+                            op->setInputData(inputInd, destPtr, srcBlob->size());
                         } else {
                             VLOG(L1, "Unable to find GNA Layer for CPU graph!!");
                         }
                     }
                 }
             }
-
             opcontainer->run();
         } else {
             std::vector<uint32_t> inputsIndex = opcontainer->getInputIndices();
@@ -2147,6 +2159,7 @@ BaseOp* GnaPreparedModel::operationDequantize(const Operation& operation) {
             break;
     }
 
+    dequantOp->setInputIndex(inputIndex, 0);
     RunTimeOperandInfo& outputOp = mOperands[operation.outputs[0]];
     outputOp.outDataType = DataType::FLOAT32;
     if (static_cast<int>(operandDetails.lifetime) == (int)V1_3_OperandLifeTime::SUBGRAPH_INPUT) {
@@ -2222,6 +2235,7 @@ BaseOp* GnaPreparedModel::operationQuantize(const Operation& operation) {
 
     if (static_cast<int>(operandDetails.lifetime) == (int)V1_3_OperandLifeTime::SUBGRAPH_INPUT) {
         mInputPorts.emplace(std::make_pair(inputIndex, LayerInfo(name, false, DeviceType::CPU)));
+        quantOp->setInputIndex(inputIndex, 0);
     } else if(static_cast<int>(operandDetails.lifetime) == static_cast<int>(OperandLifeTime::TEMPORARY_VARIABLE)) {
         if (mIntermediateLayerMap.find(inputIndex) != mIntermediateLayerMap.end()) {
             auto& halLayer = mIntermediateLayerMap.at(inputIndex);
@@ -2248,6 +2262,82 @@ BaseOp* GnaPreparedModel::operationQuantize(const Operation& operation) {
     }
 
     return quantOp;
+}
+
+BaseOp* GnaPreparedModel::operationEmbeddingLookup(const Operation& operation) {
+    static int count = 0;
+    std::string name_values = "embedding-lookup-values" + std::to_string(count++);
+    uint32_t lookupIndex = operation.inputs[0];
+
+    BaseOp* embeddinglookupOp = nullptr;
+
+    uint32_t valuesIndex = operation.inputs[1];
+
+    uint32_t outputIndex = operation.outputs[0];
+    RunTimeOperandInfo& valuesOp = mOperands[valuesIndex];
+    RunTimeOperandInfo& lookupOp = mOperands[lookupIndex];
+
+    auto OutOperandDetails = mModel.main.operands[outputIndex];
+
+
+    auto ValuesDetails = mModel.main.operands[valuesIndex];
+    auto values_dims = ValuesDetails.dimensions;
+    auto LookupDetails = mModel.main.operands[lookupIndex];
+    auto lookup_dims = LookupDetails.dimensions;
+    embeddinglookupOp = new EmbeddingLookupOp(name_values, values_dims, lookup_dims, ValuesDetails.type);
+    if ( (static_cast<int>(ValuesDetails.lifetime) == static_cast<int>(OperandLifeTime::CONSTANT_COPY)) ||
+         (static_cast<int>(ValuesDetails.lifetime) == static_cast<int>(OperandLifeTime::CONSTANT_REFERENCE))) {
+            embeddinglookupOp->setInputIndex(valuesIndex, 1);
+            auto poolIndex = ValuesDetails.location.poolIndex;
+            auto& r = mPoolInfos[poolIndex];
+            auto buf = const_cast<uint8_t*>(r.buffer + ValuesDetails.location.offset);
+            auto len_out = sizeOfData(ValuesDetails.type, ValuesDetails.dimensions);
+            embeddinglookupOp->setInputData(valuesIndex, buf, len_out);
+
+    }
+    else if (static_cast<int>(ValuesDetails.lifetime) == (int)V1_3_OperandLifeTime::SUBGRAPH_INPUT) {
+        VLOG(L1, "Values of type SUBGRAPH_INPUT\n");
+    } else if(static_cast<int>(ValuesDetails.lifetime) == static_cast<int>(OperandLifeTime::TEMPORARY_VARIABLE)) {
+        VLOG(L1, "Values of type TEMPORARY_VARIABLE\n");
+        /*if (mIntermediateLayerMap.find(inputIndex) != mIntermediateLayerMap.end()) {
+            auto& halLayer = mIntermediateLayerMap.at(inputIndex);
+            halLayer.setInputNode(name, DeviceType::CPU);
+        } else {
+            mIntermediateLayerMap.emplace(std::make_pair(inputIndex,
+                                                        HalLayerInfo(name, DeviceType::CPU, "", DeviceType::None, false)));
+        }*/
+    } else if(static_cast<int>(ValuesDetails.lifetime) == static_cast<int>(OperandLifeTime::CONSTANT_COPY)) {
+
+
+    }
+
+
+    if ( (static_cast<int>(LookupDetails.lifetime) == static_cast<int>(OperandLifeTime::CONSTANT_COPY)) ||
+         (static_cast<int>(LookupDetails.lifetime) == static_cast<int>(OperandLifeTime::CONSTANT_REFERENCE))) {
+		VLOG(L1, "Lookup of type CONST_COPY/REF\n");
+    }
+    VLOG(L1, "Check done %d, %d\n", valuesIndex, lookupIndex);
+
+    if (static_cast<int>(LookupDetails.lifetime) == (int)V1_3_OperandLifeTime::SUBGRAPH_INPUT) {
+        VLOG(L1, "Lookup of type SUBGRAPH_INPUT %d\n", LookupDetails.type);
+        embeddinglookupOp->setInputIndex(lookupIndex, 0);
+
+        mInputPorts.emplace(std::make_pair(lookupIndex, LayerInfo(name_values, false, DeviceType::CPU)));
+
+        //mInputPorts.emplace(std::make_pair(valuesIndex, LayerInfo(name, false, DeviceType::CPU)));
+    } else if(static_cast<int>(LookupDetails.lifetime) == static_cast<int>(OperandLifeTime::TEMPORARY_VARIABLE)) {
+        VLOG(L1, "Lookup of type TEMPORARY_VARIABLE\n");
+        /*if (mIntermediateLayerMap.find(inputIndex) != mIntermediateLayerMap.end()) {
+            auto& halLayer = mIntermediateLayerMap.at(inputIndex);
+            halLayer.setInputNode(name, DeviceType::CPU);
+        } else {
+            mIntermediateLayerMap.emplace(std::make_pair(inputIndex,
+                                                        HalLayerInfo(name, DeviceType::CPU, "", DeviceType::None, false)));
+        }*/
+    } else if(static_cast<int>(LookupDetails.lifetime) == static_cast<int>(OperandLifeTime::CONSTANT_COPY)) {
+    }
+
+    return embeddinglookupOp;
 }
 
 IRBlob::Ptr GnaPreparedModel::GetConstWeightsOperandAsTensor(uint32_t index)
