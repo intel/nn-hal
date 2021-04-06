@@ -23,7 +23,7 @@
 
 //#define PERF_COUNTERS
 //#define CACHING
-#define NN_DEBUG
+//#define NN_DEBUG
 
 enum DebugLevel {
     L0,
@@ -191,7 +191,7 @@ class BaseOp {
 
     public:
         virtual bool isCpuOp() = 0;
-        
+
         virtual bool run() {
             return false;
         };
@@ -200,9 +200,14 @@ class BaseOp {
         virtual ~BaseOp() {}
 
         //TODO: Use Blob::Ptr to make it generic
-        virtual bool setInputData(void* dataPtr, uint32_t len) {
+        virtual bool setInputData(uint32_t graph_index, void* dataPtr, uint32_t len)
+        {
             return false;
         }
+
+        virtual bool setInputIndex(uint32_t graph_index, uint32_t op_index) {
+            return false;
+        };
 
         virtual std::tuple<void*, int32_t> getOutputData() {
             return std::make_pair(nullptr, 0);
@@ -243,8 +248,35 @@ class OpContainer {
         }
 
         bool run() {
-            for (auto op: opsVec) {
+            std::tuple<void*, uint32_t> intermediate_inp;
+            int i;
+            BaseOp* op;
+            if (opsVec.size() == 1) {
+                op = opsVec[0];
                 op->run();
+            }
+            else {
+            for (i = 0; i < opsVec.size() - 1 ; i++) {
+                op = opsVec[i];
+                if ( i == 0) {
+                    op->run();
+                }
+                else {
+                    std::vector<uint32_t> ip_indices = op->getInputIndices();
+                    op->setInputData(ip_indices[0], std::get<0>(intermediate_inp), std::get<1>(intermediate_inp));
+                    op->run();
+                }
+                intermediate_inp = op->getOutputData();
+                auto inp_ptr = static_cast<float*>(std::get<0>(intermediate_inp));
+            }
+            if (i == opsVec.size() - 1) {
+                op = opsVec[i];
+                std::vector<uint32_t> ip_indices = op->getInputIndices();
+
+                op->setInputData(ip_indices[0], std::get<0>(intermediate_inp), std::get<1>(intermediate_inp));
+
+                op->run();
+            }
             }
 
             return true;

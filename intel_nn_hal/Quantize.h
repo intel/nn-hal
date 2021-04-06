@@ -19,16 +19,28 @@ class QuantizeOp : public BaseOp {
     InputType* inputDataPtr;
     int32_t inputLen;
     std::string layerName;
+    std::map<uint32_t, uint32_t> mGraphtoOpIndex;
 
     public:
         bool isCpuOp() {
             return true;
         }
 
-        bool setInputData(void* dataPtr, uint32_t len) {
-            inputDataPtr = static_cast<InputType*>(dataPtr);
-            inputLen = len;
+        bool setInputIndex(uint32_t graph_index, uint32_t op_index) {
+            mGraphtoOpIndex[graph_index] = op_index;
             return true;
+        }
+
+        bool setInputData(uint32_t graph_index, void* dataPtr, uint32_t len) {
+            if (mGraphtoOpIndex[graph_index] == 0) {
+                inputDataPtr = static_cast<InputType*>(dataPtr);
+                inputLen = len;
+                return true;
+            }
+            else {
+                nnAssert("Cannot have Operand index greater or equal to one\n");
+            }
+            return false;
         }
 
         std::tuple<void*, int32_t> getOutputData() {

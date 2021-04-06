@@ -843,6 +843,9 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
                     // }
                 }
                 break;
+            case OperationType::EMBEDDING_LOOKUP:
+                VLOG(L1, "Supporting Embedding Lookup !!!!");
+		break;
             default:
                 VLOG(L1, "OP (%d) not supported", operation.type);
                 return false;
