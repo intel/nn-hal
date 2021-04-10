@@ -136,51 +136,6 @@ bool GnaPreparedModel::finalizeOutput(/*RunTimeOperandInfo* output */) {
 
 bool GnaPreparedModel::constructGNAGraph(std::pair<int, int> indices) {
     bool success = false;
-
-    // TODO: Remove this hack to identify the nw based on operations
-    int lstmCount = 0;
-    isDecoderNw = false;
-    for (auto op: mModel.main.operations) {
-        if (op.type == OperationType::FULLY_CONNECTED) {
-            isDecoderNw = true;
-            modelNameStr = "Decoder";
-        } else if (op.type == OperationType::QUANTIZED_LSTM) {
-            lstmCount++;
-        }
-    }
-
-    if (!isDecoderNw) {
-        if (lstmCount > 3) {
-            isEnc1Nw = true;
-            modelNameStr = "Encoder1";
-        } else {
-            isEnc0Nw = true;
-            modelNameStr = "Encoder0";
-        }
-    }
-
-    // Check operation supoorted or not, user may not call getOpertionSupported()
-    for (const auto& operation : mModel.main.operations) {
-        success = isOperationSupported(operation, mModel, mTargetDevice);
-        dumpOperationSupport(operation, success);
-        if (!success) {
-            VLOG(L1, "get unsupported operation in initialize()");
-            return false;
-        }
-    }
-
-    success = setRunTimePoolInfosFromHidlMemories(&mPoolInfos, mModel.pools);
-    if (!success) {
-        VLOG(L1, "setRunTimePoolInfosFromHidlMemories failed.");
-        return false;
-    }
-
-    success = initializeRunTimeOperandInfo();
-    if (!success) {
-        VLOG(L1, "initializeRunTimeOperandInfo failed.");
-        return false;
-    }
-
     mBuilderModel = new IRBuilder::ModelBuilder();
     mBuilderModel->initializeBuilder();
     gnaPluginPtr = new GnaNetwork();
@@ -341,7 +296,7 @@ OpContainer* GnaPreparedModel::constructCpuGraph(std::pair<int, int> indices) {
         dumpOperation(operation);
         switch (operation.type) {
            case OperationType::DEQUANTIZE:
-                cpuOperation = operationDequantize(operation);
+                cpuOperation = operationDequantize(operation, true);
                 if (!cpuOperation) {
                     VLOG(L1, "Failed to create dequantize operation !!!!");
                 }
@@ -350,7 +305,13 @@ OpContainer* GnaPreparedModel::constructCpuGraph(std::pair<int, int> indices) {
                 break;
 
             case OperationType::QUANTIZE:
-                cpuOperation = operationQuantize(operation);
+                if (i == std::get<1>(indices)) {
+                    VLOG(L1, "Skipping Quantize as it is last op in the CPU graph !!!");
+                    cpuOperation = operationQuantize(operation, true);
+                }
+                else {
+                    cpuOperation = operationQuantize(operation, false);
+                }
                 if (!cpuOperation) {
                     VLOG(L1, "Failed to create Quantize operation !!!!");
                 }
@@ -530,7 +491,6 @@ bool GnaPreparedModel::initialize(const hidl_vec<hidl_handle>& modelCache, const
     }
 
     initializeInput();
->>>>>>> Add Dequant and hybrid execution model
 
     return true;
 }
@@ -1168,15 +1128,15 @@ bool GnaPreparedModel::updateMemoryAfterGraphExecution(const V1_0_Request& reque
                     } else if (operand.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED) {
                         quantizeToQuant8Signed(srcPtr, (int8_t*)destPtr, operand.shape(), runtimeMetrics);
                     } else if (operand.type == OperandType::TENSOR_FLOAT32) {
-                        std::memcpy((uint8_t*)destPtr, (uint8_t*)srcPtr, outputLen*4);
+                        std::memcpy((uint8_t*)destPtr, (uint8_t*)srcPtr, outputLen * sizeof(float));
                     }
     #else
                     if (operand.type == OperandType::TENSOR_QUANT16_SYMM) {
-                        std::memcpy((uint8_t*)destPtr, (uint8_t*)srcPtrVoid, outputLen*sizeof(uint16_t));
+                        std::memcpy((uint8_t*)destPtr, (uint8_t*)srcPtrVoid, outputLen * sizeof(uint16_t));
                     } else if (operand.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED) {
-                        std::memcpy((uint8_t*)destPtr, (uint8_t*)srcPtrVoid, outputLen*sizeof(uint8_t));
+                        std::memcpy((uint8_t*)destPtr, (uint8_t*)srcPtrVoid, outputLen * sizeof(uint8_t));
                     } else if (operand.type == OperandType::TENSOR_FLOAT32) {
-                        std::memcpy((uint8_t*)destPtr, (uint8_t*)srcPtrVoid, outputLen*sizeof(float));
+                        std::memcpy((uint8_t*)destPtr, (uint8_t*)srcPtrVoid, outputLen * sizeof(float));
                     }
     #endif
                 } else {
@@ -1435,7 +1395,8 @@ void GnaPreparedModel::asyncExecute(const V1_0_Request& request, MeasureTiming m
                             nnAssert(false);
                         }
                         auto[srcMemoryPtr, srcLen] = cpuLayerPtr->getOutputData();
-                        uint8_t* srcPtr = static_cast<uint8_t*>(srcMemoryPtr);
+
+                        float* srcPtr = static_cast<float*>(srcMemoryPtr);
 
                         // Make sure the layername is present in inputinfo from the layer
                         auto iter2 = std::find_if(gnaPluginPtr->inputInfo.begin(),
@@ -1451,14 +1412,17 @@ void GnaPreparedModel::asyncExecute(const V1_0_Request& request, MeasureTiming m
                         auto destBlob = gnaPluginPtr->getInferRequest().GetBlob(gnaLayerName);
                         RunTimeOperandInfo& op = mOperands[inputInd];
                         if (op.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED) {
-                            deQuantize<int8_t>(srcPtr, srcLen, op.scale, op.zeroPoint, destBlob->buffer().as<float*>());
-                        } else if (op.type == OperandType::TENSOR_QUANT8_SYMM) {
+                            std::memcpy(destBlob->buffer().as<float*>(), srcPtr, srcLen * 4);
+
+                            //deQuantize<int8_t>(srcPtr, srcLen, op.scale, op.zeroPoint, destBlob->buffer().as<float*>());
+                        }/* else if (op.type == OperandType::TENSOR_QUANT8_SYMM) {
+                            VLOG(L1, "Dequantizing not needed 2\n");
                             deQuantize<int8_t>(srcPtr, srcLen, op.scale, 0, destBlob->buffer().as<float*>());
                         } else if (op.type == OperandType::TENSOR_QUANT16_SYMM) {
                             deQuantize_s16(srcPtr, srcLen, op.scale, 0, destBlob->buffer().as<float*>());
                         } else if (op.type == OperandType::TENSOR_FLOAT32) {
                             std::memcpy(destBlob->buffer().as<uint8_t*>(), srcPtr, srcLen);
-                        }
+                        }*/
                     } else {
                         VLOG(L1, "Index  %d is not in output index map", index);
                     }
@@ -1780,16 +1744,20 @@ bool GnaPreparedModel::operationLSTM(const Operation& operation)
     params.cellState.data = getIRBlobFromOperand(operation.inputs[19], 19);
     params.cellState.lifeTime = getV1_3_OperandLifeTime(operation.inputs[19]);
 
-    if (!lstmDesc.cifgEnabled) {
-        params.input2inputWeights.data     = getIRBlobFromOperand(operation.inputs[1], 1);
-        params.input2inputWeights.lifeTime = getV1_0_OperandLifeTime(operation.inputs[1]);
+    params.input2inputWeights.data     = getIRBlobFromOperand(operation.inputs[1], 1);
+    params.input2inputWeights.lifeTime = getV1_3_OperandLifeTime(operation.inputs[1]);
 
-        params.recurrant2inputWeights.data     = getIRBlobFromOperand(operation.inputs[5], 5);
-        params.recurrant2inputWeights.lifeTime     = getV1_0_OperandLifeTime(operation.inputs[5]);
+    params.input2ForgetWeights.data     = getIRBlobFromOperand(operation.inputs[2], 2);
+    params.input2ForgetWeights.lifeTime    = getV1_3_OperandLifeTime(operation.inputs[2]);
 
-        params.inputGateBias.data = getIRBlobFromOperand(operation.inputs[12], 12);
-        params.inputGateBias.lifeTime = getV1_0_OperandLifeTime(operation.inputs[12]);
-    }
+    params.input2CellWeights.data     = getIRBlobFromOperand(operation.inputs[3], 3);
+    params.input2CellWeights.lifeTime     = getV1_3_OperandLifeTime(operation.inputs[3]);
+
+    params.input2OutputWeights.data     = getIRBlobFromOperand(operation.inputs[4], 4);
+    params.input2OutputWeights.lifeTime     = getV1_3_OperandLifeTime(operation.inputs[4]);
+
+    params.recurrant2inputWeights.data     = getIRBlobFromOperand(operation.inputs[5], 5);
+    params.recurrant2inputWeights.lifeTime     = getV1_3_OperandLifeTime(operation.inputs[5]);
 
     params.recurrant2ForgetWeights.data     = getIRBlobFromOperand(operation.inputs[6], 6);
     params.recurrant2ForgetWeights.lifeTime     = getV1_3_OperandLifeTime(operation.inputs[6]);
@@ -1808,6 +1776,9 @@ bool GnaPreparedModel::operationLSTM(const Operation& operation)
 
     params.cell2OutputWeights.data  = getIRBlobFromOperand(operation.inputs[11], 11);
     params.cell2OutputWeights.lifeTime  = getV1_3_OperandLifeTime(operation.inputs[11]);
+
+    params.inputGateBias.data = getIRBlobFromOperand(operation.inputs[12], 12);
+    params.inputGateBias.lifeTime = getV1_3_OperandLifeTime(operation.inputs[12]);
 
     params.forgetGateBias.data   = getIRBlobFromOperand(operation.inputs[13], 13);
     params.forgetGateBias.lifeTime   = getV1_3_OperandLifeTime(operation.inputs[13]);
@@ -2123,7 +2094,7 @@ bool GnaPreparedModel::operationQuantizedLSTM(const Operation& operation)
     return true;
 }
 
-BaseOp* GnaPreparedModel::operationDequantize(const Operation& operation) {
+BaseOp* GnaPreparedModel::operationDequantize(const Operation& operation, bool dummyOp) {
     static int count = 0;
     std::string name = "dequantize-cpu-" + std::to_string(count++);
     uint32_t inputIndex = operation.inputs[0], outIndex = operation.outputs[0];
@@ -2147,10 +2118,10 @@ BaseOp* GnaPreparedModel::operationDequantize(const Operation& operation) {
 
     switch(operandDetails.type) {
         case OperandType::TENSOR_QUANT8_ASYMM_SIGNED:
-            dequantOp = new DequantizeOp<int8_t>(name, scaleFactor, zp);
+            dequantOp = new DequantizeOp<int8_t>(name, scaleFactor, zp, dummyOp);
             break;
         case OperandType::TENSOR_QUANT8_SYMM:
-            dequantOp = new DequantizeOp<int8_t>(name, scaleFactor, zp);
+            dequantOp = new DequantizeOp<int8_t>(name, scaleFactor, zp, dummyOp);
             break;
         case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL:
         default:
@@ -2192,7 +2163,8 @@ BaseOp* GnaPreparedModel::operationDequantize(const Operation& operation) {
     return dequantOp;
 }
 
-BaseOp* GnaPreparedModel::operationQuantize(const Operation& operation) {
+BaseOp* GnaPreparedModel::operationQuantize(const Operation& operation, bool dummyOp) {
+
     static int count = 0;
     std::string name = "quantize-cpu-" + std::to_string(count++);
     uint32_t inputIndex = operation.inputs[0], outIndex = operation.outputs[0];
@@ -2206,8 +2178,10 @@ BaseOp* GnaPreparedModel::operationQuantize(const Operation& operation) {
     }
 
     bool isFp16 = false;
-    if (operandDetails.type == OperandType::FLOAT16)
+    if (operandDetails.type == OperandType::FLOAT16){
+        VLOG(L1, "is FP16 Quantize\n");
         isFp16 = true;
+    }
 
     auto OutOperandDetails = mModel.main.operands[outIndex];
     BaseOp* quantOp = nullptr;
@@ -2217,16 +2191,24 @@ BaseOp* GnaPreparedModel::operationQuantize(const Operation& operation) {
 
     switch(OutOperandDetails.type) {
         case OperandType::TENSOR_QUANT8_ASYMM:
-            if (isFp16)
-                quantOp = new QuantizeOp<_Float16, uint8_t>(name, scaleFactor, zp);
-            else
-                quantOp = new QuantizeOp<float, uint8_t>(name, scaleFactor, zp);
+            if (isFp16) {
+                VLOG(L1, "is Fp16 Quantize \n");
+                quantOp = new QuantizeOp<_Float16, uint8_t>(name, scaleFactor, zp, dummyOp);
+            }
+            else {
+                VLOG(L1, "is float Quantize \n");
+                quantOp = new QuantizeOp<float, uint8_t>(name, scaleFactor, zp, dummyOp);
+            }
             break;
         case OperandType::TENSOR_QUANT8_ASYMM_SIGNED:
-            if (isFp16)
-                quantOp = new QuantizeOp<_Float16, int8_t>(name, scaleFactor, zp);
-            else
-                quantOp = new QuantizeOp<float, int8_t>(name, scaleFactor, zp);
+            if (isFp16) {
+                VLOG(L1, "is Fp16 Quantize \n");
+                quantOp = new QuantizeOp<_Float16, int8_t>(name, scaleFactor, zp, dummyOp);
+            }
+            else {
+                VLOG(L1, "is float Quantize \n");
+                quantOp = new QuantizeOp<float, int8_t>(name, scaleFactor, zp, dummyOp);
+            }
             break;
         default:
             nnAssert(false);
@@ -2522,7 +2504,7 @@ IRBlob::Ptr GnaPreparedModel::GetConstOperandAsTensor(int operand_index, int ope
                         deQuantize((int16_t*)buf, getNumberOfElements(op.dimensions), op.scale, 0, blob->buffer().as<float*>(), runtimeMetrics);
                     } else if (op.type == OperandType::TENSOR_INT32) {
                         deQuantize((int32_t*)buf, getNumberOfElements(op.dimensions), op.scale, 0, blob->buffer().as<float*>(), runtimeMetrics);
-                    }   
+                    }
 #else
                     if (op.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED) {
                         deQuantize((int8_t*)buf, getNumberOfElements(op.dimensions), op.scale, op.zeroPoint, blob->buffer().as<float*>());
@@ -2533,13 +2515,13 @@ IRBlob::Ptr GnaPreparedModel::GetConstOperandAsTensor(int operand_index, int ope
                     } else if (op.type == OperandType::TENSOR_INT32) {
                         deQuantize((int32_t*)buf, getNumberOfElements(op.dimensions), op.scale, 0, blob->buffer().as<float*>());
                     }
-                
+
 #endif
                 } else {
                     blob = std::make_shared<InferenceEngine::TBlob<float>>(td, (float *)buf, len);
                     blob->allocate();
                 }
-                if (op.lifetime == V1_0_OperandLifeTime::CONSTANT_COPY || op.lifetime == V1_0_OperandLifeTime::CONSTANT_REFERENCE) {
+                if (op.lifetime == V1_3_OperandLifeTime::CONSTANT_COPY || op.lifetime == V1_3_OperandLifeTime::CONSTANT_REFERENCE) {
                     mModelIRBlobs.push_back(blob);
                     buf = nullptr;
                 }
@@ -2570,7 +2552,7 @@ IRBlob::Ptr GnaPreparedModel::GetConstOperandAsTensor(int operand_index, int ope
                         }
                     }
                 }
-                if (op.lifetime == V1_0_OperandLifeTime::CONSTANT_COPY || op.lifetime == V1_0_OperandLifeTime::CONSTANT_REFERENCE) {
+                if (op.lifetime == V1_3_OperandLifeTime::CONSTANT_COPY || op.lifetime == V1_3_OperandLifeTime::CONSTANT_REFERENCE) {
                     mModelIRBlobs.push_back(blob);
                     buf = nullptr;
                 }
