@@ -20,6 +20,7 @@ class QuantizeOp : public BaseOp {
     int32_t inputLen;
     std::string layerName;
     std::map<uint32_t, uint32_t> mGraphtoOpIndex;
+    bool dummyOp_ = false;
 
     public:
         bool isCpuOp() {
@@ -48,10 +49,11 @@ class QuantizeOp : public BaseOp {
             return std::make_tuple((void*)output, inputLen);
         }
 
-        QuantizeOp(std::string name, float sc, int32_t zp) : scale(sc), zeroPoint(zp) {
+        QuantizeOp(std::string name, float sc, int32_t zp, bool dummyOp = false) : scale(sc), zeroPoint(zp) {
             inputDataPtr = nullptr;
             inputLen = 0;
             layerName = name;
+            dummyOp_ = dummyOp;
         }
 
         bool quantizeToQuant8Unsigned(const InputType* inputData, uint8_t* outputData) {
@@ -72,6 +74,12 @@ class QuantizeOp : public BaseOp {
         }
 
         bool  run() {
+            if (dummyOp_) {
+                output = (void*)inputDataPtr;
+                InputType* inputData = inputDataPtr;
+                return true;
+            }
+
             if (std::is_same<OutputType, uint8_t>::value) {
                 if (!output)
                     output = new uint8_t[inputLen];
@@ -90,13 +98,13 @@ class QuantizeOp : public BaseOp {
         std::string getLayerName() { return layerName; }
 
         void cleanup() {
-            if (output) {
+            if (output && !dummyOp_) {
                 delete output;
             }
         }
 
         ~QuantizeOp() {
-            if (output) {
+            if (output && !dummyOp_) {
                 delete output;
             }
         }

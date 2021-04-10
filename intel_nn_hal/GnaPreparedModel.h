@@ -49,7 +49,7 @@ class GnaPreparedModel : public PreparedModel {
                      bool memory):inLayerName(inLayer), inDevice(inDev),
                                   outLayerName(outLayer), outDevice(outDev),
                                   memoryLayer(memory){}
-    
+
         void setInputNode(std::string inLayer, DeviceType dev) {
             inLayerName = inLayer;
             inDevice = dev;
@@ -132,8 +132,8 @@ public:
     bool operationLSTM(const Operation& operation);
     bool operationQuantizedLSTM(const Operation& operation);
     BaseOp* operationEmbeddingLookup(const Operation& operation);
-    BaseOp* operationDequantize(const Operation& operation);
-    BaseOp* operationQuantize(const Operation& operation);
+    BaseOp* operationDequantize(const Operation& operation, bool dummyOp = false);
+    BaseOp* operationQuantize(const Operation& operation, bool dummyOp = false);
 
 protected:
     void deinitialize();
@@ -142,7 +142,7 @@ protected:
 
     void asyncExecute(const V1_0_Request& request, MeasureTiming measure, time_point driverStart,
                       const sp<V1_0::IExecutionCallback>& callback);
-    
+
     bool constructGNAGraph(std::pair<int, int> indices);
     OpContainer* constructCpuGraph(std::pair<int, int> indices);
     BaseOp* getCpuOpFromLayerName(std::string layer);
