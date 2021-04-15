@@ -31,6 +31,9 @@ std::shared_ptr<ngraph::Node> OperationsBase::transpose(ConversionType type,
         case NCH_NHC:
             order = {0, 1, 2};
             break;
+        case NC_CN:
+            order = {1, 0};
+            break;
     }
     const auto order_node =
         ngraph::opset3::Constant::create(ngraph::element::i64, ngraph::Shape{order.size()}, order);

@@ -112,6 +112,9 @@ void asyncExecute(const Request& request, MeasureTiming measure, BasePreparedMod
         auto srcBlob = modelInfo->getBlobFromMemoryPoolIn(request, i);
 
         const std::string& inputNodeName = ngraphNw->getNodeName(inIndex);
+        if (inputNodeName == "") {
+            continue;
+        }
         ALOGD("Input index: %d layername : %s", inIndex, inputNodeName.c_str());
         auto destBlob = plugin->getBlob(inputNodeName);
         uint8_t* dest = destBlob->buffer().as<uint8_t*>();
@@ -129,6 +132,9 @@ void asyncExecute(const Request& request, MeasureTiming measure, BasePreparedMod
         void* destPtr = modelInfo->getBlobFromMemoryPoolOut(request, i);
 
         const std::string& outputNodeName = ngraphNw->getNodeName(outIndex);
+        if (outputNodeName == "") {
+            continue;
+        }
         ALOGD("Output index: %d layername : %s", outIndex, outputNodeName.c_str());
         auto srcBlob = plugin->getBlob(outputNodeName);
         std::memcpy((uint8_t*)destPtr, srcBlob->buffer().as<uint8_t*>(), srcBlob->byteSize());
@@ -174,6 +180,9 @@ static std::tuple<ErrorStatus, hidl_vec<V1_2::OutputShape>, Timing> executeSynch
         auto srcBlob = modelInfo->getBlobFromMemoryPoolIn(request, i);
 
         const std::string& inputNodeName = ngraphNw->getNodeName(inIndex);
+        if (inputNodeName == "") {
+            continue;
+        }
         ALOGD("Input index: %d layername : %s", inIndex, inputNodeName.c_str());
         auto destBlob = plugin->getBlob(inputNodeName);
         uint8_t* dest = destBlob->buffer().as<uint8_t*>();
@@ -192,6 +201,9 @@ static std::tuple<ErrorStatus, hidl_vec<V1_2::OutputShape>, Timing> executeSynch
         void* destPtr = modelInfo->getBlobFromMemoryPoolOut(request, i);
 
         const std::string& outputNodeName = ngraphNw->getNodeName(outIndex);
+        if (outputNodeName == "") {
+            continue;
+        }
         ALOGD("Output index: %d layername : %s", outIndex, outputNodeName.c_str());
         auto srcBlob = plugin->getBlob(outputNodeName);
         std::memcpy((uint8_t*)destPtr, srcBlob->buffer().as<uint8_t*>(), srcBlob->byteSize());

@@ -4,6 +4,7 @@
 #include <Concat.hpp>
 #include <Conv_2d.hpp>
 #include <Depthwise_Conv_2d.hpp>
+#include <LSTM.hpp>
 #include <Reshape.hpp>
 
 namespace android {

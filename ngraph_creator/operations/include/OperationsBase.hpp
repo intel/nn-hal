@@ -17,7 +17,7 @@ namespace nnhal {
 
 class OperationsBase {
 protected:
-    enum ConversionType { NHWC_NCHW, NCHW_NHWC, IHWO_OIHW, OHWI_OIHW, NHC_NCH, NCH_NHC };
+    enum ConversionType { NHWC_NCHW, NCHW_NHWC, IHWO_OIHW, OHWI_OIHW, NHC_NCH, NCH_NHC, NC_CN };
     uint32_t mDefaultOutputIndex;
     int mNnapiOperationIndex;
     std::shared_ptr<ngraph::Node> transpose(ConversionType type,
@@ -40,8 +40,11 @@ protected:
         if (sModelInfo->isOperandLifeTimeConst(operandIndex)) {
             auto operandValues = sModelInfo->GetConstVecOperand<T>(operandIndex);
             auto operandDims = getInputOperandDimensions(inputIndex);
-            return std::make_shared<ngraph::opset3::Constant>(
-                ngraph::element::f32, toNgraphShape(operandDims), operandValues);
+            if (operandDims[0] != 0)
+                return std::make_shared<ngraph::opset3::Constant>(
+                    ngraph::element::f32, toNgraphShape(operandDims), operandValues);
+            else
+                return nullptr;
         } else
             return mNgraphNodes->getOperationOutput(operandIndex).get_node_shared_ptr();
     }

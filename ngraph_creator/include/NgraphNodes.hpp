@@ -36,6 +36,7 @@ public:
     const std::string& getNodeName(size_t index);
 
     std::shared_ptr<ngraph::Function> generateGraph();
+    void setNullPtr(size_t index);
 };
 
 }  // namespace nnhal

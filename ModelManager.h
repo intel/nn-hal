@@ -83,6 +83,9 @@ public:
     size_t getOperationInputsSize(int operationIndex) {
         return mModel.operations[operationIndex].inputs.size();
     }
+    size_t getOperationOutputsSize(int operationIndex) {
+        return mModel.operations[operationIndex].outputs.size();
+    }
 
     size_t getOperationsSize() { return mModel.operations.size(); }
 
@@ -177,6 +180,8 @@ public:
             runtimeInfo.unmap_mem();
         }
     }
+
+    bool isOperandDataNull(int operationIndex, uint32_t index);
 
 private:
     bool initializeRunTimeOperandInfo();
