@@ -398,9 +398,21 @@ void* NnapiModelInfo::getBlobFromMemoryPoolOut(const Request& request, uint32_t 
     return (r.buffer + arg.location.offset);
 }
 
+bool NnapiModelInfo::isOperandDataNull(int operationIndex, uint32_t index) {
+    uint32_t inputIndex = mModel.operations[operationIndex].inputs[index];
+    const auto op = mModel.operands[inputIndex];
+    if (op.lifetime == OperandLifeTime::NO_VALUE) {
+        ALOGD("index %d has life time NO_VALUE", index);
+        return true;
+    }
+
+    return false;
+}
+
 template int NnapiModelInfo::GetConstOperand<int>(unsigned int);
 template unsigned int NnapiModelInfo::GetConstOperand<unsigned int>(unsigned int);
 template int NnapiModelInfo::GetConstFromBuffer<int>(unsigned char const*, unsigned int);
+template float NnapiModelInfo::GetConstFromBuffer<float>(unsigned char const*, unsigned int);
 
 }  // namespace nnhal
 }  // namespace neuralnetworks

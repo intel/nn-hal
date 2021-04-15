@@ -13,6 +13,7 @@ cc_library_static {
         "operations/src/Concat.cpp",
         "operations/src/Conv_2d.cpp",
         "operations/src/Depthwise_Conv_2d.cpp",
+        "operations/src/LSTM.cpp",
         "operations/src/Reshape.cpp",
         "operations/src/OperationsBase.cpp",
     ],

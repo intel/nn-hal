@@ -31,6 +31,8 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<Conv_2d>(operationIndex);
         case OperationType::DEPTHWISE_CONV_2D:
             return std::make_shared<Depthwise_Conv_2d>(operationIndex);
+        case OperationType::LSTM:
+            return std::make_shared<LSTM>(operationIndex);
         default:
             ALOGE("%s Cannot identify OperationType %d", __func__, operationType);
             break;
