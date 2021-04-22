@@ -113,6 +113,7 @@ void asyncExecute(const Request& request, MeasureTiming measure, BasePreparedMod
 
         const std::string& inputNodeName = ngraphNw->getNodeName(inIndex);
         if (inputNodeName == "") {
+            ALOGV("Ignorning optional input nodes with values as 0's");
             continue;
         }
         ALOGD("Input index: %d layername : %s", inIndex, inputNodeName.c_str());
@@ -133,6 +134,7 @@ void asyncExecute(const Request& request, MeasureTiming measure, BasePreparedMod
 
         const std::string& outputNodeName = ngraphNw->getNodeName(outIndex);
         if (outputNodeName == "") {
+            ALOGV("Ignorning output nodes with values as 0's");
             continue;
         }
         ALOGD("Output index: %d layername : %s", outIndex, outputNodeName.c_str());
@@ -181,6 +183,7 @@ static std::tuple<ErrorStatus, hidl_vec<V1_2::OutputShape>, Timing> executeSynch
 
         const std::string& inputNodeName = ngraphNw->getNodeName(inIndex);
         if (inputNodeName == "") {
+            ALOGV("Ignorning optional input nodes with values as 0's");
             continue;
         }
         ALOGD("Input index: %d layername : %s", inIndex, inputNodeName.c_str());
@@ -202,6 +205,7 @@ static std::tuple<ErrorStatus, hidl_vec<V1_2::OutputShape>, Timing> executeSynch
 
         const std::string& outputNodeName = ngraphNw->getNodeName(outIndex);
         if (outputNodeName == "") {
+            ALOGV("Ignorning output nodes with values as 0's");
             continue;
         }
         ALOGD("Output index: %d layername : %s", outIndex, outputNodeName.c_str());

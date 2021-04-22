@@ -46,7 +46,7 @@ std::shared_ptr<ngraph::Function> NgraphNodes::generateGraph() {
     return std::make_shared<ngraph::Function>(mResultNodes, mInputParams);
 }
 
-void NgraphNodes::setNullPtr(size_t index) { mNodeNames[index] = ""; }
+void NgraphNodes::setInvalidNode(size_t index) { mNodeNames[index] = ""; }
 
 }  // namespace nnhal
 }  // namespace neuralnetworks

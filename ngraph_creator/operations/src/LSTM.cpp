@@ -7,6 +7,12 @@ namespace hardware {
 namespace neuralnetworks {
 namespace nnhal {
 
+#define ACTIVATION_FUNCTION_NONE 0
+#define ACTIVATION_FUNCTION_RELU 1
+#define ACTIVATION_FUNCTION_RELU6 3
+#define ACTIVATION_FUNCTION_TANH 4
+#define ACTIVATION_FUNCTION_SIGMOID 6
+
 LSTM::LSTM(int operationIndex) : OperationsBase(operationIndex) {
     mDefaultOutputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
 }
@@ -63,25 +69,25 @@ bool LSTM::validate() {
         }
     }
 
-    if (!sModelInfo->isOperandDataNull(mNnapiOperationIndex, 1) &&
-        !sModelInfo->isOperandDataNull(mNnapiOperationIndex, 5) &&
-        !sModelInfo->isOperandDataNull(mNnapiOperationIndex, 12)) {
+    if (!sModelInfo->isOperationInputNull(mNnapiOperationIndex, 1) &&
+        !sModelInfo->isOperationInputNull(mNnapiOperationIndex, 5) &&
+        !sModelInfo->isOperationInputNull(mNnapiOperationIndex, 12)) {
         // CIFG diabled, check input types
         if (!checkInputOperandType(1, (int32_t)OperandType::TENSOR_FLOAT32)) return false;
         if (!checkInputOperandType(5, (int32_t)OperandType::TENSOR_FLOAT32)) return false;
         if (!checkInputOperandType(12, (int32_t)OperandType::TENSOR_FLOAT32)) return false;
     }
 
-    if (!sModelInfo->isOperandDataNull(mNnapiOperationIndex, 9) &&
-        !sModelInfo->isOperandDataNull(mNnapiOperationIndex, 10) &&
-        !sModelInfo->isOperandDataNull(mNnapiOperationIndex, 11)) {
+    if (!sModelInfo->isOperationInputNull(mNnapiOperationIndex, 9) &&
+        !sModelInfo->isOperationInputNull(mNnapiOperationIndex, 10) &&
+        !sModelInfo->isOperationInputNull(mNnapiOperationIndex, 11)) {
         // peephole enabled, check input types
         if (!checkInputOperandType(9, (int32_t)OperandType::TENSOR_FLOAT32)) return false;
         if (!checkInputOperandType(10, (int32_t)OperandType::TENSOR_FLOAT32)) return false;
         if (!checkInputOperandType(11, (int32_t)OperandType::TENSOR_FLOAT32)) return false;
     }
 
-    if (!sModelInfo->isOperandDataNull(mNnapiOperationIndex, 16)) {
+    if (!sModelInfo->isOperationInputNull(mNnapiOperationIndex, 16)) {
         // projection used, check input types
         if (!checkInputOperandType(16, (int32_t)OperandType::TENSOR_FLOAT32)) return false;
     }
@@ -97,9 +103,9 @@ std::shared_ptr<ngraph::Node> LSTM::createNode() {
          isLayerNormUsed = false;
 
     // checking if CIFG enabled
-    if (sModelInfo->isOperandDataNull(mNnapiOperationIndex, 1) &&
-        sModelInfo->isOperandDataNull(mNnapiOperationIndex, 5) &&
-        sModelInfo->isOperandDataNull(mNnapiOperationIndex, 12)) {
+    if (sModelInfo->isOperationInputNull(mNnapiOperationIndex, 1) &&
+        sModelInfo->isOperationInputNull(mNnapiOperationIndex, 5) &&
+        sModelInfo->isOperationInputNull(mNnapiOperationIndex, 12)) {
         isCIFGenabled = true;
     }
 
@@ -108,9 +114,9 @@ std::shared_ptr<ngraph::Node> LSTM::createNode() {
     const auto& c2fDimensions = getInputOperandDimensions(10);
     const auto& c2oDimensions = getInputOperandDimensions(11);
 
-    if (!sModelInfo->isOperandDataNull(mNnapiOperationIndex, 9) &&
-        !sModelInfo->isOperandDataNull(mNnapiOperationIndex, 10) &&
-        !sModelInfo->isOperandDataNull(mNnapiOperationIndex, 11)) {
+    if (!sModelInfo->isOperationInputNull(mNnapiOperationIndex, 9) &&
+        !sModelInfo->isOperationInputNull(mNnapiOperationIndex, 10) &&
+        !sModelInfo->isOperationInputNull(mNnapiOperationIndex, 11)) {
         isPeepholeUsed = true;
     }
 
@@ -121,7 +127,7 @@ std::shared_ptr<ngraph::Node> LSTM::createNode() {
 
     // checking if projection enabled
     const auto& projWeightsDims = getInputOperandDimensions(16);
-    if (!sModelInfo->isOperandDataNull(mNnapiOperationIndex, 16)) {
+    if (!sModelInfo->isOperationInputNull(mNnapiOperationIndex, 16)) {
         isProjectionUsed = true;
     }
 
@@ -132,10 +138,10 @@ std::shared_ptr<ngraph::Node> LSTM::createNode() {
 
     if (inputsSize == 27) {
         // checking if layer normalization enabled
-        if (!sModelInfo->isOperandDataNull(mNnapiOperationIndex, 23) &&
-            !sModelInfo->isOperandDataNull(mNnapiOperationIndex, 24) &&
-            !sModelInfo->isOperandDataNull(mNnapiOperationIndex, 25) &&
-            !sModelInfo->isOperandDataNull(mNnapiOperationIndex, 26)) {
+        if (!sModelInfo->isOperationInputNull(mNnapiOperationIndex, 23) &&
+            !sModelInfo->isOperationInputNull(mNnapiOperationIndex, 24) &&
+            !sModelInfo->isOperationInputNull(mNnapiOperationIndex, 25) &&
+            !sModelInfo->isOperationInputNull(mNnapiOperationIndex, 26)) {
             isLayerNormUsed = true;
         }
     }
@@ -316,7 +322,7 @@ std::shared_ptr<ngraph::Node> LSTM::createNode() {
     for (int i = 0; i < 4; i++) {
         auto outputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, i);
         if (i == 0)
-            mNgraphNodes->setNullPtr(outputIndex);
+            mNgraphNodes->setInvalidNode(outputIndex);
         else {
             mNgraphNodes->setOutputAtOperandIndex(outputIndex, LstmOutputs[i]);
             const auto op = sModelInfo->getOperand(outputIndex);
@@ -359,16 +365,16 @@ std::shared_ptr<ngraph::Node> LSTM::clip(const ngraph::Output<ngraph::Node>& dat
 std::shared_ptr<ngraph::Node> LSTM::applyActivation(const std::shared_ptr<ngraph::Node>& arg,
                                                     int activationFn) const {
     switch (activationFn) {
-        case 1:
+        case ACTIVATION_FUNCTION_RELU:
             return std::make_shared<ngraph::opset3::Relu>(arg);
             break;
-        case 3:
+        case ACTIVATION_FUNCTION_RELU6:
             return std::make_shared<ngraph::opset3::Clamp>(arg, 0, 6);
             break;
-        case 4:
+        case ACTIVATION_FUNCTION_TANH:
             return std::make_shared<ngraph::opset3::Tanh>(arg);
             break;
-        case 6:
+        case ACTIVATION_FUNCTION_SIGMOID:
             return std::make_shared<ngraph::opset3::Sigmoid>(arg);
             break;
         default:
