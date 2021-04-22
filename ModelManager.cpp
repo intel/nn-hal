@@ -398,7 +398,7 @@ void* NnapiModelInfo::getBlobFromMemoryPoolOut(const Request& request, uint32_t 
     return (r.buffer + arg.location.offset);
 }
 
-bool NnapiModelInfo::isOperandDataNull(int operationIndex, uint32_t index) {
+bool NnapiModelInfo::isOperationInputNull(int operationIndex, uint32_t index) {
     uint32_t inputIndex = mModel.operations[operationIndex].inputs[index];
     const auto op = mModel.operands[inputIndex];
     if (op.lifetime == OperandLifeTime::NO_VALUE) {

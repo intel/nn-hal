@@ -36,7 +36,8 @@ public:
     const std::string& getNodeName(size_t index);
 
     std::shared_ptr<ngraph::Function> generateGraph();
-    void setNullPtr(size_t index);
+    // Setting the node name to empty string "". Caller of getNodeName should validate against "".
+    void setInvalidNode(size_t index);
 };
 
 }  // namespace nnhal

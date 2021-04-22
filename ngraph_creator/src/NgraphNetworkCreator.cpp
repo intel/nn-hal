@@ -34,6 +34,8 @@ bool NgraphNetworkCreator::createInputParams() {
         auto& nnapiOperand = mModelInfo->getOperand(i);
         auto& dims = nnapiOperand.dimensions;
         ALOGI("createInputParams operand %d dims.size(%d)", i, dims.size());
+        // keeping this condition to make VTS pass. Operation's optional input lifetime is supposed
+        // to be "NO_VALUE"
         if (dims.size() > 0) {
             if (dims[0] != 0) {
                 switch (nnapiOperand.type) {
@@ -53,10 +55,10 @@ bool NgraphNetworkCreator::createInputParams() {
                 mNgraphNodes->addInputParam(inputParam);
                 mNgraphNodes->setOutputAtOperandIndex(i, inputParam);
             } else {
-                mNgraphNodes->setNullPtr(i);
+                mNgraphNodes->setInvalidNode(i);
             }
         } else {
-            mNgraphNodes->setNullPtr(i);
+            mNgraphNodes->setInvalidNode(i);
         }
     }
     return true;

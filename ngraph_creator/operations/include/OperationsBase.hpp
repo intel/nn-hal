@@ -40,7 +40,8 @@ protected:
         if (sModelInfo->isOperandLifeTimeConst(operandIndex)) {
             auto operandValues = sModelInfo->GetConstVecOperand<T>(operandIndex);
             auto operandDims = getInputOperandDimensions(inputIndex);
-            if (operandDims[0] != 0)
+            if (operandDims[0] != 0)  // keeping this condition to make VTS pass. Operation's
+                                      // optional input lifetime is supposed to be "NO_VALUE"
                 return std::make_shared<ngraph::opset3::Constant>(
                     ngraph::element::f32, toNgraphShape(operandDims), operandValues);
             else
