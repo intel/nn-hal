@@ -16,6 +16,7 @@ cc_library_static {
         "operations/src/LSTM.cpp",
         "operations/src/Reshape.cpp",
         "operations/src/OperationsBase.cpp",
+        "operations/src/Softmax.cpp",
     ],
 
     header_libs: [
