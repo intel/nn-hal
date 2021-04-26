@@ -6,6 +6,7 @@
 #include <Depthwise_Conv_2d.hpp>
 #include <LSTM.hpp>
 #include <Reshape.hpp>
+#include <Softmax.hpp>
 
 namespace android {
 namespace hardware {

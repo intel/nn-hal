@@ -29,9 +29,37 @@ std::shared_ptr<ngraph::Node> Reshape::createNode() {
     const auto& dimsOperandIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 1);
     auto outDims = sModelInfo->GetConstVecOperand<int32_t>(dimsOperandIndex);
     VLOGDIMS(L3, outDims, "Reshape::createNode dims");
+
     auto inputIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 0);
     auto inputOp = mNgraphNodes->getOperationOutput(inputIndex);
-    ALOGV("%s outDims.size=%d", __func__, outDims.size());
+    const auto& inDims = getInputOperandDimensions(0);
+    auto numInputElements = 1;
+    int strechDim = -1;
+    auto numOutputElements = 1;
+
+
+    for (auto i = 0; i < inDims.size(); i++)
+        numInputElements*=inDims[i];
+
+    for (auto i = 0; i < outDims.size(); i++) {
+        if ((int)outDims[i] < 0) {
+            strechDim = i;
+            continue;
+        }
+        numOutputElements *= outDims[i];
+    }
+    if (strechDim >= 0) {
+        auto strechValue = numInputElements / numOutputElements;
+        outDims[strechDim] = (uint32_t)strechValue;
+        numOutputElements *= strechValue;
+
+        VLOGDIMS(L3,outDims, "Reshape::outDims with stretch dimension introduced");
+    }
+
+    if (numInputElements != numOutputElements) {
+        ALOGE("numInputElements = %d is not equal to numOutputElements = %d",numInputElements,
+             numOutputElements);
+    }
 
     if (mNgraphNodes->isForcedNchw(inputIndex)) {
         inputOp = transpose(NCHW_NHWC, inputOp);
