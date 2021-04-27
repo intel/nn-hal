@@ -358,7 +358,7 @@ std::shared_ptr<ngraph::Node> LSTM::matMul(const ngraph::Output<ngraph::Node>& l
 std::shared_ptr<ngraph::Node> LSTM::clip(const ngraph::Output<ngraph::Node>& data,
                                          float m_clip) const {
     if (m_clip == 0.f) {
-        return data.as_single_output_node();
+        return data.get_node_shared_ptr();
     }
     return make_shared<ngraph::opset3::Clamp>(data, -m_clip, m_clip);
 }
