@@ -1124,11 +1124,11 @@ bool GnaPreparedModel::updateMemoryAfterGraphExecution(const V1_0_Request& reque
                     auto[srcPtrVoid, outputLen] = layerPtr->getOutputData();
     #ifdef PERF_COUNTERS
                     if (operand.type == OperandType::TENSOR_QUANT16_SYMM) {
-                        quantizeToQuant16(srcPtr, (uint16_t*)destPtr, operand.shape(), runtimeMetrics);
+                        quantizeToQuant16((float*)srcPtrVoid, (uint16_t*)destPtr, operand.shape(), runtimeMetrics);
                     } else if (operand.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED) {
-                        quantizeToQuant8Signed(srcPtr, (int8_t*)destPtr, operand.shape(), runtimeMetrics);
+                        quantizeToQuant8Signed((float*)srcPtrVoid, (int8_t*)destPtr, operand.shape(), runtimeMetrics);
                     } else if (operand.type == OperandType::TENSOR_FLOAT32) {
-                        std::memcpy((uint8_t*)destPtr, (uint8_t*)srcPtr, outputLen * sizeof(float));
+                        std::memcpy((uint8_t*)destPtr, (uint8_t*)srcPtrVoid, outputLen * sizeof(float));
                     }
     #else
                     if (operand.type == OperandType::TENSOR_QUANT16_SYMM) {
@@ -1175,11 +1175,11 @@ bool GnaPreparedModel::updateMemoryAfterCPUGraphExecution(const V1_0_Request& re
                 auto[srcPtrVoid, outputLen] = layerPtr->getOutputData();
 #ifdef PERF_COUNTERS
                 if (operand.type == OperandType::TENSOR_QUANT16_SYMM) {
-                    quantizeToQuant16(srcPtr, (uint16_t*)destPtr, operand.shape(), runtimeMetrics);
+                    quantizeToQuant16((float*)srcPtrVoid, (uint16_t*)destPtr, operand.shape(), runtimeMetrics);
                 } else if (operand.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED) {
-                    quantizeToQuant8Signed(srcPtr, (int8_t*)destPtr, operand.shape(), runtimeMetrics);
+                    quantizeToQuant8Signed((float*)srcPtrVoid, (int8_t*)destPtr, operand.shape(), runtimeMetrics);
                 } else if (operand.type == OperandType::TENSOR_FLOAT32) {
-                    std::memcpy((uint8_t*)destPtr, (uint8_t*)srcPtr, outputLen*4);
+                    std::memcpy((uint8_t*)destPtr, (uint8_t*)srcPtrVoid, outputLen*4);
                 }
 #else
                 if (operand.type == OperandType::TENSOR_QUANT16_SYMM) {
@@ -1237,11 +1237,11 @@ bool GnaPreparedModel::updateMemoryAfterCPUGraphExecution(const V1_0_Request& re
 
 #ifdef PERF_COUNTERS
             if (operand.type == OperandType::TENSOR_QUANT16_SYMM) {
-                quantizeToQuant16(srcPtr, (uint16_t*)destPtr, operand.shape(), runtimeMetrics);
+                quantizeToQuant16((float*)srcPtrVoid, (uint16_t*)destPtr, operand.shape(), runtimeMetrics);
             } else if (operand.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED) {
-                quantizeToQuant8Signed(srcPtr, (int8_t*)destPtr, operand.shape(), runtimeMetrics);
+                quantizeToQuant8Signed((float*)srcPtrVoid, (int8_t*)destPtr, operand.shape(), runtimeMetrics);
             } else if (operand.type == OperandType::TENSOR_FLOAT32) {
-                std::memcpy((uint8_t*)destPtr, (uint8_t*)srcPtr, outputLen*4);
+                std::memcpy((uint8_t*)destPtr, (uint8_t*)srcPtrVoid, outputLen*4);
             }
 #else
             if (operand.type == OperandType::TENSOR_QUANT16_SYMM) {
@@ -1365,8 +1365,13 @@ void GnaPreparedModel::asyncExecute(const V1_0_Request& request, MeasureTiming m
 
                             if (op.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED) {
                                 float * opGetBlob = srcBlob->buffer().as<float*>();
-                                quantizeToQuant8Signed(srcBlob->buffer().as<float*>(),
-                                                        (int8_t*)destPtr, op.shape());
+                                #ifdef PERF_COUNTERS
+                                    quantizeToQuant8Signed(srcBlob->buffer().as<float*>(),
+                                                            (int8_t*)destPtr, op.shape(), runtimeMetrics);
+                                #else
+                                    quantizeToQuant8Signed(srcBlob->buffer().as<float*>(),
+                                                            (int8_t*)destPtr, op.shape());
+                                #endif
                             } else {
                                 VLOG(L1, "op type for copying to CPU is different from TENSOR_QUANT8_ASYMM_SIGNED !!!!");
 								nnAssert(false);
