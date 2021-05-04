@@ -22,6 +22,7 @@
 #include <Logical_Or.hpp>
 #include <Maximum.hpp>
 #include <Mean.hpp>
+#include <Minimum.hpp>
 #include <Reshape.hpp>
 #include <Softmax.hpp>
 

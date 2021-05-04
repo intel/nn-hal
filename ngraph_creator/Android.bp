@@ -32,6 +32,7 @@ cc_library_static {
         "operations/src/Logical_Or.cpp",
         "operations/src/Maximum.cpp",
         "operations/src/Mean.cpp",
+        "operations/src/Minimum.cpp",
         "operations/src/Reshape.cpp",
         "operations/src/Softmax.cpp",
     ],
