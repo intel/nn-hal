@@ -35,6 +35,8 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<Depthwise_Conv_2d>(operationIndex);
         case OperationType::DIV:
             return std::make_shared<Div>(operationIndex);
+        case OperationType::EQUAL:
+            return std::make_shared<Equal>(operationIndex);
         case OperationType::LSTM:
             return std::make_shared<LSTM>(operationIndex);
         case OperationType::RESHAPE:
