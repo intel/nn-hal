@@ -95,6 +95,8 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<Softmax>(operationIndex);
         case OperationType::SQRT:
             return std::make_shared<SQRT>(operationIndex);
+        case OperationType::SIN:
+            return std::make_shared<Sin>(operationIndex);
         default:
             ALOGE("%s Cannot identify OperationType %d", __func__, operationType);
             break;
