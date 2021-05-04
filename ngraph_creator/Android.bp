@@ -37,6 +37,7 @@ cc_library_static {
         "operations/src/Neg.cpp",
         "operations/src/Not_Equal.cpp",
         "operations/src/Pow.cpp",
+        "operations/src/Reduce_All.cpp",
         "operations/src/Reshape.cpp",
         "operations/src/Softmax.cpp",
     ],
