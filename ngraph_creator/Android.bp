@@ -29,6 +29,7 @@ cc_library_static {
         "operations/src/Log.cpp",
         "operations/src/Logical_And.cpp",
         "operations/src/Logical_Not.cpp",
+        "operations/src/Logical_Or.cpp",
         "operations/src/Reshape.cpp",
         "operations/src/Softmax.cpp",
     ],
