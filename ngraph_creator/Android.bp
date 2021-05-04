@@ -20,6 +20,7 @@ cc_library_static {
         "operations/src/Equal.cpp",
         "operations/src/Exp.cpp",
         "operations/src/Floor.cpp",
+        "operations/src/Gather.cpp",
         "operations/src/LSTM.cpp",
         "operations/src/Reshape.cpp",
         "operations/src/Softmax.cpp",
