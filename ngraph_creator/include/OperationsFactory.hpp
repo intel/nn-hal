@@ -17,6 +17,7 @@
 #include <Less.hpp>
 #include <Less_Equal.hpp>
 #include <Log.hpp>
+#include <Logical_And.hpp>
 #include <Reshape.hpp>
 #include <Softmax.hpp>
 
