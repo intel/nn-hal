@@ -40,6 +40,7 @@
 #include <Softmax.hpp>
 #include <Split.hpp>
 #include <Squeeze.hpp>
+#include <Sub.hpp>
 
 namespace android {
 namespace hardware {
