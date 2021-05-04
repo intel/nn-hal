@@ -29,14 +29,16 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<Cast>(operationIndex);
         case OperationType::CONCATENATION:
             return std::make_shared<Concat>(operationIndex);
-        case OperationType::RESHAPE:
-            return std::make_shared<Reshape>(operationIndex);
         case OperationType::CONV_2D:
             return std::make_shared<Conv_2d>(operationIndex);
         case OperationType::DEPTHWISE_CONV_2D:
             return std::make_shared<Depthwise_Conv_2d>(operationIndex);
+        case OperationType::DIV:
+            return std::make_shared<Div>(operationIndex);
         case OperationType::LSTM:
             return std::make_shared<LSTM>(operationIndex);
+        case OperationType::RESHAPE:
+            return std::make_shared<Reshape>(operationIndex);
         case OperationType::SOFTMAX:
             return std::make_shared<Softmax>(operationIndex);
         default:
