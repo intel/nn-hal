@@ -20,6 +20,7 @@
 #include <Logical_And.hpp>
 #include <Logical_Not.hpp>
 #include <Logical_Or.hpp>
+#include <Logistic.hpp>
 #include <Maximum.hpp>
 #include <Mean.hpp>
 #include <Minimum.hpp>
