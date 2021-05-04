@@ -25,6 +25,8 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<Abs>(operationIndex);
         case OperationType::ADD:
             return std::make_shared<Add>(operationIndex);
+        case OperationType::CAST:
+            return std::make_shared<Cast>(operationIndex);
         case OperationType::CONCATENATION:
             return std::make_shared<Concat>(operationIndex);
         case OperationType::RESHAPE:
