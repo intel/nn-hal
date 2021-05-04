@@ -9,6 +9,7 @@
 #include <Div.hpp>
 #include <Equal.hpp>
 #include <Exp.hpp>
+#include <Floor.hpp>
 #include <LSTM.hpp>
 #include <Reshape.hpp>
 #include <Softmax.hpp>
