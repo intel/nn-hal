@@ -29,6 +29,7 @@
 #include <Pow.hpp>
 #include <Reduce_All.hpp>
 #include <Reduce_Any.hpp>
+#include <Reduce_Min.hpp>
 #include <Reshape.hpp>
 #include <Softmax.hpp>
 

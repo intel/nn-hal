@@ -39,6 +39,7 @@ cc_library_static {
         "operations/src/Pow.cpp",
         "operations/src/Reduce_All.cpp",
         "operations/src/Reduce_Any.cpp",
+        "operations/src/Reduce_Min.cpp",
         "operations/src/Reshape.cpp",
         "operations/src/Softmax.cpp",
     ],
