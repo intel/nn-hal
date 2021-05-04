@@ -49,6 +49,8 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<Greater_Equal>(operationIndex);
         case OperationType::LSTM:
             return std::make_shared<LSTM>(operationIndex);
+        case OperationType::LESS:
+            return std::make_shared<Less>(operationIndex);
         case OperationType::RESHAPE:
             return std::make_shared<Reshape>(operationIndex);
         case OperationType::SOFTMAX:
