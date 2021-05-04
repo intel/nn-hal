@@ -73,6 +73,8 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<Neg>(operationIndex);
         case OperationType::NOT_EQUAL:
             return std::make_shared<Not_Equal>(operationIndex);
+        case OperationType::POW:
+            return std::make_shared<Pow>(operationIndex);
         case OperationType::RESHAPE:
             return std::make_shared<Reshape>(operationIndex);
         case OperationType::SOFTMAX:
