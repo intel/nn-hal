@@ -170,7 +170,7 @@ bool GnaPreparedModel::constructGNAGraph(std::pair<int, int> indices) {
 #ifdef PERF_COUNTERS
     time_point irbuild_end = now();
     runtimeMetrics.irBuild_time = (double(millisecondsDuration(irbuild_end, irbuild_start)));
-    gnaPluginPtr = new GnaNetwork(network, "GNA");
+    gnaPluginPtr->setNetwork(network);
     InferenceEngine::CNNNetwork passed_network({network});
     gnaPluginPtr->loadNetwork(passed_network, isDecoderNw);
     time_point gnabuild_end = now();
