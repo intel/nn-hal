@@ -19,6 +19,7 @@
 #include <Log.hpp>
 #include <Logical_And.hpp>
 #include <Logical_Not.hpp>
+#include <Logical_Or.hpp>
 #include <Reshape.hpp>
 #include <Softmax.hpp>
 
