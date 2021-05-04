@@ -28,6 +28,7 @@
 #include <Not_Equal.hpp>
 #include <Pow.hpp>
 #include <Reduce_All.hpp>
+#include <Reduce_Any.hpp>
 #include <Reshape.hpp>
 #include <Softmax.hpp>
 
