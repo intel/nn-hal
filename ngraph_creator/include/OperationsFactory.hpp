@@ -25,6 +25,7 @@
 #include <Minimum.hpp>
 #include <Mul.hpp>
 #include <Neg.hpp>
+#include <Not_Equal.hpp>
 #include <Reshape.hpp>
 #include <Softmax.hpp>
 
