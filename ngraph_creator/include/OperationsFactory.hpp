@@ -24,6 +24,7 @@
 #include <Mean.hpp>
 #include <Minimum.hpp>
 #include <Mul.hpp>
+#include <Neg.hpp>
 #include <Reshape.hpp>
 #include <Softmax.hpp>
 
