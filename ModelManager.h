@@ -181,7 +181,7 @@ public:
         }
     }
 
-    bool isOperationInputNull(int operationIndex, uint32_t index);
+    bool isOmittedInput(int operationIndex, uint32_t index);
 
 private:
     bool initializeRunTimeOperandInfo();

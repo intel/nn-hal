@@ -37,9 +37,7 @@ std::shared_ptr<ngraph::Node> Reshape::createNode() {
     int strechDim = -1;
     auto numOutputElements = 1;
 
-
-    for (auto i = 0; i < inDims.size(); i++)
-        numInputElements*=inDims[i];
+    for (auto i = 0; i < inDims.size(); i++) numInputElements *= inDims[i];
 
     for (auto i = 0; i < outDims.size(); i++) {
         if ((int)outDims[i] < 0) {
@@ -53,12 +51,12 @@ std::shared_ptr<ngraph::Node> Reshape::createNode() {
         outDims[strechDim] = (uint32_t)strechValue;
         numOutputElements *= strechValue;
 
-        VLOGDIMS(L3,outDims, "Reshape::outDims with stretch dimension introduced");
+        VLOGDIMS(L3, outDims, "Reshape::outDims with stretch dimension introduced");
     }
 
     if (numInputElements != numOutputElements) {
-        ALOGE("numInputElements = %d is not equal to numOutputElements = %d",numInputElements,
-             numOutputElements);
+        ALOGE("numInputElements = %d is not equal to numOutputElements = %d", numInputElements,
+              numOutputElements);
     }
 
     if (mNgraphNodes->isForcedNchw(inputIndex)) {

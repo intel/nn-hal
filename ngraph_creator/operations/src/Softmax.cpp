@@ -29,14 +29,12 @@ std::shared_ptr<ngraph::Node> Softmax::createNode() {
     auto inputIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 0);
     auto inputOp = mNgraphNodes->getOperationOutput(inputIndex);
 
-    std::shared_ptr<ngraph::Node> outputNode =
-        std::make_shared<ngraph::opset3::Softmax>(inputOp);
+    std::shared_ptr<ngraph::Node> outputNode = std::make_shared<ngraph::opset3::Softmax>(inputOp);
 
     float beta = sModelInfo->ParseOperationInput<float>(mNnapiOperationIndex, 1);
     ALOGV("Softmax beta = %f ", beta);
 
-    if (beta <= 0.0f)
-        ALOGE("beta must be positive for softmax");
+    if (beta <= 0.0f) ALOGE("beta must be positive for softmax");
 
     const auto outputOperand = sModelInfo->getOperand(mDefaultOutputIndex);
     if (outputOperand.lifetime == OperandLifeTime::MODEL_OUTPUT)
