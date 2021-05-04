@@ -38,14 +38,15 @@ protected:
     std::shared_ptr<ngraph::Node> getInputNode(uint32_t inputIndex) {
         auto operandIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, inputIndex);
         if (sModelInfo->isOperandLifeTimeConst(operandIndex)) {
+            ngraph::element::Type elementType;
+            auto operandType = sModelInfo->getOperandType(operandIndex);
+            if (operandType == OperandType::TENSOR_FLOAT32) elementType = ngraph::element::f32;
+            if (operandType == OperandType::TENSOR_INT32) elementType = ngraph::element::i32;
+            if (operandType == OperandType::TENSOR_BOOL8) elementType = ngraph::element::boolean;
             auto operandValues = sModelInfo->GetConstVecOperand<T>(operandIndex);
             auto operandDims = getInputOperandDimensions(inputIndex);
-            if (operandDims[0] != 0)  // keeping this condition to make VTS pass. Operation's
-                                      // optional input lifetime is supposed to be "NO_VALUE"
-                return std::make_shared<ngraph::opset3::Constant>(
-                    ngraph::element::f32, toNgraphShape(operandDims), operandValues);
-            else
-                return nullptr;
+            return std::make_shared<ngraph::opset3::Constant>(
+                elementType, toNgraphShape(operandDims), operandValues);
         } else
             return mNgraphNodes->getOperationOutput(operandIndex).get_node_shared_ptr();
     }
