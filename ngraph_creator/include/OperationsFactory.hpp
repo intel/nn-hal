@@ -15,6 +15,7 @@
 #include <Greater_Equal.hpp>
 #include <LSTM.hpp>
 #include <Less.hpp>
+#include <Less_Equal.hpp>
 #include <Reshape.hpp>
 #include <Softmax.hpp>
 
