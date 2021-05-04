@@ -31,6 +31,7 @@
 #include <Reduce_Any.hpp>
 #include <Reduce_Min.hpp>
 #include <Reduce_Prod.hpp>
+#include <Relu.hpp>
 #include <Reshape.hpp>
 #include <Softmax.hpp>
 
