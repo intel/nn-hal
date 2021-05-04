@@ -61,6 +61,8 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<Logical_Not>(operationIndex);
         case OperationType::LOGICAL_OR:
             return std::make_shared<Logical_Or>(operationIndex);
+        case OperationType::LOGISTIC:
+            return std::make_shared<Logistic>(operationIndex);
         case OperationType::MAXIMUM:
             return std::make_shared<Maximum>(operationIndex);
         case OperationType::MEAN:
