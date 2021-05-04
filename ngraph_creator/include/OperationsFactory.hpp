@@ -7,6 +7,7 @@
 #include <Conv_2d.hpp>
 #include <Depthwise_Conv_2d.hpp>
 #include <Div.hpp>
+#include <Equal.hpp>
 #include <LSTM.hpp>
 #include <Reshape.hpp>
 #include <Softmax.hpp>
