@@ -37,6 +37,8 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<Div>(operationIndex);
         case OperationType::EQUAL:
             return std::make_shared<Equal>(operationIndex);
+        case OperationType::EXP:
+            return std::make_shared<Exp>(operationIndex);
         case OperationType::LSTM:
             return std::make_shared<LSTM>(operationIndex);
         case OperationType::RESHAPE:

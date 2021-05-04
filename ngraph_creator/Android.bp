@@ -18,6 +18,7 @@ cc_library_static {
         "operations/src/Depthwise_Conv_2d.cpp",
         "operations/src/Div.cpp",
         "operations/src/Equal.cpp",
+        "operations/src/Exp.cpp",
         "operations/src/LSTM.cpp",
         "operations/src/Reshape.cpp",
         "operations/src/Softmax.cpp",
