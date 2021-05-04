@@ -35,6 +35,7 @@
 #include <Relu1.hpp>
 #include <Relu6.hpp>
 #include <Reshape.hpp>
+#include <SQRT.hpp>
 #include <Softmax.hpp>
 
 namespace android {
