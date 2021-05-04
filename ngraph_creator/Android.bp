@@ -47,7 +47,8 @@ cc_library_static {
         "operations/src/Reshape.cpp",
         "operations/src/Softmax.cpp",
         "operations/src/SQRT.cpp",
-        "operations/src/Sin.cpp"
+        "operations/src/Sin.cpp",
+        "operations/src/Split.cpp"
     ],
 
     header_libs: [
