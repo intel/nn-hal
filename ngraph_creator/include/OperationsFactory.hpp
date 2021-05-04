@@ -20,6 +20,7 @@
 #include <Logical_And.hpp>
 #include <Logical_Not.hpp>
 #include <Logical_Or.hpp>
+#include <Maximum.hpp>
 #include <Reshape.hpp>
 #include <Softmax.hpp>
 
