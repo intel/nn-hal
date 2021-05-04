@@ -81,6 +81,8 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<Reduce_Any>(operationIndex);
         case OperationType::REDUCE_MIN:
             return std::make_shared<Reduce_Min>(operationIndex);
+        case OperationType::REDUCE_PROD:
+            return std::make_shared<Reduce_Prod>(operationIndex);
         case OperationType::RESHAPE:
             return std::make_shared<Reshape>(operationIndex);
         case OperationType::SOFTMAX:
