@@ -50,7 +50,8 @@ cc_library_static {
         "operations/src/Sin.cpp",
         "operations/src/Split.cpp",
         "operations/src/Squeeze.cpp",
-        "operations/src/Sub.cpp"
+        "operations/src/Sub.cpp",
+        "operations/src/Tanh.cpp"
     ],
 
     header_libs: [
