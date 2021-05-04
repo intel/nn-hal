@@ -38,6 +38,7 @@
 #include <SQRT.hpp>
 #include <Sin.hpp>
 #include <Softmax.hpp>
+#include <Split.hpp>
 
 namespace android {
 namespace hardware {
