@@ -9,6 +9,7 @@ cc_library_static {
         "src/OperationsFactory.cpp",
         "src/NgraphNetworkCreator.cpp",
         "src/NgraphNodes.cpp",
+        "operations/src/Abs.cpp",
         "operations/src/Add.cpp",
         "operations/src/Concat.cpp",
         "operations/src/Conv_2d.cpp",
