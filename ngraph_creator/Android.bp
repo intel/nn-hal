@@ -49,7 +49,8 @@ cc_library_static {
         "operations/src/SQRT.cpp",
         "operations/src/Sin.cpp",
         "operations/src/Split.cpp",
-        "operations/src/Squeeze.cpp"
+        "operations/src/Squeeze.cpp",
+        "operations/src/Sub.cpp"
     ],
 
     header_libs: [
