@@ -105,6 +105,8 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<Sub>(operationIndex);
         case OperationType::TANH:
             return std::make_shared<Tanh>(operationIndex);
+        case OperationType::TRANSPOSE:
+            return std::make_shared<Transpose>(operationIndex);
         default:
             ALOGE("%s Cannot identify OperationType %d", __func__, operationType);
             break;
