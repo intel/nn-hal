@@ -65,6 +65,8 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<Maximum>(operationIndex);
         case OperationType::MEAN:
             return std::make_shared<Mean>(operationIndex);
+        case OperationType::MINIMUM:
+            return std::make_shared<Minimum>(operationIndex);
         case OperationType::RESHAPE:
             return std::make_shared<Reshape>(operationIndex);
         case OperationType::SOFTMAX:
