@@ -57,6 +57,8 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<Log>(operationIndex);
         case OperationType::LOGICAL_AND:
             return std::make_shared<Logical_And>(operationIndex);
+        case OperationType::LOGICAL_NOT:
+            return std::make_shared<Logical_Not>(operationIndex);
         case OperationType::RESHAPE:
             return std::make_shared<Reshape>(operationIndex);
         case OperationType::SOFTMAX:
