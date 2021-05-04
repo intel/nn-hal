@@ -46,6 +46,20 @@ bool NgraphNetworkCreator::createInputParams() {
                         ALOGV("createInputParams created inputIndex %d, type %d", i,
                               nnapiOperand.type);
                         break;
+                    case OperandType::INT32:
+                    case OperandType::TENSOR_INT32:
+                        inputParam = std::make_shared<ngraph::opset3::Parameter>(
+                            ngraph::element::i32, ngraph::Shape(dims.begin(), dims.end()));
+                        ALOGV("createInputParams created inputIndex %d, type %d", i,
+                              nnapiOperand.type);
+                        break;
+                    case OperandType::BOOL:
+                    case OperandType::TENSOR_BOOL8:
+                        inputParam = std::make_shared<ngraph::opset3::Parameter>(
+                            ngraph::element::boolean, ngraph::Shape(dims.begin(), dims.end()));
+                        ALOGV("createInputParams created inputIndex %d, type %d", i,
+                              nnapiOperand.type);
+                        break;
                     default:
                         ALOGE("createInputParams Failure at inputIndex %d, type %d", i,
                               nnapiOperand.type);
