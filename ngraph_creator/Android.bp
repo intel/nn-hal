@@ -46,6 +46,7 @@ cc_library_static {
         "operations/src/Relu6.cpp",
         "operations/src/Reshape.cpp",
         "operations/src/Softmax.cpp",
+        "operations/src/SQRT.cpp"
     ],
 
     header_libs: [
