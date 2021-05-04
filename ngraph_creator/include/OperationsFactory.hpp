@@ -23,6 +23,7 @@
 #include <Maximum.hpp>
 #include <Mean.hpp>
 #include <Minimum.hpp>
+#include <Mul.hpp>
 #include <Reshape.hpp>
 #include <Softmax.hpp>
 
