@@ -33,6 +33,7 @@
 #include <Reduce_Prod.hpp>
 #include <Relu.hpp>
 #include <Relu1.hpp>
+#include <Relu6.hpp>
 #include <Reshape.hpp>
 #include <Softmax.hpp>
 
