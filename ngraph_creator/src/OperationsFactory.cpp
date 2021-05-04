@@ -61,6 +61,8 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<Logical_Not>(operationIndex);
         case OperationType::LOGICAL_OR:
             return std::make_shared<Logical_Or>(operationIndex);
+        case OperationType::MAXIMUM:
+            return std::make_shared<Maximum>(operationIndex);
         case OperationType::RESHAPE:
             return std::make_shared<Reshape>(operationIndex);
         case OperationType::SOFTMAX:
