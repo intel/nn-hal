@@ -10,6 +10,7 @@
 #include <Equal.hpp>
 #include <Exp.hpp>
 #include <Floor.hpp>
+#include <Gather.hpp>
 #include <LSTM.hpp>
 #include <Reshape.hpp>
 #include <Softmax.hpp>
