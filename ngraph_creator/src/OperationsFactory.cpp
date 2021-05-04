@@ -21,6 +21,8 @@ OperationsFactory::~OperationsFactory() {
 std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
     int operationIndex, const OperationType& operationType) {
     switch (operationType) {
+        case OperationType::ABS:
+            return std::make_shared<Abs>(operationIndex);
         case OperationType::ADD:
             return std::make_shared<Add>(operationIndex);
         case OperationType::CONCATENATION:
