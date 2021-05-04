@@ -41,6 +41,7 @@
 #include <Split.hpp>
 #include <Squeeze.hpp>
 #include <Sub.hpp>
+#include <Tanh.hpp>
 
 namespace android {
 namespace hardware {

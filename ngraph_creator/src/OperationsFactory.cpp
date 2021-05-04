@@ -103,6 +103,8 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<Squeeze>(operationIndex);
         case OperationType::SUB:
             return std::make_shared<Sub>(operationIndex);
+        case OperationType::TANH:
+            return std::make_shared<Tanh>(operationIndex);
         default:
             ALOGE("%s Cannot identify OperationType %d", __func__, operationType);
             break;
