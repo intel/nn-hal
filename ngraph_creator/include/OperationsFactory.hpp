@@ -11,6 +11,7 @@
 #include <Exp.hpp>
 #include <Floor.hpp>
 #include <Gather.hpp>
+#include <Greater.hpp>
 #include <LSTM.hpp>
 #include <Reshape.hpp>
 #include <Softmax.hpp>

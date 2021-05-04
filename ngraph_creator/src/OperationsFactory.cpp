@@ -43,6 +43,8 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<Floor>(operationIndex);
         case OperationType::GATHER:
             return std::make_shared<Gather>(operationIndex);
+        case OperationType::GREATER:
+            return std::make_shared<Greater>(operationIndex);
         case OperationType::LSTM:
             return std::make_shared<LSTM>(operationIndex);
         case OperationType::RESHAPE:
