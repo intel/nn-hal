@@ -101,6 +101,9 @@ public:
 #else
     GnaPreparedModel(const Model& model) : PreparedModel("GNA", model), gnaPluginPtr(nullptr), mBuilderModel(nullptr),
                                             isDecoderNw(false), isEnc0Nw(false), isEnc1Nw(false) {
+#ifdef PERF_COUNTERS
+        runtimeMetrics.reset();
+#endif
     }
 #endif
 
