@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#define LOG_TAG "BasePreparedModel"
 #include "BasePreparedModel.h"
 
 #include <android-base/logging.h>
@@ -100,7 +99,6 @@ void asyncExecute(const Request& request, MeasureTiming measure, BasePreparedMod
     auto plugin = preparedModel->getPlugin();
     auto ngraphNw = preparedModel->getNgraphNwCreator();
     time_point driverEnd, deviceStart, deviceEnd;
-    if (measure == MeasureTiming::YES) deviceStart = now();
     std::vector<RunTimePoolInfo> requestPoolInfos;
     if (!modelInfo->setRunTimePoolInfosFromHidlMemories(request.pools)) {
         notify(callback, ErrorStatus::GENERAL_FAILURE, {}, kNoTiming);
@@ -125,7 +123,9 @@ void asyncExecute(const Request& request, MeasureTiming measure, BasePreparedMod
     }
     ALOGD("Run");
 
+    if (measure == MeasureTiming::YES) deviceStart = now();
     plugin->infer();
+    if (measure == MeasureTiming::YES) deviceEnd = now();
 
     for (size_t i = 0; i < request.outputs.size(); i++) {
         auto outIndex = modelInfo->getModelOutputIndex(i);
@@ -170,7 +170,6 @@ static std::tuple<ErrorStatus, hidl_vec<V1_2::OutputShape>, Timing> executeSynch
     auto plugin = preparedModel->getPlugin();
     auto ngraphNw = preparedModel->getNgraphNwCreator();
     time_point driverEnd, deviceStart, deviceEnd;
-    if (measure == MeasureTiming::YES) deviceStart = now();
     std::vector<RunTimePoolInfo> requestPoolInfos;
     if (!modelInfo->setRunTimePoolInfosFromHidlMemories(request.pools)) {
         ALOGE("Failed to set runtime pool info from HIDL memories");
@@ -196,7 +195,9 @@ static std::tuple<ErrorStatus, hidl_vec<V1_2::OutputShape>, Timing> executeSynch
 
     ALOGD("Run");
 
+    if (measure == MeasureTiming::YES) deviceStart = now();
     plugin->infer();
+    if (measure == MeasureTiming::YES) deviceEnd = now();
 
     for (size_t i = 0; i < request.outputs.size(); i++) {
         auto outIndex = modelInfo->getModelOutputIndex(i);
