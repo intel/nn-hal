@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "Driver"
-
 #include "Driver.h"
 
 #include <android-base/logging.h>
@@ -25,6 +23,8 @@
 #include "GnaPreparedModel.h"
 #include "ModelManager.h"
 #include "ValidateHal.h"
+
+#define LOG_TAG "Driver"
 
 namespace android {
 namespace hardware {

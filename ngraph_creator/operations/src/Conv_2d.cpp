@@ -111,7 +111,7 @@ std::shared_ptr<ngraph::Node> Conv_2d::createNode() {
                 dilation_width_factor =
                     sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 11);
             case 11:
-                layout = sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 10);
+                layout = sModelInfo->ParseOperationInput<uint8_t>(mNnapiOperationIndex, 10);
             default:
                 break;
         }
@@ -136,7 +136,7 @@ std::shared_ptr<ngraph::Node> Conv_2d::createNode() {
                 dilation_width_factor =
                     sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 8);
             case 8:
-                layout = sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 7);
+                layout = sModelInfo->ParseOperationInput<uint8_t>(mNnapiOperationIndex, 7);
             default:
                 break;
         }

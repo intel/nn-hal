@@ -29,7 +29,7 @@ std::shared_ptr<ngraph::Node> Reduce_Prod::createNode() {
     // Creating input nodes
     auto input = getInputNode<float>(0);
     auto reduction_axes = getInputNode<int>(1);
-    auto keep_dims = sModelInfo->ParseOperationInput<bool>(mNnapiOperationIndex, 2);
+    auto keep_dims = sModelInfo->ParseOperationInput<uint8_t>(mNnapiOperationIndex, 2);
 
     auto outputNode =
         std::make_shared<ngraph::opset3::ReduceProd>(input, reduction_axes, keep_dims);

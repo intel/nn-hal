@@ -504,10 +504,10 @@ bool NnapiModelInfo::isOmittedInput(int operationIndex, uint32_t index) {
 template int NnapiModelInfo::GetConstOperand<int>(unsigned int);
 template unsigned int NnapiModelInfo::GetConstOperand<unsigned int>(unsigned int);
 template float NnapiModelInfo::GetConstOperand<float>(unsigned int);
-template bool NnapiModelInfo::GetConstOperand<bool>(unsigned int);
+template uint8_t NnapiModelInfo::GetConstOperand<uint8_t>(unsigned int);
 template int NnapiModelInfo::GetConstFromBuffer<int>(unsigned char const*, unsigned int);
 template float NnapiModelInfo::GetConstFromBuffer<float>(unsigned char const*, unsigned int);
-template bool NnapiModelInfo::GetConstFromBuffer<bool>(unsigned char const*, unsigned int);
+template uint8_t NnapiModelInfo::GetConstFromBuffer<uint8_t>(unsigned char const*, unsigned int);
 }  // namespace nnhal
 }  // namespace neuralnetworks
 }  // namespace hardware

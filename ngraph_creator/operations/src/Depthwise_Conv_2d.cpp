@@ -112,7 +112,7 @@ std::shared_ptr<ngraph::Node> Depthwise_Conv_2d::createNode() {
             sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 13);
 
         activationFn = sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 10);
-        layout = sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 11);
+        layout = sModelInfo->ParseOperationInput<uint8_t>(mNnapiOperationIndex, 11);
 
         if (layout) useNchw = true;
 
@@ -132,7 +132,7 @@ std::shared_ptr<ngraph::Node> Depthwise_Conv_2d::createNode() {
             sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 10);
 
         activationFn = sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 7);
-        layout = sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 8);
+        layout = sModelInfo->ParseOperationInput<uint8_t>(mNnapiOperationIndex, 8);
 
         if (layout) useNchw = true;
 
