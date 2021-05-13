@@ -1,5 +1,3 @@
-#define LOG_TAG "CpuPreparedModel"
-
 #include "CpuPreparedModel.h"
 #include <android-base/logging.h>
 #include <android/log.h>
@@ -9,6 +7,8 @@
 #include "ExecutionBurstServer.h"
 #include "ValidateHal.h"
 #include "utils.h"
+
+#define LOG_TAG "CpuPreparedModel"
 
 using namespace android::nn;
 
@@ -39,11 +39,16 @@ bool CpuPreparedModel::initialize(const Model& model) {
         ALOGE("%s ngraph generation failed", __func__);
         return false;
     }
-    auto ngraph_net = std::make_shared<InferenceEngine::CNNNetwork>(ngraph_function);
-    ngraph_net->serialize("/data/vendor/neuralnetworks/ngraph_ir.xml",
-                          "/data/vendor/neuralnetworks/ngraph_ir.bin");
-    mPlugin = std::make_shared<IENetwork>(ngraph_net);
-    mPlugin->loadNetwork();
+    try {
+        auto ngraph_net = std::make_shared<InferenceEngine::CNNNetwork>(ngraph_function);
+        ngraph_net->serialize("/data/vendor/neuralnetworks/ngraph_ir.xml",
+                              "/data/vendor/neuralnetworks/ngraph_ir.bin");
+        mPlugin = std::make_shared<IENetwork>(ngraph_net);
+        mPlugin->loadNetwork();
+    } catch (const std::exception& ex) {
+        ALOGE("%s Exception !!! %s", __func__, ex.what());
+        return false;
+    }
 
     ALOGV("Exiting %s", __func__);
     return true;
