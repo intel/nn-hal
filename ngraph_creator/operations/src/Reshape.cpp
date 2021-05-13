@@ -21,6 +21,12 @@ bool Reshape::validate() {
     if (!checkInputOperandType(1, (int32_t)OperandType::TENSOR_INT32)) {
         return false;
     }
+    const auto& dimsOperandIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 1);
+    if (!sModelInfo->isOperandLifeTimeConst(dimsOperandIndex)) {
+        // TODO: Support CPU_reshape_all_tensors_as_inputs
+        ALOGE("%s Only Constant dimensions supported now", __func__);
+        return false;
+    }
     ALOGV("%s PASSED", __func__);
     return true;
 }
