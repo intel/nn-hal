@@ -50,6 +50,12 @@ protected:
         } else
             return mNgraphNodes->getOperationOutput(operandIndex).get_node_shared_ptr();
     }
+    // remove null input node parameter
+    void removeInputNode(uint32_t inputIndex) {
+        auto operandIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, inputIndex);
+        auto nodeName = mNgraphNodes->getNodeName(operandIndex);
+        mNgraphNodes->removeInputParameter(nodeName, operandIndex);
+    }
 
 public:
     static std::shared_ptr<NnapiModelInfo> sModelInfo;
