@@ -1,0 +1,208 @@
+import("//common-mk/pkg_config.gni")
+
+group("all") {
+    deps = [
+        ":vendor-nn-hal",
+        ":intel_nnhal",
+    ]
+}
+
+shared_library("vendor-nn-hal") {
+  configs += [
+    ":target_defaults",
+  ]
+  deps = [
+    ":intel_nnhal",
+  ]
+  libs = [
+    "pthread",
+    "rt",
+    "tensorflowlite",
+    "textclassifier",
+  ]
+}
+
+config("target_defaults") {
+    cflags = [
+        "-Wall",
+        "-Wno-error",
+        "-Wextra",
+        "-Wno-unuse",
+    ]
+    cflags_cc = [
+        "-std=c++17",
+        "-Wno-inconsistent-missing-override",
+    ]
+    ldflags = [
+        "-Wl,--no-as-needed",
+        "-Wl,--no-undefined",
+    ]
+    include_dirs = [
+        "${sysroot}/usr/include/aosp",
+        "${sysroot}/usr/include/aosp/frameworks/ml",
+        "${sysroot}/usr/include/aosp/frameworks/ml/nn/common/include",
+        "${sysroot}/usr/include/aosp/frameworks/ml/nn/runtime/include",
+        "${sysroot}/usr/include/aosp/frameworks/ml/nn/driver/cache",
+    ]
+}
+
+shared_library("intel_nnhal") {
+  configs += [
+    ":target_defaults",
+    "//common-mk:visibility_default",
+  ]
+  cflags_cc = [
+    "-Wno-unused-variable",
+    "-Wno-unused-parameter",
+    "-Wno-non-virtual-dtor",
+    "-Wno-missing-field-initializers",
+    "-Wno-extern-c-compat",
+    "-Wno-unused-local-typedef",
+    "-Wno-unused-private-field",
+    "-Wno-invalid-partial-specialization",
+    "-Wno-array-bounds",
+    "-D_FORTIFY_SOURCE=2",
+    "-fexceptions",
+    "-fvisibility=default",
+    "-DIMPLEMENT_INFERENCE_ENGINE_API",
+  ]
+  deps=[
+    ":pugixml"
+  ]
+  sources = [
+    "ngraph_creator/src/OperationsFactory.cpp",
+    "ngraph_creator/src/NgraphNetworkCreator.cpp",
+    "ngraph_creator/src/NgraphNodes.cpp",
+    "ngraph_creator/operations/src/Abs.cpp",
+    "ngraph_creator/operations/src/Add.cpp",
+    "ngraph_creator/operations/src/Cast.cpp",
+    "ngraph_creator/operations/src/Concat.cpp",
+    "ngraph_creator/operations/src/Conv_2d.cpp",
+    "ngraph_creator/operations/src/Depthwise_Conv_2d.cpp",
+    "ngraph_creator/operations/src/Div.cpp",
+    "ngraph_creator/operations/src/Equal.cpp",
+    "ngraph_creator/operations/src/Exp.cpp",
+    "ngraph_creator/operations/src/Floor.cpp",
+    "ngraph_creator/operations/src/Gather.cpp",
+    "ngraph_creator/operations/src/Greater_Equal.cpp",
+    "ngraph_creator/operations/src/Greater.cpp",
+    "ngraph_creator/operations/src/Less_Equal.cpp",
+    "ngraph_creator/operations/src/Less.cpp",
+    "ngraph_creator/operations/src/Log.cpp",
+    "ngraph_creator/operations/src/Logical_And.cpp",
+    "ngraph_creator/operations/src/Logical_Not.cpp",
+    "ngraph_creator/operations/src/Logical_Or.cpp",
+    "ngraph_creator/operations/src/Logistic.cpp",
+    "ngraph_creator/operations/src/LSTM.cpp",
+    "ngraph_creator/operations/src/Maximum.cpp",
+    "ngraph_creator/operations/src/Mean.cpp",
+    "ngraph_creator/operations/src/Minimum.cpp",
+    "ngraph_creator/operations/src/Mul.cpp",
+    "ngraph_creator/operations/src/Neg.cpp",
+    "ngraph_creator/operations/src/Not_Equal.cpp",
+    "ngraph_creator/operations/src/OperationsBase.cpp",
+    "ngraph_creator/operations/src/Pow.cpp",
+    "ngraph_creator/operations/src/Reduce_All.cpp",
+    "ngraph_creator/operations/src/Reduce_Any.cpp",
+    "ngraph_creator/operations/src/Reduce_Min.cpp",
+    "ngraph_creator/operations/src/Reduce_Prod.cpp",
+    "ngraph_creator/operations/src/Relu.cpp",
+    "ngraph_creator/operations/src/Relu1.cpp",
+    "ngraph_creator/operations/src/Relu6.cpp",
+    "ngraph_creator/operations/src/Reshape.cpp",
+    "ngraph_creator/operations/src/Sin.cpp",
+    "ngraph_creator/operations/src/Softmax.cpp",
+    "ngraph_creator/operations/src/Split.cpp",
+    "ngraph_creator/operations/src/SQRT.cpp",
+    "ngraph_creator/operations/src/Squeeze.cpp",
+    "ngraph_creator/operations/src/Sub.cpp",
+    "ngraph_creator/operations/src/Tanh.cpp",
+    "ngraph_creator/operations/src/Transpose.cpp",
+    "service.cpp",
+    "Driver.cpp",
+    "gna/GnaPreparedModel.cpp",
+    "utils.cpp",
+    "IENetwork.cpp",
+    "ModelManager.cpp",
+    "cpu/CpuPreparedModel.cpp",
+    "BasePreparedModel.cpp",
+  ]
+
+  include_dirs = [
+    "./",
+    "ngraph_creator/include",
+    "ngraph_creator/operations/include",
+    "cpu",
+    "gna",
+    "intel_nn_hal",
+    "intel_nn_hal/graphAPI",
+    "intel_nn_hal/graphAPI/builderLayerNorm",
+    "intel_nn_hal/dl",
+    "../intel-openvino-dev/inference-engine/src/inference_engine",
+    "../intel-openvino-dev/inference-engine/thirdparty/pugixml/src",
+    "../intel-openvino-dev/inference-engine/include",
+    "../intel-openvino-dev/inference-engine/include/cpp",
+    "../intel-openvino-dev/inference-engine/include/details",
+    "../intel-openvino-dev/inference-engine/include/details/os",
+    "../intel-openvino-dev/inference-engine/include/cldnn",
+    "../intel-openvino-dev/inference-engine/include/gna",
+    "../intel-openvino-dev/inference-engine/include/hetero",
+    "../intel-openvino-dev/inference-engine/include/mkldnn",
+    "../intel-openvino-dev/inference-engine/include/openvx",
+    "../intel-openvino-dev/inference-engine/include/vpu",
+    "../intel-openvino-dev/inference-engine/src/inference_engine",
+    "../intel-openvino-dev/inference-engine/src/dumper",
+    "../intel-openvino-dev/inference-engine/src/inference_engine/cpp_interfaces",
+    "../intel-openvino-dev/inference-engine/src/inference_engine/cpp_interfaces/base",
+    "../intel-openvino-dev/inference-engine/src/inference_engine/cpp_interfaces/impl",
+    "../intel-openvino-dev/inference-engine/src/inference_engine/cpp_interfaces/interface",
+    "../intel-openvino-dev/inference-engine/thirdparty/pugixml/src/",
+    "../intel-openvino-dev/ngraph/core/include",
+  ]
+  libs = [
+    "pthread",
+    "rt",
+    "nnapi-support",
+    "ngraph",
+    #"inference_engine_legacy", 
+    #"inference_engine_c_api",
+    #"inference_engine_preproc",
+    "inference_engine",
+    "nn-common", 
+    "ssl",
+    "crypto"
+  ]
+  lib_dirs = [
+    "${sysroot}/usr/local/deployment_tools/inference_engine/lib/intel64/",
+    "${sysroot}/usr/local/deployment_tools/ngraph/lib64/",
+    "${sysroot}/usr/local/lib64"
+  ]
+}
+
+static_library("pugixml") {
+  configs += [
+    ":target_defaults",
+    "//common-mk:pic",
+  ]
+  cflags_cc = [
+    "-Wno-unused-variable",
+    "-Wno-unused-parameter",
+    "-Wno-non-virtual-dtor",
+    "-Wno-missing-field-initializers",
+    "-Wno-extern-c-compat",
+    "-Wno-unused-local-typedef",
+    "-Wno-unused-private-field",
+    "-Wno-invalid-partial-specialization",
+    "-Wno-array-bounds",
+    "-D_FORTIFY_SOURCE=2",
+    "-fexceptions",
+    "-fvisibility=default",
+    "-DIMPLEMENT_INFERENCE_ENGINE_API",
+  ]
+  sources = [
+    "../intel-openvino-dev/inference-engine/thirdparty/pugixml/src/pugixml.cpp"
+  ]
+  include_dirs = [
+   "../intel-openvino-dev/inference-engine/thirdparty/pugixml/src",
+  ]
+}

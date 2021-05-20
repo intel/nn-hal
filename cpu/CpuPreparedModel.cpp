@@ -41,8 +41,13 @@ bool CpuPreparedModel::initialize(const Model& model) {
     }
     try {
         auto ngraph_net = std::make_shared<InferenceEngine::CNNNetwork>(ngraph_function);
+#if __ANDROID__
         ngraph_net->serialize("/data/vendor/neuralnetworks/ngraph_ir.xml",
                               "/data/vendor/neuralnetworks/ngraph_ir.bin");
+#else
+        ngraph_net->serialize("/tmp/ngraph_ir.xml",
+                              "/tmp/ngraph_ir.bin");
+#endif
         mPlugin = std::make_shared<IENetwork>(ngraph_net);
         mPlugin->loadNetwork();
     } catch (const std::exception& ex) {

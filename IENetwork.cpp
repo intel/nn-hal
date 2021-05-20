@@ -15,7 +15,11 @@ namespace nnhal {
 bool IENetwork::loadNetwork() {
     ALOGD("%s", __func__);
 
+#if __ANDROID__
     InferenceEngine::Core ie(std::string("/vendor/etc/openvino/plugins.xml"));
+#else
+    InferenceEngine::Core ie(std::string("/usr/local/lib64/plugins.xml"));
+#endif
     std::map<std::string, std::string> config;
 
     if (mNetwork) {

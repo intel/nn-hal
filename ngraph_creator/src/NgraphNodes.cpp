@@ -29,7 +29,7 @@ bool NgraphNodes::isForcedNchw(size_t index) { return mForcedNchw[index]; }
 void NgraphNodes::setForcedNchw(size_t index, bool flag) { mForcedNchw[index] = flag; }
 
 void NgraphNodes::setResultNode(size_t outputIndex, std::shared_ptr<ngraph::Node> resultNode) {
-    ALOGD("setResultNode %d", outputIndex);
+    ALOGD("setResultNode %uz", outputIndex);
     mResultNodes.push_back(resultNode);
 }
 
