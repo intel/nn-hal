@@ -20,7 +20,6 @@
 #include <android/hardware/neuralnetworks/1.2/IPreparedModel.h>
 #include <android/hardware/neuralnetworks/1.2/types.h>
 #include <android/hidl/memory/1.0/IMemory.h>
-#include <hardware/hardware.h>
 #include <hidlmemory/mapping.h>
 #include <sys/mman.h>
 #include <fstream>
@@ -31,6 +30,10 @@
 #include "IENetwork.h"
 #include "ModelManager.h"
 #include "utils.h"
+
+#if __ANDROID__
+#include <hardware/hardware.h>
+#endif
 
 using ::android::hardware::MQDescriptorSync;
 using ::android::hidl::memory::V1_0::IMemory;

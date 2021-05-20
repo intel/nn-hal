@@ -19,11 +19,9 @@
 #include <android-base/logging.h>
 #include <android/hidl/memory/1.0/IMemory.h>
 #include <android/log.h>
-#include <hardware/hardware.h>
 #include <hidlmemory/mapping.h>
 #include <log/log.h>
 #include <sys/mman.h>
-
 #include <sys/stat.h>
 #include <fstream>
 #include "Driver.h"
@@ -31,6 +29,11 @@
 // May be move these out of utils??
 #include "ie_blob.h"
 #include "ie_common.h"
+
+#if __ANDROID__
+#include <hardware/hardware.h>
+#endif
+
 
 // unsigned int debugMask = ((1 << (L1 + 1)) - 1);
 
@@ -82,7 +85,7 @@ enum PaddingScheme {
 };
 
 // inline unsigned int debugMask = ((1 << (L1 + 1)) - 1);
-
+//#define NN_DEBUG
 #ifdef NN_DEBUG
 #define VLOG(l, x, ...)                                                          \
     do {                                                                         \

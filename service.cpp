@@ -16,11 +16,12 @@
 
 #define LOG_TAG "neuralnetworks-hal-service"
 
-#include <hidl/HidlTransportSupport.h>
-#include <hidl/LegacySupport.h>
-
 #include "Driver.h"
 #define MAX_LENGTH (255)
+
+#if __ANDROID__
+#include <hidl/HidlTransportSupport.h>
+#include <hidl/LegacySupport.h>
 
 using android::hardware::configureRpcThreadpool;
 using android::hardware::joinRpcThreadpool;
@@ -41,3 +42,17 @@ int main(int argc, char* argv[]) {
 
     return 0;
 }
+#else
+// This registers the SampleDriverFull into the DeviceManager.
+namespace android {
+namespace hardware {
+namespace neuralnetworks {
+
+::android::sp<V1_0::IDevice> V1_0::IDevice::getService(const std::string& serviceName, bool dummy) {
+    return new nnhal::Driver("CPU");
+}
+
+}
+}
+}
+#endif
