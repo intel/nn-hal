@@ -669,7 +669,7 @@ void GnaPreparedModel::deinitialize() {
 }
 
 #ifdef PERF_COUNTERS
-#ifdef __AVX2__
+#ifdef __AVX512__
 bool quantizeToQuant8Signed(const float* inputData, int8_t* outputData, const Shape& outputShape,
                             metrics& runtime_metrics) {
     auto start = now();
@@ -783,7 +783,7 @@ bool deQuantize(const T* inputData, const uint32_t& len, const float scale,
       return true;
 }
 
-#ifdef __AVX2__
+#ifdef __AVX512__
 template <>
 bool deQuantize(const int8_t* inputData, const uint32_t& len, const float scale,
                 const int32_t zeroPoint, float* outputData, metrics& runtime_metrics) {
@@ -834,7 +834,7 @@ bool deQuantize(const uint16_t* inputData, const uint32_t& len, const float scal
 
 
 #else
-#ifdef __AVX2__
+#ifdef __AVX512__
 bool quantizeToQuant8Signed(const float* inputData, int8_t* outputData, const Shape& outputShape
                             ) {
     uint32_t len = getNumberOfElements(outputShape.dimensions);
@@ -935,7 +935,7 @@ bool deQuantize(const T* inputData, const uint32_t& len, const float scale,
     return true;
 }
 
-#ifdef __AVX2__
+#ifdef __AVX512__
 template <>
 bool deQuantize(const int8_t* inputData, const uint32_t& len, const float scale,
                 const int32_t zeroPoint, float* outputData) {
