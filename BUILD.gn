@@ -64,10 +64,6 @@ shared_library("intel_nnhal") {
     "-fvisibility=default",
     "-DIMPLEMENT_INFERENCE_ENGINE_API",
     "-msse4.2",
-    "-mavx512f",
-    "-march=tigerlake",
-    "-mavx512vl",
-    "-mavx512bw",
     "-march=native",
   ]
   deps=[
