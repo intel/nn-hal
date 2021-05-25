@@ -21,6 +21,7 @@
 #include <Logical_Not.hpp>
 #include <Logical_Or.hpp>
 #include <Logistic.hpp>
+#include <Max_Pool_2d.hpp>
 #include <Maximum.hpp>
 #include <Mean.hpp>
 #include <Minimum.hpp>

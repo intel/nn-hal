@@ -32,6 +32,7 @@ cc_library_static {
         "operations/src/Logical_Or.cpp",
         "operations/src/Logistic.cpp",
         "operations/src/Maximum.cpp",
+        "operations/src/Max_Pool_2d.cpp",
         "operations/src/Mean.cpp",
         "operations/src/Minimum.cpp",
         "operations/src/Mul.cpp",
