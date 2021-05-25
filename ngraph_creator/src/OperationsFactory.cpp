@@ -65,6 +65,8 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<Logistic>(operationIndex);
         case OperationType::MAXIMUM:
             return std::make_shared<Maximum>(operationIndex);
+        case OperationType::MAX_POOL_2D:
+            return std::make_shared<Max_Pool_2d>(operationIndex);
         case OperationType::MEAN:
             return std::make_shared<Mean>(operationIndex);
         case OperationType::MINIMUM:
