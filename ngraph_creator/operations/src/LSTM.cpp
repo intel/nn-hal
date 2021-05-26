@@ -343,16 +343,32 @@ std::shared_ptr<ngraph::Node> LSTM::createNode() {
                                              std::vector<float>(shape_size(f_t->get_shape()), 1.f)),
                 f_t);
 
+        // TODO: Implement proper scratchBuffer
+        // Creating a dummy scratchBuffer with same size as i_t, initialized to 0.0f
+        // and then multiplying with i_t so that it gets connected to the graph
+        // Then it's concat'ed on axis 1 to make that dim 3x
         scratchBuffer = std::make_shared<ngraph::opset3::Constant>(
-            inputNode->get_element_type(), ngraph::Shape{1, 3 * output_size},
-            std::vector<float>{0.f});
+            inputNode->get_element_type(), i_t->get_shape(), std::vector<float>{0.f});
+        scratchBuffer = std::make_shared<ngraph::opset3::Multiply>(
+            scratchBuffer, i_t, ngraph::op::AutoBroadcastType::NUMPY);
+        std::vector<ngraph::Output<ngraph::Node>> inputs;
+        for (int i = 0; i < 3; i++) inputs.push_back(scratchBuffer);
+        scratchBuffer = std::make_shared<ngraph::opset3::Concat>(inputs, 1);
     } else {
         // f(Xt*(Wi^T) + Ht-1*(Ri^T) + Pi (.) Ct-1 + Wbi + Rbi)
         i_t = applyActivation(clip(i_t, cell_state_clipping), ACTIVATION_FUNCTION_SIGMOID);
 
+        // TODO: Implement proper scratchBuffer
+        // Creating a dummy scratchBuffer with same size as i_t, initialized to 0.0f
+        // and then multiplying with i_t so that it gets connected to the graph
+        // Then it's concat'ed on axis 1 to make that dim 4x
         scratchBuffer = std::make_shared<ngraph::opset3::Constant>(
-            inputNode->get_element_type(), ngraph::Shape{1, 4 * output_size},
-            std::vector<float>{0.f});
+            inputNode->get_element_type(), i_t->get_shape(), std::vector<float>{0.f});
+        scratchBuffer = std::make_shared<ngraph::opset3::Multiply>(
+            scratchBuffer, i_t, ngraph::op::AutoBroadcastType::NUMPY);
+        std::vector<ngraph::Output<ngraph::Node>> inputs;
+        for (int i = 0; i < 4; i++) inputs.push_back(scratchBuffer);
+        scratchBuffer = std::make_shared<ngraph::opset3::Concat>(inputs, 1);
     }
 
     // ft (.) Ct-1 + it (.) ct
@@ -384,14 +400,10 @@ std::shared_ptr<ngraph::Node> LSTM::createNode() {
     // eleminating scratchBuffer, otherwise its crashing loadNetwork()
     for (int i = 0; i < 4; i++) {
         auto outputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, i);
-        if (i == 0)
-            mNgraphNodes->setInvalidNode(outputIndex);
-        else {
-            mNgraphNodes->setOutputAtOperandIndex(outputIndex, LstmOutputs[i]);
-            const auto op = sModelInfo->getOperand(outputIndex);
-            if (op.lifetime == OperandLifeTime::MODEL_OUTPUT) {
-                addResultNode(outputIndex, LstmOutputs[i]);
-            }
+        mNgraphNodes->setOutputAtOperandIndex(outputIndex, LstmOutputs[i]);
+        const auto op = sModelInfo->getOperand(outputIndex);
+        if (op.lifetime == OperandLifeTime::MODEL_OUTPUT) {
+            addResultNode(outputIndex, LstmOutputs[i]);
         }
     }
     return scratchBuffer;
