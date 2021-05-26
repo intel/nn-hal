@@ -20,7 +20,8 @@ NgraphNetworkCreator::NgraphNetworkCreator(std::shared_ptr<NnapiModelInfo> model
         auto operationNode = mOpFactoryInstance.getOperation(index, nnapiOperationType);
         if (operationNode == nullptr) {
             ALOGV("%s Unsupported Operation type %d", __func__, nnapiOperationType);
-        }
+        } else
+            operationNode->mNgraphNodes = mNgraphNodes;
         mOperationNodes[index] = operationNode;
     }
     ALOGV("%s Constructed", __func__);

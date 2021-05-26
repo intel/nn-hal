@@ -11,13 +11,9 @@ OperationsFactory::OperationsFactory(const std::string& plugin,
                                      std::shared_ptr<NgraphNodes> nodes) {
     OperationsBase::sPluginType = plugin;
     OperationsBase::sModelInfo = modelInfo;
-    OperationsBase::mNgraphNodes = nodes;
     ALOGV("%s Constructed", __func__);
 }
-OperationsFactory::~OperationsFactory() {
-    OperationsBase::mNgraphNodes.reset();
-    ALOGV("%s Destructed & reset", __func__);
-}
+OperationsFactory::~OperationsFactory() { ALOGV("%s Destructed", __func__); }
 std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
     int operationIndex, const OperationType& operationType) {
     switch (operationType) {

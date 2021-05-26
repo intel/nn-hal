@@ -59,8 +59,8 @@ protected:
 
 public:
     static std::shared_ptr<NnapiModelInfo> sModelInfo;
-    static std::shared_ptr<NgraphNodes> mNgraphNodes;
     static std::string sPluginType;
+    std::shared_ptr<NgraphNodes> mNgraphNodes;
     OperationsBase(int operationIndex);
     void setNgraphNodes(std::shared_ptr<NgraphNodes> nodes);
     virtual bool validate();
