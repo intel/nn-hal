@@ -52,7 +52,7 @@ namespace neuralnetworks {
     return new nnhal::Driver("CPU");
 }
 
-}
-}
-}
+}  // namespace neuralnetworks
+}  // namespace hardware
+}  // namespace android
 #endif
