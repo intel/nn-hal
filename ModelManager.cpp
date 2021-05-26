@@ -7,6 +7,23 @@ namespace hardware {
 namespace neuralnetworks {
 namespace nnhal {
 
+bool NnapiModelInfo::updateOutputshapes(size_t outputIndex, std::vector<size_t>& outputDims,
+                                        bool isLengthSufficient) {
+    auto& outputShapeDims = mOutputShapes[outputIndex].dimensions;
+    mOutputShapes[outputIndex].isSufficient = isLengthSufficient;
+    if (outputDims.size() < outputShapeDims.size()) {
+        ALOGE("%s Output size mismatch at index(%d)", __func__, outputIndex);
+        return false;
+    }
+    for (int i = 0; i < outputShapeDims.size(); i++) {
+        if (outputShapeDims[i] != outputDims[i]) {
+            ALOGD("%s Updating dim(%d) at Output index(%d)", __func__, i, outputIndex);
+            outputShapeDims[i] = outputDims[i];
+        }
+    }
+    return true;
+}
+
 bool NnapiModelInfo::initializeRunTimeOperandInfo() {
     // initialize runtime operand info from model.
     const size_t count = mModel.operands.size();
@@ -465,7 +482,8 @@ Blob::Ptr NnapiModelInfo::getBlobFromMemoryPoolIn(const Request& request, uint32
                                  operand.length);
 }
 
-void* NnapiModelInfo::getBlobFromMemoryPoolOut(const Request& request, uint32_t index) {
+void* NnapiModelInfo::getBlobFromMemoryPoolOut(const Request& request, uint32_t index,
+                                               uint32_t& rBufferLength) {
     RunTimeOperandInfo& operand = mOperands[mModel.outputIndexes[index]];
     const V1_0::RequestArgument& arg = request.outputs[index];
     auto poolIndex = arg.location.poolIndex;
@@ -485,6 +503,7 @@ void* NnapiModelInfo::getBlobFromMemoryPoolOut(const Request& request, uint32_t 
 
     operand.buffer = r.buffer + arg.location.offset;
     operand.length = arg.location.length;
+    rBufferLength = operand.length;
     ALOGI("%s Operand length:%d pointer:%p", __func__, operand.length,
           (r.buffer + arg.location.offset));
     return (r.buffer + arg.location.offset);

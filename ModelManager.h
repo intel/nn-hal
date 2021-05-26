@@ -159,7 +159,7 @@ public:
     T GetConstFromBuffer(const uint8_t* buf, uint32_t len);
 
     Blob::Ptr getBlobFromMemoryPoolIn(const Request& request, uint32_t index);
-    void* getBlobFromMemoryPoolOut(const Request& request, uint32_t index);
+    void* getBlobFromMemoryPoolOut(const Request& request, uint32_t index, uint32_t& rBufferLength);
 
     Model getModel() { return mModel; }
 
@@ -182,6 +182,8 @@ public:
     }
 
     bool isOmittedInput(int operationIndex, uint32_t index);
+    bool updateOutputshapes(size_t outputIndex, std::vector<size_t>& outputShape,
+                            bool isLengthSufficient = true);
 
 private:
     bool initializeRunTimeOperandInfo();
