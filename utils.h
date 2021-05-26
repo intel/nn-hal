@@ -34,7 +34,6 @@
 #include <hardware/hardware.h>
 #endif
 
-
 // unsigned int debugMask = ((1 << (L1 + 1)) - 1);
 
 // extern unsigned int debugMask  = ((1 << (L1 + 1)) - 1);
