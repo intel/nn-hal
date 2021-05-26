@@ -6,7 +6,6 @@ namespace neuralnetworks {
 namespace nnhal {
 
 std::string OperationsBase::sPluginType;
-std::shared_ptr<NgraphNodes> OperationsBase::mNgraphNodes;
 std::shared_ptr<NnapiModelInfo> OperationsBase::sModelInfo;
 
 std::shared_ptr<ngraph::Node> OperationsBase::transpose(ConversionType type,
