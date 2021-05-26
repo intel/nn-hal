@@ -137,8 +137,6 @@ void asyncExecute(const Request& request, MeasureTiming measure, BasePreparedMod
     for (size_t i = 0; i < request.outputs.size(); i++) {
         auto outIndex = modelInfo->getModelOutputIndex(i);
         ALOGI("OutputIndex: %d", outIndex);
-        void* destPtr = modelInfo->getBlobFromMemoryPoolOut(request, i);
-
         const std::string& outputNodeName = ngraphNw->getNodeName(outIndex);
         if (outputNodeName == "") {
             ALOGD("Ignorning output at index(%d), since it is invalid", outIndex);
@@ -147,6 +145,22 @@ void asyncExecute(const Request& request, MeasureTiming measure, BasePreparedMod
         ALOGD("Output index: %d layername : %s", outIndex, outputNodeName.c_str());
         auto srcBlob = plugin->getBlob(outputNodeName);
         auto operandType = modelInfo->getOperandType(outIndex);
+        uint32_t expectedLength = srcBlob->byteSize();
+        uint32_t rActualLength = 0;
+        void* destPtr = modelInfo->getBlobFromMemoryPoolOut(request, i, rActualLength);
+        auto outDims = srcBlob->getTensorDesc().getDims();
+        if (operandType == OperandType::TENSOR_BOOL8)
+            expectedLength /= 4;  // 8bit expected instead of 32bit
+        if (rActualLength != expectedLength) {
+            ALOGE("%s Invalid length(%d) at outIndex(%d)", __func__, rActualLength, outIndex);
+            // Notify Insufficient Buffer Length to modelInfo
+            modelInfo->updateOutputshapes(i, outDims, false);
+            notify(callback, ErrorStatus::OUTPUT_INSUFFICIENT_SIZE, modelInfo->getOutputShapes(),
+                   kNoTiming);
+            return;
+        } else {
+            modelInfo->updateOutputshapes(i, outDims);
+        }
         switch (operandType) {
             case OperandType::TENSOR_INT32:
             case OperandType::TENSOR_FLOAT32: {
@@ -225,8 +239,6 @@ static std::tuple<ErrorStatus, hidl_vec<V1_2::OutputShape>, Timing> executeSynch
     for (size_t i = 0; i < request.outputs.size(); i++) {
         auto outIndex = modelInfo->getModelOutputIndex(i);
         ALOGI("OutputIndex: %d", outIndex);
-        void* destPtr = modelInfo->getBlobFromMemoryPoolOut(request, i);
-
         const std::string& outputNodeName = ngraphNw->getNodeName(outIndex);
         if (outputNodeName == "") {
             ALOGD("Ignorning output at index(%d), since it is invalid", outIndex);
@@ -235,6 +247,19 @@ static std::tuple<ErrorStatus, hidl_vec<V1_2::OutputShape>, Timing> executeSynch
         ALOGD("Output index: %d layername : %s", outIndex, outputNodeName.c_str());
         auto srcBlob = plugin->getBlob(outputNodeName);
         auto operandType = modelInfo->getOperandType(outIndex);
+        uint32_t expectedLength = srcBlob->byteSize();
+        uint32_t rActualLength = 0;
+        void* destPtr = modelInfo->getBlobFromMemoryPoolOut(request, i, rActualLength);
+        auto outDims = srcBlob->getTensorDesc().getDims();
+        if (operandType == OperandType::TENSOR_BOOL8)
+            expectedLength /= 4;  // 8bit expected instead of 32bit
+        if (rActualLength != expectedLength) {
+            ALOGE("%s Invalid length(%d) at outIndex(%d)", __func__, rActualLength, outIndex);
+            // Notify Insufficient Buffer Length to modelInfo
+            modelInfo->updateOutputshapes(i, outDims, false);
+            return {ErrorStatus::OUTPUT_INSUFFICIENT_SIZE, modelInfo->getOutputShapes(), kNoTiming};
+        } else
+            modelInfo->updateOutputshapes(i, outDims);
         switch (operandType) {
             case OperandType::TENSOR_INT32:
             case OperandType::TENSOR_FLOAT32: {
