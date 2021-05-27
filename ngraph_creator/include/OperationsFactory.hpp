@@ -2,6 +2,7 @@
 
 #include <Abs.hpp>
 #include <Add.hpp>
+#include <Average_Pool_2D.hpp>
 #include <Cast.hpp>
 #include <Concat.hpp>
 #include <Conv_2d.hpp>

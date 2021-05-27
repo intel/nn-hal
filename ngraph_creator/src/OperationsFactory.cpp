@@ -21,6 +21,8 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<Abs>(operationIndex);
         case OperationType::ADD:
             return std::make_shared<Add>(operationIndex);
+        case OperationType::AVERAGE_POOL_2D:
+            return std::make_shared<Average_Pool_2D>(operationIndex);
         case OperationType::CAST:
             return std::make_shared<Cast>(operationIndex);
         case OperationType::CONCATENATION:
