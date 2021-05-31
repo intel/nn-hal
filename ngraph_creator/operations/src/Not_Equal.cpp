@@ -18,12 +18,14 @@ bool Not_Equal::validate() {
     // Check all input types
     if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
         !checkInputOperandType(0, (int32_t)OperandType::TENSOR_INT32) &&
-        !checkInputOperandType(0, (int32_t)OperandType::TENSOR_BOOL8)) {
+        !checkInputOperandType(0, (int32_t)OperandType::TENSOR_BOOL8) &&
+        !checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
         return false;
     }
     if (!checkInputOperandType(1, (int32_t)OperandType::TENSOR_FLOAT32) &&
         !checkInputOperandType(1, (int32_t)OperandType::TENSOR_INT32) &&
-        !checkInputOperandType(1, (int32_t)OperandType::TENSOR_BOOL8)) {
+        !checkInputOperandType(1, (int32_t)OperandType::TENSOR_BOOL8) &&
+        !checkInputOperandType(1, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
         return false;
     }
 
@@ -37,20 +39,29 @@ std::shared_ptr<ngraph::Node> Not_Equal::createNode() {
     if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) {
         input1 = getInputNode<float>(0);
         input2 = getInputNode<float>(1);
-    }
-
-    if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_INT32)) {
+    } else if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_INT32)) {
         input1 = getInputNode<int>(0);
         input2 = getInputNode<int>(1);
+    } else if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_BOOL8)) {
+        input1 = getInputNode<uint8_t>(0);
+        input2 = getInputNode<uint8_t>(1);
+    } else if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
+        input1 = getInputNode<uint8_t>(0);
+        input2 = getInputNode<uint8_t>(1);
+        const auto& input1Index = sModelInfo->getOperationInput(mNnapiOperationIndex, 0);
+        const auto& input2Index = sModelInfo->getOperationInput(mNnapiOperationIndex, 1);
+        input1 = DequantizeNode(input1, input1Index, ngraph::element::f32);
+        input2 = DequantizeNode(input2, input2Index, ngraph::element::f32);
     }
+    std::shared_ptr<ngraph::Node> outputNode;
 
-    if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_BOOL8)) {
-        input1 = getInputNode<bool>(0);
-        input2 = getInputNode<bool>(1);
+    outputNode = std::make_shared<ngraph::opset3::NotEqual>(input1, input2,
+                                                            ngraph::op::AutoBroadcastType::NUMPY);
+
+    if (checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
+        const auto& outputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
+        outputNode = QuantizeNode(outputNode, outputIndex, ngraph::element::u8);
     }
-
-    auto outputNode = std::make_shared<ngraph::opset3::NotEqual>(
-        input1, input2, ngraph::op::AutoBroadcastType::NUMPY);
 
     const auto op = sModelInfo->getOperand(mDefaultOutputIndex);
     if (op.lifetime == OperandLifeTime::MODEL_OUTPUT) {
