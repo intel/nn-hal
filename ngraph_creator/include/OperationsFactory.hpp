@@ -30,6 +30,7 @@
 #include <Neg.hpp>
 #include <Not_Equal.hpp>
 #include <Pow.hpp>
+#include <Quantize.hpp>
 #include <Reduce_All.hpp>
 #include <Reduce_Any.hpp>
 #include <Reduce_Min.hpp>

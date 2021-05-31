@@ -95,6 +95,16 @@ public:
 
     size_t getOperandsSize() { return mModel.operands.size(); }
 
+    const float getOperandScale(int index) {
+        auto operand = getOperand(index);
+        return operand.scale;
+    }
+
+    const int32_t getOperandZeroPoint(int index) {
+        auto operand = getOperand(index);
+        return operand.zeroPoint;
+    }
+
     RunTimeOperandInfo& getRuntimeOperand(uint32_t index) {
         return mOperands[mModel.inputIndexes[index]];
     }
