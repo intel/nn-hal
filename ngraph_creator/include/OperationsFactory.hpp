@@ -7,6 +7,7 @@
 #include <Concat.hpp>
 #include <Conv_2d.hpp>
 #include <Depthwise_Conv_2d.hpp>
+#include <Dequantize.hpp>
 #include <Div.hpp>
 #include <Equal.hpp>
 #include <Exp.hpp>
