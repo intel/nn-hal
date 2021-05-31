@@ -64,7 +64,8 @@ bool NnapiModelInfo::initializeRunTimeOperandInfo() {
                 to.type = from.type;
                 break;
             case OperandType::TENSOR_QUANT8_ASYMM:
-                ALOGE("OperandType::TENSOR_QUANT8_ASYMM is not supported");
+            case OperandType::TENSOR_QUANT8_SYMM:
+                to.type = from.type;
                 break;
             default:
                 ALOGE("wrong operand type %d", from.type);
@@ -263,6 +264,36 @@ Blob::Ptr NnapiModelInfo::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const ui
         } else {
             InferenceEngine::TBlob<uint8_t>::Ptr blob =
                 std::make_shared<InferenceEngine::TBlob<uint8_t>>(td, (uint8_t*)buf, len);
+            return blob;
+        }
+    } else if (op.type == OperandType::TENSOR_QUANT8_ASYMM) {
+        ALOGV("check if tensors of type TENSOR_QUANT8_ASYMM supported");
+        InferenceEngine::TensorDesc td(InferenceEngine::Precision::U8, toDims(op.dimensions),
+                                       InferenceEngine::Layout::ANY);
+        if (buf == nullptr) {
+            ALOGD("TENSOR_QUANT8_ASYMM buf is NULL !!!!!!!!!!!!!!!");
+            InferenceEngine::TBlob<uint8_t>::Ptr blob =
+                std::make_shared<InferenceEngine::TBlob<uint8_t>>(td);
+            blob->allocate();
+            return blob;
+        } else {
+            InferenceEngine::TBlob<uint8_t>::Ptr blob =
+                std::make_shared<InferenceEngine::TBlob<uint8_t>>(td, (uint8_t*)buf, len);
+            return blob;
+        }
+    } else if (op.type == OperandType::TENSOR_QUANT8_SYMM) {
+        ALOGV("check if tensors of type TENSOR_QUANT8_SYMM supported");
+        InferenceEngine::TensorDesc td(InferenceEngine::Precision::I8, toDims(op.dimensions),
+                                       InferenceEngine::Layout::ANY);
+        if (buf == nullptr) {
+            ALOGD("TENSOR_QUANT8_SYMM buf is NULL !!!!!!!!!!!!!!!");
+            InferenceEngine::TBlob<int8_t>::Ptr blob =
+                std::make_shared<InferenceEngine::TBlob<int8_t>>(td);
+            blob->allocate();
+            return blob;
+        } else {
+            InferenceEngine::TBlob<int8_t>::Ptr blob =
+                std::make_shared<InferenceEngine::TBlob<int8_t>>(td, (int8_t*)buf, len);
             return blob;
         }
     }
@@ -521,12 +552,14 @@ bool NnapiModelInfo::isOmittedInput(int operationIndex, uint32_t index) {
 }
 
 template int NnapiModelInfo::GetConstOperand<int>(unsigned int);
-template uint32_t NnapiModelInfo::GetConstOperand<uint32_t>(unsigned int);
 template float NnapiModelInfo::GetConstOperand<float>(unsigned int);
 template uint8_t NnapiModelInfo::GetConstOperand<uint8_t>(unsigned int);
+template int8_t NnapiModelInfo::GetConstOperand<int8_t>(unsigned int);
+template uint32_t NnapiModelInfo::GetConstOperand<uint32_t>(unsigned int);
 template int NnapiModelInfo::GetConstFromBuffer<int>(unsigned char const*, unsigned int);
 template float NnapiModelInfo::GetConstFromBuffer<float>(unsigned char const*, unsigned int);
 template uint8_t NnapiModelInfo::GetConstFromBuffer<uint8_t>(unsigned char const*, unsigned int);
+template int8_t NnapiModelInfo::GetConstFromBuffer<int8_t>(unsigned char const*, unsigned int);
 template uint32_t NnapiModelInfo::GetConstFromBuffer<uint32_t>(unsigned char const*, unsigned int);
 }  // namespace nnhal
 }  // namespace neuralnetworks

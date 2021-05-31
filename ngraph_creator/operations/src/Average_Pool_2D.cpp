@@ -12,7 +12,6 @@ Average_Pool_2D::Average_Pool_2D(int operationIndex) : OperationsBase(operationI
 }
 
 bool Average_Pool_2D::validate() {
-
     // Check Output type
     if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) return false;
 
@@ -50,7 +49,6 @@ bool Average_Pool_2D::validate() {
 
     ALOGV("%s PASSED", __func__);
     return true;
-
 }
 
 std::shared_ptr<ngraph::Node> Average_Pool_2D::createNode() {
@@ -76,7 +74,7 @@ std::shared_ptr<ngraph::Node> Average_Pool_2D::createNode() {
     int32_t filter_width, filter_height;
     int32_t input_width, input_height;
     int32_t activationFn;
-    ngraph::op::PadType auto_pad ;
+    ngraph::op::PadType auto_pad;
 
     if (inputsSize >= 10 && inputsSize <= 11) {
         isExplicit = true;
@@ -96,7 +94,7 @@ std::shared_ptr<ngraph::Node> Average_Pool_2D::createNode() {
         filter_width = sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 7);
         filter_height = sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 8);
 
-        activationFn= sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 9);
+        activationFn = sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 9);
 
         if (inputsSize == 11) {
             layout = sModelInfo->ParseOperationInput<uint8_t>(mNnapiOperationIndex, 10);
@@ -116,7 +114,7 @@ std::shared_ptr<ngraph::Node> Average_Pool_2D::createNode() {
         filter_width = sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 4);
         filter_height = sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 5);
 
-        activationFn= sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 6);
+        activationFn = sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 6);
 
         if (inputsSize == 8) {
             layout = sModelInfo->ParseOperationInput<uint8_t>(mNnapiOperationIndex, 7);
@@ -133,10 +131,10 @@ std::shared_ptr<ngraph::Node> Average_Pool_2D::createNode() {
         }
 
         if (padding_scheme == 1) {
-            calculateExplicitPadding(input_width, stride_width, filter_width,
-                                     1, &padding_left, &padding_right);
-            calculateExplicitPadding(input_height, stride_height, filter_height,
-                                     1, &padding_top, &padding_bottom);
+            calculateExplicitPadding(input_width, stride_width, filter_width, 1, &padding_left,
+                                     &padding_right);
+            calculateExplicitPadding(input_height, stride_height, filter_height, 1, &padding_top,
+                                     &padding_bottom);
 
             auto_pad = ngraph::op::PadType::SAME_UPPER;
 
@@ -146,7 +144,7 @@ std::shared_ptr<ngraph::Node> Average_Pool_2D::createNode() {
             padding_top = 0;
             padding_bottom = 0;
             auto_pad = ngraph::op::PadType::VALID;
-        }else
+        } else
             auto_pad = ngraph::op::PadType::NOTSET;
     }
 
@@ -192,4 +190,3 @@ std::shared_ptr<ngraph::Node> Average_Pool_2D::createNode() {
 }  // namespace neuralnetworks
 }  // namespace hardware
 }  // namespace android
-

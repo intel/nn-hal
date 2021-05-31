@@ -43,6 +43,8 @@ protected:
             if (operandType == OperandType::TENSOR_FLOAT32) elementType = ngraph::element::f32;
             if (operandType == OperandType::TENSOR_INT32) elementType = ngraph::element::i32;
             if (operandType == OperandType::TENSOR_BOOL8) elementType = ngraph::element::boolean;
+            if (operandType == OperandType::TENSOR_QUANT8_ASYMM) elementType = ngraph::element::u8;
+            if (operandType == OperandType::TENSOR_QUANT8_SYMM) elementType = ngraph::element::i8;
             auto operandValues = sModelInfo->GetConstVecOperand<T>(operandIndex);
             auto operandDims = getInputOperandDimensions(inputIndex);
             return std::make_shared<ngraph::opset3::Constant>(
