@@ -13,7 +13,8 @@ Concat::Concat(int operationIndex) : OperationsBase(operationIndex) {
 
 bool Concat::validate() {
     // Check Output type
-    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) {
+    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
+        !checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
         return false;
     }
     // check concatenation axis
@@ -42,11 +43,21 @@ std::shared_ptr<ngraph::Node> Concat::createNode() {
             inputOp = transpose(NCHW_NHWC, inputOp);
             mNgraphNodes->setForcedNchw(mDefaultOutputIndex, false);
         }
+        if (checkInputOperandType(i, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
+            inputOp =
+                DequantizeNode(inputOp.get_node_shared_ptr(), inputIndex, ngraph::element::f32);
+        }
         inputs.push_back(inputOp);
     }
 
     std::shared_ptr<ngraph::Node> outputNode =
         std::make_shared<ngraph::opset3::Concat>(inputs, axis);
+
+    if (checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
+        const auto& outputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
+        outputNode = QuantizeNode(outputNode, outputIndex, ngraph::element::u8);
+    }
+
     const auto op = sModelInfo->getOperand(mDefaultOutputIndex);
     if (op.lifetime == OperandLifeTime::MODEL_OUTPUT) {
         addResultNode(mDefaultOutputIndex, outputNode);
