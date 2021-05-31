@@ -53,6 +53,8 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<Less>(operationIndex);
         case OperationType::LESS_EQUAL:
             return std::make_shared<Less_Equal>(operationIndex);
+        case OperationType::LOG_SOFTMAX:
+            return std::make_shared<Log_Softmax>(operationIndex);
         case OperationType::LOG:
             return std::make_shared<Log>(operationIndex);
         case OperationType::LOGICAL_AND:

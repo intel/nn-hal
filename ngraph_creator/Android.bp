@@ -28,6 +28,7 @@ cc_library_static {
         "operations/src/LSTM.cpp",
         "operations/src/Less.cpp",
         "operations/src/Less_Equal.cpp",
+        "operations/src/Log_Softmax.cpp",
         "operations/src/Log.cpp",
         "operations/src/Logical_And.cpp",
         "operations/src/Logical_Not.cpp",
