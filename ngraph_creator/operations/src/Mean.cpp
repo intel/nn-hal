@@ -22,6 +22,14 @@ bool Mean::validate() {
 
     if (!checkInputOperandType(2, (int32_t)OperandType::INT32)) return false;
 
+    // TODO: Add Support for all_tensors_as_inputs
+    const auto& axesOperandIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 1);
+
+    if (!sModelInfo->isOperandLifeTimeConst(axesOperandIndex)) {
+        ALOGE("%s Only Constant dimensions supported now", __func__);
+        return false;
+    }
+
     return true;
 }
 

@@ -18,6 +18,18 @@ bool Squeeze::validate() {
 
     if (!checkInputOperandType(1, (int32_t)OperandType::TENSOR_INT32)) return false;
 
+    // TODO: Add Support for all_tensors_as_inputs
+    const auto& dimsOperandIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 1);
+
+    // TODO: Support OmittedInput.
+    // The empty 2nd argument in Squeeze op causes dynamic output
+    // To add support, the dims will have to be calculated statically
+    if (sModelInfo->isOmittedInput(mNnapiOperationIndex, 1) ||
+        !sModelInfo->isOperandLifeTimeConst(dimsOperandIndex)) {
+        ALOGE("%s Only Constant dimensions supported now", __func__);
+        return false;
+    }
+
     return true;
 }
 
@@ -30,7 +42,8 @@ std::shared_ptr<ngraph::Node> Squeeze::createNode() {
     if (!sModelInfo->isOmittedInput(mNnapiOperationIndex, 1))
         dims = getInputNode<int>(1);
     else
-        dims = ngraph::opset3::Constant::create(ngraph::element::i64, ngraph::Shape{}, {1});
+        dims = make_shared<ngraph::opset3::Constant>(ngraph::element::i64, ngraph::Shape{0},
+                                                     std::vector<int64_t>{});
 
     auto outputNode = std::make_shared<ngraph::opset3::Squeeze>(input, dims);
 

@@ -2,6 +2,7 @@
 
 #include <Abs.hpp>
 #include <Add.hpp>
+#include <Average_Pool_2D.hpp>
 #include <Cast.hpp>
 #include <Concat.hpp>
 #include <Conv_2d.hpp>
@@ -21,6 +22,7 @@
 #include <Logical_Not.hpp>
 #include <Logical_Or.hpp>
 #include <Logistic.hpp>
+#include <Max_Pool_2d.hpp>
 #include <Maximum.hpp>
 #include <Mean.hpp>
 #include <Minimum.hpp>

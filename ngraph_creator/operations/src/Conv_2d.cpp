@@ -30,30 +30,44 @@ bool Conv_2d::validate() {
     }
 
     const auto& inputsSize = sModelInfo->getOperationInputsSize(mNnapiOperationIndex);
-    if (inputsSize >= 10 && checkInputOperandType(7, (int32_t)OperandType::INT32)) {
-        // Explicit Padding if 10 or more inputs present and index 7 is INT32.
-        // Check all other Input operand types for explicit Padding
-        for (int i = 3; i < inputsSize; i++) {
-            // All inputs except index 10 should be INT32
-            // index 10 should be BOOL
-            if (i == 10) {
-                if (!checkInputOperandType(i, (int32_t)OperandType::BOOL)) return false;
-            } else if (!checkInputOperandType(i, (int32_t)OperandType::INT32))
-                return false;
+
+    if (inputsSize >= 10 && inputsSize <= 13 &&
+        !checkInputOperandType(7, (int32_t)OperandType::BOOL)) {
+        // Checking input types for explicit padding
+        for (int i = 3; i < 10; i++) {
+            if (!checkInputOperandType(i, (int32_t)OperandType::INT32)) return false;
+        }
+
+        if (inputsSize > 10 && inputsSize <= 13) {
+            switch (inputsSize) {
+                case 13:
+                    if (!checkInputOperandType(12, (int32_t)OperandType::INT32)) return false;
+                case 12:
+                    if (!checkInputOperandType(11, (int32_t)OperandType::INT32)) return false;
+                case 11:
+                    if (!checkInputOperandType(10, (int32_t)OperandType::BOOL)) return false;
+                default:
+                    break;
+            }
         }
     } else if (inputsSize >= 7 && inputsSize <= 10) {
-        // Check all other Input operand types for implicit Padding
-        for (int i = 3; i < inputsSize; i++) {
-            // All inputs except index 7 should be INT32
-            // index 7 should be BOOL
-            if (i == 7) {
-                if (!checkInputOperandType(i, (int32_t)OperandType::BOOL)) return false;
-            } else if (!checkInputOperandType(i, (int32_t)OperandType::INT32))
-                return false;
+        // Checking input types for implicit padding
+        for (int i = 3; i < 7; i++) {
+            if (!checkInputOperandType(i, (int32_t)OperandType::INT32)) return false;
         }
-    } else {
-        ALOGE("%s FAILED inputsSize %d", __func__);
-        return false;
+
+        if (inputsSize > 7 && inputsSize <= 10) {
+            switch (inputsSize) {
+                case 10:
+                    if (!checkInputOperandType(9, (int32_t)OperandType::INT32)) return false;
+                case 9:
+                    if (!checkInputOperandType(8, (int32_t)OperandType::INT32)) return false;
+                case 8:
+                    if (!checkInputOperandType(7, (int32_t)OperandType::BOOL)) return false;
+                default:
+                    break;
+            }
+        }
     }
 
     ALOGV("%s PASSED", __func__);
@@ -63,6 +77,15 @@ bool Conv_2d::validate() {
 std::shared_ptr<ngraph::Node> Conv_2d::createNode() {
     const auto& inputsSize = sModelInfo->getOperationInputsSize(mNnapiOperationIndex);
     ALOGD("%s inputsSize %d", __func__, inputsSize);
+
+    bool isImplicit = false, isExplicit = false;
+
+    if (inputsSize >= 10 && inputsSize <= 13 &&
+        !checkInputOperandType(7, (int32_t)OperandType::BOOL)) {
+        isExplicit = true;
+    } else if (inputsSize >= 7 && inputsSize <= 10) {
+        isImplicit = true;
+    }
 
     int32_t padding_left, padding_right;
     int32_t padding_top, padding_bottom;
@@ -80,19 +103,15 @@ std::shared_ptr<ngraph::Node> Conv_2d::createNode() {
     std::vector<size_t> dilations;
     ngraph::op::PadType auto_pad;
 
-    {
-        const auto& inputDimensions = getInputOperandDimensions(0);
-        input_width = inputDimensions[2];
-        input_height = inputDimensions[1];
-    }
+    const auto& inputDimensions = getInputOperandDimensions(0);
+
     {
         const auto& filterDimensions = getInputOperandDimensions(1);
         filter_width = filterDimensions[2];
         filter_height = filterDimensions[1];
     }
 
-    if (inputsSize >= 10 && checkInputOperandType(7, (int32_t)OperandType::INT32)) {
-        // Explicit Padding if 10 or more inputs present and index 7 is INT32.
+    if (isExplicit) {
         padding_left = sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 3);
         padding_right = sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 4);
         padding_top = sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 5);
@@ -103,45 +122,69 @@ std::shared_ptr<ngraph::Node> Conv_2d::createNode() {
 
         activationFn = sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 9);
 
-        switch (inputsSize) {
-            case 13:
-                dilation_height_factor =
-                    sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 12);
-            case 12:
-                dilation_width_factor =
-                    sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 11);
-            case 11:
-                layout = sModelInfo->ParseOperationInput<uint8_t>(mNnapiOperationIndex, 10);
-            default:
-                break;
+        if (inputsSize > 10 && inputsSize <= 13) {
+            switch (inputsSize) {
+                case 13:
+                    dilation_height_factor =
+                        sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 12);
+                case 12:
+                    dilation_width_factor =
+                        sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 11);
+                case 11:
+                    layout = sModelInfo->ParseOperationInput<uint8_t>(mNnapiOperationIndex, 10);
+                default:
+                    break;
+            }
         }
 
         if (layout) useNchw = true;
 
         auto_pad = ngraph::op::PadType::EXPLICIT;
-    } else if (inputsSize == 7 ||
-               (inputsSize <= 10 && checkInputOperandType(7, (int32_t)OperandType::BOOL))) {
-        // Implicit Padding if 7 to 10 inputs present and index 7 is BOOL.
+        {
+            if (useNchw) {
+                input_width = inputDimensions[3];
+                input_height = inputDimensions[2];
+            } else {
+                input_width = inputDimensions[2];
+                input_height = inputDimensions[1];
+            }
+        }
+    }
+
+    if (isImplicit) {
         padding_scheme = sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 3);
 
         stride_width = sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 4);
         stride_height = sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 5);
 
         activationFn = sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 6);
-        switch (inputsSize) {
-            case 10:
-                dilation_height_factor =
-                    sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 9);
-            case 9:
-                dilation_width_factor =
-                    sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 8);
-            case 8:
-                layout = sModelInfo->ParseOperationInput<uint8_t>(mNnapiOperationIndex, 7);
-            default:
-                break;
+
+        if (inputsSize > 7 && inputsSize <= 10) {
+            switch (inputsSize) {
+                case 10:
+                    dilation_height_factor =
+                        sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 9);
+                case 9:
+                    dilation_width_factor =
+                        sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 8);
+                case 8:
+                    layout = sModelInfo->ParseOperationInput<uint8_t>(mNnapiOperationIndex, 7);
+                default:
+                    break;
+            }
         }
 
         if (layout) useNchw = true;
+
+        {
+            if (useNchw) {
+                input_width = inputDimensions[3];
+                input_height = inputDimensions[2];
+            } else {
+                input_width = inputDimensions[2];
+                input_height = inputDimensions[1];
+            }
+        }
 
         if (padding_scheme == 1) {
             calculateExplicitPadding(input_width, stride_width, filter_width, 1, &padding_left,
@@ -158,8 +201,6 @@ std::shared_ptr<ngraph::Node> Conv_2d::createNode() {
         } else {
             auto_pad = ngraph::op::PadType::NOTSET;
         }
-    } else {
-        ALOGE("%s FAILED inputsSize %d not defined", __func__);
     }
 
     auto inputNode = getInputNode<float>(0);
@@ -205,8 +246,10 @@ std::shared_ptr<ngraph::Node> Conv_2d::createNode() {
 
     const auto outputLifetime = sModelInfo->getOperandLifetime(mDefaultOutputIndex);
     if (outputLifetime == OperandLifeTime::MODEL_OUTPUT) {
-        outputNode = transpose(NCHW_NHWC, outputNode);
-        mNgraphNodes->setForcedNchw(mDefaultOutputIndex, false);
+        if (!useNchw) {
+            outputNode = transpose(NCHW_NHWC, outputNode);
+            mNgraphNodes->setForcedNchw(mDefaultOutputIndex, false);
+        }
         addResultNode(mDefaultOutputIndex, outputNode);
     }
     return outputNode;
