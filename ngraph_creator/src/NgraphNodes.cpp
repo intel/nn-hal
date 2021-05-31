@@ -29,7 +29,7 @@ bool NgraphNodes::isForcedNchw(size_t index) { return mForcedNchw[index]; }
 void NgraphNodes::setForcedNchw(size_t index, bool flag) { mForcedNchw[index] = flag; }
 
 void NgraphNodes::setResultNode(size_t outputIndex, std::shared_ptr<ngraph::Node> resultNode) {
-    ALOGD("setResultNode %uz", outputIndex);
+    ALOGD("setResultNode %u", outputIndex);
     mResultNodes.push_back(resultNode);
 }
 
@@ -42,7 +42,7 @@ const std::string& NgraphNodes::getNodeName(size_t index) {
     return mNodeNames[index];
 }
 // remove null input node parameter
-const void NgraphNodes::removeInputParameter(std::string name, size_t index) {
+void NgraphNodes::removeInputParameter(std::string name, size_t index) {
     for (int i = 0; i < mInputParams.size(); i++) {
         if (name.compare(mInputParams[i]->get_name()) == 0) {
             mInputParams.erase(mInputParams.begin() + i);

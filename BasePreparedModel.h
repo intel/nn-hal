@@ -61,10 +61,10 @@ typedef uint8_t* memory;
 
 class BasePreparedModel : public V1_2::IPreparedModel {
 public:
-    BasePreparedModel(const Model& model) : mTargetDevice("CPU") {
+    BasePreparedModel(const Model& model) : mTargetDevice(IntelDeviceType::CPU) {
         mModelInfo = std::make_shared<NnapiModelInfo>(model);
     }
-    BasePreparedModel(const std::string device, const Model& model) : mTargetDevice(device) {
+    BasePreparedModel(const IntelDeviceType device, const Model& model) : mTargetDevice(device) {
         mModelInfo = std::make_shared<NnapiModelInfo>(model);
     }
 
@@ -93,7 +93,7 @@ public:
 protected:
     virtual void deinitialize();
 
-    std::string mTargetDevice;
+    IntelDeviceType mTargetDevice;
     std::shared_ptr<NnapiModelInfo> mModelInfo;
     std::shared_ptr<NgraphNetworkCreator> mNgc;
     std::shared_ptr<IIENetwork> mPlugin;

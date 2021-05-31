@@ -1,5 +1,4 @@
 #pragma once
-#define LOG_TAG "NgraphHelper"
 #include <log/log.h>
 #include <ngraph/ngraph.hpp>
 #include <ngraph/opsets/opset3.hpp>
@@ -10,16 +9,16 @@ namespace neuralnetworks {
 namespace nnhal {
 using FusedActivationFunc = V1_0::FusedActivationFunc;
 
-static ngraph::Shape toNgraphShape(const std::vector<uint32_t>& dimensions) {
+static inline ngraph::Shape toNgraphShape(const std::vector<uint32_t>& dimensions) {
     ngraph::Shape shapeVec;
-    for (auto i = 0; i < dimensions.size(); i++) {
+    for (size_t i = 0; i < dimensions.size(); i++) {
         shapeVec.push_back(static_cast<size_t>(dimensions[i]));
     }
     return shapeVec;
 }
 
-static std::shared_ptr<ngraph::Node> applyActivation(std::shared_ptr<ngraph::Node> inputNode,
-                                                     int32_t activationFn) {
+static inline std::shared_ptr<ngraph::Node> applyActivation(std::shared_ptr<ngraph::Node> inputNode,
+                                                            int32_t activationFn) {
     std::shared_ptr<ngraph::Node> activationNode = nullptr;
     switch (activationFn) {
         case (int32_t)FusedActivationFunc::NONE:
@@ -45,9 +44,9 @@ static std::shared_ptr<ngraph::Node> applyActivation(std::shared_ptr<ngraph::Nod
     return activationNode;
 }
 
-static void calculateExplicitPadding(int32_t in_size, int32_t stride, int32_t filter_size,
-                                     int32_t padding_implicit, int32_t* padding_head,
-                                     int32_t* padding_tail) {
+static inline void calculateExplicitPadding(int32_t in_size, int32_t stride, int32_t filter_size,
+                                            int32_t padding_implicit, int32_t* padding_head,
+                                            int32_t* padding_tail) {
     *padding_head = 0;
     *padding_tail = 0;
 

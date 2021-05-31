@@ -14,6 +14,7 @@
 #include <Equal.hpp>
 #include <Exp.hpp>
 #include <Floor.hpp>
+#include <FullyConnected.hpp>
 #include <Gather.hpp>
 #include <Greater.hpp>
 #include <Greater_Equal.hpp>
@@ -67,7 +68,7 @@ private:
     std::shared_ptr<NgraphNodes> mNgraphNodes;
 
 public:
-    OperationsFactory(const std::string& plugin, std::shared_ptr<NnapiModelInfo> modelInfo,
+    OperationsFactory(IntelDeviceType deviceType, std::shared_ptr<NnapiModelInfo> modelInfo,
                       std::shared_ptr<NgraphNodes> nodes);
     ~OperationsFactory();
     std::shared_ptr<OperationsBase> getOperation(int operationIndex,

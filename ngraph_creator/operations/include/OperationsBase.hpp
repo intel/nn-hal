@@ -118,9 +118,19 @@ protected:
     std::shared_ptr<ngraph::Node> DequantizeNode(std::shared_ptr<ngraph::Node> input, size_t index,
                                                  ngraph::element::Type dequantizeType);
 
+    const Operand& getInputOperand(uint32_t index) {
+        auto inputIdx = sModelInfo->getOperationInput(mNnapiOperationIndex, index);
+        return sModelInfo->getOperand(inputIdx);
+    }
+
+    const Operand& getOutputOperand(uint32_t index) {
+        auto outputIdx = sModelInfo->getOperationOutput(mNnapiOperationIndex, index);
+        return sModelInfo->getOperand(outputIdx);
+    }
+
 public:
     static std::shared_ptr<NnapiModelInfo> sModelInfo;
-    static std::string sPluginType;
+    static IntelDeviceType sPluginType;
     std::shared_ptr<NgraphNodes> mNgraphNodes;
     OperationsBase(int operationIndex);
     void setNgraphNodes(std::shared_ptr<NgraphNodes> nodes);
@@ -129,6 +139,7 @@ public:
     virtual bool validateForPlugin();
     // override connectOperationToGraph in case Operation has multiple outputs
     virtual void connectOperationToGraph();
+    virtual ~OperationsBase() {}
 };
 
 }  // namespace nnhal

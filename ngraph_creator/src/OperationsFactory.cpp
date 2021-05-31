@@ -6,10 +6,10 @@ namespace hardware {
 namespace neuralnetworks {
 namespace nnhal {
 
-OperationsFactory::OperationsFactory(const std::string& plugin,
+OperationsFactory::OperationsFactory(IntelDeviceType deviceType,
                                      std::shared_ptr<NnapiModelInfo> modelInfo,
                                      std::shared_ptr<NgraphNodes> nodes) {
-    OperationsBase::sPluginType = plugin;
+    OperationsBase::sPluginType = deviceType;
     OperationsBase::sModelInfo = modelInfo;
     ALOGV("%s Constructed", __func__);
 }
@@ -43,6 +43,8 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<Equal>(operationIndex);
         case OperationType::EXP:
             return std::make_shared<Exp>(operationIndex);
+        case OperationType::FULLY_CONNECTED:
+            return std::make_shared<FullyConnected>(operationIndex);
         case OperationType::FLOOR:
             return std::make_shared<Floor>(operationIndex);
         case OperationType::GATHER:
