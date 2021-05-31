@@ -11,13 +11,16 @@ Add::Add(int operationIndex) : OperationsBase(operationIndex) {
 
 bool Add::validate() {
     // check output type
-    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) {
+    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
+        !checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
         return false;
     }
 
     // Check all input types
     for (int i = 0; i <= 1; i++) {
-        if (!checkInputOperandType(i, (int32_t)OperandType::TENSOR_FLOAT32)) return false;
+        if (!checkInputOperandType(i, (int32_t)OperandType::TENSOR_FLOAT32) &&
+            !checkInputOperandType(i, (int32_t)OperandType::TENSOR_QUANT8_ASYMM))
+            return false;
     }
 
     if (!checkInputOperandType(2, (int32_t)OperandType::INT32)) {
@@ -29,8 +32,19 @@ bool Add::validate() {
 
 std::shared_ptr<ngraph::Node> Add::createNode() {
     // Creating input nodes
-    auto input1 = getInputNode<float>(0);
-    auto input2 = getInputNode<float>(1);
+    std::shared_ptr<ngraph::Node> input1, input2;
+    if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) {
+        input1 = getInputNode<float>(0);
+        input2 = getInputNode<float>(1);
+    } else if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
+        input1 = getInputNode<uint8_t>(0);
+        input2 = getInputNode<uint8_t>(1);
+
+        const auto& input1Index = sModelInfo->getOperationInput(mNnapiOperationIndex, 0);
+        const auto& input2Index = sModelInfo->getOperationInput(mNnapiOperationIndex, 1);
+        input1 = DequantizeNode(input1, input1Index, ngraph::element::f32);
+        input2 = DequantizeNode(input2, input2Index, ngraph::element::f32);
+    }
 
     auto activationFn = sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 2);
 
@@ -38,6 +52,11 @@ std::shared_ptr<ngraph::Node> Add::createNode() {
         std::make_shared<ngraph::opset3::Add>(input1, input2, ngraph::op::AutoBroadcastType::NUMPY);
 
     auto outputNode = applyActivation(addNode, activationFn);
+
+    if (checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
+        const auto& outputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
+        outputNode = QuantizeNode(outputNode, outputIndex, ngraph::element::u8);
+    }
 
     const auto op = sModelInfo->getOperand(mDefaultOutputIndex);
     if (op.lifetime == OperandLifeTime::MODEL_OUTPUT) {

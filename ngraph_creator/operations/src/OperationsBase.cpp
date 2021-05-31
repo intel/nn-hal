@@ -96,6 +96,60 @@ const vec<uint32_t> OperationsBase::getInputOperandDimensions(uint32_t inputInde
     return operand.dimensions;
 }
 
+std::shared_ptr<ngraph::Node> OperationsBase::QuantizeNode(std::shared_ptr<ngraph::Node> input,
+                                                           size_t index,
+                                                           ngraph::element::Type quantizeType) {
+    auto floatElementType = ngraph::element::f32;
+    auto intElementType = ngraph::element::i32;
+
+    float inputScale = sModelInfo->getOperandScale(index);
+    int inputZeroPoint = sModelInfo->getOperandZeroPoint(index);
+
+    auto scale = ngraph::op::Constant::create(floatElementType, ngraph::Shape{}, {inputScale});
+    auto zeroPoint =
+        ngraph::op::Constant::create(intElementType, ngraph::Shape{}, {inputZeroPoint});
+    auto minVal = ngraph::op::Constant::create(intElementType, ngraph::Shape{}, {0});
+    auto maxVal = ngraph::op::Constant::create(intElementType, ngraph::Shape{}, {255});
+
+    if (input->get_element_type() != ngraph::element::f32)
+        input = std::make_shared<ngraph::opset3::Convert>(input, floatElementType);
+    auto div = std::make_shared<ngraph::opset3::Divide>(input, scale);
+    ngraph::op::v5::Round::RoundMode mode = ngraph::op::v5::Round::RoundMode::HALF_TO_EVEN;
+    auto round = std::make_shared<ngraph::op::v5::Round>(div, mode);
+    auto convertRound = std::make_shared<ngraph::opset3::Convert>(round, ngraph::element::i32);
+    auto sum = std::make_shared<ngraph::opset3::Add>(convertRound, zeroPoint);
+    auto min = std::make_shared<ngraph::opset3::Minimum>(maxVal, sum);
+    auto max = std::make_shared<ngraph::opset3::Maximum>(minVal, min);
+
+    auto outputNode = std::make_shared<ngraph::opset3::Convert>(max, quantizeType);
+
+    return outputNode;
+}
+
+std::shared_ptr<ngraph::Node> OperationsBase::DequantizeNode(std::shared_ptr<ngraph::Node> input,
+                                                             size_t index,
+                                                             ngraph::element::Type dequantizeType) {
+    auto floatElementType = ngraph::element::f32;
+    auto intElementType = ngraph::element::i32;
+
+    float inputScale = sModelInfo->getOperandScale(index);
+    int inputZeroPoint = sModelInfo->getOperandZeroPoint(index);
+
+    auto scale = ngraph::op::Constant::create(floatElementType, ngraph::Shape{}, {inputScale});
+    auto zeroPoint =
+        ngraph::op::Constant::create(intElementType, ngraph::Shape{}, {inputZeroPoint});
+
+    if (input->get_element_type() != ngraph::element::i32)
+        input = std::make_shared<ngraph::opset3::Convert>(input, intElementType);
+    auto diff = std::make_shared<ngraph::opset3::Subtract>(input, zeroPoint);
+    auto convertDiff = std::make_shared<ngraph::opset3::Convert>(diff, floatElementType);
+    auto mul = std::make_shared<ngraph::opset3::Multiply>(convertDiff, scale);
+
+    auto outputNode = std::make_shared<ngraph::opset3::Convert>(mul, dequantizeType);
+
+    return outputNode;
+}
+
 }  // namespace nnhal
 }  // namespace neuralnetworks
 }  // namespace hardware
