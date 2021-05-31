@@ -13,12 +13,20 @@ Depthwise_Conv_2d::Depthwise_Conv_2d(int operationIndex) : OperationsBase(operat
 
 bool Depthwise_Conv_2d::validate() {
     // Check Output type
-    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) return false;
+    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
+        !checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM))
+        return false;
 
-    for (int i = 0; i <= 2; i++) {
-        // Check input/filter/bias operands(0/1/2) are of type TENSOR_FLOAT32
-        if (!checkInputOperandType(i, (int32_t)OperandType::TENSOR_FLOAT32)) return false;
+    for (int i = 0; i < 2; i++) {
+        // Check input/filter operands(0/1) are of type TENSOR_FLOAT32/TENSOR_QUANT8_ASYMM
+        if (!checkInputOperandType(i, (int32_t)OperandType::TENSOR_FLOAT32) &&
+            !checkInputOperandType(i, (int32_t)OperandType::TENSOR_QUANT8_ASYMM))
+            return false;
     }
+    // Check bias type
+    if (!checkInputOperandType(2, (int32_t)OperandType::TENSOR_FLOAT32) &&
+        !checkInputOperandType(2, (int32_t)OperandType::TENSOR_INT32))
+        return false;
 
     // Check Input, Filter Dimension size
     const auto& inputDimensionsSize = getInputOperandDimensions(0).size();
@@ -218,11 +226,27 @@ std::shared_ptr<ngraph::Node> Depthwise_Conv_2d::createNode() {
         }
     }
 
-    auto inputNode = getInputNode<float>(0);
-    auto filterNode = getInputNode<float>(1);
+    std::shared_ptr<ngraph::Node> inputNode, filterNode, biasNode;
+
+    const auto& inputIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 0);
+    const auto& filterIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 1);
+    const auto& biasIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 2);
+
+    if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) {
+        inputNode = getInputNode<float>(0);
+        filterNode = getInputNode<float>(1);
+        biasNode = getInputNode<float>(2);
+    } else if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
+        inputNode = getInputNode<uint8_t>(0);
+        filterNode = getInputNode<uint8_t>(1);
+        biasNode = getInputNode<int>(2);
+
+        inputNode = DequantizeNode(inputNode, inputIndex, ngraph::element::f32);
+        filterNode = DequantizeNode(filterNode, filterIndex, ngraph::element::f32);
+        biasNode = DequantizeNode(biasNode, biasIndex, ngraph::element::f32);
+    }
     // OpenVino expects filter in OIHW format
     filterNode = transpose(IHWO_OIHW, filterNode);
-    auto inputIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 0);
     if (mNgraphNodes->isForcedNchw(inputIndex)) {
         if (useNchw) {
             ALOGI("%s Forced NCHW done already but NCHW flag set at operationIndex %d", __func__,
@@ -261,7 +285,6 @@ std::shared_ptr<ngraph::Node> Depthwise_Conv_2d::createNode() {
         inputNode, filterNode, ngraph::Strides(strides), ngraph::CoordinateDiff(pads_begin),
         ngraph::CoordinateDiff(pads_end), ngraph::Strides(dilations), auto_pad);
 
-    auto biasNode = getInputNode<float>(2);
     auto biasDimensions = getInputOperandDimensions(2);
     std::vector<uint32_t> shape(groupConvNode->get_shape().size(), 1);
     shape[1] = biasDimensions[0];
@@ -273,12 +296,18 @@ std::shared_ptr<ngraph::Node> Depthwise_Conv_2d::createNode() {
         groupConvNode, biasNode, ngraph::op::AutoBroadcastType::NUMPY);
     outputNode = applyActivation(outputNode, activationFn);
 
+    if (!useNchw) {
+        outputNode = transpose(NCHW_NHWC, outputNode);
+        mNgraphNodes->setForcedNchw(mDefaultOutputIndex, false);
+    }
+
+    if (checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
+        const auto& outputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
+        outputNode = QuantizeNode(outputNode, outputIndex, ngraph::element::u8);
+    }
+
     const auto outputLifetime = sModelInfo->getOperandLifetime(mDefaultOutputIndex);
     if (outputLifetime == OperandLifeTime::MODEL_OUTPUT) {
-        if (!useNchw) {
-            outputNode = transpose(NCHW_NHWC, outputNode);
-            mNgraphNodes->setForcedNchw(mDefaultOutputIndex, false);
-        }
         addResultNode(mDefaultOutputIndex, outputNode);
     }
     return outputNode;
