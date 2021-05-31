@@ -12,10 +12,14 @@ Max_Pool_2d::Max_Pool_2d(int operationIndex) : OperationsBase(operationIndex) {
 
 bool Max_Pool_2d::validate() {
     // Check Output type
-    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) return false;
+    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
+        !checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM))
+        return false;
 
     // Check Input Type
-    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) return false;
+    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
+        !checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM))
+        return false;
 
     // Check Input Dimension size
     const auto& inputDimensionsSize = getInputOperandDimensions(0).size();
@@ -153,8 +157,16 @@ std::shared_ptr<ngraph::Node> Max_Pool_2d::createNode() {
         }
     }
 
-    auto inputNode = getInputNode<float>(0);
+    std::shared_ptr<ngraph::Node> inputNode;
     auto inputIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 0);
+
+    if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) {
+        inputNode = getInputNode<float>(0);
+    } else if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
+        inputNode = getInputNode<uint8_t>(0);
+        inputNode = DequantizeNode(inputNode, inputIndex, ngraph::element::f32);
+    }
+
     if (mNgraphNodes->isForcedNchw(inputIndex)) {
         if (useNchw) {
             ALOGI("%s Forced NCHW done already but NCHW flag set at operationIndex %d", __func__,
@@ -182,12 +194,18 @@ std::shared_ptr<ngraph::Node> Max_Pool_2d::createNode() {
 
     auto outputNode = applyActivation(maxpoolNode, activationFn);
 
+    if (!useNchw) {
+        outputNode = transpose(NCHW_NHWC, outputNode);
+        mNgraphNodes->setForcedNchw(mDefaultOutputIndex, false);
+    }
+
+    if (checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
+        const auto& outputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
+        outputNode = QuantizeNode(outputNode, outputIndex, ngraph::element::u8);
+    }
+
     const auto outputLifetime = sModelInfo->getOperandLifetime(mDefaultOutputIndex);
     if (outputLifetime == OperandLifeTime::MODEL_OUTPUT) {
-        if (!useNchw) {
-            outputNode = transpose(NCHW_NHWC, outputNode);
-            mNgraphNodes->setForcedNchw(mDefaultOutputIndex, false);
-        }
         addResultNode(mDefaultOutputIndex, outputNode);
     }
     return outputNode;
