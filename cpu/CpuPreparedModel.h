@@ -34,7 +34,7 @@ namespace nnhal {
 
 class CpuPreparedModel : public BasePreparedModel {
 public:
-    CpuPreparedModel(const Model& model) : BasePreparedModel("CPU", model) {}
+    CpuPreparedModel(const Model& model) : BasePreparedModel(IntelDeviceType::CPU, model) {}
     ~CpuPreparedModel() { deinitialize(); }
 
     bool initialize(const Model& model) override;

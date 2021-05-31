@@ -54,9 +54,9 @@ std::shared_ptr<ngraph::Node> Add::createNode() {
 }
 
 std::shared_ptr<ngraph::Node> Add::createNodeForPlugin() {
-    if (sPluginType == "VPU") {
+    if (sPluginType == IntelDeviceType::VPU) {
         auto input = mNgraphNodes->getOperationOutput(
-            sModelInfo->getOperationInput(mNnapiOperationIndex, OP_INPUT_IDX_CONV));
+            sModelInfo->getOperationInput(mNnapiOperationIndex, 0));
         std::shared_ptr<ngraph::Node> constantOp =
             std::make_shared<ngraph::opset3::Constant>(ngraph::element::f32, input.get_shape());
         auto transposedOp = transpose(NHWC_NCHW, constantOp);

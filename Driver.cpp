@@ -96,7 +96,7 @@ Return<ErrorStatus> Driver::prepareModel_1_1(const V1_1_Model& model,
 // For HAL-1.2 version
 Return<void> Driver::getCapabilities_1_2(getCapabilities_1_2_cb cb) {
     ALOGV("Entering %s", __func__);
-    if (mDeviceName.compare("CPU") == 0) {
+    if (mDeviceType == IntelDeviceType::CPU) {
         ALOGI("CPU driver getCapabilities()");
         // Setting operandPerformance value to base value for all operand types
         Capabilities capabilities = {
@@ -106,7 +106,7 @@ Return<void> Driver::getCapabilities_1_2(getCapabilities_1_2_cb cb) {
 
         ALOGI("CPU MKLDNN driver Capabilities .execTime = 0.9f, .powerUsage = 0.9f");
         cb(ErrorStatus::NONE, capabilities);
-    } else if (mDeviceName.compare("GPU") == 0) {
+    } else if (mDeviceType == IntelDeviceType::GPU) {
         ALOGI("GPU driver getCapabilities()");
         Capabilities capabilities = {
             .relaxedFloat32toFloat16PerformanceScalar = {.execTime = 0.95f, .powerUsage = 0.85f},
@@ -115,7 +115,7 @@ Return<void> Driver::getCapabilities_1_2(getCapabilities_1_2_cb cb) {
 
         ALOGI("GPU clDNN driver Capabilities .execTime = 0.95f, .powerUsage = 0.85f");
         cb(ErrorStatus::NONE, capabilities);
-    } else if (mDeviceName.compare("GNA") == 0) {
+    } else if (mDeviceType == IntelDeviceType::GNA) {
         ALOGI("GPU driver getCapabilities()");
         Capabilities capabilities = {
             .relaxedFloat32toFloat16PerformanceScalar = {.execTime = 0.8f, .powerUsage = 0.8f},
@@ -124,7 +124,7 @@ Return<void> Driver::getCapabilities_1_2(getCapabilities_1_2_cb cb) {
 
         ALOGI("GPU clDNN driver Capabilities .execTime = 0.95f, .powerUsage = 0.85f");
         cb(ErrorStatus::NONE, capabilities);
-    } else if (mDeviceName.compare("VPU") == 0) {
+    } else if (mDeviceType == IntelDeviceType::VPU) {
         ALOGI("Myriad driver getCapabilities()");
         Capabilities capabilities = {
             .relaxedFloat32toFloat16PerformanceScalar = {.execTime = 1.1f, .powerUsage = 1.1f},
@@ -178,7 +178,7 @@ Return<void> Driver::getSupportedOperations_1_2(const Model& model,
     }
 
     auto modelInfo = std::make_shared<NnapiModelInfo>(model);
-    NgraphNetworkCreator ngraphCreatorInst(modelInfo, mDeviceName.c_str());
+    NgraphNetworkCreator ngraphCreatorInst(modelInfo, mDeviceType);
     ngraphCreatorInst.getSupportedOperations(supported);
 
     cb(ErrorStatus::NONE, supported);
@@ -186,19 +186,20 @@ Return<void> Driver::getSupportedOperations_1_2(const Model& model,
     return Void();
 }
 
-static sp<BasePreparedModel> ModelFactory(const char* name, const Model& model) {
+static sp<BasePreparedModel> ModelFactory(IntelDeviceType deviceType, const Model& model) {
     sp<BasePreparedModel> driverPreparedModel = NULL;
 
-    if (strcmp(name, "CPU") == 0)
+    if (deviceType == IntelDeviceType::CPU)
         driverPreparedModel = new CpuPreparedModel(model);
-    else if (strcmp(name, "GNA") == 0)
+    else if (deviceType == IntelDeviceType::GNA)
         driverPreparedModel = new GnaPreparedModel(model);
     return driverPreparedModel;
 }
 
 Return<ErrorStatus> Driver::prepareModel_1_2(const Model& model, ExecutionPreference preference,
-                                             const hidl_vec<hidl_handle>&,
-                                             const hidl_vec<hidl_handle>&, const HidlToken&,
+                                             const hidl_vec<hidl_handle>& modelCache,
+                                             const hidl_vec<hidl_handle>& dataCache,
+                                             const HidlToken& token,
                                              const sp<V1_2::IPreparedModelCallback>& callback) {
     ALOGV("Entering %s", __func__);
 
@@ -212,7 +213,7 @@ Return<ErrorStatus> Driver::prepareModel_1_2(const Model& model, ExecutionPrefer
     }
 
     // TODO: make asynchronous later
-    sp<BasePreparedModel> driverPreparedModel = ModelFactory(mDeviceName.c_str(), model);
+    sp<BasePreparedModel> driverPreparedModel = ModelFactory(mDeviceType, model);
     if (driverPreparedModel == NULL) {
         ALOGE("failed to create preparedmodel");
         return ErrorStatus::INVALID_ARGUMENT;

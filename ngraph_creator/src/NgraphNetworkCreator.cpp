@@ -8,11 +8,11 @@ namespace neuralnetworks {
 namespace nnhal {
 
 NgraphNetworkCreator::NgraphNetworkCreator(std::shared_ptr<NnapiModelInfo> modelInfo,
-                                           const std::string& plugin)
+                                           IntelDeviceType deviceType)
     : mModelInfo(modelInfo),
       mNgraphNodes(std::make_shared<NgraphNodes>(mModelInfo->getOperandsSize(),
                                                  mModelInfo->getModelOutputsSize())),
-      mOpFactoryInstance(plugin, mModelInfo, mNgraphNodes) {
+      mOpFactoryInstance(deviceType, mModelInfo, mNgraphNodes) {
     auto nnapiOperationsSize = mModelInfo->getOperationsSize();
     mOperationNodes.resize(nnapiOperationsSize);
     for (int index = 0; index < nnapiOperationsSize; index++) {
@@ -79,6 +79,7 @@ bool NgraphNetworkCreator::createInputParams() {
                         inputParam = nullptr;
                         return false;
                 }
+
                 mNgraphNodes->addInputParam(inputParam);
                 mNgraphNodes->setOutputAtOperandIndex(i, inputParam);
             } else {
