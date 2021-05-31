@@ -11,12 +11,14 @@ Transpose::Transpose(int operationIndex) : OperationsBase(operationIndex) {
 
 bool Transpose::validate() {
     // check output type
-    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) {
+    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
+        !checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
         return false;
     }
 
     // Check all input types
-    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) {
+    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
+        !checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
         return false;
     }
 
@@ -37,7 +39,15 @@ bool Transpose::validate() {
 
 std::shared_ptr<ngraph::Node> Transpose::createNode() {
     // Creating input nodes
-    auto input = getInputNode<float>(0);
+    std::shared_ptr<ngraph::Node> input;
+
+    if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) {
+        input = getInputNode<float>(0);
+    } else if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
+        input = getInputNode<uint8_t>(0);
+        const auto& inputIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 0);
+        input = DequantizeNode(input, inputIndex, ngraph::element::f32);
+    }
 
     std::shared_ptr<ngraph::Node> order;
 
@@ -48,7 +58,14 @@ std::shared_ptr<ngraph::Node> Transpose::createNode() {
         order = ngraph::opset3::Constant::create(ngraph::element::i64, ngraph::Shape{0}, {0});
     }
 
-    auto outputNode = std::make_shared<ngraph::opset3::Transpose>(input, order);
+    std::shared_ptr<ngraph::Node> outputNode;
+
+    outputNode = std::make_shared<ngraph::opset3::Transpose>(input, order);
+
+    if (checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
+        const auto& outputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
+        outputNode = QuantizeNode(outputNode, outputIndex, ngraph::element::u8);
+    }
 
     const auto op = sModelInfo->getOperand(mDefaultOutputIndex);
     if (op.lifetime == OperandLifeTime::MODEL_OUTPUT) {
