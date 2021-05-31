@@ -34,7 +34,7 @@ namespace nnhal {
 
 class GnaPreparedModel : public BasePreparedModel {
 public:
-    GnaPreparedModel(const Model& model) : BasePreparedModel("GNA", model) {}
+    GnaPreparedModel(const Model& model) : BasePreparedModel(IntelDeviceType::GNA, model) {}
     ~GnaPreparedModel() { deinitialize(); }
 
     bool initialize(const Model& model) override;

@@ -94,12 +94,12 @@ public:
 
     size_t getOperandsSize() { return mModel.operands.size(); }
 
-    const float getOperandScale(int index) {
+    float getOperandScale(int index) {
         auto operand = getOperand(index);
         return operand.scale;
     }
 
-    const int32_t getOperandZeroPoint(int index) {
+    int32_t getOperandZeroPoint(int index) {
         auto operand = getOperand(index);
         return operand.zeroPoint;
     }
@@ -142,7 +142,7 @@ public:
     std::vector<T> GetConstVecFromBuffer(const uint8_t* buf, uint32_t len) {
         int n = len / sizeof(T);
         if (n * sizeof(T) != len) {
-            ALOGE("typeid(T).name() should be  multiples of %d bytes", sizeof(T));
+            ALOGE("typeid(T).name() should be  multiples of %lu bytes", sizeof(T));
             nnAssert(false);
         }
 

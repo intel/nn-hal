@@ -514,7 +514,8 @@ int sizeOfData(OperandType type, std::vector<uint32_t> dims) {
     return size;
 }
 
-void createDirs(std::string path) {
+// TODO: Hide under debug flag or remove from code
+bool createDirs(std::string path) {
     char delim = '/';
     int start = 0;
 
@@ -524,15 +525,16 @@ void createDirs(std::string path) {
 
         struct stat sb;
         if (!((stat(dir.c_str(), &sb) == 0) && (S_ISDIR(sb.st_mode)))) {
-            if (mkdir(dir.c_str(), 0777) != 0)
-                std::cout << "failed to create folder: " << dir << std::endl;
+            if (mkdir(dir.c_str(), 0777) != 0) return false;
         }
         pos = path.find(delim, pos + 1);
     }
+
+    return true;
 }
 
 void writeBufferToFile(std::string filename, const float* buf, size_t length) {
-    createDirs(filename);
+    if (!createDirs(filename)) return;
 
     std::ofstream ofs;
     ofs.open(filename.c_str(), std::ofstream::out | std::ofstream::trunc);

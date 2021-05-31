@@ -21,6 +21,7 @@ namespace nnhal {
 
 class IIENetwork {
 public:
+    virtual ~IIENetwork() {}
     virtual bool loadNetwork() = 0;
     virtual InferenceEngine::InferRequest getInferRequest() = 0;
     virtual void infer() = 0;

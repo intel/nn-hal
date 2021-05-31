@@ -21,7 +21,7 @@ private:
     bool initializeModel();
 
 public:
-    NgraphNetworkCreator(std::shared_ptr<NnapiModelInfo> modelInfo, const std::string& plugin);
+    NgraphNetworkCreator(std::shared_ptr<NnapiModelInfo> modelInfo, IntelDeviceType deviceType);
     ~NgraphNetworkCreator();
     void getSupportedOperations(std::vector<bool>& supportedOperations);
     bool validateOperations();
