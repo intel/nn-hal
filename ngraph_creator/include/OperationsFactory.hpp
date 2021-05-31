@@ -42,6 +42,7 @@
 #include <Relu6.hpp>
 #include <Reshape.hpp>
 #include <SQRT.hpp>
+#include <Select.hpp>
 #include <Sin.hpp>
 #include <Softmax.hpp>
 #include <Split.hpp>
