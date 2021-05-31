@@ -13,10 +13,14 @@ Average_Pool_2D::Average_Pool_2D(int operationIndex) : OperationsBase(operationI
 
 bool Average_Pool_2D::validate() {
     // Check Output type
-    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) return false;
+    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
+        !checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM))
+        return false;
 
     // Check Input Type
-    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) return false;
+    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
+        !checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM))
+        return false;
 
     // Check Input Dimension size
     const auto& inputDimensionsSize = getInputOperandDimensions(0).size();
@@ -53,9 +57,16 @@ bool Average_Pool_2D::validate() {
 
 std::shared_ptr<ngraph::Node> Average_Pool_2D::createNode() {
     auto inputIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 0);
-    auto inputNode = getInputNode<float>(0);
+    std::shared_ptr<ngraph::Node> inputNode;
     const auto& inDims = getInputOperandDimensions(0);
     const auto& inputsSize = sModelInfo->getOperationInputsSize(mNnapiOperationIndex);
+
+    if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) {
+        inputNode = getInputNode<float>(0);
+    } else if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
+        inputNode = getInputNode<uint8_t>(0);
+        inputNode = DequantizeNode(inputNode, inputIndex, ngraph::element::f32);
+    }
 
     ALOGD("%s inputsSize %d", __func__, inputsSize);
 
@@ -175,12 +186,18 @@ std::shared_ptr<ngraph::Node> Average_Pool_2D::createNode() {
 
     outputNode = applyActivation(outputNode, activationFn);
 
+    if (!useNchw) {
+        outputNode = transpose(NCHW_NHWC, outputNode);
+        mNgraphNodes->setForcedNchw(mDefaultOutputIndex, false);
+    }
+
+    if (checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
+        const auto& outputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
+        outputNode = QuantizeNode(outputNode, outputIndex, ngraph::element::u8);
+    }
+
     const auto outputLifetime = sModelInfo->getOperandLifetime(mDefaultOutputIndex);
     if (outputLifetime == OperandLifeTime::MODEL_OUTPUT) {
-        if (!useNchw) {
-            outputNode = transpose(NCHW_NHWC, outputNode);
-            mNgraphNodes->setForcedNchw(mDefaultOutputIndex, false);
-        }
         addResultNode(mDefaultOutputIndex, outputNode);
     }
 
