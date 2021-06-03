@@ -12,6 +12,8 @@ cc_library_static {
         "operations/src/OperationsBase.cpp",
         "operations/src/Abs.cpp",
         "operations/src/Add.cpp",
+        "operations/src/Argmax.cpp",
+        "operations/src/Argmin.cpp",
         "operations/src/Average_Pool_2D.cpp",
         "operations/src/Cast.cpp",
         "operations/src/Concat.cpp",
