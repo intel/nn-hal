@@ -117,6 +117,8 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<Sub>(operationIndex);
         case OperationType::TANH:
             return std::make_shared<Tanh>(operationIndex);
+        case OperationType::TOPK_V2:
+            return std::make_shared<Topk_V2>(operationIndex);
         case OperationType::TRANSPOSE:
             return std::make_shared<Transpose>(operationIndex);
         default:

@@ -60,6 +60,7 @@ cc_library_static {
         "operations/src/Squeeze.cpp",
         "operations/src/Sub.cpp",
         "operations/src/Tanh.cpp",
+        "operations/src/Topk_V2.cpp",
         "operations/src/Transpose.cpp"
     ],
 
