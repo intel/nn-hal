@@ -2,6 +2,8 @@
 
 #include <Abs.hpp>
 #include <Add.hpp>
+#include <Argmax.hpp>
+#include <Argmin.hpp>
 #include <Average_Pool_2D.hpp>
 #include <Cast.hpp>
 #include <Concat.hpp>
