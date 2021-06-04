@@ -40,7 +40,7 @@ std::shared_ptr<ngraph::Node> Sub::createNode() {
     auto outputNode = applyActivation(subNode, activationFn);
 
     const auto op = sModelInfo->getOperand(mDefaultOutputIndex);
-    if (op.lifetime == OperandLifeTime::MODEL_OUTPUT) {
+    if (op.lifetime == V1_3::OperandLifeTime::SUBGRAPH_OUTPUT) {
         addResultNode(mDefaultOutputIndex, outputNode);
     }
     return outputNode;

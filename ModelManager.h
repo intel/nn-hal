@@ -36,21 +36,21 @@ public:
         return true;
     }
     // Copy model input indices to a seperate vector
-    const auto& getModelInputIndexes() { return mModel.inputIndexes; }
+    const auto& getModelInputIndexes() { return mModel.main.inputIndexes; }
 
-    uint32_t getModelInputIndex(uint32_t index) { return mModel.inputIndexes[index]; }
+    uint32_t getModelInputIndex(uint32_t index) { return mModel.main.inputIndexes[index]; }
 
-    uint32_t getModelOutputIndex(uint32_t index) { return mModel.outputIndexes[index]; }
+    uint32_t getModelOutputIndex(uint32_t index) { return mModel.main.outputIndexes[index]; }
 
-    size_t getModelOutputsSize() { return mModel.outputIndexes.size(); }
+    size_t getModelOutputsSize() { return mModel.main.outputIndexes.size(); }
 
     // Index into the operand vector
-    OperandLifeTime getOperandLifetime(uint32_t operandIdx) {
-        auto tmpOperand = mModel.operands[operandIdx];
-        return tmpOperand.lifetime;
+    V1_3::OperandLifeTime getOperandLifetime(uint32_t operandIdx) {
+        auto tmpOperand = mModel.main.operands[operandIdx];
+        return (tmpOperand.lifetime);
     }
     OperandType getOperandType(uint32_t operandIdx) {
-        auto tmpOperand = mModel.operands[operandIdx];
+        auto tmpOperand = mModel.main.operands[operandIdx];
         return tmpOperand.type;
     }
 
@@ -73,36 +73,36 @@ public:
         return GetConstFromBuffer<T>(buf, len);
     }
 
-    const auto& getOperations() { return mModel.operations; }
+    const auto& getOperations() { return mModel.main.operations; }
     const auto& getOperationOutput(int operationIndex, uint32_t outputIndex) {
-        return mModel.operations[operationIndex].outputs[outputIndex];
+        return mModel.main.operations[operationIndex].outputs[outputIndex];
     }
     const auto& getOperationInput(int operationIndex, uint32_t inputIndex) {
-        return mModel.operations[operationIndex].inputs[inputIndex];
+        return mModel.main.operations[operationIndex].inputs[inputIndex];
     }
     size_t getOperationInputsSize(int operationIndex) {
-        return mModel.operations[operationIndex].inputs.size();
+        return mModel.main.operations[operationIndex].inputs.size();
     }
     size_t getOperationOutputsSize(int operationIndex) {
-        return mModel.operations[operationIndex].outputs.size();
+        return mModel.main.operations[operationIndex].outputs.size();
     }
 
-    size_t getOperationsSize() { return mModel.operations.size(); }
+    size_t getOperationsSize() { return mModel.main.operations.size(); }
 
-    const auto& getOperationType(int index) { return mModel.operations[index].type; }
+    const auto& getOperationType(int index) { return mModel.main.operations[index].type; }
 
-    const Operand& getOperand(int index) { return mModel.operands[index]; }
+    const Operand& getOperand(int index) { return mModel.main.operands[index]; }
 
-    size_t getOperandsSize() { return mModel.operands.size(); }
+    size_t getOperandsSize() { return mModel.main.operands.size(); }
 
     RunTimeOperandInfo& getRuntimeOperand(uint32_t index) {
-        return mOperands[mModel.inputIndexes[index]];
+        return mOperands[mModel.main.inputIndexes[index]];
     }
 
     bool isConstOperand(int index) {
         ALOGD("---------------------------------------------");
         ALOGD("Operand index: %d", index);
-        const auto op = mModel.operands[index];
+        const auto op = mModel.main.operands[index];
         ALOGD(" %s", toString(op).c_str());
         bool ret = (op.lifetime == OperandLifeTime::CONSTANT_COPY ||
                     op.lifetime == OperandLifeTime::CONSTANT_REFERENCE);
@@ -118,12 +118,12 @@ public:
 
     template <typename T>
     T ParseOperationInput(int operationIndex, uint32_t index) {
-        uint32_t inputIndex = mModel.operations[operationIndex].inputs[index];
-        const auto operand = mModel.operands[inputIndex];
+        uint32_t inputIndex = mModel.main.operations[operationIndex].inputs[index];
+        const auto operand = mModel.main.operands[inputIndex];
         const auto value = GetConstOperand<T>(inputIndex);
         VLOG(L1, "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
         VLOG(L1, "Operation input index: %d, operand index: %d", index, inputIndex);
-        VLOG(L1, "Operation: %s", toString(mModel.operations[operationIndex]).c_str());
+        VLOG(L1, "Operation: %s", toString(mModel.main.[operationIndex]).c_str());
         printHelper<T>::print(value, toString(operand).c_str());
         VLOG(L1, "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
 

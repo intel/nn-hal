@@ -37,7 +37,7 @@ std::shared_ptr<ngraph::Node> Softmax::createNode() {
     if (beta <= 0.0f) ALOGE("beta must be positive for softmax");
 
     const auto outputOperand = sModelInfo->getOperand(mDefaultOutputIndex);
-    if (outputOperand.lifetime == OperandLifeTime::MODEL_OUTPUT)
+    if (outputOperand.lifetime ==  V1_3::OperandLifeTime::SUBGRAPH_OUTPUT)
         addResultNode(mDefaultOutputIndex, outputNode);
 
     return outputNode;

@@ -245,7 +245,7 @@ std::shared_ptr<ngraph::Node> Conv_2d::createNode() {
     outputNode = applyActivation(outputNode, activationFn);
 
     const auto outputLifetime = sModelInfo->getOperandLifetime(mDefaultOutputIndex);
-    if (outputLifetime == OperandLifeTime::MODEL_OUTPUT) {
+    if (outputLifetime ==  V1_3::OperandLifeTime::SUBGRAPH_OUTPUT) {
         if (!useNchw) {
             outputNode = transpose(NCHW_NHWC, outputNode);
             mNgraphNodes->setForcedNchw(mDefaultOutputIndex, false);

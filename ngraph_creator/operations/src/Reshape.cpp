@@ -77,7 +77,7 @@ std::shared_ptr<ngraph::Node> Reshape::createNode() {
         std::make_shared<ngraph::opset3::Reshape>(inputOp, shapeNode, true);
 
     const auto outputOperand = sModelInfo->getOperand(mDefaultOutputIndex);
-    if (outputOperand.lifetime == OperandLifeTime::MODEL_OUTPUT)
+    if (outputOperand.lifetime ==  V1_3::OperandLifeTime::SUBGRAPH_OUTPUT)
         addResultNode(mDefaultOutputIndex, outputNode);
 
     return outputNode;

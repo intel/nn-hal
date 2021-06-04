@@ -53,7 +53,7 @@ std::shared_ptr<ngraph::Node> Less::createNode() {
                                                              ngraph::op::AutoBroadcastType::NUMPY);
 
     const auto op = sModelInfo->getOperand(mDefaultOutputIndex);
-    if (op.lifetime == OperandLifeTime::MODEL_OUTPUT) {
+    if (op.lifetime == V1_3::OperandLifeTime::SUBGRAPH_OUTPUT) {
         addResultNode(mDefaultOutputIndex, outputNode);
     }
     return outputNode;

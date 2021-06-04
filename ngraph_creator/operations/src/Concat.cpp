@@ -48,7 +48,7 @@ std::shared_ptr<ngraph::Node> Concat::createNode() {
     std::shared_ptr<ngraph::Node> outputNode =
         std::make_shared<ngraph::opset3::Concat>(inputs, axis);
     const auto op = sModelInfo->getOperand(mDefaultOutputIndex);
-    if (op.lifetime == OperandLifeTime::MODEL_OUTPUT) {
+    if (op.lifetime == V1_3::OperandLifeTime::SUBGRAPH_OUTPUT) {
         addResultNode(mDefaultOutputIndex, outputNode);
     }
     return outputNode;

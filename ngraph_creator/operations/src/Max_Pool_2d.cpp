@@ -183,7 +183,7 @@ std::shared_ptr<ngraph::Node> Max_Pool_2d::createNode() {
     auto outputNode = applyActivation(maxpoolNode, activationFn);
 
     const auto outputLifetime = sModelInfo->getOperandLifetime(mDefaultOutputIndex);
-    if (outputLifetime == OperandLifeTime::MODEL_OUTPUT) {
+    if (outputLifetime ==  V1_3::OperandLifeTime::SUBGRAPH_OUTPUT) {
         if (!useNchw) {
             outputNode = transpose(NCHW_NHWC, outputNode);
             mNgraphNodes->setForcedNchw(mDefaultOutputIndex, false);
