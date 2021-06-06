@@ -61,12 +61,7 @@ std::shared_ptr<ngraph::Node> Average_Pool_2D::createNode() {
     const auto& inDims = getInputOperandDimensions(0);
     const auto& inputsSize = sModelInfo->getOperationInputsSize(mNnapiOperationIndex);
 
-    if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) {
-        inputNode = getInputNode<float>(0);
-    } else if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        inputNode = getInputNode<uint8_t>(0);
-        inputNode = DequantizeNode(inputNode, inputIndex, ngraph::element::f32);
-    }
+    inputNode = getInputNode(0);
 
     ALOGD("%s inputsSize %d", __func__, inputsSize);
 
@@ -189,16 +184,6 @@ std::shared_ptr<ngraph::Node> Average_Pool_2D::createNode() {
     if (!useNchw) {
         outputNode = transpose(NCHW_NHWC, outputNode);
         mNgraphNodes->setForcedNchw(mDefaultOutputIndex, false);
-    }
-
-    if (checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        const auto& outputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
-        outputNode = QuantizeNode(outputNode, outputIndex, ngraph::element::u8);
-    }
-
-    const auto outputLifetime = sModelInfo->getOperandLifetime(mDefaultOutputIndex);
-    if (outputLifetime == OperandLifeTime::MODEL_OUTPUT) {
-        addResultNode(mDefaultOutputIndex, outputNode);
     }
 
     return outputNode;

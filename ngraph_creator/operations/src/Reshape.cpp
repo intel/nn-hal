@@ -41,12 +41,8 @@ std::shared_ptr<ngraph::Node> Reshape::createNode() {
     auto inputIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 0);
     std::shared_ptr<ngraph::Node> inputOp;
 
-    if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) {
-        inputOp = getInputNode<float>(0);
-    } else if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        inputOp = getInputNode<uint8_t>(0);
-        inputOp = DequantizeNode(inputOp, inputIndex, ngraph::element::f32);
-    }
+    inputOp = getInputNode(0);
+
     const auto& inDims = getInputOperandDimensions(0);
     auto numInputElements = 1;
     int strechDim = -1;
@@ -84,15 +80,6 @@ std::shared_ptr<ngraph::Node> Reshape::createNode() {
 
     std::shared_ptr<ngraph::Node> outputNode =
         std::make_shared<ngraph::opset3::Reshape>(inputOp, shapeNode, true);
-
-    if (checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        const auto& outputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
-        outputNode = QuantizeNode(outputNode, outputIndex, ngraph::element::u8);
-    }
-
-    const auto outputOperand = sModelInfo->getOperand(mDefaultOutputIndex);
-    if (outputOperand.lifetime == OperandLifeTime::MODEL_OUTPUT)
-        addResultNode(mDefaultOutputIndex, outputNode);
 
     return outputNode;
 }

@@ -41,35 +41,19 @@ std::shared_ptr<ngraph::Node> Squeeze::createNode() {
     // Creating input nodes
     std::shared_ptr<ngraph::Node> input;
 
-    if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) {
-        input = getInputNode<float>(0);
-    } else if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        input = getInputNode<uint8_t>(0);
-        const auto& inputIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 0);
-        input = DequantizeNode(input, inputIndex, ngraph::element::f32);
-    }
+    input = getInputNode(0);
 
     std::shared_ptr<ngraph::Node> dims;
 
     if (!sModelInfo->isOmittedInput(mNnapiOperationIndex, 1))
-        dims = getInputNode<int>(1);
+        dims = getInputNode(1);
     else
-        dims = make_shared<ngraph::opset3::Constant>(ngraph::element::i64, ngraph::Shape{0},
-                                                     std::vector<int64_t>{});
+        dims = createConstNode(ngraph::element::i32, {0}, std::vector<int64_t>{});
 
     std::shared_ptr<ngraph::Node> outputNode;
 
     outputNode = std::make_shared<ngraph::opset3::Squeeze>(input, dims);
 
-    if (checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        const auto& outputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
-        outputNode = QuantizeNode(outputNode, outputIndex, ngraph::element::u8);
-    }
-
-    const auto op = sModelInfo->getOperand(mDefaultOutputIndex);
-    if (op.lifetime == OperandLifeTime::MODEL_OUTPUT) {
-        addResultNode(mDefaultOutputIndex, outputNode);
-    }
     return outputNode;
 }
 

@@ -39,33 +39,17 @@ std::shared_ptr<ngraph::Node> Gather::createNode() {
     // Creating input nodes
     std::shared_ptr<ngraph::Node> gatherVals;
 
-    if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) {
-        gatherVals = getInputNode<float>(0);
-    } else if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_INT32)) {
-        gatherVals = getInputNode<int>(0);
-    } else if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        gatherVals = getInputNode<uint8_t>(0);
+    gatherVals = getInputNode(0);
 
-        const auto& inputIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 0);
-        gatherVals = DequantizeNode(gatherVals, inputIndex, ngraph::element::f32);
-    }
     // axis range [-n, n]
     auto axis = sModelInfo->ParseOperationInput<int>(mNnapiOperationIndex, 1);
-    auto axisNode = ngraph::opset3::Constant::create(ngraph::element::i64, {}, {axis});
-    auto indices = getInputNode<int>(2);
+    auto axisNode = createConstNode(ngraph::element::i32, {}, convertToVector(axis));
+
+    auto indices = getInputNode(2);
 
     std::shared_ptr<ngraph::Node> outputNode;
     outputNode = std::make_shared<ngraph::opset3::Gather>(gatherVals, indices, axisNode);
 
-    if (checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        const auto& outputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
-        outputNode = QuantizeNode(outputNode, outputIndex, ngraph::element::u8);
-    }
-
-    const auto op = sModelInfo->getOperand(mDefaultOutputIndex);
-    if (op.lifetime == OperandLifeTime::MODEL_OUTPUT) {
-        addResultNode(mDefaultOutputIndex, outputNode);
-    }
     return outputNode;
 }
 

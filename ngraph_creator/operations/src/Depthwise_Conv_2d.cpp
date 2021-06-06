@@ -232,19 +232,16 @@ std::shared_ptr<ngraph::Node> Depthwise_Conv_2d::createNode() {
     const auto& filterIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 1);
     const auto& biasIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 2);
 
-    if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) {
-        inputNode = getInputNode<float>(0);
-        filterNode = getInputNode<float>(1);
-        biasNode = getInputNode<float>(2);
-    } else if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        inputNode = getInputNode<uint8_t>(0);
-        filterNode = getInputNode<uint8_t>(1);
-        biasNode = getInputNode<int>(2);
+    inputNode = getInputNode(0);
+    filterNode = getInputNode(1);
+    biasNode = getInputNode(2);
 
-        inputNode = DequantizeNode(inputNode, inputIndex, ngraph::element::f32);
-        filterNode = DequantizeNode(filterNode, filterIndex, ngraph::element::f32);
+    if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
+        // for quant type inputs, bias is of type TENSOR_INT32. For TENSOR_INT32 type,
+        // dequantization is not applied during node creation
         biasNode = DequantizeNode(biasNode, biasIndex, ngraph::element::f32);
     }
+
     // OpenVino expects filter in OIHW format
     filterNode = transpose(IHWO_OIHW, filterNode);
     if (mNgraphNodes->isForcedNchw(inputIndex)) {
@@ -268,16 +265,14 @@ std::shared_ptr<ngraph::Node> Depthwise_Conv_2d::createNode() {
     pads_end = {padding_right, padding_bottom};
     dilations = {(size_t)dilation_width_factor, (size_t)dilation_height_factor};
 
-    ALOGD("input_channel value is ******* %d", input_channel);
-
     if (filterNode != nullptr) {
         std::vector<size_t> shape(&filterNode->get_shape()[0], &filterNode->get_shape()[0] + 4);
         shape[0] /= input_channel;
         shape.insert(shape.begin(), input_channel);
         ALOGD("%s final filternode shape %d", __func__, shape.size());
 
-        auto shapeNode = std::make_shared<ngraph::op::Constant>(
-            ngraph::element::i64, ngraph::Shape{shape.size()}, shape.data());
+        auto shapeNode = createConstNode(ngraph::element::i32, ngraph::Shape{shape.size()}, shape);
+
         filterNode = std::make_shared<ngraph::op::v1::Reshape>(filterNode, shapeNode, true);
     }
 
@@ -288,8 +283,8 @@ std::shared_ptr<ngraph::Node> Depthwise_Conv_2d::createNode() {
     auto biasDimensions = getInputOperandDimensions(2);
     std::vector<uint32_t> shape(groupConvNode->get_shape().size(), 1);
     shape[1] = biasDimensions[0];
-    auto shapeNode = std::make_shared<ngraph::opset3::Constant>(ngraph::element::i32,
-                                                                ngraph::Shape{shape.size()}, shape);
+    auto shapeNode = createConstNode(ngraph::element::i32, ngraph::Shape{shape.size()}, shape);
+
     biasNode = std::make_shared<ngraph::opset3::Reshape>(biasNode, shapeNode, true);
 
     std::shared_ptr<ngraph::Node> outputNode = std::make_shared<ngraph::opset3::Add>(
@@ -301,15 +296,6 @@ std::shared_ptr<ngraph::Node> Depthwise_Conv_2d::createNode() {
         mNgraphNodes->setForcedNchw(mDefaultOutputIndex, false);
     }
 
-    if (checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        const auto& outputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
-        outputNode = QuantizeNode(outputNode, outputIndex, ngraph::element::u8);
-    }
-
-    const auto outputLifetime = sModelInfo->getOperandLifetime(mDefaultOutputIndex);
-    if (outputLifetime == OperandLifeTime::MODEL_OUTPUT) {
-        addResultNode(mDefaultOutputIndex, outputNode);
-    }
     return outputNode;
 }
 

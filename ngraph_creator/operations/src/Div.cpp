@@ -29,8 +29,8 @@ bool Div::validate() {
 
 std::shared_ptr<ngraph::Node> Div::createNode() {
     // Creating input nodes
-    auto input1 = getInputNode<float>(0);
-    auto input2 = getInputNode<float>(1);
+    auto input1 = getInputNode(0);
+    auto input2 = getInputNode(1);
 
     auto activationFn = sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 2);
 
@@ -39,10 +39,6 @@ std::shared_ptr<ngraph::Node> Div::createNode() {
 
     auto outputNode = applyActivation(DivNode, activationFn);
 
-    const auto op = sModelInfo->getOperand(mDefaultOutputIndex);
-    if (op.lifetime == OperandLifeTime::MODEL_OUTPUT) {
-        addResultNode(mDefaultOutputIndex, outputNode);
-    }
     return outputNode;
 }
 

@@ -36,16 +36,12 @@ std::shared_ptr<ngraph::Node> Concat::createNode() {
     ALOGD("createNode n %d, axis %d", n, axis);
     for (int i = 0; i < n; i++) {
         auto inputIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, i);
-        auto inputOp = mNgraphNodes->getOperationOutput(inputIndex);
+        auto inputOp = getInputNode(inputIndex);
         const auto op = sModelInfo->getOperand(inputIndex);
         ALOGD("createNode inputIndex %d, lifetime %d", inputIndex, op.lifetime);
         if (mNgraphNodes->isForcedNchw(inputIndex)) {
             inputOp = transpose(NCHW_NHWC, inputOp);
             mNgraphNodes->setForcedNchw(mDefaultOutputIndex, false);
-        }
-        if (checkInputOperandType(i, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-            inputOp =
-                DequantizeNode(inputOp.get_node_shared_ptr(), inputIndex, ngraph::element::f32);
         }
         inputs.push_back(inputOp);
     }
@@ -53,15 +49,6 @@ std::shared_ptr<ngraph::Node> Concat::createNode() {
     std::shared_ptr<ngraph::Node> outputNode =
         std::make_shared<ngraph::opset3::Concat>(inputs, axis);
 
-    if (checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        const auto& outputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
-        outputNode = QuantizeNode(outputNode, outputIndex, ngraph::element::u8);
-    }
-
-    const auto op = sModelInfo->getOperand(mDefaultOutputIndex);
-    if (op.lifetime == OperandLifeTime::MODEL_OUTPUT) {
-        addResultNode(mDefaultOutputIndex, outputNode);
-    }
     return outputNode;
 }
 
