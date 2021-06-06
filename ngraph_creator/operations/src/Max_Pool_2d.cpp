@@ -160,12 +160,7 @@ std::shared_ptr<ngraph::Node> Max_Pool_2d::createNode() {
     std::shared_ptr<ngraph::Node> inputNode;
     auto inputIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 0);
 
-    if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) {
-        inputNode = getInputNode<float>(0);
-    } else if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        inputNode = getInputNode<uint8_t>(0);
-        inputNode = DequantizeNode(inputNode, inputIndex, ngraph::element::f32);
-    }
+    inputNode = getInputNode(0);
 
     if (mNgraphNodes->isForcedNchw(inputIndex)) {
         if (useNchw) {
@@ -199,15 +194,6 @@ std::shared_ptr<ngraph::Node> Max_Pool_2d::createNode() {
         mNgraphNodes->setForcedNchw(mDefaultOutputIndex, false);
     }
 
-    if (checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        const auto& outputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
-        outputNode = QuantizeNode(outputNode, outputIndex, ngraph::element::u8);
-    }
-
-    const auto outputLifetime = sModelInfo->getOperandLifetime(mDefaultOutputIndex);
-    if (outputLifetime == OperandLifeTime::MODEL_OUTPUT) {
-        addResultNode(mDefaultOutputIndex, outputNode);
-    }
     return outputNode;
 }
 

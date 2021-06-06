@@ -25,14 +25,10 @@ bool Logical_Not::validate() {
 
 std::shared_ptr<ngraph::Node> Logical_Not::createNode() {
     // Creating input nodes
-    auto input = getInputNode<bool>(0);
+    auto input = getInputNode(0);
 
     auto outputNode = std::make_shared<ngraph::opset3::LogicalNot>(input);
 
-    const auto op = sModelInfo->getOperand(mDefaultOutputIndex);
-    if (op.lifetime == OperandLifeTime::MODEL_OUTPUT) {
-        addResultNode(mDefaultOutputIndex, outputNode);
-    }
     return outputNode;
 }
 

@@ -54,8 +54,15 @@ std::shared_ptr<ngraph::Node> OperationsBase::createNodeForPlugin() { return cre
 
 // override connectOperationToGraph in case Operation has multiple outputs
 void OperationsBase::connectOperationToGraph() {
-    mNgraphNodes->setOutputAtOperandIndex(mDefaultOutputIndex,
-                                          createNodeForPlugin()->get_default_output());
+    auto outputNode = createNodeForPlugin();
+    const auto op = sModelInfo->getOperand(mDefaultOutputIndex);
+    if (op.type == OperandType::TENSOR_QUANT8_ASYMM) {
+        outputNode = QuantizeNode(outputNode, mDefaultOutputIndex, ngraph::element::u8);
+    }
+    if (op.lifetime == OperandLifeTime::MODEL_OUTPUT) {
+        addResultNode(mDefaultOutputIndex, outputNode);
+    }
+    mNgraphNodes->setOutputAtOperandIndex(mDefaultOutputIndex, outputNode->get_default_output());
 }
 
 void OperationsBase::addResultNode(size_t index, std::shared_ptr<ngraph::Node> resultNode) {
@@ -105,11 +112,8 @@ std::shared_ptr<ngraph::Node> OperationsBase::QuantizeNode(std::shared_ptr<ngrap
     float inputScale = sModelInfo->getOperandScale(index);
     int inputZeroPoint = sModelInfo->getOperandZeroPoint(index);
 
-    auto scale = ngraph::op::Constant::create(floatElementType, ngraph::Shape{}, {inputScale});
-    auto zeroPoint =
-        ngraph::op::Constant::create(intElementType, ngraph::Shape{}, {inputZeroPoint});
-    auto minVal = ngraph::op::Constant::create(intElementType, ngraph::Shape{}, {0});
-    auto maxVal = ngraph::op::Constant::create(intElementType, ngraph::Shape{}, {255});
+    auto scale = createConstNode(floatElementType, {}, convertToVector(inputScale));
+    auto zeroPoint = createConstNode(intElementType, {}, convertToVector(inputZeroPoint));
 
     if (input->get_element_type() != ngraph::element::f32)
         input = std::make_shared<ngraph::opset3::Convert>(input, floatElementType);
@@ -118,10 +122,9 @@ std::shared_ptr<ngraph::Node> OperationsBase::QuantizeNode(std::shared_ptr<ngrap
     auto round = std::make_shared<ngraph::op::v5::Round>(div, mode);
     auto convertRound = std::make_shared<ngraph::opset3::Convert>(round, ngraph::element::i32);
     auto sum = std::make_shared<ngraph::opset3::Add>(convertRound, zeroPoint);
-    auto min = std::make_shared<ngraph::opset3::Minimum>(maxVal, sum);
-    auto max = std::make_shared<ngraph::opset3::Maximum>(minVal, min);
+    auto data = make_shared<ngraph::opset3::Clamp>(sum, 0, 255);
 
-    auto outputNode = std::make_shared<ngraph::opset3::Convert>(max, quantizeType);
+    auto outputNode = std::make_shared<ngraph::opset3::Convert>(data, quantizeType);
 
     return outputNode;
 }
@@ -135,9 +138,8 @@ std::shared_ptr<ngraph::Node> OperationsBase::DequantizeNode(std::shared_ptr<ngr
     float inputScale = sModelInfo->getOperandScale(index);
     int inputZeroPoint = sModelInfo->getOperandZeroPoint(index);
 
-    auto scale = ngraph::op::Constant::create(floatElementType, ngraph::Shape{}, {inputScale});
-    auto zeroPoint =
-        ngraph::op::Constant::create(intElementType, ngraph::Shape{}, {inputZeroPoint});
+    auto scale = createConstNode(floatElementType, {}, convertToVector(inputScale));
+    auto zeroPoint = createConstNode(intElementType, {}, convertToVector(inputZeroPoint));
 
     if (input->get_element_type() != ngraph::element::i32)
         input = std::make_shared<ngraph::opset3::Convert>(input, intElementType);

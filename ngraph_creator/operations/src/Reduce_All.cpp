@@ -27,17 +27,13 @@ bool Reduce_All::validate() {
 
 std::shared_ptr<ngraph::Node> Reduce_All::createNode() {
     // Creating input nodes
-    auto input = getInputNode<bool>(0);
-    auto reduction_axes = getInputNode<int>(1);
+    auto input = getInputNode(0);
+    auto reduction_axes = getInputNode(1);
     auto keep_dims = sModelInfo->ParseOperationInput<uint8_t>(mNnapiOperationIndex, 2);
 
     auto outputNode =
         std::make_shared<ngraph::opset3::ReduceLogicalAnd>(input, reduction_axes, keep_dims);
 
-    const auto op = sModelInfo->getOperand(mDefaultOutputIndex);
-    if (op.lifetime == OperandLifeTime::MODEL_OUTPUT) {
-        addResultNode(mDefaultOutputIndex, outputNode);
-    }
     return outputNode;
 }
 

@@ -25,17 +25,13 @@ bool RSQRT::validate() {
 
 std::shared_ptr<ngraph::Node> RSQRT::createNode() {
     // Creating input nodes
-    auto input = getInputNode<float>(0);
+    auto input = getInputNode(0);
 
     auto sqrtNode = std::make_shared<ngraph::opset3::Sqrt>(input);
-    auto constNode =
-        ngraph::opset3::Constant::create(ngraph::element::f32, ngraph::Shape{1}, {1.0});
+    auto constNode = createConstNode(ngraph::element::f32, {1}, convertToVector(1.0));
+
     auto outputNode = std::make_shared<ngraph::opset3::Divide>(constNode, sqrtNode);
 
-    const auto op = sModelInfo->getOperand(mDefaultOutputIndex);
-    if (op.lifetime == OperandLifeTime::MODEL_OUTPUT) {
-        addResultNode(mDefaultOutputIndex, outputNode);
-    }
     return outputNode;
 }
 

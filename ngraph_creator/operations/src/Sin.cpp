@@ -25,14 +25,10 @@ bool Sin::validate() {
 
 std::shared_ptr<ngraph::Node> Sin::createNode() {
     // Creating input nodes
-    auto input = getInputNode<float>(0);
+    auto input = getInputNode(0);
 
     auto outputNode = std::make_shared<ngraph::opset3::Sin>(input);
 
-    const auto op = sModelInfo->getOperand(mDefaultOutputIndex);
-    if (op.lifetime == OperandLifeTime::MODEL_OUTPUT) {
-        addResultNode(mDefaultOutputIndex, outputNode);
-    }
     return outputNode;
 }
 

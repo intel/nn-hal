@@ -41,16 +41,10 @@ std::shared_ptr<ngraph::Node> Split::createNode() {
     // Creating input nodes
     std::shared_ptr<ngraph::Node> splitNode;
 
-    if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) {
-        splitNode = getInputNode<float>(0);
-    } else if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_INT32)) {
-        splitNode = getInputNode<int>(0);
-    } else if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        splitNode = getInputNode<uint8_t>(0);
-    }
+    splitNode = getInputNode(0, false);
 
     auto axis = sModelInfo->ParseOperationInput<int>(mNnapiOperationIndex, 1);
-    auto axisNode = ngraph::opset3::Constant::create(ngraph::element::i64, {}, {axis});
+    auto axisNode = createConstNode(ngraph::element::i32, {}, convertToVector(axis));
     auto numSplits = sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 2);
 
     auto outputNode =

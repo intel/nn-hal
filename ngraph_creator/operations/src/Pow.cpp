@@ -28,16 +28,12 @@ bool Pow::validate() {
 
 std::shared_ptr<ngraph::Node> Pow::createNode() {
     // Creating input nodes
-    auto base = getInputNode<float>(0);
-    auto exponent = getInputNode<float>(1);
+    auto base = getInputNode(0);
+    auto exponent = getInputNode(1);
 
     auto outputNode = std::make_shared<ngraph::opset3::Power>(base, exponent,
                                                               ngraph::op::AutoBroadcastType::NUMPY);
 
-    const auto op = sModelInfo->getOperand(mDefaultOutputIndex);
-    if (op.lifetime == OperandLifeTime::MODEL_OUTPUT) {
-        addResultNode(mDefaultOutputIndex, outputNode);
-    }
     return outputNode;
 }
 

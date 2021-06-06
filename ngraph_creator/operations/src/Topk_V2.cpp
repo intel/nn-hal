@@ -37,20 +37,12 @@ std::shared_ptr<ngraph::Node> Topk_V2::createNode() {
     // Creating input nodes
     std::shared_ptr<ngraph::Node> input;
 
-    if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) {
-        input = getInputNode<float>(0);
-    } else if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_INT32)) {
-        input = getInputNode<int>(0);
-    } else if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        input = getInputNode<uint8_t>(0);
+    input = getInputNode(0);
 
-        const auto& inputIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 0);
-        input = DequantizeNode(input, inputIndex, ngraph::element::f32);
-    }
     auto k = sModelInfo->ParseOperationInput<int>(mNnapiOperationIndex, 1);
     int axis = -1;  // to find largest entries for the last dimension.
 
-    auto k_node = ngraph::opset3::Constant::create(ngraph::element::i32, {}, {k});
+    auto k_node = createConstNode(ngraph::element::i32, {}, convertToVector(k));
     const auto topk =
         std::make_shared<ngraph::opset3::TopK>(input, k_node, axis, ngraph::opset3::TopK::Mode::MAX,
                                                ngraph::opset3::TopK::SortType::SORT_VALUES);

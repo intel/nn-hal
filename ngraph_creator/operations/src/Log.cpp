@@ -25,14 +25,10 @@ bool Log::validate() {
 
 std::shared_ptr<ngraph::Node> Log::createNode() {
     // Creating input nodes
-    auto input = getInputNode<float>(0);
+    auto input = getInputNode(0);
 
     auto outputNode = std::make_shared<ngraph::opset3::Log>(input);
 
-    const auto op = sModelInfo->getOperand(mDefaultOutputIndex);
-    if (op.lifetime == OperandLifeTime::MODEL_OUTPUT) {
-        addResultNode(mDefaultOutputIndex, outputNode);
-    }
     return outputNode;
 }
 

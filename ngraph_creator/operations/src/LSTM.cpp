@@ -96,6 +96,8 @@ bool LSTM::validate() {
     return true;
 }
 
+void LSTM::connectOperationToGraph() { createNode(); }
+
 std::shared_ptr<ngraph::Node> LSTM::createNode() {
     const auto& inputsSize = sModelInfo->getOperationInputsSize(mNnapiOperationIndex);
 
@@ -190,64 +192,69 @@ std::shared_ptr<ngraph::Node> LSTM::createNode() {
     auto output_size = initial_hidden_state_dims[1];
 
     // Creating input nodes
-    inputNode = getInputNode<float>(0);
+    inputNode = getInputNode(0);
     const auto& elementType = inputNode->get_element_type();
 
     // W_{xi}, W_{xf}, W_{xc}, W_{xo}
     if (isCIFGenabled) {
         if (!isCifgDimsEmpty) removeInputNode(1);
     } else {
-        input2input_weights = getInputNode<float>(1);
+        input2input_weights = getInputNode(1);
     }
-    input2forget_weights = getInputNode<float>(2);
-    input2cell_weights = getInputNode<float>(3);
-    input2output_weights = getInputNode<float>(4);
+    input2forget_weights = getInputNode(2);
+    input2cell_weights = getInputNode(3);
+    input2output_weights = getInputNode(4);
 
     // W_{hi}, W_{hf}, W_{hc}, W_{ho}
     if (isCIFGenabled) {
         if (!isCifgDimsEmpty) removeInputNode(5);
     } else {
-        recurrent2input_weights = getInputNode<float>(5);
+        recurrent2input_weights = getInputNode(5);
     }
-    recurrent2forget_weights = getInputNode<float>(6);
-    recurrent2cell_weights = getInputNode<float>(7);
-    recurrent2output_weights = getInputNode<float>(8);
+    recurrent2forget_weights = getInputNode(6);
+    recurrent2cell_weights = getInputNode(7);
+    recurrent2output_weights = getInputNode(8);
 
     // W_{ci}, W_{cf}, W_{co}
     if (isPeepholeUsed) {
         if (isCIFGenabled)
-            cell2input_weights = createConstNode(elementType, ngraph::Shape{num_units});
+            cell2input_weights =
+                createConstNode(elementType, ngraph::Shape{num_units}, convertToVector(0));
         else
-            cell2input_weights = getInputNode<float>(9);
-        cell2forget_weights = getInputNode<float>(10);
-        cell2output_weights = getInputNode<float>(11);
+            cell2input_weights = getInputNode(9);
+        cell2forget_weights = getInputNode(10);
+        cell2output_weights = getInputNode(11);
     } else {
-        cell2input_weights = createConstNode(elementType, ngraph::Shape{num_units});
-        cell2forget_weights = createConstNode(elementType, ngraph::Shape{num_units});
-        cell2output_weights = createConstNode(elementType, ngraph::Shape{num_units});
+        cell2input_weights =
+            createConstNode(elementType, ngraph::Shape{num_units}, convertToVector(0));
+        cell2forget_weights =
+            createConstNode(elementType, ngraph::Shape{num_units}, convertToVector(0));
+        cell2output_weights =
+            createConstNode(elementType, ngraph::Shape{num_units}, convertToVector(0));
     }
 
     // b_i, b_f, b_c, b_o
     if (isCIFGenabled) {
         if (!isCifgDimsEmpty) removeInputNode(12);
     } else {
-        input_gate_bias = getInputNode<float>(12);
+        input_gate_bias = getInputNode(12);
     }
-    forget_gate_bias = getInputNode<float>(13);
-    cell_bias = getInputNode<float>(14);
-    output_gate_bias = getInputNode<float>(15);
+    forget_gate_bias = getInputNode(13);
+    cell_bias = getInputNode(14);
+    output_gate_bias = getInputNode(15);
 
     // W_{proj}, b_{proj}
     if (isProjectionUsed) {
-        projection_weights = getInputNode<float>(16);
+        projection_weights = getInputNode(16);
         if (isValidInputTensor(17))
-            projection_bias = getInputNode<float>(17);
+            projection_bias = getInputNode(17);
         else
-            projection_bias = createConstNode(elementType, ngraph::Shape{output_size});
+            projection_bias =
+                createConstNode(elementType, ngraph::Shape{output_size}, convertToVector(0));
     }
 
-    initial_hidden_state = getInputNode<float>(18);  // h_{t-1}
-    initial_cell_state = getInputNode<float>(19);    // C_{t-1}
+    initial_hidden_state = getInputNode(18);  // h_{t-1}
+    initial_cell_state = getInputNode(19);    // C_{t-1}
 
     activationFn = sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 20);
     cell_state_clipping = sModelInfo->ParseOperationInput<float>(mNnapiOperationIndex, 21);
@@ -257,6 +264,22 @@ std::shared_ptr<ngraph::Node> LSTM::createNode() {
 
     std::shared_ptr<ngraph::Node> i_t, f_t, c_t, o_t;
     std::shared_ptr<ngraph::Node> scratchBuffer;
+
+    std::shared_ptr<ngraph::Node> input_layer_norm_weights, forget_layer_norm_weights,
+        cell_layer_norm_weights, output_layer_norm_weights;
+
+    std::shared_ptr<ngraph::Node> i_t_Mean, i_t_Variance, f_t_Mean, f_t_Variance, c_t_Mean,
+        c_t_Variance, o_t_Mean, o_t_Variance;
+
+    std::shared_ptr<ngraph::Node> reduceAxes;
+
+    if (isLayerNormUsed) {
+        if (!isCIFGenabled) input_layer_norm_weights = getInputNode(23);
+        forget_layer_norm_weights = getInputNode(24);
+        cell_layer_norm_weights = getInputNode(25);
+        output_layer_norm_weights = getInputNode(26);
+        reduceAxes = createConstNode(ngraph::element::i32, {}, convertToVector(0));
+    }
 
     // i_t = W_{xi}x_t+W_{hi}h_{t-1}+W_{ci}C_{t-1}
     if (!isCIFGenabled)
@@ -274,121 +297,104 @@ std::shared_ptr<ngraph::Node> LSTM::createNode() {
     o_t = add(matMul(inputNode, input2output_weights, false, true),
               matMul(initial_hidden_state, recurrent2output_weights, false, true));
 
+    /* ################# Update Forget Gate ################# */
     if (isLayerNormUsed) {
-        std::shared_ptr<ngraph::Node> input_layer_norm_weights, forget_layer_norm_weights,
-            cell_layer_norm_weights, output_layer_norm_weights;
-
-        if (isCIFGenabled)
-            input_layer_norm_weights = createConstNode(elementType, ngraph::Shape{num_units});
-        else
-            input_layer_norm_weights = getInputNode<float>(23);
-        forget_layer_norm_weights = getInputNode<float>(24);
-        cell_layer_norm_weights = getInputNode<float>(25);
-        output_layer_norm_weights = getInputNode<float>(26);
-
-        const auto& elementType = inputNode->get_element_type();
-        auto reduceAxes = ngraph::op::Constant::create(ngraph::element::i32, ngraph::Shape{}, {0});
-
-        std::shared_ptr<ngraph::Node> i_t_Mean, i_t_Variance, f_t_Mean, f_t_Variance, c_t_Mean,
-            c_t_Variance, o_t_Mean, o_t_Variance;
-
-        if (!isCIFGenabled) {
-            i_t_Mean = std::make_shared<ngraph::opset3::ReduceMean>(i_t, reduceAxes, false);
-            i_t_Variance = calculateVariance(i_t, i_t_Mean, reduceAxes, elementType);
-        }
-        f_t_Mean = std::make_shared<ngraph::opset3::ReduceMean>(f_t, reduceAxes, false);
+        f_t_Mean = calculatemean(f_t, reduceAxes, false);
         f_t_Variance = calculateVariance(f_t, f_t_Mean, reduceAxes, elementType);
-
-        c_t_Mean = std::make_shared<ngraph::opset3::ReduceMean>(c_t, reduceAxes, false);
-        c_t_Variance = calculateVariance(c_t, c_t_Mean, reduceAxes, elementType);
-
-        o_t_Mean = std::make_shared<ngraph::opset3::ReduceMean>(o_t, reduceAxes, false);
-        o_t_Variance = calculateVariance(o_t, o_t_Mean, reduceAxes, elementType);
-
-        double normalizationConstant = 1e-8f;
-        std::shared_ptr<ngraph::Node> batchNorm_i_t, batchNorm_f_t, batchNorm_c_t, batchNorm_o_t;
-
-        if (!isCIFGenabled)
-            batchNorm_i_t = std::make_shared<ngraph::opset3::BatchNormInference>(
-                i_t, input_layer_norm_weights, input_gate_bias, i_t_Mean, i_t_Variance,
-                normalizationConstant);
-        batchNorm_f_t = std::make_shared<ngraph::opset3::BatchNormInference>(
-            f_t, forget_layer_norm_weights, forget_gate_bias, f_t_Mean, f_t_Variance,
-            normalizationConstant);
-        batchNorm_c_t = std::make_shared<ngraph::opset3::BatchNormInference>(
-            c_t, cell_layer_norm_weights, cell_bias, c_t_Mean, c_t_Variance, normalizationConstant);
-        batchNorm_o_t = std::make_shared<ngraph::opset3::BatchNormInference>(
-            o_t, output_layer_norm_weights, output_gate_bias, o_t_Mean, o_t_Variance,
-            normalizationConstant);
-
-        if (!isCIFGenabled) i_t = batchNorm_i_t;
-        f_t = batchNorm_f_t;
-        c_t = batchNorm_c_t;
-        o_t = batchNorm_o_t;
+        f_t = LayerNorm(f_t, f_t_Mean, f_t_Variance, forget_layer_norm_weights, forget_gate_bias);
     } else {
-        // adding bias to gates
-        if (!isCIFGenabled) i_t = add(i_t, input_gate_bias);
+        // W_{xf}x_t + W_{hf}h_{t-1} + W_{cf}C_{t-1} + b_f
         f_t = add(f_t, forget_gate_bias);
-        c_t = add(c_t, cell_bias);
-        o_t = add(o_t, output_gate_bias);
     }
+    // sigma(W_{xf}x_t + W_{hf}h_{t-1} + W_{cf}C_{t-1} + b_f)
+    f_t = applyActivation(f_t, ACTIVATION_FUNCTION_SIGMOID);
 
-    // f(Xt*(Wf^T) + Ht-1*(Rf^T) + Pf (.) Ct-1 + Wbf + Rbf)
-    f_t = applyActivation(clip(f_t, cell_state_clipping), ACTIVATION_FUNCTION_SIGMOID);
-
+    /* ################# Update Input Gate ################# */
     if (isCIFGenabled) {
+        auto constNode = createConstNode(elementType, f_t->get_shape(), convertToVector(1.f));
         // Couple input with forget gate: 1 - i_f
-        i_t =
-            sub(ngraph::op::Constant::create(f_t->get_element_type(), f_t->get_shape(),
-                                             std::vector<float>(shape_size(f_t->get_shape()), 1.f)),
-                f_t);
+        i_t = sub(constNode, f_t);
 
         // TODO: Implement proper scratchBuffer
         // Creating a dummy scratchBuffer with same size as i_t, initialized to 0.0f
         // and then multiplying with i_t so that it gets connected to the graph
         // Then it's concat'ed on axis 1 to make that dim 3x
-        scratchBuffer = std::make_shared<ngraph::opset3::Constant>(
-            inputNode->get_element_type(), i_t->get_shape(), std::vector<float>{0.f});
-        scratchBuffer = std::make_shared<ngraph::opset3::Multiply>(
-            scratchBuffer, i_t, ngraph::op::AutoBroadcastType::NUMPY);
+        scratchBuffer = createConstNode(elementType, i_t->get_shape(), convertToVector(0.f));
+        scratchBuffer = std::make_shared<ngraph::opset3::Multiply>(scratchBuffer, i_t);
         std::vector<ngraph::Output<ngraph::Node>> inputs;
         for (int i = 0; i < 3; i++) inputs.push_back(scratchBuffer);
         scratchBuffer = std::make_shared<ngraph::opset3::Concat>(inputs, 1);
     } else {
-        // f(Xt*(Wi^T) + Ht-1*(Ri^T) + Pi (.) Ct-1 + Wbi + Rbi)
-        i_t = applyActivation(clip(i_t, cell_state_clipping), ACTIVATION_FUNCTION_SIGMOID);
+        if (isLayerNormUsed) {
+            i_t_Mean = calculatemean(i_t, reduceAxes, false);
+            i_t_Variance = calculateVariance(i_t, i_t_Mean, reduceAxes, elementType);
+            i_t = LayerNorm(i_t, i_t_Mean, i_t_Variance, input_layer_norm_weights, input_gate_bias);
+        } else {
+            // W_{xi}x_t + W_{hi}h_{t-1} + W_{ci}C_{t-1} + b_i
+            i_t = add(i_t, input_gate_bias);
+        }
+        // sigma(W_{xi}x_t + W_{hi}h_{t-1} + W_{ci}C_{t-1} + b_i)
+        i_t = applyActivation(i_t, ACTIVATION_FUNCTION_SIGMOID);
 
         // TODO: Implement proper scratchBuffer
         // Creating a dummy scratchBuffer with same size as i_t, initialized to 0.0f
         // and then multiplying with i_t so that it gets connected to the graph
         // Then it's concat'ed on axis 1 to make that dim 4x
-        scratchBuffer = std::make_shared<ngraph::opset3::Constant>(
-            inputNode->get_element_type(), i_t->get_shape(), std::vector<float>{0.f});
-        scratchBuffer = std::make_shared<ngraph::opset3::Multiply>(
-            scratchBuffer, i_t, ngraph::op::AutoBroadcastType::NUMPY);
+        scratchBuffer = createConstNode(elementType, i_t->get_shape(), convertToVector(0.f));
+        scratchBuffer = std::make_shared<ngraph::opset3::Multiply>(scratchBuffer, i_t);
         std::vector<ngraph::Output<ngraph::Node>> inputs;
         for (int i = 0; i < 4; i++) inputs.push_back(scratchBuffer);
         scratchBuffer = std::make_shared<ngraph::opset3::Concat>(inputs, 1);
     }
 
-    // ft (.) Ct-1 + it (.) ct
-    auto C = add(mul(f_t, initial_cell_state),
-                 mul(i_t, applyActivation(clip(c_t, cell_state_clipping), activationFn)));  // C_t
+    /* ################# Update Cell Gate ################# */
 
-    // f(Xt*(Wo^T) + Ht-1*(Ro^T) + Po (.) Ct + Wbo + Rbo)
-    o_t = applyActivation(clip(add(o_t, mul(cell2output_weights, C)), cell_state_clipping),
-                          ACTIVATION_FUNCTION_SIGMOID);  // o_t
+    if (isLayerNormUsed) {
+        c_t_Mean = calculatemean(c_t, reduceAxes, false);
+        c_t_Variance = calculateVariance(c_t, c_t_Mean, reduceAxes, elementType);
+        c_t = LayerNorm(c_t, c_t_Mean, c_t_Variance, cell_layer_norm_weights, cell_bias);
+    } else {
+        // W_{xc}x_t+W_{hc}h_{t-1}+b_c
+        c_t = add(c_t, cell_bias);
+    }
+    // g(W_{xc}x_t+W_{hc}h_{t-1}+b_c)
+    c_t = applyActivation(c_t, activationFn);
+
+    // ft (.) Ct-1 + it (.) ct
+    auto C = add(mul(f_t, initial_cell_state), mul(i_t, c_t));
+    // clip(ft (.) Ct-1 + it (.) ct, t_{cell})
+    C = clip(C, cell_state_clipping);
+
+    /* ################# Update Output Gate ################# */
+
+    // W_{xo}x_t+W_{ho}h_{t-1}+W_{co}C_t
+    o_t = add(o_t, mul(cell2output_weights, C));
+
+    if (isLayerNormUsed) {
+        o_t_Mean = calculatemean(o_t, reduceAxes, false);
+        o_t_Variance = calculateVariance(o_t, o_t_Mean, reduceAxes, elementType);
+        o_t = LayerNorm(o_t, o_t_Mean, o_t_Variance, output_layer_norm_weights, output_gate_bias);
+    } else {
+        // W_{xo}x_t+W_{ho}h_{t-1}+W_{co}C_t+b_o
+        o_t = add(o_t, output_gate_bias);
+    }
+
+    // sigma(W_{xo}x_t+W_{ho}h_{t-1}+W_{co}C_t+b_o)
+    o_t = applyActivation(o_t, ACTIVATION_FUNCTION_SIGMOID);
 
     std::shared_ptr<ngraph::Node> H;
     if (isProjectionUsed) {
-        auto projWeightsProduct = matMul(
-            projection_weights,
-            mul(o_t, applyActivation(clip(C, cell_state_clipping), activationFn)), false, true);
+        // o_t odot g(C_t)
+        auto dotProd = mul(o_t, applyActivation(C, activationFn));
+        // W_{proj}(o_t odot g(C_t))
+        auto projWeightsProduct = matMul(projection_weights, dotProd, false, true);
+        // W_{proj}(o_t odot g(C_t))+b_{proj}
+        auto projBiasAdd = add(transpose(NC_CN, projWeightsProduct), projection_bias);
         // clip(W_{proj}(o_t odot g(C_t))+b_{proj}, t_{proj})
-        H = clip(add(transpose(NC_CN, projWeightsProduct), projection_bias), proj_clipping);  // h_t
+        H = clip(projBiasAdd, proj_clipping);
     } else {
-        // ot (.) h(Ct)
-        H = mul(o_t, applyActivation(clip(C, cell_state_clipping), activationFn));  // h_t
+        // o_t odot g(C_t)
+        H = mul(o_t, applyActivation(C, activationFn));
     }
 
     std::vector<std::shared_ptr<ngraph::Node>> LstmOutputs(4, nullptr);
@@ -397,7 +403,6 @@ std::shared_ptr<ngraph::Node> LSTM::createNode() {
     LstmOutputs[2] = C;
     LstmOutputs[3] = H;
 
-    // eleminating scratchBuffer, otherwise its crashing loadNetwork()
     for (int i = 0; i < 4; i++) {
         auto outputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, i);
         mNgraphNodes->setOutputAtOperandIndex(outputIndex, LstmOutputs[i]);
@@ -406,7 +411,7 @@ std::shared_ptr<ngraph::Node> LSTM::createNode() {
             addResultNode(outputIndex, LstmOutputs[i]);
         }
     }
-    return scratchBuffer;
+    return nullptr;
 }
 
 std::shared_ptr<ngraph::Node> LSTM::add(const ngraph::Output<ngraph::Node>& lhs,
@@ -453,36 +458,75 @@ std::shared_ptr<ngraph::Node> LSTM::applyActivation(const std::shared_ptr<ngraph
             return std::make_shared<ngraph::opset3::Sigmoid>(arg);
             break;
         default:
-            return std::make_shared<ngraph::opset3::Sigmoid>(arg);
+            return std::make_shared<ngraph::opset3::Tanh>(arg);
     }
 }
 
 std::shared_ptr<ngraph::Node> LSTM::get_num_elements(
     const ngraph::Output<ngraph::Node>& value, const ngraph::Output<ngraph::Node>& reduction_axes) {
     const auto value_shape = std::make_shared<ngraph::opset3::ShapeOf>(value);
-    const auto dim_values = std::make_shared<ngraph::opset3::Gather>(
-        value_shape, reduction_axes,
-        ngraph::opset3::Constant::create(ngraph::element::i64, {}, {0}));
+    const auto constNode = createConstNode(ngraph::element::i32, {}, convertToVector(0));
+    const auto dim_values =
+        std::make_shared<ngraph::opset3::Gather>(value_shape, reduction_axes, constNode);
 
-    return std::make_shared<ngraph::opset3::ReduceProd>(
-        dim_values, ngraph::opset3::Constant::create(ngraph::element::i64, {}, {0}));
+    return std::make_shared<ngraph::opset3::ReduceProd>(dim_values, constNode);
 }
 
 std::shared_ptr<ngraph::Node> LSTM::calculateVariance(
     const ngraph::Output<ngraph::Node>& input, const std::shared_ptr<ngraph::Node>& mean,
     const std::shared_ptr<ngraph::Node>& reduction_axes, const ngraph::element::Type& elementType) {
-    ngraph::Output<ngraph::Node> diff = std::make_shared<ngraph::opset3::Subtract>(
-        input, mean, ngraph::op::AutoBroadcastType::NUMPY);
-    diff = std::make_shared<ngraph::opset3::ReduceSum>(
-        std::make_shared<ngraph::opset3::Multiply>(diff, diff), reduction_axes, false);
+    // x_i - mean_i
+    auto diff = std::make_shared<ngraph::opset3::Subtract>(input, mean);
+    // (x_i - mean_i) ** 2
+    auto multiply = mul(diff, diff);
+    // sum((x_i - mean_i) ** 2)
+    auto sum_diff = std::make_shared<ngraph::opset3::ReduceSum>(multiply, reduction_axes, false);
     auto N = get_num_elements(input, reduction_axes);
     N = std::make_shared<ngraph::opset3::Convert>(N, elementType);
-    return std::make_shared<ngraph::opset3::Divide>(diff, N, ngraph::op::AutoBroadcastType::NUMPY);
+    // sum((x_i - mean_i) ** 2) / k
+    return std::make_shared<ngraph::opset3::Divide>(sum_diff, N);
 }
 
-std::shared_ptr<ngraph::Node> LSTM::createConstNode(const ngraph::element::Type& elementType,
-                                                    const ngraph::Shape& shape) {
-    return ngraph::op::Constant::create(elementType, shape, {0});
+std::shared_ptr<ngraph::Node> LSTM::calculatemean(
+    const ngraph::Output<ngraph::Node>& value, const std::shared_ptr<ngraph::Node>& reduction_axes,
+    bool keep_dims) {
+    std::shared_ptr<ngraph::Node> elems_number;
+    auto value_elem_type = value.get_element_type();
+    // sum(x_i[j] for j in range(k))
+    auto value_elems_sum =
+        std::make_shared<ngraph::opset3::ReduceSum>(value, reduction_axes, keep_dims);
+    elems_number = get_num_elements(value, reduction_axes);
+    elems_number = std::make_shared<ngraph::opset3::Convert>(elems_number, value_elem_type);
+    // sum(x_i[j] for j in range(k)) / k
+    return std::make_shared<ngraph::opset3::Divide>(value_elems_sum, elems_number);
+}
+
+std::shared_ptr<ngraph::Node> LSTM::LayerNorm(
+    const ngraph::Output<ngraph::Node>& input, const std::shared_ptr<ngraph::Node>& mean,
+    const std::shared_ptr<ngraph::Node>& variance,
+    const std::shared_ptr<ngraph::Node>& normalizedweights,
+    const std::shared_ptr<ngraph::Node>& bias) {
+    // LayerNormalization
+    auto elementeType = ngraph::element::f32;
+    auto normalizationConstant = createConstNode(elementeType, {}, convertToVector(1e-8f));
+
+    auto constNode = createConstNode(elementeType, {}, convertToVector(1.0));
+    // (x_i - mean_i)
+    auto sub_input_mean = sub(input, mean);
+    // var_i + epsilon
+    auto add_var = add(variance, normalizationConstant);
+    // sqrt(var_i + epsilon)
+    auto sqrt = std::make_shared<ngraph::opset3::Sqrt>(add_var);
+    // 1 / sqrt(var_i + epsilon)
+    auto stddev_inv = std::make_shared<ngraph::opset3::Divide>(constNode, sqrt);
+    // (x_i - mean_i) * (1 / sqrt(var_i + epsilon))
+    auto normalized_input = mul(sub_input_mean, stddev_inv);
+    // x_i_normalized * gamma
+    auto mul_norm_weights = mul(normalized_input, normalizedweights);
+    // x_i_normalized * gamma + beta
+    auto output = add(mul_norm_weights, bias);
+
+    return output;
 }
 
 bool LSTM::isValidInputTensor(uint32_t inputIndex) {

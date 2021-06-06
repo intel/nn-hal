@@ -25,14 +25,10 @@ bool Abs::validate() {
 
 std::shared_ptr<ngraph::Node> Abs::createNode() {
     // Creating input nodes
-    auto input = getInputNode<float>(0);
+    auto input = getInputNode(0);
 
     auto outputNode = std::make_shared<ngraph::opset3::Abs>(input);
 
-    const auto op = sModelInfo->getOperand(mDefaultOutputIndex);
-    if (op.lifetime == OperandLifeTime::MODEL_OUTPUT) {
-        addResultNode(mDefaultOutputIndex, outputNode);
-    }
     return outputNode;
 }
 

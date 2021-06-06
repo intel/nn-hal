@@ -29,20 +29,10 @@ std::shared_ptr<ngraph::Node> Neg::createNode() {
     // Creating input nodes
     std::shared_ptr<ngraph::Node> input;
 
-    if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) {
-        input = getInputNode<float>(0);
-    }
-
-    if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_INT32)) {
-        input = getInputNode<int>(0);
-    }
+    input = getInputNode(0);
 
     auto outputNode = std::make_shared<ngraph::opset3::Negative>(input);
 
-    const auto op = sModelInfo->getOperand(mDefaultOutputIndex);
-    if (op.lifetime == OperandLifeTime::MODEL_OUTPUT) {
-        addResultNode(mDefaultOutputIndex, outputNode);
-    }
     return outputNode;
 }
 
