@@ -42,6 +42,7 @@ cc_library_static {
         "operations/src/Neg.cpp",
         "operations/src/Not_Equal.cpp",
         "operations/src/Pad.cpp",
+        "operations/src/Pad_V2.cpp",
         "operations/src/Pow.cpp",
         "operations/src/Quantize.cpp",
         "operations/src/Reduce_All.cpp",
