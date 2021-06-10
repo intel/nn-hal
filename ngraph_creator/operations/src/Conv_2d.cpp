@@ -35,6 +35,10 @@ bool Conv_2d::validate() {
               inputDimensionsSize, filterDimensionsSize);
         return false;
     }
+    if (!isValidInputTensor(0) || !isValidInputTensor(1)) {
+        ALOGE("%s Invalid dimensions for input or filter", __func__);
+        return false;
+    }
 
     const auto& inputsSize = sModelInfo->getOperationInputsSize(mNnapiOperationIndex);
 

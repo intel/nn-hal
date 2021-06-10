@@ -1,4 +1,5 @@
 #include <Topk_V2.hpp>
+#define LOG_TAG "Topk_V2"
 
 namespace android {
 namespace hardware {
@@ -47,31 +48,31 @@ std::shared_ptr<ngraph::Node> Topk_V2::createNode() {
         std::make_shared<ngraph::opset3::TopK>(input, k_node, axis, ngraph::opset3::TopK::Mode::MAX,
                                                ngraph::opset3::TopK::SortType::SORT_VALUES);
 
-    std::shared_ptr<ngraph::Node> outputNode1, outputNode2;
+    auto outputNode = topk->outputs();
 
-    if (checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        const auto& outputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
-        outputNode1 =
-            std::make_shared<ngraph::opset3::Convert>(topk->output(0), ngraph::element::f32);
-        outputNode1 = QuantizeNode(outputNode1, outputIndex, ngraph::element::u8);
-    } else if (checkOutputOperandType(0, (int32_t)OperandType::TENSOR_INT32)) {
-        outputNode1 =
-            std::make_shared<ngraph::opset3::Convert>(topk->output(0), ngraph::element::i32);
-    } else if (checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) {
-        outputNode1 =
-            std::make_shared<ngraph::opset3::Convert>(topk->output(0), ngraph::element::f32);
-    }
+    for (int i = 0; i < 2; i++) {
+        auto outputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, i);
+        // TODO: remove this dummy convert
+        std::shared_ptr<ngraph::Node> outNode;
+        if (checkOutputOperandType(i, (int32_t)OperandType::TENSOR_FLOAT32)) {
+            outNode =
+                std::make_shared<ngraph::opset3::Convert>(outputNode[i], ngraph::element::f32);
+        } else if (checkOutputOperandType(i, (int32_t)OperandType::TENSOR_INT32)) {
+            outNode =
+                std::make_shared<ngraph::opset3::Convert>(outputNode[i], ngraph::element::i32);
+        } else if (checkOutputOperandType(i, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
+            outNode =
+                std::make_shared<ngraph::opset3::Convert>(outputNode[i], ngraph::element::f32);
+            outNode = QuantizeNode(outNode, outputIndex, ngraph::element::u8);
+        }
 
-    outputNode2 = std::make_shared<ngraph::opset3::Convert>(topk->output(1), ngraph::element::i32);
-
-    auto outputIndex1 = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
-    auto outputIndex2 = sModelInfo->getOperationOutput(mNnapiOperationIndex, 1);
-    mNgraphNodes->setOutputAtOperandIndex(outputIndex1, outputNode1);
-    mNgraphNodes->setOutputAtOperandIndex(outputIndex2, outputNode2);
-    const auto op = sModelInfo->getOperand(outputIndex1);
-    if (op.lifetime == OperandLifeTime::MODEL_OUTPUT) {
-        addResultNode(outputIndex1, outputNode1);
-        addResultNode(outputIndex2, outputNode2);
+        mNgraphNodes->setOutputAtOperandIndex(outputIndex, outNode);
+        ALOGD("%s Set Output index %d", __func__, outputIndex);
+        const auto op = sModelInfo->getOperand(outputIndex);
+        if (op.lifetime == OperandLifeTime::MODEL_OUTPUT) {
+            addResultNode(outputIndex, outNode);
+            ALOGD("%s Add result %d", __func__, outputIndex);
+        }
     }
     return nullptr;
 }

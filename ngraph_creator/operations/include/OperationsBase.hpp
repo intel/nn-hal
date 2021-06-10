@@ -19,6 +19,7 @@ class OperationsBase {
 protected:
     enum ConversionType { NHWC_NCHW, NCHW_NHWC, IHWO_OIHW, OHWI_OIHW, NHC_NCH, NCH_NHC, NC_CN };
     uint32_t mDefaultOutputIndex;
+    uint32_t mDefaultInputIndex = 0;
     int mNnapiOperationIndex;
     std::shared_ptr<ngraph::Node> transpose(ConversionType type,
                                             ngraph::Output<ngraph::Node> input);
@@ -34,6 +35,7 @@ protected:
     bool checkOutputOperandType(uint32_t index, const int32_t expectedOperandType);
     bool checkInputOperandType(uint32_t index, const int32_t expectedOperandType);
     const vec<uint32_t> getInputOperandDimensions(uint32_t inputIndex);
+    bool isValidInputTensor(uint32_t inputIndex);
 
     std::shared_ptr<ngraph::Node> getInputNode(uint32_t inputIndex, bool dequantize = true) {
         std::shared_ptr<ngraph::Node> input;
@@ -74,7 +76,8 @@ protected:
                     break;
                 }
                 default: {
-                    ALOGE("Unsupported Tensor type %s", __func__);
+                    ALOGE("Unsupported Tensor type %s inputIndex %d, operandType %d", __func__,
+                          inputIndex, operandType);
                     return nullptr;
                 }
             }
@@ -122,6 +125,8 @@ public:
     OperationsBase(int operationIndex);
     void setNgraphNodes(std::shared_ptr<NgraphNodes> nodes);
     virtual bool validate();
+    // override validateForPlugin in case sPluginType specific implementation is required
+    virtual bool validateForPlugin();
     // override connectOperationToGraph in case Operation has multiple outputs
     virtual void connectOperationToGraph();
 };
