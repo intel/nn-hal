@@ -465,11 +465,11 @@ std::shared_ptr<ngraph::Node> LSTM::applyActivation(const std::shared_ptr<ngraph
 std::shared_ptr<ngraph::Node> LSTM::get_num_elements(
     const ngraph::Output<ngraph::Node>& value, const ngraph::Output<ngraph::Node>& reduction_axes) {
     const auto value_shape = std::make_shared<ngraph::opset3::ShapeOf>(value);
-    const auto constNode = createConstNode(ngraph::element::i32, {}, convertToVector(0));
+    const auto indices = createConstNode(ngraph::element::i32, {}, convertToVector(1));
     const auto dim_values =
-        std::make_shared<ngraph::opset3::Gather>(value_shape, reduction_axes, constNode);
+        std::make_shared<ngraph::opset3::Gather>(value_shape, indices, reduction_axes);
 
-    return std::make_shared<ngraph::opset3::ReduceProd>(dim_values, constNode);
+    return std::make_shared<ngraph::opset3::ReduceProd>(dim_values, reduction_axes);
 }
 
 std::shared_ptr<ngraph::Node> LSTM::calculateVariance(
