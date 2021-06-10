@@ -268,17 +268,11 @@ std::shared_ptr<ngraph::Node> LSTM::createNode() {
     std::shared_ptr<ngraph::Node> input_layer_norm_weights, forget_layer_norm_weights,
         cell_layer_norm_weights, output_layer_norm_weights;
 
-    std::shared_ptr<ngraph::Node> i_t_Mean, i_t_Variance, f_t_Mean, f_t_Variance, c_t_Mean,
-        c_t_Variance, o_t_Mean, o_t_Variance;
-
-    std::shared_ptr<ngraph::Node> reduceAxes;
-
     if (isLayerNormUsed) {
         if (!isCIFGenabled) input_layer_norm_weights = getInputNode(23);
         forget_layer_norm_weights = getInputNode(24);
         cell_layer_norm_weights = getInputNode(25);
         output_layer_norm_weights = getInputNode(26);
-        reduceAxes = createConstNode(ngraph::element::i32, {}, convertToVector(0));
     }
 
     // i_t = W_{xi}x_t+W_{hi}h_{t-1}+W_{ci}C_{t-1}
@@ -299,9 +293,7 @@ std::shared_ptr<ngraph::Node> LSTM::createNode() {
 
     /* ################# Update Forget Gate ################# */
     if (isLayerNormUsed) {
-        f_t_Mean = calculatemean(f_t, reduceAxes, false);
-        f_t_Variance = calculateVariance(f_t, f_t_Mean, reduceAxes, elementType);
-        f_t = LayerNorm(f_t, f_t_Mean, f_t_Variance, forget_layer_norm_weights, forget_gate_bias);
+        f_t = LayerNorm(f_t, forget_layer_norm_weights, forget_gate_bias);
     } else {
         // W_{xf}x_t + W_{hf}h_{t-1} + W_{cf}C_{t-1} + b_f
         f_t = add(f_t, forget_gate_bias);
@@ -326,9 +318,7 @@ std::shared_ptr<ngraph::Node> LSTM::createNode() {
         scratchBuffer = std::make_shared<ngraph::opset3::Concat>(inputs, 1);
     } else {
         if (isLayerNormUsed) {
-            i_t_Mean = calculatemean(i_t, reduceAxes, false);
-            i_t_Variance = calculateVariance(i_t, i_t_Mean, reduceAxes, elementType);
-            i_t = LayerNorm(i_t, i_t_Mean, i_t_Variance, input_layer_norm_weights, input_gate_bias);
+            i_t = LayerNorm(i_t, input_layer_norm_weights, input_gate_bias);
         } else {
             // W_{xi}x_t + W_{hi}h_{t-1} + W_{ci}C_{t-1} + b_i
             i_t = add(i_t, input_gate_bias);
@@ -350,9 +340,7 @@ std::shared_ptr<ngraph::Node> LSTM::createNode() {
     /* ################# Update Cell Gate ################# */
 
     if (isLayerNormUsed) {
-        c_t_Mean = calculatemean(c_t, reduceAxes, false);
-        c_t_Variance = calculateVariance(c_t, c_t_Mean, reduceAxes, elementType);
-        c_t = LayerNorm(c_t, c_t_Mean, c_t_Variance, cell_layer_norm_weights, cell_bias);
+        c_t = LayerNorm(c_t, cell_layer_norm_weights, cell_bias);
     } else {
         // W_{xc}x_t+W_{hc}h_{t-1}+b_c
         c_t = add(c_t, cell_bias);
@@ -371,9 +359,7 @@ std::shared_ptr<ngraph::Node> LSTM::createNode() {
     o_t = add(o_t, mul(cell2output_weights, C));
 
     if (isLayerNormUsed) {
-        o_t_Mean = calculatemean(o_t, reduceAxes, false);
-        o_t_Variance = calculateVariance(o_t, o_t_Mean, reduceAxes, elementType);
-        o_t = LayerNorm(o_t, o_t_Mean, o_t_Variance, output_layer_norm_weights, output_gate_bias);
+        o_t = LayerNorm(o_t, output_layer_norm_weights, output_gate_bias);
     } else {
         // W_{xo}x_t+W_{ho}h_{t-1}+W_{co}C_t+b_o
         o_t = add(o_t, output_gate_bias);
@@ -462,67 +448,28 @@ std::shared_ptr<ngraph::Node> LSTM::applyActivation(const std::shared_ptr<ngraph
     }
 }
 
-std::shared_ptr<ngraph::Node> LSTM::get_num_elements(
-    const ngraph::Output<ngraph::Node>& value, const ngraph::Output<ngraph::Node>& reduction_axes) {
-    const auto value_shape = std::make_shared<ngraph::opset3::ShapeOf>(value);
-    const auto constNode = createConstNode(ngraph::element::i32, {}, convertToVector(0));
-    const auto dim_values =
-        std::make_shared<ngraph::opset3::Gather>(value_shape, reduction_axes, constNode);
-
-    return std::make_shared<ngraph::opset3::ReduceProd>(dim_values, constNode);
-}
-
-std::shared_ptr<ngraph::Node> LSTM::calculateVariance(
-    const ngraph::Output<ngraph::Node>& input, const std::shared_ptr<ngraph::Node>& mean,
-    const std::shared_ptr<ngraph::Node>& reduction_axes, const ngraph::element::Type& elementType) {
-    // x_i - mean_i
-    auto diff = std::make_shared<ngraph::opset3::Subtract>(input, mean);
-    // (x_i - mean_i) ** 2
-    auto multiply = mul(diff, diff);
-    // sum((x_i - mean_i) ** 2)
-    auto sum_diff = std::make_shared<ngraph::opset3::ReduceSum>(multiply, reduction_axes, false);
-    auto N = get_num_elements(input, reduction_axes);
-    N = std::make_shared<ngraph::opset3::Convert>(N, elementType);
-    // sum((x_i - mean_i) ** 2) / k
-    return std::make_shared<ngraph::opset3::Divide>(sum_diff, N);
-}
-
-std::shared_ptr<ngraph::Node> LSTM::calculatemean(
-    const ngraph::Output<ngraph::Node>& value, const std::shared_ptr<ngraph::Node>& reduction_axes,
-    bool keep_dims) {
-    std::shared_ptr<ngraph::Node> elems_number;
-    auto value_elem_type = value.get_element_type();
-    // sum(x_i[j] for j in range(k))
-    auto value_elems_sum =
-        std::make_shared<ngraph::opset3::ReduceSum>(value, reduction_axes, keep_dims);
-    elems_number = get_num_elements(value, reduction_axes);
-    elems_number = std::make_shared<ngraph::opset3::Convert>(elems_number, value_elem_type);
-    // sum(x_i[j] for j in range(k)) / k
-    return std::make_shared<ngraph::opset3::Divide>(value_elems_sum, elems_number);
-}
-
 std::shared_ptr<ngraph::Node> LSTM::LayerNorm(
-    const ngraph::Output<ngraph::Node>& input, const std::shared_ptr<ngraph::Node>& mean,
-    const std::shared_ptr<ngraph::Node>& variance,
+    const ngraph::Output<ngraph::Node>& input,
     const std::shared_ptr<ngraph::Node>& normalizedweights,
     const std::shared_ptr<ngraph::Node>& bias) {
     // LayerNormalization
-    auto elementeType = ngraph::element::f32;
-    auto normalizationConstant = createConstNode(elementeType, {}, convertToVector(1e-8f));
-
-    auto constNode = createConstNode(elementeType, {}, convertToVector(1.0));
-    // (x_i - mean_i)
-    auto sub_input_mean = sub(input, mean);
+    auto normalizationConstant = createConstNode(ngraph::element::f32, {}, convertToVector(1e-8f));
+    auto axis = ngraph::op::Constant::create(ngraph::element::i32, {}, {-1});
+    auto mean = std::make_shared<ngraph::opset3::ReduceMean>(input, axis, true);
+    // x_i - mean_i
+    auto diff = sub(input, mean);
+    // (x_i - mean_i) ** 2
+    auto multiply = mul(diff, diff);
+    // mean((x_i - mean_i) ** 2)
+    auto var = std::make_shared<ngraph::opset3::ReduceMean>(multiply, axis, true);
     // var_i + epsilon
-    auto add_var = add(variance, normalizationConstant);
+    auto add_var = add(var, normalizationConstant);
     // sqrt(var_i + epsilon)
     auto sqrt = std::make_shared<ngraph::opset3::Sqrt>(add_var);
-    // 1 / sqrt(var_i + epsilon)
-    auto stddev_inv = std::make_shared<ngraph::opset3::Divide>(constNode, sqrt);
-    // (x_i - mean_i) * (1 / sqrt(var_i + epsilon))
-    auto normalized_input = mul(sub_input_mean, stddev_inv);
+    // (x_i - mean_i) / sqrt(var_i + epsilon)
+    auto stddev_inv = std::make_shared<ngraph::opset3::Divide>(diff, sqrt);
     // x_i_normalized * gamma
-    auto mul_norm_weights = mul(normalized_input, normalizedweights);
+    auto mul_norm_weights = mul(stddev_inv, normalizedweights);
     // x_i_normalized * gamma + beta
     auto output = add(mul_norm_weights, bias);
 
