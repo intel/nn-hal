@@ -217,6 +217,7 @@ Return<ErrorStatus> Driver::prepareModel_1_2(const Model& model, ExecutionPrefer
         ALOGE("failed to create preparedmodel");
         return ErrorStatus::INVALID_ARGUMENT;
     }
+    for (auto opn : model.operations) dumpOperation(opn);
 
     if (!driverPreparedModel->initialize(model)) {
         ALOGE("failed to initialize preparedmodel");

@@ -25,7 +25,8 @@ bool Pad_V2::validate() {
         return false;
     }
     if (!checkInputOperandType(2, (int32_t)OperandType::FLOAT32) &&
-        !checkInputOperandType(2, (int32_t)OperandType::INT32)) return false;
+        !checkInputOperandType(2, (int32_t)OperandType::INT32))
+        return false;
 
     // Check input rank
     const auto inputRank = getInputOperandDimensions(0).size();
@@ -54,12 +55,13 @@ std::shared_ptr<ngraph::Node> Pad_V2::createNode() {
 
     if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) {
         auto pad_scalar_value = sModelInfo->ParseOperationInput<float>(mNnapiOperationIndex, 2);
-        pad_value = createConstNode(ngraph::element::f32, {}, convertToVector(pad_scalar_value));    
+        pad_value = createConstNode(ngraph::element::f32, {}, convertToVector(pad_scalar_value));
     } else if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        auto pad_scalar_value = sModelInfo->ParseOperationInput<int>(mNnapiOperationIndex, 2);    
+        auto pad_scalar_value = sModelInfo->ParseOperationInput<int>(mNnapiOperationIndex, 2);
         pad_value = createConstNode(ngraph::element::i32, {}, convertToVector(pad_scalar_value));
-        
-        // scale and zeropoint of pad value has to be same as in inputNode. so inputIndex is passed as second parameter to DequantizeNode
+
+        // scale and zeropoint of pad value has to be same as in inputNode. so inputIndex is passed
+        // as second parameter to DequantizeNode
         pad_value = DequantizeNode(pad_value, inputIndex, ngraph::element::f32);
     }
 
@@ -67,7 +69,8 @@ std::shared_ptr<ngraph::Node> Pad_V2::createNode() {
     auto paddingsSplitNode =
         std::make_shared<ngraph::opset3::Split>(paddings, axisNode, 2)->outputs();
 
-    const auto shapeNode = createConstNode(ngraph::element::i32, {1}, convertToVector((int32_t)getInputOperandDimensions(0).size()));
+    const auto shapeNode = createConstNode(
+        ngraph::element::i32, {1}, convertToVector((int32_t)getInputOperandDimensions(0).size()));
 
     std::shared_ptr<ngraph::Node> pads_begin =
         std::make_shared<ngraph::opset3::Reshape>(paddingsSplitNode[0], shapeNode, true);
