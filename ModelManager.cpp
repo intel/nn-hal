@@ -152,6 +152,7 @@ const uint8_t* NnapiModelInfo::GetOperandMemory(int index, uint32_t& lenOut) {
         //     "operand lifetime "
         //     "OperandLifeTime::MODEL_INPUT||MODEL_OUTPUT||NO_VALUE||TEMPORARY_VARIABLE");
         lenOut = sizeOfData(op.type, op.dimensions);
+        ALOGV("operand lifetime(%d), type(%d), lenOut(%d)", op.lifetime, op.type, lenOut);
         return nullptr;
     }
     ALOGE("operand is expected to be const, but lifetime is %d", op.lifetime);
@@ -301,7 +302,6 @@ Blob::Ptr NnapiModelInfo::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const ui
 }
 
 IRBlob::Ptr NnapiModelInfo::GetConstOperandAsTensor(int operand_idx, int operation_idx) {
-    dumpOperand(operand_idx, mModel);
     const auto op = mModel.operands[operand_idx];
     uint32_t len;
 
@@ -388,7 +388,6 @@ IRBlob::Ptr NnapiModelInfo::GetConstOperandAsTensor(int operand_idx, int operati
 
 // Redundant.. Remove the code
 IRBlob::Ptr NnapiModelInfo::GetConstWeightsOperandAsTensor(uint32_t index) {
-    dumpOperand(index, mModel);
     const auto op = mModel.operands[index];
     uint32_t len;
     const uint8_t* buf = GetOperandMemory(index, len);

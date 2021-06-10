@@ -462,7 +462,7 @@ bool RunTimePoolInfo::unmap_mem() {
         const size_t size = hidlMemory.size();
         if (hidlMemory.name() == "mmap_fd") {
             if (munmap(buffer, size)) {
-                VLOG(L1, "Unmap failed\n");
+                ALOGE("Unmap failed\n");
                 return false;
             }
             buffer = nullptr;
