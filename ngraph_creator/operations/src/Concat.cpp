@@ -23,6 +23,12 @@ bool Concat::validate() {
     if (!checkInputOperandType(n, (int32_t)OperandType::INT32)) {
         return false;
     }
+    for (int i = 0; i < n; i++) {
+        if (!isValidInputTensor(i)) {
+            ALOGE("%s Invalid dimensions for input", __func__);
+            return false;
+        }
+    }
     ALOGV("%s PASSED", __func__);
     return true;
 }
@@ -36,7 +42,7 @@ std::shared_ptr<ngraph::Node> Concat::createNode() {
     ALOGD("createNode n %d, axis %d", n, axis);
     for (int i = 0; i < n; i++) {
         auto inputIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, i);
-        auto inputOp = getInputNode(inputIndex);
+        auto inputOp = getInputNode(i);
         const auto op = sModelInfo->getOperand(inputIndex);
         ALOGD("createNode inputIndex %d, lifetime %d", inputIndex, op.lifetime);
         if (mNgraphNodes->isForcedNchw(inputIndex)) {
