@@ -83,14 +83,6 @@ enum PaddingScheme {
     kPaddingValid = 2,
 };
 
-// inline unsigned int debugMask = ((1 << (L1 + 1)) - 1);
-//#define NN_DEBUG
-#ifdef NN_DEBUG
-#define VLOG(l, x, ...)                                                          \
-    do {                                                                         \
-        if (debugMask & (1 << l)) ALOGI("[%s] " x, __FUNCTION__, ##__VA_ARGS__); \
-    } while (0)
-
 #define VLOGDIMS(l, d, header)                                                       \
     do {                                                                             \
         auto size = (d).size();                                                      \
@@ -98,45 +90,16 @@ enum PaddingScheme {
               size > 2 ? (d)[2] : 0, size > 3 ? (d)[3] : 0);                         \
     } while (0)
 
-#define dumpOperand(index, model)                               \
-    do {                                                        \
-        const auto op = model.operands[index];                  \
-        ALOGI("---------------------------------------------"); \
-        ALOGI("Operand index: %d", index);                      \
-        ALOGI("%s", toString(op).c_str());                      \
-        ALOGI("---------------------------------------------"); \
+#define dumpOperand(index, model)                              \
+    do {                                                       \
+        const auto op = model.operands[index];                 \
+        ALOGI("Operand (%d) %s", index, toString(op).c_str()); \
     } while (0)
 
-#define dumpOperation(operation)                                \
-    do {                                                        \
-        ALOGI("---------------------------------------------"); \
-        ALOGI("Operation:");                                    \
-        ALOGI("%s", toString(operation).c_str());               \
-        ALOGI("---------------------------------------------"); \
+#define dumpOperation(operation)                             \
+    do {                                                     \
+        ALOGI("Operation: %s", toString(operation).c_str()); \
     } while (0)
-
-#define dumpOperationSupport(operation, support)                    \
-    do {                                                            \
-        ALOGI("---------------------------------------------");     \
-        ALOGI("Operation support: %s", support ? "True" : "False"); \
-        ALOGI("%s", toString(operation).c_str());                   \
-        ALOGI("---------------------------------------------");     \
-    } while (0)
-
-#define dumpOperationParam(operation)             \
-    do {                                          \
-        ALOGI("dumping operation-params");        \
-        ALOGI("%s", toString(operation).c_str()); \
-    } while (0)
-
-#else
-#define VLOG(...)
-#define VLOGDIMS(l, d, header)
-#define dumpOperand(...)
-#define dumpOperation(operation)
-#define dumpOperationSupport(operation, support)
-#define dumpOperationParam(operation)
-#endif
 
 #define WRONG_DIM (-1)
 
@@ -327,7 +290,7 @@ size_t sizeOfTensor(const TensorDims& dims);
 
 #ifdef NN_DEBUG
 template <typename T>
-void printBuffer(int level, T* buf, int num, int items, const char* format, uint32_t buf_len) {
+void printBuffer(T* buf, int num, int items, const char* format, uint32_t buf_len) {
     const size_t maxlen = 1024;
     char str[maxlen] = {0};
     int start = 0;
@@ -343,7 +306,7 @@ void printBuffer(int level, T* buf, int num, int items, const char* format, uint
             }
         }
         start = n;
-        VLOG(level, "%s", str);
+        ALOGV("%s", str);
     }
 }
 
