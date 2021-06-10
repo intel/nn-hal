@@ -23,6 +23,12 @@ bool Add::validate() {
             return false;
     }
 
+    const auto& activationIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 1);
+    if (!sModelInfo->isOperandLifeTimeConst(activationIndex)) {
+        ALOGE("%s Only Constant supported for specifying Activation", __func__);
+        return false;
+    }
+
     if (!checkInputOperandType(2, (int32_t)OperandType::INT32)) {
         return false;
     }

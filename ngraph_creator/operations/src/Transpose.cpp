@@ -28,7 +28,7 @@ bool Transpose::validate() {
 
     // TODO: Add Support for all_tensors_as_inputs
     const auto& dimsOperandIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 1);
-    const auto& dims = getInputOperandDimensions(dimsOperandIndex);
+    const auto& dims = getInputOperandDimensions(1);
     if (!dims.empty() && dims[0] != 0 && !sModelInfo->isOperandLifeTimeConst(dimsOperandIndex)) {
         ALOGE("%s Only Constant dimensions supported now", __func__);
         return false;

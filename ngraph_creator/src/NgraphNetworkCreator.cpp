@@ -93,7 +93,7 @@ bool NgraphNetworkCreator::createInputParams() {
 
 void NgraphNetworkCreator::getSupportedOperations(std::vector<bool>& supportedOperations) {
     for (int i = 0; i < mModelInfo->getOperationsSize(); i++) {
-        if (!mOperationNodes[i] || !mOperationNodes[i]->validate())
+        if (!mOperationNodes[i] || !mOperationNodes[i]->validateForPlugin())
             supportedOperations[i] = false;
         else
             supportedOperations[i] = true;
@@ -104,7 +104,7 @@ void NgraphNetworkCreator::getSupportedOperations(std::vector<bool>& supportedOp
 
 bool NgraphNetworkCreator::validateOperations() {
     for (int i = 0; i < mModelInfo->getOperationsSize(); i++) {
-        if (!mOperationNodes[i] || !mOperationNodes[i]->validate()) {
+        if (!mOperationNodes[i] || !mOperationNodes[i]->validateForPlugin()) {
             ALOGE("%s index %d, type %d not supported", __func__, i,
                   mModelInfo->getOperationType(i));
             return false;

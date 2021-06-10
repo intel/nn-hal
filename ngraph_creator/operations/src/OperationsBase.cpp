@@ -1,4 +1,5 @@
 #include <OperationsBase.hpp>
+#define LOG_TAG "OperationsBase"
 
 namespace android {
 namespace hardware {
@@ -77,6 +78,16 @@ void OperationsBase::setNgraphNodes(std::shared_ptr<NgraphNodes> nodes) { mNgrap
 
 bool OperationsBase::validate() { return true; }
 
+bool OperationsBase::validateForPlugin() {
+    // Only validates default input(initialized to 0)
+    // All other validations to be done at each operation's validate
+    if (!isValidInputTensor(mDefaultInputIndex)) {
+        ALOGE("%s Invalid dimensions for input", __func__);
+        return false;
+    }
+    return validate();
+}
+
 bool OperationsBase::checkOperandType(uint32_t operandIndex, const int32_t expectedOperandType,
                                       const std::string& strLogInfo) {
     const auto operandType = (int32_t)sModelInfo->getOperandType(operandIndex);
@@ -101,6 +112,18 @@ const vec<uint32_t> OperationsBase::getInputOperandDimensions(uint32_t inputInde
     const auto& operandIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, inputIndex);
     const auto& operand = sModelInfo->getOperand(operandIndex);
     return operand.dimensions;
+}
+
+bool OperationsBase::isValidInputTensor(uint32_t inputIndex) {
+    size_t size = 1;
+    const auto& dims = getInputOperandDimensions(inputIndex);
+    ALOGV("%s dims.size(%d)", __func__, dims.size());
+    if (dims.empty()) return false;
+
+    for (auto d : dims) size *= d;
+    if (size == 0) return false;
+
+    return true;
 }
 
 std::shared_ptr<ngraph::Node> OperationsBase::QuantizeNode(std::shared_ptr<ngraph::Node> input,
