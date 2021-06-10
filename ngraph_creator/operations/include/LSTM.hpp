@@ -27,19 +27,7 @@ public:
                                        float m_clip) const;
     std::shared_ptr<ngraph::Node> applyActivation(const std::shared_ptr<ngraph::Node>& arg,
                                                   int activationFn) const;
-    std::shared_ptr<ngraph::Node> get_num_elements(
-        const ngraph::Output<ngraph::Node>& value,
-        const ngraph::Output<ngraph::Node>& reduction_axes);
-    std::shared_ptr<ngraph::Node> calculateVariance(
-        const ngraph::Output<ngraph::Node>& input, const std::shared_ptr<ngraph::Node>& mean,
-        const std::shared_ptr<ngraph::Node>& reduction_axes,
-        const ngraph::element::Type& elementType);
-    std::shared_ptr<ngraph::Node> calculatemean(const ngraph::Output<ngraph::Node>& value,
-                                                const std::shared_ptr<ngraph::Node>& reduction_axes,
-                                                bool keep_dims);
     std::shared_ptr<ngraph::Node> LayerNorm(const ngraph::Output<ngraph::Node>& input,
-                                            const std::shared_ptr<ngraph::Node>& mean,
-                                            const std::shared_ptr<ngraph::Node>& variance,
                                             const std::shared_ptr<ngraph::Node>& normalizedweights,
                                             const std::shared_ptr<ngraph::Node>& bias);
 
