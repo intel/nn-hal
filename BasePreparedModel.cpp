@@ -134,10 +134,16 @@ void asyncExecute(const Request& request, MeasureTiming measure, BasePreparedMod
         uint8_t* src = srcBlob->buffer().as<uint8_t*>();
         std::memcpy(dest, src, srcBlob->byteSize());
     }
-    ALOGD("Run");
+    ALOGD("%s Run", __func__);
 
     if (measure == MeasureTiming::YES) deviceStart = now();
-    plugin->infer();
+    try {
+        plugin->infer();
+    } catch (const std::exception& ex) {
+        ALOGE("%s Exception !!! %s", __func__, ex.what());
+        notify(callback, ErrorStatus::GENERAL_FAILURE, {}, kNoTiming);
+        return;
+    }
     if (measure == MeasureTiming::YES) deviceEnd = now();
 
     for (size_t i = 0; i < request.outputs.size(); i++) {
@@ -244,10 +250,15 @@ static std::tuple<ErrorStatus, hidl_vec<V1_2::OutputShape>, Timing> executeSynch
         std::memcpy(dest, src, srcBlob->byteSize());
     }
 
-    ALOGD("Run");
+    ALOGD("%s Run", __func__);
 
     if (measure == MeasureTiming::YES) deviceStart = now();
-    plugin->infer();
+    try {
+        plugin->infer();
+    } catch (const std::exception& ex) {
+        ALOGE("%s Exception !!! %s", __func__, ex.what());
+        return {ErrorStatus::GENERAL_FAILURE, {}, kNoTiming};
+    }
     if (measure == MeasureTiming::YES) deviceEnd = now();
 
     for (size_t i = 0; i < request.outputs.size(); i++) {
