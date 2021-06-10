@@ -40,7 +40,7 @@ static std::shared_ptr<ngraph::Node> applyActivation(std::shared_ptr<ngraph::Nod
             break;
         default:
             ALOGI("UNKNOWN ACTIVATION FUNCTION %d !!!!!", activationFn);
-            break;
+            return inputNode;
     }
     return activationNode;
 }
