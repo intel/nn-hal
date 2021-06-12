@@ -106,15 +106,113 @@ std::shared_ptr<InferenceEngine::ICNNNetwork> ModelBuilder::convertBuilder()
     return cnnNetwork;
 }
 
+std::string ModelBuilder::createAdd(BuilderADDLayer::AddParams& params, IRBlob::Ptr input,
+                                  std::vector<std::string>& inputLayerNames) {
+    auto input1Dims = params.input1.data->getTensorDesc().getDims();
+    auto input2Dims = params.input2.data->getTensorDesc().getDims();
+    auto outputDims = input2Dims;
+
+    auto getLayerName = [&](std::string layerName) -> std::string
+    {
+        std::string strName(layerName);
+        strName = strName + "_" + std::to_string(layer_name_count++);
+        return strName;
+    };
+
+    idx_t input1LayerId, input2LayerId;
+    // Does not consider CONST layer.. Should we??
+    if (params.input1.lifeTime == (int)V1_0_OperandLifeTime::SUBGRAPH_INPUT) {
+        auto inLayer1Name = getLayerName("input1");
+        input1LayerId = getBuilderNetwork()->getBuilder()->addLayer(INLayer(inLayer1Name) \
+                            .setPort(Port({input1Dims})));
+        inputLayerNames.push_back(inLayer1Name);
+    } else { // is not subgraph input but the first value in GNA graph
+        if (getBuilderNetwork()->mConnections.empty()) {
+            auto inLayer1Name = getLayerName("input1");
+            input1LayerId = getBuilderNetwork()->getBuilder()->addLayer(INLayer(inLayer1Name) \
+                                .setPort(Port({input1Dims})));
+            inputLayerNames.push_back(inLayer1Name);
+        } else {
+            input1LayerId = getBuilderNetwork()->mConnections.back();
+        }
+    }
+
+    if (params.input2.lifeTime == (int)V1_0_OperandLifeTime::SUBGRAPH_INPUT) {
+        auto inLayer2Name = getLayerName("input2");
+        input2LayerId = getBuilderNetwork()->getBuilder()->addLayer(INLayer(inLayer2Name) \
+                            .setPort(Port({input2Dims})));
+        inputLayerNames.push_back(inLayer2Name);
+    } else { // is not subgraph input but the first value in GNA graph
+        if (getBuilderNetwork()->mConnections.empty()) {
+            auto inLayer2Name = getLayerName("input2");
+            input2LayerId = getBuilderNetwork()->getBuilder()->addLayer(INLayer(inLayer2Name) \
+                                .setPort(Port({input2Dims})));
+            inputLayerNames.push_back(inLayer2Name);
+        } else {
+            input2LayerId = getBuilderNetwork()->mConnections.back();
+        }
+    }
+
+    auto sumLayer = getLayerName("add");
+    auto sumLayer_output = ELTWISELayer(sumLayer);
+    sumLayer_output.setEltwiseType(ELTWISELayer::SUM);
+    idx_t sumLayerId = getBuilderNetwork()->getBuilder()->addLayer(sumLayer_output);
+
+    getBuilderNetwork()->getBuilder()->connect({input1LayerId}, {sumLayerId, 0});
+    getBuilderNetwork()->getBuilder()->connect({input2LayerId}, {sumLayerId, 1});
+    getBuilderNetwork()->mConnections.push_back(sumLayerId);
+    return sumLayer;
+
+}
+
+std::string ModelBuilder::createTanh(BuilderTANHLayer::TanhParams& params, IRBlob::Ptr input,
+                                  std::vector<std::string>& inputLayerNames) {
+    auto inputDims = params.input.data->getTensorDesc().getDims();
+    auto outputDims = inputDims;
+
+    auto getLayerName = [&](std::string layerName) -> std::string
+    {
+        std::string strName(layerName);
+        strName = strName + "_" + std::to_string(layer_name_count++);
+        return strName;
+    };
+
+    idx_t inputLayerId;
+    // Does not consider CONST layer.. Should we??
+    if (params.input.lifeTime == (int)V1_0_OperandLifeTime::SUBGRAPH_INPUT) {
+        auto inLayerName = getLayerName("input1");
+        inputLayerId = getBuilderNetwork()->getBuilder()->addLayer(INLayer(inLayerName) \
+                            .setPort(Port({inputDims})));
+        inputLayerNames.push_back(inLayerName);
+    } else { // is not subgraph input but the first value in GNA graph
+        if (getBuilderNetwork()->mConnections.empty()) {
+            auto inLayerName = getLayerName("input");
+            inputLayerId = getBuilderNetwork()->getBuilder()->addLayer(INLayer(inLayerName) \
+                                .setPort(Port({inputDims})));
+            inputLayerNames.push_back(inLayerName);
+        } else {
+            inputLayerId = getBuilderNetwork()->mConnections.back();
+        }
+    }
+
+    auto tanLayer = getLayerName("tanh");
+    idx_t tanhLayerId = getBuilderNetwork()->getBuilder()->addLayer(TANHLayer(tanLayer) \
+                             .setPort(Port(outputDims)));
+    getBuilderNetwork()->getBuilder()->connect({inputLayerId}, {tanhLayerId});
+    getBuilderNetwork()->mConnections.push_back(tanhLayerId);
+    return tanLayer;
+
+}
+
 std::string ModelBuilder::createFC(BuilderFCLayer::FCParams& params, IRBlob::Ptr input,
                                   std::vector<std::string>& inputLayerNames)
 {
     auto inputDims = params.input.data->getTensorDesc().getDims();
 
-    if(!isValidInputTensor(inputDims)) {
+    /*if(!isValidInputTensor(inputDims)) {
         std::string nullStr;
         return nullStr;
-    }
+    }*/
     auto weightDims = params.weights.data->getTensorDesc().getDims();
     auto outputDims = weightDims[1] * weightDims[0]/inputDims[1];
 

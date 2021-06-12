@@ -33,6 +33,34 @@ struct FCParams
 };
 } // Builder FC layer
 
+namespace BuilderADDLayer
+{
+struct ParamsData
+{
+    IRBlob::Ptr data;
+    bool lifeTime;
+};
+struct AddParams
+{
+    ParamsData input1;
+    ParamsData input2;
+    ParamsData activation;
+};
+}
+
+namespace BuilderTANHLayer
+{
+struct ParamsData
+{
+    IRBlob::Ptr data;
+    bool lifeTime;
+};
+struct TanhParams
+{
+    ParamsData input;
+};
+}
+
 namespace LstmLayer
 {
 enum class LstmActivationFn: char
@@ -121,6 +149,12 @@ public:
     void initializeBuilder();
 
     std::string createFC(BuilderFCLayer::FCParams& params, IRBlob::Ptr input,
+                        std::vector<std::string>& inputLayerNames);
+
+    std::string createAdd(BuilderADDLayer::AddParams& params, IRBlob::Ptr input,
+                        std::vector<std::string>& inputLayerNames);
+
+    std::string createTanh(BuilderTANHLayer::TanhParams& params, IRBlob::Ptr input,
                         std::vector<std::string>& inputLayerNames);
 
     IRBlob::Ptr generateBlobwithData(InferenceEngine::SizeVector dims,

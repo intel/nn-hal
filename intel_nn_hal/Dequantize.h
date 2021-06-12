@@ -20,10 +20,17 @@ class DequantizeOp : public BaseOp {
     std::string layerName;
     std::map<uint32_t, uint32_t> mGraphtoOpIndex;
     bool dummyOp_ = false;
+    bool isSubgraphInput = false;
     public:
 
         bool isCpuOp() {
             return true;
+        }
+        void setSubgraphInput() {
+            isSubgraphInput = true;
+        }
+         bool hasSubgraphInput() {
+            return isSubgraphInput;
         }
 
         bool setInputIndex(uint32_t graph_index, uint32_t op_index) {

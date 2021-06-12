@@ -23,11 +23,20 @@ class EmbeddingLookupOp : public BaseOp {
     std::map<uint32_t, uint32_t> mGraphtoOpIndex;
     std::map<int32_t, std::tuple<float*, int32_t>> indexToInputLenMap;
     std::map<int32_t, float*> indexToOutputMap;
+    bool isSubgraphInput = false;
 
     public:
 
         bool isCpuOp() {
             return true;
+        }
+
+        void setSubgraphInput() {
+            isSubgraphInput = true;
+        }
+
+        bool hasSubgraphInput() {
+            return isSubgraphInput;
         }
 
         bool setInputIndex(uint32_t graph_index, uint32_t op_index) override {

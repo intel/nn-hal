@@ -21,12 +21,19 @@ class QuantizeOp : public BaseOp {
     std::string layerName;
     std::map<uint32_t, uint32_t> mGraphtoOpIndex;
     bool dummyOp_ = false;
+    bool isSubgraphInput = false;
 
     public:
         bool isCpuOp() {
             return true;
         }
 
+        void setSubgraphInput() {
+            isSubgraphInput = true;
+        }
+        bool hasSubgraphInput() {
+            return isSubgraphInput;
+        }
         bool setInputIndex(uint32_t graph_index, uint32_t op_index) {
             mGraphtoOpIndex[graph_index] = op_index;
             return true;
@@ -65,13 +72,10 @@ class QuantizeOp : public BaseOp {
         }
 
         bool quantizeToQuant8Signed(const InputType* inputData, int8_t* outputData) {
-            std::cout << "zp = " << zeroPoint;
             for (uint32_t i = 0; i < inputLen; ++i) {
-                std::cout << " inputData[" << i << "] = " <<  static_cast<float>(inputData[i]) << "\n";
                 outputData[i] = static_cast<int8_t>(std::max<float>(-128.0f,
                                                     std::min<float>(127.0f, zeroPoint +
                                                     std::round(inputData[i] / scale))));
-                std::cout << " outputData[" << i << "] = " <<  static_cast<int16_t>(outputData[i]) << "\n";
             }
             return true;
         }
@@ -101,13 +105,16 @@ class QuantizeOp : public BaseOp {
 
         void cleanup() {
             if (output && !dummyOp_) {
-                delete output;
+                delete[] output;
+                output = nullptr;
             }
         }
 
         ~QuantizeOp() {
             if (output && !dummyOp_) {
-                delete output;
+                delete[] output;
+                output = nullptr;
+
             }
         }
 };

@@ -23,7 +23,7 @@
 
 //#define PERF_COUNTERS
 //#define CACHING
-#define NN_DEBUG
+//#define NN_DEBUG
 
 enum DebugLevel {
     L0,
@@ -191,7 +191,8 @@ class BaseOp {
 
     public:
         virtual bool isCpuOp() = 0;
-
+        virtual bool hasSubgraphInput() = 0;
+        virtual void setSubgraphInput() = 0;
         virtual bool run() {
             return false;
         };
@@ -261,6 +262,9 @@ class OpContainer {
                 if ( i == 0) {
                     op->run();
                 }
+                else if (op->hasSubgraphInput()) {
+                    op->run();
+                }
                 else {
                     std::vector<uint32_t> ip_indices = op->getInputIndices();
                     op->setInputData(ip_indices[0], std::get<0>(intermediate_inp), std::get<1>(intermediate_inp));
@@ -271,11 +275,14 @@ class OpContainer {
             }
             if (i == opsVec.size() - 1) {
                 op = opsVec[i];
-                std::vector<uint32_t> ip_indices = op->getInputIndices();
-
-                op->setInputData(ip_indices[0], std::get<0>(intermediate_inp), std::get<1>(intermediate_inp));
-
-                op->run();
+                if (op->hasSubgraphInput()) {
+                    op->run();
+                }
+                else {
+                    std::vector<uint32_t> ip_indices = op->getInputIndices();
+                    op->setInputData(ip_indices[0], std::get<0>(intermediate_inp), std::get<1>(intermediate_inp));
+                    op->run();
+                }
             }
             }
 

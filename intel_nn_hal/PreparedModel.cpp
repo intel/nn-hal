@@ -809,46 +809,11 @@ Return<V1_0_ErrorStatus> PreparedModel::executeBase(const V1_0_Request& request,
     return V1_0_ErrorStatus::NONE;
 }
 
-/*Return<void> PreparedModel::executeSynchronously(const V1_0::Request& request,
-                                                        V1_2::MeasureTiming measure,
-                                                        executeSynchronously_cb cb) {
-    VLOG(L1, "BasePreparedModel::executeSynchronously");
-    cb(V1_0::ErrorStatus::GENERAL_FAILURE, {}, kNoTiming);
-    return Void();
-}
-
-Return<void> PreparedModel::executeSynchronously_1_3(const V1_3::Request &request,
-                                          MeasureTiming measure,
-                                          const V1_3::OptionalTimePoint& deadline,
-                                          const V1_3::OptionalTimeoutDuration& loopTimeoutDuration,
-                                          V1_3::IPreparedModel::executeSynchronously_1_3_cb cb) {
-    VLOG(L1, "Begin to executeSynchronously_1_3");
-    //auto [status, outputShapes, timing] = executeSynchronouslyBase(request, measure, this, deadline, loopTimeoutDuration);
-    cb(V1_0::ErrorStatus::GENERAL_FAILURE, {}, kNoTiming);
-    return Void();
-} */
-
 Return<V1_0_ErrorStatus> PreparedModel::execute(const V1_0_Request& request,
                                            const sp<V1_0::IExecutionCallback>& callback) {
     VLOG(L1, "Begin to execute");
     return executeBase(request, MeasureTiming::NO, callback);
 }
-
-/*Return<ErrorStatus> PreparedModel::execute_1_3(const V1_3::Request& request,
-                                          MeasureTiming measure,
-                                          const V1_3::OptionalTimePoint& deadline,
-                                          const V1_3::OptionalTimeoutDuration& loopTimeoutDuration,
-                                          const sp<V1_3::IExecutionCallback>& callback) {
-    VLOG(L1, "Begin to execute_1_3");
-    return executeBase(request, MeasureTiming::NO, this, deadline, loopTimeoutDuration, callback);
-}
-
-Return<V1_0::ErrorStatus> PreparedModel::execute_1_2(const V1_0::Request& request, MeasureTiming measure,
-                                               const sp<V1_2::IExecutionCallback>& callback) {
-    VLOG(L1, "Begin to execute_1_2");
-    callback->notify_1_2(V1_0::ErrorStatus::GENERAL_FAILURE, {}, kNoTiming);
-    return V1_0::ErrorStatus::GENERAL_FAILURE;
-}*/
 
 template <typename T>
 T getOperandConstVal(const Model& model, const Operand& operand) {
@@ -908,6 +873,12 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
         switch (operation.type) {
             case OperationType::QUANTIZED_LSTM:
                 VLOG(L1, "Supporting Quantized LSTM !!!!");
+                if (!isOperandDataNull(operation.inputs[9]) ||
+                    !isOperandDataNull(operation.inputs[10]) ||
+                    !isOperandDataNull(operation.inputs[11]))
+                    {
+                        return false;
+                    }
                 break;
             case OperationType::FULLY_CONNECTED: {
                 if (model.main.operands[operation.inputs[0]].dimensions[0] == 0) {
@@ -935,6 +906,15 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
                 }
                 break;
             }
+            case OperationType::ADD:
+                for (auto i : operation.inputs) {
+                    const auto input = model.main.operands[i];
+                    if (input.dimensions.size() != 2) {
+                        VLOG(L1, "add dimensions.size = %d\n", input.dimensions.size());
+                        return false;
+                    }
+                }
+                break;
             case OperationType::DEQUANTIZE: {
                 auto OutOperandDetails = model.main.operands[operation.outputs[0]];
                 if (static_cast<int>(OutOperandDetails.type) == static_cast<int>(OperandType::TENSOR_FLOAT16)) {
@@ -943,16 +923,20 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
                 VLOG(L1, "Supporting Dequantize !!!!");
                 break;
             }
-            case OperationType::QUANTIZE:
-                {
-                    VLOG(L1, "Supporting Quantize !!!!");
+            case OperationType::QUANTIZE: {
+                VLOG(L1, "Supporting Quantize !!!!");
                     // auto operandDetails = model.main.operands[operation.inputs[0]];
                     // if (operandDetails.type != OperandType::FLOAT32) {
                     //     VLOG(L1, "Input of type FLOAT16 is not supported");
                     //     return false;
                     // }
-                }
                 break;
+            }
+            case OperationType::TANH:
+                if (model.main.operands[operation.inputs[0]].dimensions.size() != 2)
+                    return false;
+                VLOG(L1, "Supporting Tanh !!!!");
+		        break;
             case OperationType::EMBEDDING_LOOKUP:
                 VLOG(L1, "Supporting Embedding Lookup !!!!");
                 if (model.main.operands[operation.inputs[1]].type != OperandType::FLOAT32 || model.main.operands[operation.inputs[1]].type != OperandType::TENSOR_FLOAT32 ) {
