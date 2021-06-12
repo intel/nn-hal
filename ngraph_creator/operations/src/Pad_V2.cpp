@@ -1,4 +1,5 @@
 #include <Pad_V2.hpp>
+#define LOG_TAG "Pad_V2"
 
 namespace android {
 namespace hardware {
@@ -49,7 +50,6 @@ bool Pad_V2::validate() {
 std::shared_ptr<ngraph::Node> Pad_V2::createNode() {
     // Creating input nodes
     auto inputNode = getInputNode(0);
-    auto paddings = getInputNode(1);
     std::shared_ptr<ngraph::Node> pad_value;
     auto inputIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 0);
 
@@ -65,18 +65,18 @@ std::shared_ptr<ngraph::Node> Pad_V2::createNode() {
         pad_value = DequantizeNode(pad_value, inputIndex, ngraph::element::f32);
     }
 
-    const auto axisNode = createConstNode(ngraph::element::i32, {}, convertToVector(1));
-    auto paddingsSplitNode =
-        std::make_shared<ngraph::opset3::Split>(paddings, axisNode, 2)->outputs();
-
-    const auto shapeNode = createConstNode(
-        ngraph::element::i32, {1}, convertToVector((int32_t)getInputOperandDimensions(0).size()));
-
-    std::shared_ptr<ngraph::Node> pads_begin =
-        std::make_shared<ngraph::opset3::Reshape>(paddingsSplitNode[0], shapeNode, true);
-
-    std::shared_ptr<ngraph::Node> pads_end =
-        std::make_shared<ngraph::opset3::Reshape>(paddingsSplitNode[1], shapeNode, true);
+    const auto& paddingsOperandIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 1);
+    // Fetch the 2D paddings as a 1D vector, and then split it into 2
+    auto paddings_2d = sModelInfo->GetConstVecOperand<int32_t>(paddingsOperandIndex);
+    auto half_size = paddings_2d.size() / 2;
+    std::vector<int32_t> paddings_0(half_size);
+    std::vector<int32_t> paddings_1(half_size);
+    for (int i = 0; i < half_size; i++) {
+        paddings_0[i] = paddings_2d[2 * i];
+        paddings_1[i] = paddings_2d[2 * i + 1];
+    }
+    const auto pads_begin = createConstNode(ngraph::element::i32, {half_size}, paddings_0);
+    const auto pads_end = createConstNode(ngraph::element::i32, {half_size}, paddings_1);
 
     auto outputNode = std::make_shared<ngraph::opset3::Pad>(
         inputNode, pads_begin, pads_end, pad_value, ngraph::op::PadMode::CONSTANT);
