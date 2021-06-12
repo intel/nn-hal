@@ -129,7 +129,7 @@ T NnapiModelInfo::GetConstFromBuffer(const uint8_t* buf, uint32_t len) {
 }
 
 const uint8_t* NnapiModelInfo::GetOperandMemory(int index, uint32_t& lenOut) {
-    ALOGD("%s", __func__);
+    ALOGV("%s", __func__);
     const auto op = mModel.operands[index];
     lenOut = op.location.length;
     if (op.lifetime == OperandLifeTime::CONSTANT_COPY) {

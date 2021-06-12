@@ -34,7 +34,7 @@ bool NgraphNetworkCreator::createInputParams() {
         std::shared_ptr<ngraph::opset3::Parameter> inputParam;
         auto& nnapiOperand = mModelInfo->getOperand(i);
         auto& dims = nnapiOperand.dimensions;
-        ALOGI("createInputParams operand %d dims.size(%d)", i, dims.size());
+        ALOGV("createInputParams operand %d dims.size(%d)", i, dims.size());
         // keeping this condition to make VTS pass. Operation's optional input lifetime is supposed
         // to be "NO_VALUE"
         if (dims.size() > 0) {
