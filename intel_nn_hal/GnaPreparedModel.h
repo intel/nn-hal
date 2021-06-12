@@ -78,6 +78,8 @@ class GnaPreparedModel : public PreparedModel {
     bool isDecoderNw = false;
     bool isEnc0Nw = false;
     bool isEnc1Nw = false;
+    bool isJointNw = false;
+
     std::string modelNameStr;
 #ifdef PERF_COUNTERS
     metrics runtimeMetrics;
@@ -85,13 +87,13 @@ class GnaPreparedModel : public PreparedModel {
 public:
 #ifdef CACHING
     GnaPreparedModel(const Model& model) : PreparedModel("GNA", model), gnaPluginPtr(nullptr), mBuilderModel(nullptr),
-                                            isDecoderNw(false), isEnc0Nw(false), isEnc1Nw(false) {
+                                            isDecoderNw(false), isEnc0Nw(false), isEnc1Nw(false), isJointNw(false) {
 #ifdef PERF_COUNTERS
         runtimeMetrics.reset();
 #endif
     }
 	GnaPreparedModel() : PreparedModel("GNA"), gnaPluginPtr(nullptr), mBuilderModel(nullptr),
-                         isDecoderNw(false), isEnc0Nw(false), isEnc1Nw(false) {
+                         isDecoderNw(false), isEnc0Nw(false), isEnc1Nw(false), isJointNw(false) {
 #ifdef PERF_COUNTERS
         runtimeMetrics.reset();
 #endif
@@ -118,6 +120,8 @@ public:
 
     virtual bool initialize(const hidl_vec<hidl_handle>& modelCache, const HidlToken& token) override;
     virtual bool operationFullyConnected(const Operation& operation) override;
+    virtual bool operationAdd(const Operation& operation) override;
+    virtual bool operationTANH(const Operation& operation) override;
 
     virtual Blob::Ptr GetConstOperandAsTensor(int operand_index, int operation_idx) override;
     virtual Blob::Ptr GetInOutOperandAsBlob(RunTimeOperandInfo& op, const uint8_t *buf, uint32_t& len) override;
@@ -167,6 +171,10 @@ public:
     BaseOp* operationEmbeddingLookup(const Operation& operation);
     BaseOp* operationDequantize(const Operation& operation, bool dummyOp = false);
     BaseOp* operationQuantize(const Operation& operation, bool dummyOp = false);
+    bool isRnnT() {
+        return (isDecoderNw ? true : (isEnc0Nw ? true : (isEnc1Nw ? true : (isJointNw ? true : false))));
+    }
+
 
 protected:
     void deinitialize();

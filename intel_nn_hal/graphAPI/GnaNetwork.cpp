@@ -73,7 +73,7 @@ void GnaNetwork::loadNetwork(InferenceEngine::CNNNetwork& passed_network, bool i
     std::map<std::string, std::string> config;
     //config[CONFIG_KEY(LOG_LEVEL)] = CONFIG_VALUE(LOG_INFO);
     std::map<std::string, std::string> gnaPluginConfig;
-    gnaPluginConfig[GNAConfigParams::KEY_GNA_DEVICE_MODE] = "GNA_SW_FP32";
+    gnaPluginConfig[GNAConfigParams::KEY_GNA_DEVICE_MODE] = "GNA_HW";
     gnaPluginConfig[GNAConfigParams::KEY_GNA_PRECISION] = "I8";
 #ifdef PERF_COUNTERS
     gnaPluginConfig[PluginConfigParams::KEY_PERF_COUNT] = PluginConfigParams::YES;
@@ -85,7 +85,7 @@ void GnaNetwork::loadNetwork(InferenceEngine::CNNNetwork& passed_network, bool i
         gnaPluginConfig[PluginConfigParams::KEY_IDENTITY_SCALE_FACTOR] =  std::to_string(256);
     }
     std::string scaleFactorConfigKey_1 = GNA_CONFIG_KEY(SCALE_FACTOR) + std::string("_") + std::to_string(0);
-    gnaPluginConfig[scaleFactorConfigKey_1] = std::to_string(512);
+    gnaPluginConfig[scaleFactorConfigKey_1] = std::to_string(2048);
     std::string scaleFactorConfigKey_2 = GNA_CONFIG_KEY(SCALE_FACTOR) + std::string("_") + std::to_string(1);
     gnaPluginConfig[scaleFactorConfigKey_2] = std::to_string(2048);
     std::string scaleFactorConfigKey_3 = GNA_CONFIG_KEY(SCALE_FACTOR) + std::string("_") + std::to_string(2);

@@ -165,8 +165,14 @@ bool GnaPreparedModel::constructGNAGraph(std::pair<int, int> indices) {
                 success = operationLSTM(operation);
                 break;
             case OperationType::FULLY_CONNECTED:
-                success = operationFullyConnected(operation); // Return false
-                    break;
+                success = operationFullyConnected(operation);
+                break;
+            case OperationType::ADD:
+                success = operationAdd(operation);
+                break;
+            case OperationType::TANH:
+                success = operationTANH(operation);
+                break;
             default:
                 return false;
         }
@@ -305,7 +311,10 @@ OpContainer* GnaPreparedModel::constructCpuGraph(std::pair<int, int> indices) {
         dumpOperation(operation);
         switch (operation.type) {
            case OperationType::DEQUANTIZE:
-                cpuOperation = operationDequantize(operation, false);
+                if(isRnnT())
+                    cpuOperation = operationDequantize(operation, true);
+                else
+                    cpuOperation = operationDequantize(operation, false);
                 if (!cpuOperation) {
                     VLOG(L1, "Failed to create dequantize operation !!!!");
                 }
@@ -314,9 +323,12 @@ OpContainer* GnaPreparedModel::constructCpuGraph(std::pair<int, int> indices) {
                 break;
 
             case OperationType::QUANTIZE:
-                if (i == std::get<1>(indices)) {
-                    VLOG(L1, "Skipping Quantize as it is last op in the CPU graph !!!");
-                    cpuOperation = operationQuantize(operation, false);
+                if (isRnnT()) {
+			        if (isJointNw) {
+                        cpuOperation = operationQuantize(operation, false);
+                    }
+                    else
+                        cpuOperation = operationQuantize(operation, true);
                 }
                 else {
                     cpuOperation = operationQuantize(operation, false);
@@ -372,17 +384,26 @@ bool GnaPreparedModel::initialize(const hidl_vec<hidl_handle>& modelCache, const
     // TODO: Remove this hack to identify the nw based on operations
     int lstmCount = 0;
     bool hasFC = false;
+    int  quantizeCnt = 0;
+
     for (auto op: mModel.main.operations) {
         if (op.type == OperationType::FULLY_CONNECTED) {
             hasFC = true;
         } else if (op.type == OperationType::QUANTIZED_LSTM) {
             lstmCount++;
+        } else if (op.type == OperationType::QUANTIZE) {
+            quantizeCnt++;
         }
     }
 
-    if (!hasFC) {
+    if (!hasFC && quantizeCnt != 2 ) {
         isEnc0Nw = true;
         modelNameStr = "Encoder0";
+    }
+    else if (quantizeCnt == 2) {
+        VLOG(L1, "initialize quantize %d", quantizeCnt);
+        isJointNw = true;
+        modelNameStr = "Joint";
     }
     else {
         if (lstmCount > 3) {
@@ -1420,9 +1441,11 @@ void GnaPreparedModel::executeModel(const V1_3::Request& request) {
                             nnAssert(false);
                         }
                         auto[srcMemoryPtr, srcLen] = cpuLayerPtr->getOutputData();
+                        if (isRnnT() && !isJointNw) {
 
-                        float* srcPtr = static_cast<float*>(srcMemoryPtr);
-
+                        }
+                        else {
+                        }
                         // Make sure the layername is present in inputinfo from the layer
                         auto iter2 = std::find_if(gnaPluginPtr->inputInfo.begin(),
                                     gnaPluginPtr->inputInfo.end(),
@@ -1437,7 +1460,16 @@ void GnaPreparedModel::executeModel(const V1_3::Request& request) {
                         auto destBlob = gnaPluginPtr->getInferRequest().GetBlob(gnaLayerName);
                         RunTimeOperandInfo& op = mOperands[inputInd];
                         if (op.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED) {
-                            std::memcpy(destBlob->buffer().as<float*>(), srcPtr, srcLen * 4);
+                            if (isRnnT() && !isJointNw) {
+                                float* srcPtr = static_cast<float*>(srcMemoryPtr);
+                                std::memcpy(destBlob->buffer().as<float*>(), srcPtr, srcLen * 4);
+                            }
+                            else {
+                                int8_t* srcPtr = static_cast<int8_t*>(srcMemoryPtr);
+                                deQuantize<int8_t>(srcPtr, srcLen, op.scale, op.zeroPoint, destBlob->buffer().as<float*>());
+                            }
+                        }
+                       /* else if (op.type == OperandType::TENSOR_QUANT8_SYMM) {    std::memcpy(destBlob->buffer().as<float*>(), srcPtr, srcLen * 4);
 
                             //deQuantize<int8_t>(srcPtr, srcLen, op.scale, op.zeroPoint, destBlob->buffer().as<float*>());
                         }/* else if (op.type == OperandType::TENSOR_QUANT8_SYMM) {
@@ -1584,6 +1616,196 @@ void GnaPreparedModel::setDims(const uint32_t idx, const std::vector<unsigned lo
     }
 }
 
+bool GnaPreparedModel::operationAdd(const Operation& operation) {
+    VLOG(L1, "OperationType::ADD");
+
+    auto getV1_3_OperandLifeTime = [&](uint32_t idx) {
+        const auto op = mModel.main.operands[idx];
+        return (int)op.lifetime;
+    };
+
+    auto getIRBlobFromOperand = [&](uint32_t idx, uint32_t offset) {
+        const auto op = mModel.main.operands[idx];
+
+        auto blob = GetConstOperandAsTensor(idx, offset);
+        if (op.lifetime == V1_3_OperandLifeTime::SUBGRAPH_INPUT)
+        {
+            mOpIndex2BlobMap[idx] = blob;
+        }
+
+        return blob;
+    };
+
+    IRBuilder::BuilderADDLayer::AddParams params;
+    params.input1.data = getIRBlobFromOperand(operation.inputs[0], 0);
+    params.input1.lifeTime = getV1_3_OperandLifeTime(operation.inputs[0]);
+
+    params.input2.data = getIRBlobFromOperand(operation.inputs[1], 1);
+    params.input2.lifeTime = getV1_3_OperandLifeTime(operation.inputs[1]);
+
+    auto input1Dims = params.input1.data->getTensorDesc().getDims();
+    auto input2Dims = params.input2.data->getTensorDesc().getDims();
+    IRBlob::Ptr input = nullptr;
+
+    for (auto i = 0; i < input2Dims.size(); i++) {
+        VLOG(L1, "input2Dims dims[%d] = %d ", i, input2Dims[i]);
+        VLOG(L1, "input1Dims dims[%d] = %d ", i, input1Dims[i]);
+    }
+    nnAssert(input2Dims.size() == input1Dims.size());
+
+    if (mBuilderModel == nullptr) {
+        VLOG(L1, "mBuilder = nullptr !!!");
+    }
+
+    std::vector<std::string> inLayers;
+    std::string addLayerName = mBuilderModel->createAdd(params, nullptr, inLayers);
+
+    // Create an OUTPUT layer for Add.
+    static int count = 0;
+    std::string outputLayerName = "output-ADD";
+    outputLayerName += std::to_string(count++);
+
+	auto addLayerID = mBuilderModel->getBuilderNetwork()->mConnections.back();
+	mBuilderModel->getBuilderNetwork()->getBuilder()->addLayer({addLayerID}, InferenceEngine::Builder::OutputLayer(outputLayerName));
+
+    // TODO: Fix this code with CTS tests
+    // Check CONST_REFERENCE, CONST_VALUE
+    if (inLayers.size() != 0) {
+        for (int layer_num = 0; layer_num < inLayers.size(); layer_num++) {
+            if (getV1_3_OperandLifeTime(operation.inputs[layer_num]) == (int)V1_3_OperandLifeTime::SUBGRAPH_INPUT) {
+                mInputPorts.emplace(std::make_pair(operation.inputs[layer_num], LayerInfo(inLayers[layer_num], false)));
+            } else if (getV1_3_OperandLifeTime(operation.inputs[layer_num]) == (int)V1_3_OperandLifeTime::TEMPORARY_VARIABLE) {
+                VLOG(L1, "add is temp input , setting the intermediate Layer %d\n", operation.inputs[layer_num]);
+
+                if (mIntermediateLayerMap.find(operation.inputs[layer_num]) != mIntermediateLayerMap.end()) {
+                    VLOG(L1, "add is temp input , setting the intermediate Layer element found %d\n", operation.inputs[layer_num]);
+
+                    auto& halLayer = mIntermediateLayerMap.at(operation.inputs[layer_num]);
+                    halLayer.setInputNode(inLayers[layer_num], DeviceType::GNA);
+                } else {
+                    VLOG(L1, "add is temp input , setting the intermediate Layer %d\n", operation.inputs[layer_num]);
+
+                    mIntermediateLayerMap.emplace(std::make_pair(operation.inputs[layer_num],
+                                                                HalLayerInfo(inLayers[layer_num], DeviceType::GNA,
+                                                                            "", DeviceType::None, false)));
+                }
+            }
+        }
+    }
+
+    if (getV1_3_OperandLifeTime(operation.outputs[0]) == (int)V1_3_OperandLifeTime::SUBGRAPH_OUTPUT) {
+        mOutputToLayerMap.emplace(std::make_pair(operation.outputs[0], LayerInfo(addLayerName, false, DeviceType::GNA)));
+    } else if (static_cast<int>(getV1_3_OperandLifeTime(operation.outputs[0])) == static_cast<int>(OperandLifeTime::TEMPORARY_VARIABLE)) {
+        if (mIntermediateLayerMap.find(operation.outputs[0]) != mIntermediateLayerMap.end()) {
+            auto& halLayer = mIntermediateLayerMap.at(operation.outputs[0]);
+            halLayer.setOutputNode(addLayerName, DeviceType::GNA);
+        } else {
+            mIntermediateLayerMap.emplace(std::make_pair(operation.outputs[0], HalLayerInfo("", DeviceType::None,
+                                                                            addLayerName, DeviceType::GNA, false)));
+        }
+    }
+
+    if (gnaPluginPtr) {
+        gnaPluginPtr->setInputIndices({operation.inputs[0], operation.inputs[1]});
+        gnaPluginPtr->setOutputIndices({operation.outputs[0]});
+    }
+
+
+    return true;
+}
+
+bool GnaPreparedModel::operationTANH(const Operation& operation) {
+    VLOG(L1, "OperationType::TANH");
+
+    auto getV1_3_OperandLifeTime = [&](uint32_t idx) {
+        const auto op = mModel.main.operands[idx];
+        return (int)op.lifetime;
+    };
+
+    auto getIRBlobFromOperand = [&](uint32_t idx, uint32_t offset) {
+        const auto op = mModel.main.operands[idx];
+
+        auto blob = GetConstOperandAsTensor(idx, offset);
+        if (op.lifetime == V1_3_OperandLifeTime::SUBGRAPH_INPUT)
+        {
+            mOpIndex2BlobMap[idx] = blob;
+        }
+
+        return blob;
+    };
+
+    IRBuilder::BuilderTANHLayer::TanhParams params;
+    params.input.data = getIRBlobFromOperand(operation.inputs[0], 0);
+    params.input.lifeTime = getV1_3_OperandLifeTime(operation.inputs[0]);
+
+    auto inputDims = params.input.data->getTensorDesc().getDims();
+    IRBlob::Ptr input = nullptr;
+
+    for (auto i = 0; i < inputDims.size(); i++) {
+        VLOG(L1, "inputDims dims[%d] = %d ", i, inputDims[i]);
+    }
+
+
+    if (mBuilderModel == nullptr) {
+        VLOG(L1, "mBuilder = nullptr !!!");
+        // ASSERT
+    }
+
+    std::vector<std::string> inLayers;
+    std::string TanhLayerName = mBuilderModel->createTanh(params, nullptr, inLayers);
+
+    static int count = 0;
+    std::string outputLayerName = "output-Tanh";
+    outputLayerName += std::to_string(count++);
+
+	auto TanhLayerID = mBuilderModel->getBuilderNetwork()->mConnections.back();
+	mBuilderModel->getBuilderNetwork()->getBuilder()->addLayer({TanhLayerID}, InferenceEngine::Builder::OutputLayer(outputLayerName));
+
+    // TODO: Fix this code with CTS tests
+    if (inLayers.size() != 0) {
+        for (int layer_num = 0; layer_num < inLayers.size(); layer_num++) {
+            if (getV1_3_OperandLifeTime(operation.inputs[layer_num]) == (int)V1_3_OperandLifeTime::SUBGRAPH_INPUT) {
+                mInputPorts.emplace(std::make_pair(operation.inputs[layer_num], LayerInfo(inLayers[layer_num], false)));
+            } else if (getV1_3_OperandLifeTime(operation.inputs[layer_num]) == (int)V1_3_OperandLifeTime::TEMPORARY_VARIABLE) {
+                VLOG(L1, "Tanh is temp input , setting the intermediate Layer %d\n", operation.inputs[layer_num]);
+
+                if (mIntermediateLayerMap.find(operation.inputs[layer_num]) != mIntermediateLayerMap.end()) {
+                    VLOG(L1, "Tanh is temp input , setting the intermediate Layer element found %d\n", operation.inputs[layer_num]);
+
+                    auto& halLayer = mIntermediateLayerMap.at(operation.inputs[layer_num]);
+                    halLayer.setInputNode(inLayers[layer_num], DeviceType::GNA);
+                } else {
+                    VLOG(L1, "Tanh is temp input , setting the intermediate Layer %d\n", operation.inputs[layer_num]);
+
+                    mIntermediateLayerMap.emplace(std::make_pair(operation.inputs[layer_num],
+                                                                HalLayerInfo(inLayers[layer_num], DeviceType::GNA,
+                                                                            "", DeviceType::None, false)));
+                }
+            }
+        }
+    }
+
+    if (getV1_3_OperandLifeTime(operation.outputs[0]) == (int)V1_3_OperandLifeTime::SUBGRAPH_OUTPUT) {
+        mOutputToLayerMap.emplace(std::make_pair(operation.outputs[0], LayerInfo(TanhLayerName, false, DeviceType::GNA)));
+    } else if (static_cast<int>(getV1_3_OperandLifeTime(operation.outputs[0])) == static_cast<int>(OperandLifeTime::TEMPORARY_VARIABLE)) {
+        if (mIntermediateLayerMap.find(operation.outputs[0]) != mIntermediateLayerMap.end()) {
+            auto& halLayer = mIntermediateLayerMap.at(operation.outputs[0]);
+            halLayer.setOutputNode(TanhLayerName, DeviceType::GNA);
+        } else {
+            mIntermediateLayerMap.emplace(std::make_pair(operation.outputs[0], HalLayerInfo("", DeviceType::None,
+                                                                            TanhLayerName, DeviceType::GNA, false)));
+        }
+    }
+
+    if (gnaPluginPtr) {
+        gnaPluginPtr->setInputIndices({operation.inputs[0]});
+        gnaPluginPtr->setOutputIndices({operation.outputs[0]});
+    }
+
+
+    return true;
+}
+
 bool GnaPreparedModel::operationFullyConnected(const Operation& operation) {
     VLOG(L1, "OperationType::FULLY_CONNECTED");
 
@@ -1671,7 +1893,6 @@ bool GnaPreparedModel::operationFullyConnected(const Operation& operation) {
     std::vector<std::string> inLayers;
     std::string fcLayerName = mBuilderModel->createFC(params, nullptr, inLayers);
     if (fcLayerName.empty()) {
-        std::cout << "fcLayerName is empty\n";
         return false;
     }
     // Create an OUTPUT layer for FC.
@@ -2268,6 +2489,7 @@ BaseOp* GnaPreparedModel::operationDequantize(const Operation& operation, bool d
     RunTimeOperandInfo& outputOp = mOperands[operation.outputs[0]];
     outputOp.outDataType = DataType::FLOAT32;
     if (static_cast<int>(operandDetails.lifetime) == (int)V1_3_OperandLifeTime::SUBGRAPH_INPUT) {
+        dequantOp->setSubgraphInput();
         mInputPorts.emplace(std::make_pair(inputIndex, LayerInfo(name, false, DeviceType::CPU)));
     } else if (static_cast<int>(operandDetails.lifetime) == static_cast<int>(OperandLifeTime::TEMPORARY_VARIABLE)) {
         if (mIntermediateLayerMap.find(inputIndex) != mIntermediateLayerMap.end()) {
@@ -2350,6 +2572,8 @@ BaseOp* GnaPreparedModel::operationQuantize(const Operation& operation, bool dum
     }
 
     if (static_cast<int>(operandDetails.lifetime) == (int)V1_3_OperandLifeTime::SUBGRAPH_INPUT) {
+        quantOp->setSubgraphInput();
+
         mInputPorts.emplace(std::make_pair(inputIndex, LayerInfo(name, false, DeviceType::CPU)));
         quantOp->setInputIndex(inputIndex, 0);
     } else if(static_cast<int>(operandDetails.lifetime) == static_cast<int>(OperandLifeTime::TEMPORARY_VARIABLE)) {
@@ -2429,6 +2653,8 @@ BaseOp* GnaPreparedModel::operationEmbeddingLookup(const Operation& operation) {
 
     }
     else if (static_cast<int>(ValuesDetails.lifetime) == (int)V1_3_OperandLifeTime::SUBGRAPH_INPUT) {
+
+
         mInputPorts.emplace(std::make_pair(valuesIndex,currLayer));
     } else if(static_cast<int>(ValuesDetails.lifetime) == static_cast<int>(OperandLifeTime::TEMPORARY_VARIABLE)) {
         /*if (mIntermediateLayerMap.find(inputIndex) != mIntermediateLayerMap.end()) {
@@ -2445,14 +2671,11 @@ BaseOp* GnaPreparedModel::operationEmbeddingLookup(const Operation& operation) {
 
      embeddinglookupOp->setInputIndex(lookupIndex, 0);
     if (static_cast<int>(LookupDetails.lifetime) == static_cast<int>(OperandLifeTime::CONSTANT_COPY)) {
-        std::cout  <<  "Lookup of type CONST_COPY\n";
         auto buf = const_cast<uint8_t*>(&mModel.operandValues[LookupDetails.location.offset]);
          auto len_out = sizeOfData(LookupDetails.type, LookupDetails.dimensions);
             embeddinglookupOp->setInputData(lookupIndex, buf, len_out);
     }
         else if (static_cast<int>(LookupDetails.lifetime) == static_cast<int>(OperandLifeTime::CONSTANT_REFERENCE)) {
-		std::cout  <<  "Lookup of type CONST_REF\n";
-
             auto poolIndex = LookupDetails.location.poolIndex;
             auto& r = mPoolInfos[poolIndex];
             auto buf = const_cast<uint8_t*>(r.buffer + LookupDetails.location.offset);
@@ -2462,7 +2685,7 @@ BaseOp* GnaPreparedModel::operationEmbeddingLookup(const Operation& operation) {
     }
 
     if (static_cast<int>(LookupDetails.lifetime) == (int)V1_3_OperandLifeTime::SUBGRAPH_INPUT) {
-
+        embeddinglookupOp->setSubgraphInput();
         mInputPorts.emplace(std::make_pair(lookupIndex, currLayer));
 
         //mInputPorts.emplace(std::make_pair(valuesIndex, LayerInfo(name, false, DeviceType::CPU)));
@@ -2488,6 +2711,7 @@ BaseOp* GnaPreparedModel::operationEmbeddingLookup(const Operation& operation) {
                                                         HalLayerInfo("", DeviceType::None, name, DeviceType::CPU, false)));
         }*/
     }
+
     embeddinglookupOp->setInputIndices({lookupIndex, valuesIndex});
     embeddinglookupOp->setOutputIndices({outIndex});
     return embeddinglookupOp;
@@ -2785,16 +3009,7 @@ Blob::Ptr GnaPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const 
                     }
 #else
                     if (op.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED) {
-                        float *outputData = blob->buffer().as<float*>();
-                        int32_t value;
-                        const int8_t* inputBuf = reinterpret_cast<const int8_t*>(buf);
-                        for (int i = 0; i < getNumberOfElements(op.dimensions); ++i) {
-                            value = *(inputBuf + i);
-                            std::cout << "value = " << value << "\n";
-                            outputData[i] = static_cast<float>(op.scale * (value - op.zeroPoint));
-                            std::cout << "outputData[i] = " << outputData[i] << "\n";
-                        }
-                        //deQuantize((int8_t*)buf, getNumberOfElements(op.dimensions), op.scale, op.zeroPoint, blob->buffer().as<float*>());
+                        deQuantize((int8_t*)buf, getNumberOfElements(op.dimensions), op.scale, op.zeroPoint, blob->buffer().as<float*>());
                     } else if (op.type == OperandType::TENSOR_QUANT8_SYMM) {
                         deQuantize((int8_t*)buf, getNumberOfElements(op.dimensions), op.scale, 0, blob->buffer().as<float*>());
                     } else if (op.type == OperandType::TENSOR_QUANT16_SYMM) {

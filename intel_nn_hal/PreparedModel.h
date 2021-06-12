@@ -209,7 +209,7 @@ protected:
     void asyncExecute(const V1_0_Request& request, MeasureTiming measure, time_point driverStart,
                       const sp<V1_0::IExecutionCallback>& callback);
 
-    bool operationAdd(const Operation& operation);
+    virtual bool operationAdd(const Operation& operation);
     bool operationAveragePool2D(const Operation& operation);
     bool operationConCat(const Operation& operation);
     bool operationConv2D(const Operation& operation);
@@ -225,7 +225,8 @@ protected:
     bool operationRELU6(const Operation& operation);
     bool operationReshape(const Operation& operation);
     bool operationSoftmax(const Operation& operation);
-    bool operationTANH(const Operation& operation);
+    virtual bool operationTANH(const Operation& operation);
+
 
     virtual void initializeInput();
     virtual bool finalizeOutput(/*RunTimeOperandInfo* output*/);

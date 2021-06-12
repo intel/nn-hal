@@ -87,6 +87,10 @@ public:
     std::map<std::string, InferenceEngineProfileInfo> totalPerfCounters;
     bool isCpuOp() { return false; }
 
+    bool hasSubgraphInput() { return false; }
+    void setSubgraphInput() {
+        return;
+    }
     std::vector<InferenceEngine::Blob::Ptr> ptrInputBlobs;
     GnaNetwork() : network(nullptr){}
 
