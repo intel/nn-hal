@@ -18,6 +18,7 @@
 
 #include "PreparedModel.h"
 #include <android-base/logging.h>
+#include <hidlmemory/mapping.h>
 #include <android/log.h>
 #include <log/log.h>
 #include <fstream>
@@ -118,13 +119,27 @@ bool RunTimePoolInfo::update() {
     return true;
 }
 
-bool setRunTimePoolInfosFromHidlMemories(std::vector<RunTimePoolInfo>* poolInfos,
+bool setRunTimePoolInfosFromHidlMemories_1_3(std::vector<RunTimePoolInfo>* poolInfos,
                                          const hidl_vec<hidl_memory>& pools) {
     poolInfos->resize(pools.size());
     for (size_t i = 0; i < pools.size(); i++) {
         auto& poolInfo = (*poolInfos)[i];
         if (!poolInfo.set(pools[i])) {
             LOG(ERROR) << "Could not map pool";
+            return false;
+        }
+    }
+    return true;
+}
+
+bool setRunTimePoolInfosFromHidlMemories(std::vector<RunTimePoolInfo>* poolInfos,
+                                        const hidl_vec<V1_3::Request::MemoryPool>& pools) {
+    CHECK(poolInfos != nullptr);
+    poolInfos->resize(pools.size());
+    for (size_t i = 0; i < pools.size(); i++) {
+        auto& poolInfo =  (*poolInfos)[i];
+        if (!poolInfo.set(pools[i].hidlMemory())) {
+            LOG(ERROR) << "Could not map memory pool !!!";
             return false;
         }
     }
@@ -386,7 +401,6 @@ bool PreparedModel::initializeRunTimeOperandInfo() {
             case OperandType::TENSOR_FLOAT32:
             case OperandType::FLOAT32:
                 to.type = OperandType::TENSOR_FLOAT32;
-                VLOG(L1, "OperandType = %d\n", from.type);
                 break;
             case OperandType::INT32:
             case OperandType::UINT32:
@@ -395,8 +409,8 @@ bool PreparedModel::initializeRunTimeOperandInfo() {
                 to.type = from.type;
                 break;
             case OperandType::TENSOR_QUANT8_SYMM:
-                    to.type = from.type;
-                    break;
+                to.type = from.type;
+                break;
             case OperandType::TENSOR_QUANT8_ASYMM_SIGNED:
                     to.type = from.type;
             break;
@@ -404,13 +418,15 @@ bool PreparedModel::initializeRunTimeOperandInfo() {
                     to.type = from.type;
             break;
             case OperandType::FLOAT16:
+            case OperandType::TENSOR_FLOAT16:
                     to.type = from.type;
             break;
             case OperandType::TENSOR_QUANT8_ASYMM:
-                ALOGE("OperandType::TENSOR_QUANT8_ASYMM is not supported");
+                    to.type = from.type;
+                    ALOGE("OperandType::TENSOR_QUANT8_ASYMM is  supported");
                 break;
             default:
-                ALOGE("wrong operand type %d", from.type);
+                std::cout << "wrong operand type" <<  static_cast<int>(from.type) << "\n";
                 return false;
         }
 
@@ -462,7 +478,7 @@ bool PreparedModel::initialize(const hidl_vec<hidl_handle>& modelCache, const Hi
         }
     }
 
-    success = setRunTimePoolInfosFromHidlMemories(&mPoolInfos, mModel.pools);
+    success = setRunTimePoolInfosFromHidlMemories_1_3(&mPoolInfos, mModel.pools);
     if (!success) {
         VLOG(L1, "setRunTimePoolInfosFromHidlMemories failed.");
         return false;
@@ -631,7 +647,7 @@ void PreparedModel::asyncExecute(const V1_0_Request& request, MeasureTiming meas
                                  time_point driverStart,
                                  const sp<V1_0::IExecutionCallback>& callback) {
     std::vector<RunTimePoolInfo> requestPoolInfos;
-    if (!setRunTimePoolInfosFromHidlMemories(&requestPoolInfos, request.pools)) {
+    if (!setRunTimePoolInfosFromHidlMemories_1_3(&requestPoolInfos, request.pools)) {
         notify(callback, V1_0_ErrorStatus::GENERAL_FAILURE, {}, kNoTiming);
         return;
     }
@@ -733,6 +749,37 @@ void PreparedModel::asyncExecute(const V1_0_Request& request, MeasureTiming meas
         ALOGE("hidl callback failed to return properly: %s", returned.description().c_str());
     }
 }
+/*template <typename T_IExecutionCallback>
+Return<ErrorStatus> executeBase(const V1_3::Request& request,
+                                MeasureTiming measure,
+                                PreparedModel* preparedModel,
+                                const V1_3::OptionalTimePoint& halDeadline,
+                                const V1_3::OptionalTimeoutDuration& loopTimeoutDuration,
+                                const sp<T_IExecutionCallback>& callback) {
+    VLOG(L1, "executebase");
+
+    time_point driverStart;
+    if (measure == MeasureTiming::YES) driverStart = now();
+
+    if (callback.get() == nullptr) {
+        ALOGE("invalid callback passed to execute");
+        return ErrorStatus::INVALID_ARGUMENT;
+    }
+    /*
+    if (!validateRequest(request, preparedModel->getModelInfo()->getModel())) {
+        notify(callback, ErrorStatus::INVALID_ARGUMENT, {}, kNoTiming);
+        return ErrorStatus::INVALID_ARGUMENT;
+    }*/
+/*
+    // This thread is intentionally detached because the driver service
+    // is expected to live forever.
+    std::thread([request, measure, driverStart, callback] {
+        asyncExecute(request, measure,
+                     driverStart, callback);
+    }).detach();
+
+    return ErrorStatus::NONE;
+}*/
 
 Return<V1_0_ErrorStatus> PreparedModel::executeBase(const V1_0_Request& request, MeasureTiming measure,
                                                const sp<V1_0::IExecutionCallback>& callback) {
@@ -762,11 +809,46 @@ Return<V1_0_ErrorStatus> PreparedModel::executeBase(const V1_0_Request& request,
     return V1_0_ErrorStatus::NONE;
 }
 
+/*Return<void> PreparedModel::executeSynchronously(const V1_0::Request& request,
+                                                        V1_2::MeasureTiming measure,
+                                                        executeSynchronously_cb cb) {
+    VLOG(L1, "BasePreparedModel::executeSynchronously");
+    cb(V1_0::ErrorStatus::GENERAL_FAILURE, {}, kNoTiming);
+    return Void();
+}
+
+Return<void> PreparedModel::executeSynchronously_1_3(const V1_3::Request &request,
+                                          MeasureTiming measure,
+                                          const V1_3::OptionalTimePoint& deadline,
+                                          const V1_3::OptionalTimeoutDuration& loopTimeoutDuration,
+                                          V1_3::IPreparedModel::executeSynchronously_1_3_cb cb) {
+    VLOG(L1, "Begin to executeSynchronously_1_3");
+    //auto [status, outputShapes, timing] = executeSynchronouslyBase(request, measure, this, deadline, loopTimeoutDuration);
+    cb(V1_0::ErrorStatus::GENERAL_FAILURE, {}, kNoTiming);
+    return Void();
+} */
+
 Return<V1_0_ErrorStatus> PreparedModel::execute(const V1_0_Request& request,
                                            const sp<V1_0::IExecutionCallback>& callback) {
     VLOG(L1, "Begin to execute");
     return executeBase(request, MeasureTiming::NO, callback);
 }
+
+/*Return<ErrorStatus> PreparedModel::execute_1_3(const V1_3::Request& request,
+                                          MeasureTiming measure,
+                                          const V1_3::OptionalTimePoint& deadline,
+                                          const V1_3::OptionalTimeoutDuration& loopTimeoutDuration,
+                                          const sp<V1_3::IExecutionCallback>& callback) {
+    VLOG(L1, "Begin to execute_1_3");
+    return executeBase(request, MeasureTiming::NO, this, deadline, loopTimeoutDuration, callback);
+}
+
+Return<V1_0::ErrorStatus> PreparedModel::execute_1_2(const V1_0::Request& request, MeasureTiming measure,
+                                               const sp<V1_2::IExecutionCallback>& callback) {
+    VLOG(L1, "Begin to execute_1_2");
+    callback->notify_1_2(V1_0::ErrorStatus::GENERAL_FAILURE, {}, kNoTiming);
+    return V1_0::ErrorStatus::GENERAL_FAILURE;
+}*/
 
 template <typename T>
 T getOperandConstVal(const Model& model, const Operand& operand) {
@@ -797,14 +879,14 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
 #else
     for (auto i : operation.inputs) {
         const auto input = model.main.operands[i];
-        if (input.type == OperandType::TENSOR_QUANT8_ASYMM && input.zeroPoint != 0) {
+        if (input.type == OperandType::TENSOR_QUANT8_ASYMM || input.type == OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL) {
             VLOG_CHECKFAIL("input quant");
             return false;
         }
     }
     for (auto i : operation.outputs) {
         const auto output = model.main.operands[i];
-        if (output.type == OperandType::TENSOR_QUANT8_ASYMM && output.zeroPoint != 0) {
+        if (output.type == OperandType::TENSOR_QUANT8_ASYMM || output.type == OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL) {
             VLOG_CHECKFAIL("output quant");
             return false;
         }
@@ -825,14 +907,42 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
 
         switch (operation.type) {
             case OperationType::QUANTIZED_LSTM:
-            case OperationType::LSTM:
-                VLOG(L1, "Supporting LSTM !!!!");
+                VLOG(L1, "Supporting Quantized LSTM !!!!");
                 break;
-            case OperationType::FULLY_CONNECTED:
+            case OperationType::FULLY_CONNECTED: {
+                if (model.main.operands[operation.inputs[0]].dimensions[0] == 0) {
+                   ALOGE("FullyConnected: Batch size of 0 is not supported");
+                    return false;
+                }
+
+                if (model.main.operands[operation.inputs[0]].dimensions[0] != 1) {
+                   ALOGE("FullyConnected: non 1 batch size is not supported");
+                    return false;
+                }
+                if ((model.main.operands[operation.inputs[0]].type != OperandType::TENSOR_QUANT8_ASYMM_SIGNED) ||
+                    (model.main.operands[operation.inputs[1]].type != OperandType::TENSOR_QUANT8_ASYMM_SIGNED) ||
+                    (model.main.operands[operation.inputs[0]].type != OperandType::TENSOR_QUANT8_ASYMM_SIGNED) ||
+                    (model.main.operands[operation.inputs[1]].type != OperandType::TENSOR_QUANT8_ASYMM_SIGNED)) {
+                      VLOG(L1, "Currently enableing only TENSOR_QUANT8_ASYMM_SIGNED inputs\n");
+                      return false;
+                }
+                if (!(model.main.operands[operation.inputs[1]].lifetime == OperandLifeTime::CONSTANT_COPY
+                        || model.main.operands[operation.inputs[1]].lifetime == OperandLifeTime::CONSTANT_REFERENCE) ||
+                    !(model.main.operands[operation.inputs[2]].lifetime == OperandLifeTime::CONSTANT_COPY
+                        || model.main.operands[operation.inputs[2]].lifetime == OperandLifeTime::CONSTANT_REFERENCE)) {
+                      VLOG(L1, "Currently enableing only TENSOR_QUANT8_ASYMM_SIGNED inputs\n");
+                      return false;
+                }
                 break;
-            case OperationType::DEQUANTIZE:
+            }
+            case OperationType::DEQUANTIZE: {
+                auto OutOperandDetails = model.main.operands[operation.outputs[0]];
+                if (static_cast<int>(OutOperandDetails.type) == static_cast<int>(OperandType::TENSOR_FLOAT16)) {
+                    return false;
+                }
                 VLOG(L1, "Supporting Dequantize !!!!");
                 break;
+            }
             case OperationType::QUANTIZE:
                 {
                     VLOG(L1, "Supporting Quantize !!!!");
@@ -845,7 +955,11 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
                 break;
             case OperationType::EMBEDDING_LOOKUP:
                 VLOG(L1, "Supporting Embedding Lookup !!!!");
-		break;
+                if (model.main.operands[operation.inputs[1]].type != OperandType::FLOAT32 || model.main.operands[operation.inputs[1]].type != OperandType::TENSOR_FLOAT32 ) {
+                   ALOGE("FullyConnected: Batch size of 0 is not supported");
+                    return false;
+                }
+		        break;
             default:
                 VLOG(L1, "OP (%d) not supported", operation.type);
                 return false;

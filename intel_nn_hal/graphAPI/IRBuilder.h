@@ -29,6 +29,7 @@ struct FCParams
     ParamsData input;
     ParamsData weights;
     ParamsData bias;
+    int32_t fuse_parameter;
 };
 } // Builder FC layer
 

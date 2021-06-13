@@ -65,10 +65,13 @@ class QuantizeOp : public BaseOp {
         }
 
         bool quantizeToQuant8Signed(const InputType* inputData, int8_t* outputData) {
+            std::cout << "zp = " << zeroPoint;
             for (uint32_t i = 0; i < inputLen; ++i) {
+                std::cout << " inputData[" << i << "] = " <<  static_cast<float>(inputData[i]) << "\n";
                 outputData[i] = static_cast<int8_t>(std::max<float>(-128.0f,
                                                     std::min<float>(127.0f, zeroPoint +
                                                     std::round(inputData[i] / scale))));
+                std::cout << " outputData[" << i << "] = " <<  static_cast<int16_t>(outputData[i]) << "\n";
             }
             return true;
         }
@@ -89,7 +92,6 @@ class QuantizeOp : public BaseOp {
                 if (!output)
                     output = new int8_t[inputLen];
 
-                output = new int8_t[inputLen];
                 quantizeToQuant8Signed(inputDataPtr, static_cast<int8_t*>(output));
             }
             return true;

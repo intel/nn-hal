@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_ML_NN_VPU_DRIVER_H
-#define ANDROID_ML_NN_VPU_DRIVER_H
+#ifndef ANDROID_ML_NN_OV_DRIVER_H
+#define ANDROID_ML_NN_OV_DRIVER_H
 #include <android/hardware/neuralnetworks/1.0/IDevice.h>
 #include <android/hardware/neuralnetworks/1.0/IExecutionCallback.h>
 #include <android/hardware/neuralnetworks/1.0/IPreparedModel.h>
@@ -58,7 +58,7 @@ using V1_2_Capabilities = ::android::hardware::neuralnetworks::V1_2::Capabilitie
 using V1_0_ErrorStatus = ::android::hardware::neuralnetworks::V1_0::ErrorStatus;
 using ErrorStatus = ::android::hardware::neuralnetworks::V1_3::ErrorStatus;
 using V1_3_OperandLifeTime = ::android::hardware::neuralnetworks::V1_3::OperandLifeTime;
-using OperandLifeTime = ::android::hardware::neuralnetworks::V1_0::OperandLifeTime;
+using OperandLifeTime = ::android::hardware::neuralnetworks::V1_3::OperandLifeTime;
 using V1_0_Request = ::android::hardware::neuralnetworks::V1_0::Request;
 using Request = ::android::hardware::neuralnetworks::V1_3::Request;
 
@@ -106,9 +106,9 @@ public:
                                          const sp<V1_2::IPreparedModelCallback>& callback) override;
     Return<ErrorStatus> prepareModel_1_3(const Model& model, ExecutionPreference preference,
                                          Priority priority,
-					 const OptionalTimePoint& deadline,
+					                     const OptionalTimePoint& deadline,
                                          const hidl_vec<hidl_handle>& modelCache,
-				         const hidl_vec<hidl_handle>& dataCache,
+				                         const hidl_vec<hidl_handle>& dataCache,
                                          const HidlToken& token,
                                          const sp<V1_3::IPreparedModelCallback>& callback) override;
     Return<ErrorStatus> prepareModelFromCache_1_3(
@@ -140,4 +140,4 @@ protected:
 }  // namespace hardware
 }  // namespace android
 
-#endif  // ANDROID_ML_NN_VPU_DRIVER_H
+#endif  // ANDROID_ML_NN_OV_DRIVER_H

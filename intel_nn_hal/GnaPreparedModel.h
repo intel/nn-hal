@@ -125,41 +125,72 @@ public:
 
     virtual Return<V1_0_ErrorStatus> execute(const V1_0_Request& request,
                                 const sp<V1_0::IExecutionCallback>& callback) override {
-        return executeBase(request, MeasureTiming::NO, callback);
+        return V1_0::ErrorStatus::NONE;
     }
 
-    virtual void initializeInput() override;
-    void initializeInput(std::vector<uint32_t>& indexVec);
-    virtual bool finalizeOutput() override;
+    Return<V1_3::ErrorStatus> execute_1_3(const V1_3::Request& request,
+                                          V1_2::MeasureTiming measure,
+                                          const V1_3::OptionalTimePoint&,
+                                          const V1_3::OptionalTimeoutDuration&,
+                                          const sp<V1_3::IExecutionCallback>& callback) override  {
+        return executeBase_V1_3(request, MeasureTiming::NO, callback);
+    }
 
+    Return<void> executeSynchronously_1_3(const V1_3::Request &request,
+                                          V1_2::MeasureTiming measure,
+                                          const V1_3::OptionalTimePoint& deadline,
+                                          const V1_3::OptionalTimeoutDuration& loopTimeoutDuration,
+                                          V1_3::IPreparedModel::executeSynchronously_1_3_cb cb) override {
+
+        Timing kNoTiming_1 = {.timeOnDevice = UINT64_MAX, .timeInDriver = UINT64_MAX};
+
+        auto [status, outputShapes, timing] = executeSynchronouslyBase(request, measure, deadline, loopTimeoutDuration);
+        cb(status, std::move(outputShapes), timing);
+        return Void();
+    };
+
+    virtual void initializeInput() override;
+
+    virtual bool finalizeOutput() override;
+    std::tuple<ErrorStatus, hidl_vec<V1_2::OutputShape>, Timing>
+    executeSynchronouslyBase(const V1_3::Request& request, V1_2::MeasureTiming measure,
+                  const V1_3::OptionalTimePoint& halDeadline,
+                  const V1_3::OptionalTimeoutDuration& loopTimeoutDuration);
+    std::tuple<ErrorStatus, hidl_vec<V1_2::OutputShape>, Timing>
+        syncExecute(const V1_3::Request& request, MeasureTiming measure, time_point driverStart);
+    void executeModel(const V1_3::Request& request);
+
+    void initializeInput(std::vector<uint32_t>& indexVec);
     bool operationLSTM(const Operation& operation);
     bool operationQuantizedLSTM(const Operation& operation);
+    void setDims(const uint32_t idx, const std::vector<unsigned long> dims);
     BaseOp* operationEmbeddingLookup(const Operation& operation);
     BaseOp* operationDequantize(const Operation& operation, bool dummyOp = false);
     BaseOp* operationQuantize(const Operation& operation, bool dummyOp = false);
 
 protected:
     void deinitialize();
-    virtual Return<V1_0_ErrorStatus> executeBase(const V1_0_Request& request, MeasureTiming measure,
-                                    const sp<V1_0::IExecutionCallback>& callback) override;
-
-    void asyncExecute(const V1_0_Request& request, MeasureTiming measure, time_point driverStart,
-                      const sp<V1_0::IExecutionCallback>& callback);
+    void asyncExecute(const V1_3::Request& request, MeasureTiming measure, time_point driverStart,
+                      const sp<V1_3::IExecutionCallback>& callback);
 
     bool constructGNAGraph(std::pair<int, int> indices);
     OpContainer* constructCpuGraph(std::pair<int, int> indices);
     BaseOp* getCpuOpFromLayerName(std::string layer);
+        Return<V1_3::ErrorStatus> executeBase_V1_3(const V1_3::Request& request, MeasureTiming measure,
+                                    const sp<V1_3::IExecutionCallback>& callback);
+    Return<V1_0::ErrorStatus> executeBase(const V1_0::Request& request, MeasureTiming measure,
+                                    const sp<V1_0::IExecutionCallback>& callback) override;
 
     bool updateMemoryAfterCPUGraphExecution(const V1_0_Request& request);
     bool updateMemoryAfterCPUGraphExecution(const V1_0_Request& request, uint32_t index);
     bool updateMemoryAfterGNAGraphExecution(const V1_0_Request& request);
-    bool updateMemoryAfterGraphExecution(const V1_0_Request& request);
+    bool updateMemoryAfterGraphExecution(const V1_3::Request& request);
 
 
     std::vector<RunTimePoolInfo> mRuntimeRequestPoolInfos;
 
-    Blob::Ptr getBlobFromMemoryPool(uint32_t index, const V1_0_Request& request);
-    RunTimeOperandInfo& getOperandFromMemoryPool(uint32_t index, const V1_0_Request& request);
+    Blob::Ptr getBlobFromMemoryPool(uint32_t index, const V1_3::Request& request, OperandType& opType);
+    RunTimeOperandInfo& getOperandFromMemoryPool(uint32_t index, const V1_3::Request& request);
     void executeGnaGraph();
 };
 
@@ -168,4 +199,4 @@ protected:
 }  // namespace hardware
 }  // namespace android
 
-#endif  // ANDROID_ML_NN_PREPAREDMODEL_H
+#endif  // ANDROID_ML_NN_GNA_PREPAREDMODEL_H

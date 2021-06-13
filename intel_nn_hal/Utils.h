@@ -23,7 +23,7 @@
 
 //#define PERF_COUNTERS
 //#define CACHING
-//#define NN_DEBUG
+#define NN_DEBUG
 
 enum DebugLevel {
     L0,
@@ -406,7 +406,10 @@ struct RunTimePoolInfo {
 };
 
 bool setRunTimePoolInfosFromHidlMemories(std::vector<RunTimePoolInfo>* poolInfos,
-                                         const hidl_vec<hidl_memory>& pools);
+                                         const hidl_vec<V1_3::Request::MemoryPool>& pools);
+
+bool setRunTimePoolInfosFromHidlMemories_1_3(std::vector<RunTimePoolInfo>* poolInfos,
+                                        const hidl_vec<hidl_memory>& pools);
 
 enum PaddingScheme {
     kPaddingUnknown = 0,
