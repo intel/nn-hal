@@ -397,6 +397,7 @@ int sizeOfData(OperandType type, std::vector<uint32_t> dims) {
             break;
         case OperandType::TENSOR_QUANT8_ASYMM:
         case OperandType::TENSOR_QUANT8_SYMM:
+        case OperandType::TENSOR_QUANT8_ASYMM_SIGNED:
             size = 1;
             break;
 

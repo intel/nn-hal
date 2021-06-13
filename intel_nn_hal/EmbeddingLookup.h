@@ -8,9 +8,10 @@ namespace hardware {
 namespace neuralnetworks {
 namespace nnhal {
 
+template<typename T>
 class EmbeddingLookupOp : public BaseOp {
-    float* output = nullptr;
-    float* valuesDataPtr;
+    void* output = nullptr;
+    void* valuesDataPtr;
     int32_t valuesLen;
     std::vector<uint32_t> values_dims_;
     std::vector<uint32_t> lookup_dims_;
@@ -45,8 +46,9 @@ class EmbeddingLookupOp : public BaseOp {
                 lookupLen = len;
             }
             else if(opIndex == 1) {
-                valuesDataPtr  = static_cast<float*>(dataPtr);
+                valuesDataPtr  = dataPtr;
                 valuesLen = len;
+                const T* valuesBuf = reinterpret_cast<const T*>(valuesDataPtr);
             }
             return true;
         }
@@ -63,18 +65,22 @@ class EmbeddingLookupOp : public BaseOp {
         }
 
         bool  run() {
+            const T* valuesBuf = reinterpret_cast<const T*>(valuesDataPtr);
             uint32_t row_size = values_dims_[0];
             uint32_t valueBytes = sizeOfData(valueType_, values_dims_);
 
             auto row_bytes = valueBytes / row_size;
             uint32_t idx;
-            for( uint32_t i = 0; i < lookup_dims_[0]; i++) {
-                idx = *(lookupDataPtr);
-            }
 
-            output = new float[row_size];
-            memcpy(output, (uint8_t*)valuesDataPtr + idx * row_bytes, row_bytes);
-            outputLen = row_bytes / sizeof(float);
+            int num_elem_to_copy = row_bytes / sizeof(T);
+            output = new T[ lookup_dims_[0] * num_elem_to_copy];
+            T* output_t = reinterpret_cast< T*>(output);
+
+            for( uint32_t i = 0; i < lookup_dims_[0]; i++) {
+                idx = *(lookupDataPtr + i);
+                memcpy(((output_t) + i * num_elem_to_copy), valuesBuf + idx * num_elem_to_copy, num_elem_to_copy * sizeof(T));
+            }
+            outputLen = num_elem_to_copy * lookup_dims_[0];
             return true;
         }
 

@@ -18,6 +18,7 @@
 
 #include <android-base/logging.h>
 #include <thread>
+#include <algorithm>
 
 #include "Driver.h"
 #include "PreparedModel.h"
@@ -31,20 +32,21 @@ namespace nnhal {
 
 using namespace android::nn;
 
-hidl_vec<Capabilities::OperandPerformance> nonExtensionOperandPerformance(PerformanceInfo perf) {
-    using OpPerf = Capabilities::OperandPerformance;
-
-    // Note: range presents enumerators in declaration order, not in numerical order.
+hidl_vec<Capabilities::OperandPerformance> nonExtensionOperandPerformance(
+			        PerformanceInfo perf) {
+	using OpPerf = Capabilities::OperandPerformance;
+	    // Note: range presents enumerators in declaration order, not in numerical order.
     static constexpr ::android::hardware::hidl_enum_range<OperandType> kOperandTypeRange;
 
-    hidl_vec<OpPerf> ret(kOperandTypeRange.end() - kOperandTypeRange.begin());
-
-    std::transform(kOperandTypeRange.begin(), kOperandTypeRange.end(), ret.begin(),
-                   [perf](OperandType type) {
-                       return Capabilities::OperandPerformance{type, perf};
-                   });
+    std::vector<OpPerf> ret;
+    ret.reserve(kOperandTypeRange.end() - kOperandTypeRange.begin());
+    for (auto type : kOperandTypeRange) {
+        if (static_cast<OperandType>(type) != OperandType::SUBGRAPH) {
+            ret.push_back(OpPerf{type, perf});
+        }
+    }
     std::sort(ret.begin(), ret.end(),
-              [](const OpPerf& a, const OpPerf& b) { return a.type < b.type; });
+                  [](const OpPerf& a, const OpPerf& b) { return a.type < b.type; });
 
     return ret;
 }
@@ -99,6 +101,19 @@ Return<V1_0_ErrorStatus> Driver::prepareModel_1_2(const V1_2_Model& model,
     return V1_0_ErrorStatus::NONE;
 }
 
+
+std::vector<bool> getSupportedOps(const Model& model) {
+    int count = model.main.operations.size();
+    std::vector<bool> supported(count, true);
+
+    for (int i = 0; i < count; i++) {
+        const auto& operation = model.main.operations[i];
+        supported[i] = PreparedModel::isOperationSupported(operation, model, "GNA");
+    }
+
+    return supported;
+}
+
 Return<ErrorStatus> Driver::prepareModel_1_3(const Model& model, ExecutionPreference preference,
 					     Priority priority,
 					     const OptionalTimePoint& deadline,
@@ -106,30 +121,38 @@ Return<ErrorStatus> Driver::prepareModel_1_3(const Model& model, ExecutionPrefer
                                              const hidl_vec<hidl_handle>& dataCache, const HidlToken& token,
                                              const sp<V1_3::IPreparedModelCallback>& callback) {
     ALOGI("Entering %s", __func__);
+    VLOG(L1, "Entering %s", __func__);
 
     if (callback.get() == nullptr) {
         ALOGI("invalid callback passed to prepareModel");
         return ErrorStatus::INVALID_ARGUMENT;
     }
-    if (!validateModel(model) || !validateExecutionPreference(preference)) {
+    if (!validateModel(model) || !validateExecutionPreference(preference) || !validatePriority(priority)) {
         callback->notify(V1_0_ErrorStatus::INVALID_ARGUMENT, nullptr);
         return ErrorStatus::INVALID_ARGUMENT;
     }
 
-    // TODO: make asynchronous later
+    auto supported = getSupportedOps(model);
+    bool isModelFullySupported = std::all_of(supported.begin(), supported.end(),
+     [] (bool v) { return v;});
+
+    if(!isModelFullySupported) {
+        callback->notify(V1_0_ErrorStatus::INVALID_ARGUMENT, nullptr);
+        return ErrorStatus::NONE;
+    }
+
     sp<PreparedModel> preparedModel = ModelFactory(mName.c_str(), model);
     if (preparedModel == NULL) {
         ALOGI("failed to create preparedmodel");
         return ErrorStatus::INVALID_ARGUMENT;
     }
-
     if (!preparedModel->initialize(modelCache, token)) {
         ALOGE("failed to initialize preparedmodel");
         callback->notify(V1_0_ErrorStatus::INVALID_ARGUMENT, nullptr);
         return ErrorStatus::NONE;
     }
-
     callback->notify(V1_0_ErrorStatus::NONE, preparedModel);
+
     return ErrorStatus::NONE;
 }
 
@@ -264,8 +287,9 @@ Return<void> Driver::getCapabilities_1_3(getCapabilities_1_3_cb cb) {
        Capabilities capabilities = {
             .relaxedFloat32toFloat16PerformanceScalar = {.execTime = 0.8f, .powerUsage = 0.8f},
             .relaxedFloat32toFloat16PerformanceTensor = {.execTime = 0.8f, .powerUsage = 0.8f},
-            .operandPerformance = nonExtensionOperandPerformance({0.8f, 0.8f})};
-
+            .operandPerformance = nonExtensionOperandPerformance({0.8f, 0.8f}),
+            .ifPerformance = {.execTime = 0.8f, .powerUsage = 0.8f},
+            .whilePerformance = {.execTime = 0.8f, .powerUsage = 0.8f}};
        ALOGI("GNA driver Capabilities .execTime = 0.8f, .powerUsage = 0.8f");
        cb(ErrorStatus::NONE, capabilities);
     } else {
@@ -301,6 +325,7 @@ Return<void> Driver::getSupportedOperations_1_2(const V1_2_Model& model,
 
     return Void();
 }
+
 
 Return<void> Driver::getSupportedOperations_1_3(const Model& model,
                                                 getSupportedOperations_1_3_cb cb) {

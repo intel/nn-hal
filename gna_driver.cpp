@@ -22,7 +22,7 @@ namespace hardware {
 namespace neuralnetworks {
 
 // static
-// This registers the SampleDriverFull into the DeviceManager.
+// This registers the Intel NNHAL for GNA into the DeviceManager.
 ::android::sp<V1_0::IDevice> V1_0::IDevice::getService(const std::string& /*serviceName*/,
                                            bool /*dummy*/) {
   return new nnhal::Driver("GNA");

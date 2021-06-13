@@ -110,6 +110,11 @@ std::string ModelBuilder::createFC(BuilderFCLayer::FCParams& params, IRBlob::Ptr
                                   std::vector<std::string>& inputLayerNames)
 {
     auto inputDims = params.input.data->getTensorDesc().getDims();
+
+    if(!isValidInputTensor(inputDims)) {
+        std::string nullStr;
+        return nullStr;
+    }
     auto weightDims = params.weights.data->getTensorDesc().getDims();
     auto outputDims = weightDims[1] * weightDims[0]/inputDims[1];
 

@@ -64,7 +64,7 @@ auto millisecondsDuration(decltype(now()) end, decltype(now()) start) {
 //
 // Since these drivers simulate hardware, they must run the computations
 // on the CPU.  An actual driver would not do that.
-class PreparedModel : public V1_0::IPreparedModel {
+class PreparedModel : public V1_3::IPreparedModel {
 public:
     PreparedModel(const Model& model)
         : mTargetDevice("MYRIAD"),
@@ -107,15 +107,97 @@ public:
     }
 
     ~PreparedModel() override { deinitialize(); }
+
+
+    Return<V1_0::ErrorStatus> execute_1_2(const V1_0::Request& request, V1_2::MeasureTiming measure,
+                                        const sp<V1_2::IExecutionCallback>& callback) override {
+        return V1_0::ErrorStatus::NONE;
+    };
+
+    Return<V1_3::ErrorStatus> execute_1_3(const V1_3::Request& request,
+                                          V1_2::MeasureTiming measure,
+                                          const V1_3::OptionalTimePoint&,
+                                          const V1_3::OptionalTimeoutDuration&,
+                                          const sp<V1_3::IExecutionCallback>& callback) override {
+        return V1_3::ErrorStatus::NONE;
+    }
+
+    Return<void> executeSynchronously(const V1_0::Request& request,
+                                            V1_2::MeasureTiming measure,
+                                            executeSynchronously_cb cb) override {
+        return Void();
+    };
+
+    Return<void> executeSynchronously_1_3(const V1_3::Request &request,
+                                          V1_2::MeasureTiming measure,
+                                          const V1_3::OptionalTimePoint& deadline,
+                                          const V1_3::OptionalTimeoutDuration& loopTimeoutDuration,
+                                          V1_3::IPreparedModel::executeSynchronously_1_3_cb cb) override {
+        return Void();
+    };
+
+    Return<void> executeFenced(const V1_3::Request& request,
+                               const android::hardware::hidl_vec<android::hardware::hidl_handle>& fenceWaitFor,
+                               V1_2::MeasureTiming measure,
+                               const V1_3::OptionalTimePoint& deadline,
+                               const V1_3::OptionalTimeoutDuration& loopTimeoutDuration,
+                               const V1_3::OptionalTimeoutDuration& duration,
+                               executeFenced_cb callback) {
+            callback(ErrorStatus::GENERAL_FAILURE, hidl_handle(nullptr), nullptr);
+            return Void();
+    }
+
+
+    Return<void> configureExecutionBurst(
+            const sp<V1_2::IBurstCallback>& callback,
+            const MQDescriptorSync<V1_2::FmqRequestDatum>& requestChannel,
+            const MQDescriptorSync<V1_2::FmqResultDatum>& resultChannel,
+            configureExecutionBurst_cb cb) override {
+            return Void();
+    };
+
+   /* Return<V1_0::ErrorStatus> execute_1_2(const V1_0::Request& request, V1_2::MeasureTiming measure,
+                                        const sp<V1_2::IExecutionCallback>& callback) override;
+    Return<ErrorStatus> execute_1_3(const V1_3::Request& request,
+                                          V1_2::MeasureTiming measure,
+                                          const V1_3::OptionalTimePoint&,
+                                          const V1_3::OptionalTimeoutDuration&,
+                                          const sp<V1_3::IExecutionCallback>& callback) override;
+
+        Return<void> executeSynchronously(const V1_0::Request& request,
+                                            V1_2::MeasureTiming measure,
+                                            executeSynchronously_cb cb) override;
+        Return<void> executeSynchronously_1_3(const V1_3::Request &request,
+                                          V1_2::MeasureTiming measure,
+                                          const V1_3::OptionalTimePoint& deadline,
+                                          const V1_3::OptionalTimeoutDuration& loopTimeoutDuration,
+                                          V1_3::IPreparedModel::executeSynchronously_1_3_cb cb) override;
+
+        Return<void> executeFenced(const V1_3::Request& request,
+                               const android::hardware::hidl_vec<android::hardware::hidl_handle>& fenceWaitFor,
+                               V1_2::MeasureTiming measure,
+                               const V1_3::OptionalTimePoint& deadline,
+                               const V1_3::OptionalTimeoutDuration& loopTimeoutDuration,
+                               const V1_3::OptionalTimeoutDuration& duration,
+                               executeFenced_cb callback) {
+            callback(ErrorStatus::GENERAL_FAILURE, hidl_handle(nullptr), nullptr);
+            return Void();
+        }
+
+
+        Return<void> configureExecutionBurst(
+            const sp<V1_2::IBurstCallback>& callback,
+            const MQDescriptorSync<V1_2::FmqRequestDatum>& requestChannel,
+            const MQDescriptorSync<V1_2::FmqResultDatum>& resultChannel,
+            configureExecutionBurst_cb cb) override;
+*/
     virtual bool initialize(const hidl_vec<hidl_handle>& modelCache, const HidlToken& token);
 
     virtual bool initializeFromCache(const hidl_vec<hidl_handle>& modelCache, const HidlToken& token);
 
-    virtual Return<V1_0_ErrorStatus> execute(const V1_0_Request& request,
+    Return<V1_0_ErrorStatus> execute(const V1_0_Request& request,
                                 const sp<V1_0::IExecutionCallback>& callback) override;
 
-    // Return<ErrorStatus> executeBase(const Request& request, MeasureTiming measure,
-    //                             const sp<T_IExecutionCallback>& callback);
     static bool isOperationSupported(const Operation& operation, const Model& model, const std::string& device);
 
 protected:
@@ -179,7 +261,7 @@ protected:
 	    return value;
 	}
     int64_t ParseOperationInput_i8(const Model& model, const Operation& operation, uint32_t index) {
-	return ParseOperationInput<int8_t>(model, operation, index);
+	    return ParseOperationInput<int8_t>(model, operation, index);
     }
     template <typename T>
     T GetConstOperand(const Model& model, uint32_t index) {
