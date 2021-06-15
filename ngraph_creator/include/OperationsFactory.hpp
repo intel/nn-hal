@@ -7,6 +7,7 @@
 #include <Average_Pool_2D.hpp>
 #include <Batch_To_Space.hpp>
 #include <Cast.hpp>
+#include <Channel_Shuffle.hpp>
 #include <Concat.hpp>
 #include <Conv_2d.hpp>
 #include <Depthwise_Conv_2d.hpp>

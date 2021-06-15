@@ -31,6 +31,8 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<Batch_To_Space>(operationIndex);
         case OperationType::CAST:
             return std::make_shared<Cast>(operationIndex);
+        case OperationType::CHANNEL_SHUFFLE:
+            return std::make_shared<Channel_Shuffle>(operationIndex);
         case OperationType::CONCATENATION:
             return std::make_shared<Concat>(operationIndex);
         case OperationType::CONV_2D:
