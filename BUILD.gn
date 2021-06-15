@@ -81,6 +81,7 @@ shared_library("intel_nnhal") {
     "ngraph_creator/operations/src/Average_Pool_2D.cpp",
     "ngraph_creator/operations/src/Batch_To_Space.cpp",
     "ngraph_creator/operations/src/Cast.cpp",
+    "ngraph_creator/operations/src/Channel_Shuffle.cpp",
     "ngraph_creator/operations/src/Concat.cpp",
     "ngraph_creator/operations/src/Conv_2d.cpp",
     "ngraph_creator/operations/src/Depthwise_Conv_2d.cpp",
