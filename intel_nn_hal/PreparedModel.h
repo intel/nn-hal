@@ -156,41 +156,6 @@ public:
             return Void();
     };
 
-   /* Return<V1_0::ErrorStatus> execute_1_2(const V1_0::Request& request, V1_2::MeasureTiming measure,
-                                        const sp<V1_2::IExecutionCallback>& callback) override;
-    Return<ErrorStatus> execute_1_3(const V1_3::Request& request,
-                                          V1_2::MeasureTiming measure,
-                                          const V1_3::OptionalTimePoint&,
-                                          const V1_3::OptionalTimeoutDuration&,
-                                          const sp<V1_3::IExecutionCallback>& callback) override;
-
-        Return<void> executeSynchronously(const V1_0::Request& request,
-                                            V1_2::MeasureTiming measure,
-                                            executeSynchronously_cb cb) override;
-        Return<void> executeSynchronously_1_3(const V1_3::Request &request,
-                                          V1_2::MeasureTiming measure,
-                                          const V1_3::OptionalTimePoint& deadline,
-                                          const V1_3::OptionalTimeoutDuration& loopTimeoutDuration,
-                                          V1_3::IPreparedModel::executeSynchronously_1_3_cb cb) override;
-
-        Return<void> executeFenced(const V1_3::Request& request,
-                               const android::hardware::hidl_vec<android::hardware::hidl_handle>& fenceWaitFor,
-                               V1_2::MeasureTiming measure,
-                               const V1_3::OptionalTimePoint& deadline,
-                               const V1_3::OptionalTimeoutDuration& loopTimeoutDuration,
-                               const V1_3::OptionalTimeoutDuration& duration,
-                               executeFenced_cb callback) {
-            callback(ErrorStatus::GENERAL_FAILURE, hidl_handle(nullptr), nullptr);
-            return Void();
-        }
-
-
-        Return<void> configureExecutionBurst(
-            const sp<V1_2::IBurstCallback>& callback,
-            const MQDescriptorSync<V1_2::FmqRequestDatum>& requestChannel,
-            const MQDescriptorSync<V1_2::FmqResultDatum>& resultChannel,
-            configureExecutionBurst_cb cb) override;
-*/
     virtual bool initialize(const hidl_vec<hidl_handle>& modelCache, const HidlToken& token);
 
     virtual bool initializeFromCache(const hidl_vec<hidl_handle>& modelCache, const HidlToken& token);

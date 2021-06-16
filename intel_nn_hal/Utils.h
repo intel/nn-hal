@@ -23,7 +23,7 @@
 
 //#define PERF_COUNTERS
 //#define CACHING
-//#define NN_DEBUG
+#define NN_DEBUG
 
 enum DebugLevel {
     L0,
@@ -257,35 +257,31 @@ class OpContainer {
                 op->run();
             }
             else {
-            for (i = 0; i < opsVec.size() - 1 ; i++) {
-                op = opsVec[i];
-                if ( i == 0) {
-                    op->run();
+                for (i = 0; i < opsVec.size() - 1 ; i++) {
+                    op = opsVec[i];
+                    if ( i == 0) {
+                        op->run();
+                    }
+                    else if (op->hasSubgraphInput()) {
+                        op->run();
+                    }
+                    else {
+                        std::vector<uint32_t> ip_indices = op->getInputIndices();
+                        op->setInputData(ip_indices[0], std::get<0>(intermediate_inp), std::get<1>(intermediate_inp));
+                        op->run();
+                    }
+                    intermediate_inp = op->getOutputData();
+                    auto inp_ptr = static_cast<float*>(std::get<0>(intermediate_inp));
                 }
-                else if (op->hasSubgraphInput()) {
-                    op->run();
-                }
-                else {
-                    std::vector<uint32_t> ip_indices = op->getInputIndices();
-                    op->setInputData(ip_indices[0], std::get<0>(intermediate_inp), std::get<1>(intermediate_inp));
-                    op->run();
-                }
-                intermediate_inp = op->getOutputData();
-                auto inp_ptr = static_cast<float*>(std::get<0>(intermediate_inp));
-            }
-            if (i == opsVec.size() - 1) {
-                op = opsVec[i];
-                if (op->hasSubgraphInput()) {
-                    op->run();
-                }
-                else {
-                    std::vector<uint32_t> ip_indices = op->getInputIndices();
-                    op->setInputData(ip_indices[0], std::get<0>(intermediate_inp), std::get<1>(intermediate_inp));
+                if (i == opsVec.size() - 1) {
+                    op = opsVec[i];
+                    if (!op->hasSubgraphInput()) {
+                        std::vector<uint32_t> ip_indices = op->getInputIndices();
+                        op->setInputData(ip_indices[0], std::get<0>(intermediate_inp), std::get<1>(intermediate_inp));
+                    }
                     op->run();
                 }
             }
-            }
-
             return true;
         }
 
