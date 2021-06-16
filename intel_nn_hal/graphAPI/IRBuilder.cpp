@@ -208,11 +208,6 @@ std::string ModelBuilder::createFC(BuilderFCLayer::FCParams& params, IRBlob::Ptr
                                   std::vector<std::string>& inputLayerNames)
 {
     auto inputDims = params.input.data->getTensorDesc().getDims();
-
-    /*if(!isValidInputTensor(inputDims)) {
-        std::string nullStr;
-        return nullStr;
-    }*/
     auto weightDims = params.weights.data->getTensorDesc().getDims();
     auto outputDims = weightDims[1] * weightDims[0]/inputDims[1];
 
@@ -248,14 +243,15 @@ std::string ModelBuilder::createFC(BuilderFCLayer::FCParams& params, IRBlob::Ptr
         mBlob2LayerIdxMap[params.weights.data] = weightsId;
     }
 
-    idx_t biasId =  getBuilderNetwork()->getBuilder()->addLayer(CONSTLayer("bias").setData(params.bias.data));
+    /*idx_t biasId =  getBuilderNetwork()->getBuilder()->addLayer(CONSTLayer("bias").setData(params.bias.data));
     if (params.bias.lifeTime == (int)V1_0_OperandLifeTime::SUBGRAPH_INPUT)
     {
         mBlob2LayerIdxMap[params.bias.data] = biasId;
-    }
+    }*/
 
     auto layer_name = getLayerName("fully-connected");
-    idx_t FCLayerId = getBuilderNetwork()->getBuilder()->addLayer({{inputLayerId}, {weightsId}, {biasId}}, \
+    //idx_t FCLayerId = getBuilderNetwork()->getBuilder()->addLayer({{inputLayerId}, {weightsId}, {biasId}},
+    idx_t FCLayerId = getBuilderNetwork()->getBuilder()->addLayer({{inputLayerId}, {weightsId}}, \
     FCLayer(layer_name).setOutputNum(outputDims));
     getBuilderNetwork()->mConnections.push_back(FCLayerId);
 
@@ -472,6 +468,7 @@ std::vector<std::string> ModelBuilder::createFullLstm(LstmLayer::LstmParams& par
     idx_t r2cLayerId = getBuilderNetwork()->getBuilder()->addLayer({{h_t_1Id}, {weightsId}}, \
     FCLayer(getLayerName("affinetransform")) \
     .setOutputNum(cellSize));
+    std::cout << "add Layer\n";
 
     // r2o = W_{ho}h_{t-1}
     weightsId =  getBuilderNetwork()->getBuilder()->addLayer(CONSTLayer("weights").setData(params.recurrant2OutputWeights.data));
@@ -482,6 +479,7 @@ std::vector<std::string> ModelBuilder::createFullLstm(LstmLayer::LstmParams& par
     idx_t r2oLayerId = getBuilderNetwork()->getBuilder()->addLayer({{h_t_1Id}, {weightsId}}, \
     FCLayer(getLayerName("affinetransform")) \
     .setOutputNum(cellSize));
+    std::cout << "add Layer\n";
 
     idx_t c2iLayerId = 10236, c2fLayerId = 10237, cellstateToInputGateAddLayerId = 10235, cellStateToForgetGateAddLayerId = 10238, cellStateToOutputGateAddLayerId = 10234;
     if (lstmDesc.peepholeEnabled)
@@ -520,6 +518,7 @@ std::vector<std::string> ModelBuilder::createFullLstm(LstmLayer::LstmParams& par
         c2oGateSumLayer.setEltwiseType(ELTWISELayer::SUM);
         cellStateToOutputGateAddLayerId = getBuilderNetwork()->getBuilder()->addLayer(c2oGateSumLayer);
     }
+    std::cout << "add Layer\n";
 
     // Eltwise sum layer
     idx_t inputGateAddLayerId = -1;
@@ -532,6 +531,7 @@ std::vector<std::string> ModelBuilder::createFullLstm(LstmLayer::LstmParams& par
     ELTWISELayer forgetGateSumLayer = ELTWISELayer(getLayerName("add"));
     forgetGateSumLayer.setEltwiseType(ELTWISELayer::SUM);
     idx_t forgetGateAddLayerId = getBuilderNetwork()->getBuilder()->addLayer(forgetGateSumLayer);
+    std::cout << "add Layer\n";
 
     ELTWISELayer cellGateSumLayer = ELTWISELayer(getLayerName("add"));
     cellGateSumLayer.setEltwiseType(ELTWISELayer::SUM);
@@ -560,7 +560,7 @@ std::vector<std::string> ModelBuilder::createFullLstm(LstmLayer::LstmParams& par
     ELTWISELayer newOutputMulLayer = ELTWISELayer(getLayerName("mul"));
     newOutputMulLayer.setEltwiseType(ELTWISELayer::MUL);
     idx_t newOutputMulLayerId = getBuilderNetwork()->getBuilder()->addLayer(newOutputMulLayer);
-
+    std::cout << "add Layer\n";
     // clamp layers
     idx_t cellStateClampLayerId, projectionLayerClampId;
     if (lstmDesc.clippingThresholdCellState)

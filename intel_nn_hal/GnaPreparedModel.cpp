@@ -1347,22 +1347,9 @@ void GnaPreparedModel::executeModel(const V1_3::Request& request) {
                     }
                     auto destBlob = gnaPluginPtr->getInferRequest().GetBlob(layerName);
                     RunTimeOperandInfo& current_op = mOperands[inputIndex];
-
-                    /*if (opType == OperandType::TENSOR_QUANT8_ASYMM_SIGNED) {
-                            deQuantize<int8_t>(srcBlob->buffer, srcBlob->byteSize(), current_op.scale, current_op.zeroPoint, destBlob->buffer().as<float*>());
-                        }/* else if (op.type == OperandType::TENSOR_QUANT8_SYMM) {
-                            VLOG(L1, "Dequantizing not needed 2\n");
-                            deQuantize<int8_t>(srcPtr, srcLen, op.scale, 0, destBlob->buffer().as<float*>());
-                        } else if (op.type == OperandType::TENSOR_QUANT16_SYMM) {
-                            deQuantize_s16(srcPtr, srcLen, op.scale, 0, destBlob->buffer().as<float*>());
-                        } else if (op.type == OperandType::TENSOR_FLOAT32) {
-                            std::memcpy(destBlob->buffer().as<uint8_t*>(), srcPtr, srcLen);
-                        }
-                    else {*/
-                        uint8_t* dest = destBlob->buffer().as<uint8_t*>();
-                        uint8_t* src = srcBlob->buffer().as<uint8_t*>();
-                        std::memcpy(dest, src, srcBlob->byteSize());
-                    //}
+                    uint8_t* dest = destBlob->buffer().as<uint8_t*>();
+                    uint8_t* src = srcBlob->buffer().as<uint8_t*>();
+                    std::memcpy(dest, src, srcBlob->byteSize());
                 }
             }
         } else {
@@ -1441,11 +1428,7 @@ void GnaPreparedModel::executeModel(const V1_3::Request& request) {
                             nnAssert(false);
                         }
                         auto[srcMemoryPtr, srcLen] = cpuLayerPtr->getOutputData();
-                        if (isRnnT() && !isJointNw) {
 
-                        }
-                        else {
-                        }
                         // Make sure the layername is present in inputinfo from the layer
                         auto iter2 = std::find_if(gnaPluginPtr->inputInfo.begin(),
                                     gnaPluginPtr->inputInfo.end(),
@@ -1469,17 +1452,6 @@ void GnaPreparedModel::executeModel(const V1_3::Request& request) {
                                 deQuantize<int8_t>(srcPtr, srcLen, op.scale, op.zeroPoint, destBlob->buffer().as<float*>());
                             }
                         }
-                       /* else if (op.type == OperandType::TENSOR_QUANT8_SYMM) {    std::memcpy(destBlob->buffer().as<float*>(), srcPtr, srcLen * 4);
-
-                            //deQuantize<int8_t>(srcPtr, srcLen, op.scale, op.zeroPoint, destBlob->buffer().as<float*>());
-                        }/* else if (op.type == OperandType::TENSOR_QUANT8_SYMM) {
-                            VLOG(L1, "Dequantizing not needed 2\n");
-                            deQuantize<int8_t>(srcPtr, srcLen, op.scale, 0, destBlob->buffer().as<float*>());
-                        } else if (op.type == OperandType::TENSOR_QUANT16_SYMM) {
-                            deQuantize_s16(srcPtr, srcLen, op.scale, 0, destBlob->buffer().as<float*>());
-                        } else if (op.type == OperandType::TENSOR_FLOAT32) {
-                            std::memcpy(destBlob->buffer().as<uint8_t*>(), srcPtr, srcLen);
-                        }*/
                     } else {
                         VLOG(L1, "Index  %d is not in output index map", index);
                     }
@@ -1524,9 +1496,7 @@ std::tuple<ErrorStatus, hidl_vec<V1_2::OutputShape>, Timing>
     time_point driverEnd, deviceStart, deviceEnd;
     if (measure == MeasureTiming::YES) deviceStart = now();
 
-    //std::vector<RunTimePoolInfo> requestPoolInfos;
     if (!setRunTimePoolInfosFromHidlMemories(&mRuntimeRequestPoolInfos, request.pools)) {
-        //cb->notify(V1_0::ErrorStatus::GENERAL_FAILURE);
         return {ErrorStatus::GENERAL_FAILURE, {}, kNoTiming};
     }
 
@@ -1552,7 +1522,6 @@ void GnaPreparedModel::asyncExecute(const V1_3::Request& request, MeasureTiming 
     time_point driverEnd, deviceStart, deviceEnd;
     if (measure == MeasureTiming::YES) deviceStart = now();
 
-    //std::vector<RunTimePoolInfo> requestPoolInfos;
     if (!setRunTimePoolInfosFromHidlMemories(&mRuntimeRequestPoolInfos, request.pools)) {
         cb->notify(V1_0::ErrorStatus::GENERAL_FAILURE);
         return;
@@ -1565,11 +1534,11 @@ void GnaPreparedModel::asyncExecute(const V1_3::Request& request, MeasureTiming 
         Timing timing = {.timeOnDevice = uint64_t(microsecondsDuration(deviceEnd, deviceStart)),
                          .timeInDriver = uint64_t(microsecondsDuration(deviceEnd, deviceStart))};
         VLOG(L1, "Driver::asyncExecute timing = %s", toString(timing).c_str());
-        cb->notify(V1_0::ErrorStatus::NONE);
     } else {
         VLOG(L1, "MeasureTiming - No. Returning with no error");
-        cb->notify(V1_0::ErrorStatus::NONE);
     }
+
+    cb->notify(V1_0::ErrorStatus::NONE);
 }
 
 Return<V1_0::ErrorStatus> GnaPreparedModel::executeBase(const V1_0::Request& request, MeasureTiming measure,
@@ -1835,23 +1804,12 @@ bool GnaPreparedModel::operationFullyConnected(const Operation& operation) {
     };
 
     IRBuilder::BuilderFCLayer::FCParams params;
-
-    if(!validateOperand(operation.inputs[0], 0)){
-        //return false;
-    }
     params.input.lifeTime = getV1_3_OperandLifeTime(operation.inputs[0]);
     params.input.data = getIRBlobFromOperand(operation.inputs[0], 0);
 
-
-    if(!validateOperand(operation.inputs[1], 1)){
-        //return false;
-    }
     params.weights.data = getIRBlobFromOperand(operation.inputs[1], 1);
     params.weights.lifeTime = getV1_3_OperandLifeTime(operation.inputs[1]);
 
-    if (!validateOperand(operation.inputs[2], 2)){
-        //return false;
-    }
     params.bias.data = getIRBlobFromOperand(operation.inputs[2], 2);
     params.bias.lifeTime = getV1_3_OperandLifeTime(operation.inputs[2]);
 
@@ -2643,73 +2601,65 @@ BaseOp* GnaPreparedModel::operationEmbeddingLookup(const Operation& operation) {
     }
     embeddinglookupOp->setInputIndex(valuesIndex, 1);
     auto currLayer = LayerInfo(name_values, false, DeviceType::CPU);
-    if ( (static_cast<int>(ValuesDetails.lifetime) == static_cast<int>(OperandLifeTime::CONSTANT_COPY)) ||
-         (static_cast<int>(ValuesDetails.lifetime) == static_cast<int>(OperandLifeTime::CONSTANT_REFERENCE))) {
+    if (static_cast<int>(ValuesDetails.lifetime) == static_cast<int>(OperandLifeTime::CONSTANT_COPY)) {
+        auto buf = const_cast<uint8_t*>(&mModel.operandValues[ValuesDetails.location.offset]);
+        auto len_out = sizeOfData(ValuesDetails.type, ValuesDetails.dimensions);
+        embeddinglookupOp->setInputData(valuesIndex, buf, len_out);
+    }
+    else if (static_cast<int>(ValuesDetails.lifetime) == static_cast<int>(OperandLifeTime::CONSTANT_REFERENCE)) {
             auto poolIndex = ValuesDetails.location.poolIndex;
             auto& r = mPoolInfos[poolIndex];
             auto buf = const_cast<uint8_t*>(r.buffer + ValuesDetails.location.offset);
             auto len_out = sizeOfData(ValuesDetails.type, ValuesDetails.dimensions);
             embeddinglookupOp->setInputData(valuesIndex, buf, len_out);
-
     }
     else if (static_cast<int>(ValuesDetails.lifetime) == (int)V1_3_OperandLifeTime::SUBGRAPH_INPUT) {
-
-
-        mInputPorts.emplace(std::make_pair(valuesIndex,currLayer));
+        embeddinglookupOp->setSubgraphInput();
+        mInputPorts.emplace(std::make_pair(valuesIndex, currLayer));
     } else if(static_cast<int>(ValuesDetails.lifetime) == static_cast<int>(OperandLifeTime::TEMPORARY_VARIABLE)) {
-        /*if (mIntermediateLayerMap.find(inputIndex) != mIntermediateLayerMap.end()) {
+        if (mIntermediateLayerMap.find(inputIndex) != mIntermediateLayerMap.end()) {
             auto& halLayer = mIntermediateLayerMap.at(inputIndex);
             halLayer.setInputNode(name, DeviceType::CPU);
         } else {
             mIntermediateLayerMap.emplace(std::make_pair(inputIndex,
                                                         HalLayerInfo(name, DeviceType::CPU, "", DeviceType::None, false)));
-        }*/
-    } else if(static_cast<int>(ValuesDetails.lifetime) == static_cast<int>(OperandLifeTime::CONSTANT_COPY)) {
-
-
+        }
     }
 
-     embeddinglookupOp->setInputIndex(lookupIndex, 0);
+    embeddinglookupOp->setInputIndex(lookupIndex, 0);
     if (static_cast<int>(LookupDetails.lifetime) == static_cast<int>(OperandLifeTime::CONSTANT_COPY)) {
         auto buf = const_cast<uint8_t*>(&mModel.operandValues[LookupDetails.location.offset]);
-         auto len_out = sizeOfData(LookupDetails.type, LookupDetails.dimensions);
-            embeddinglookupOp->setInputData(lookupIndex, buf, len_out);
-    }
-        else if (static_cast<int>(LookupDetails.lifetime) == static_cast<int>(OperandLifeTime::CONSTANT_REFERENCE)) {
-            auto poolIndex = LookupDetails.location.poolIndex;
-            auto& r = mPoolInfos[poolIndex];
-            auto buf = const_cast<uint8_t*>(r.buffer + LookupDetails.location.offset);
-            auto len_out = sizeOfData(LookupDetails.type, LookupDetails.dimensions);
-            embeddinglookupOp->setInputData(lookupIndex, buf, len_out);
-
-    }
-
-    if (static_cast<int>(LookupDetails.lifetime) == (int)V1_3_OperandLifeTime::SUBGRAPH_INPUT) {
+        auto len_out = sizeOfData(LookupDetails.type, LookupDetails.dimensions);
+        embeddinglookupOp->setInputData(lookupIndex, buf, len_out);
+    } else if (static_cast<int>(LookupDetails.lifetime) == static_cast<int>(OperandLifeTime::CONSTANT_REFERENCE)) {
+        auto poolIndex = LookupDetails.location.poolIndex;
+        auto& r = mPoolInfos[poolIndex];
+        auto buf = const_cast<uint8_t*>(r.buffer + LookupDetails.location.offset);
+        auto len_out = sizeOfData(LookupDetails.type, LookupDetails.dimensions);
+        embeddinglookupOp->setInputData(lookupIndex, buf, len_out);
+    } else if (static_cast<int>(LookupDetails.lifetime) == (int)V1_3_OperandLifeTime::SUBGRAPH_INPUT) {
         embeddinglookupOp->setSubgraphInput();
         mInputPorts.emplace(std::make_pair(lookupIndex, currLayer));
-
-        //mInputPorts.emplace(std::make_pair(valuesIndex, LayerInfo(name, false, DeviceType::CPU)));
     } else if(static_cast<int>(LookupDetails.lifetime) == static_cast<int>(OperandLifeTime::TEMPORARY_VARIABLE)) {
-        /*if (mIntermediateLayerMap.find(inputIndex) != mIntermediateLayerMap.end()) {
+        if (mIntermediateLayerMap.find(inputIndex) != mIntermediateLayerMap.end()) {
             auto& halLayer = mIntermediateLayerMap.at(inputIndex);
             halLayer.setInputNode(name, DeviceType::CPU);
         } else {
             mIntermediateLayerMap.emplace(std::make_pair(inputIndex,
                                                         HalLayerInfo(name, DeviceType::CPU, "", DeviceType::None, false)));
-        }*/
-    } else if(static_cast<int>(LookupDetails.lifetime) == static_cast<int>(OperandLifeTime::CONSTANT_COPY)) {
+        }
     }
 
     if (static_cast<int>(OutOperandDetails.lifetime) == (int)V1_3_OperandLifeTime::SUBGRAPH_OUTPUT) {
         mOutputToLayerMap.emplace(std::make_pair(outputIndex, currLayer));
     } else if (static_cast<int>(OutOperandDetails.lifetime) == static_cast<int>(OperandLifeTime::TEMPORARY_VARIABLE)) {
-       /* if (mIntermediateLayerMap.find(outputIndex) != mIntermediateLayerMap.end()) {
+        if (mIntermediateLayerMap.find(outputIndex) != mIntermediateLayerMap.end()) {
             auto& halLayer = mIntermediateLayerMap.at(outputIndex);
             halLayer.setOutputNode(name, DeviceType::CPU);
         } else {
             mIntermediateLayerMap.emplace(std::make_pair(outputIndex,
                                                         HalLayerInfo("", DeviceType::None, name, DeviceType::CPU, false)));
-        }*/
+        }
     }
 
     embeddinglookupOp->setInputIndices({lookupIndex, valuesIndex});

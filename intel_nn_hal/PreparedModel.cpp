@@ -423,10 +423,9 @@ bool PreparedModel::initializeRunTimeOperandInfo() {
             break;
             case OperandType::TENSOR_QUANT8_ASYMM:
                     to.type = from.type;
-                    ALOGE("OperandType::TENSOR_QUANT8_ASYMM is  supported");
                 break;
             default:
-                std::cout << "wrong operand type" <<  static_cast<int>(from.type) << "\n";
+                ALOGE << "wrong operand type" <<  static_cast<int>(from.type) << "\n";
                 return false;
         }
 
@@ -749,37 +748,6 @@ void PreparedModel::asyncExecute(const V1_0_Request& request, MeasureTiming meas
         ALOGE("hidl callback failed to return properly: %s", returned.description().c_str());
     }
 }
-/*template <typename T_IExecutionCallback>
-Return<ErrorStatus> executeBase(const V1_3::Request& request,
-                                MeasureTiming measure,
-                                PreparedModel* preparedModel,
-                                const V1_3::OptionalTimePoint& halDeadline,
-                                const V1_3::OptionalTimeoutDuration& loopTimeoutDuration,
-                                const sp<T_IExecutionCallback>& callback) {
-    VLOG(L1, "executebase");
-
-    time_point driverStart;
-    if (measure == MeasureTiming::YES) driverStart = now();
-
-    if (callback.get() == nullptr) {
-        ALOGE("invalid callback passed to execute");
-        return ErrorStatus::INVALID_ARGUMENT;
-    }
-    /*
-    if (!validateRequest(request, preparedModel->getModelInfo()->getModel())) {
-        notify(callback, ErrorStatus::INVALID_ARGUMENT, {}, kNoTiming);
-        return ErrorStatus::INVALID_ARGUMENT;
-    }*/
-/*
-    // This thread is intentionally detached because the driver service
-    // is expected to live forever.
-    std::thread([request, measure, driverStart, callback] {
-        asyncExecute(request, measure,
-                     driverStart, callback);
-    }).detach();
-
-    return ErrorStatus::NONE;
-}*/
 
 Return<V1_0_ErrorStatus> PreparedModel::executeBase(const V1_0_Request& request, MeasureTiming measure,
                                                const sp<V1_0::IExecutionCallback>& callback) {
