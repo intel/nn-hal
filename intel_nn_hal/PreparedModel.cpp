@@ -425,7 +425,7 @@ bool PreparedModel::initializeRunTimeOperandInfo() {
                     to.type = from.type;
                 break;
             default:
-                ALOGE << "wrong operand type" <<  static_cast<int>(from.type) << "\n";
+                ALOGE("wrong operand type %d\n", from.type);
                 return false;
         }
 
