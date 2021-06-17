@@ -2565,6 +2565,8 @@ BaseOp* GnaPreparedModel::operationQuantize(const Operation& operation, bool dum
 BaseOp* GnaPreparedModel::operationEmbeddingLookup(const Operation& operation) {
     static int count = 0;
     std::string name_values = "embedding-lookup-values" + std::to_string(count++);
+    std::string name_lookup = "embedding-lookup" + std::to_string(count++);
+
     uint32_t lookupIndex = operation.inputs[0];
     uint32_t outIndex = operation.outputs[0];
 
@@ -2617,16 +2619,18 @@ BaseOp* GnaPreparedModel::operationEmbeddingLookup(const Operation& operation) {
         embeddinglookupOp->setSubgraphInput();
         mInputPorts.emplace(std::make_pair(valuesIndex, currLayer));
     } else if(static_cast<int>(ValuesDetails.lifetime) == static_cast<int>(OperandLifeTime::TEMPORARY_VARIABLE)) {
-        if (mIntermediateLayerMap.find(inputIndex) != mIntermediateLayerMap.end()) {
-            auto& halLayer = mIntermediateLayerMap.at(inputIndex);
-            halLayer.setInputNode(name, DeviceType::CPU);
+        if (mIntermediateLayerMap.find(valuesIndex) != mIntermediateLayerMap.end()) {
+            auto& halLayer = mIntermediateLayerMap.at(valuesIndex);
+            halLayer.setInputNode(name_values, DeviceType::CPU);
         } else {
-            mIntermediateLayerMap.emplace(std::make_pair(inputIndex,
-                                                        HalLayerInfo(name, DeviceType::CPU, "", DeviceType::None, false)));
+            mIntermediateLayerMap.emplace(std::make_pair(valuesIndex,
+                                                        HalLayerInfo(name_values, DeviceType::CPU, "", DeviceType::None, false)));
         }
     }
 
     embeddinglookupOp->setInputIndex(lookupIndex, 0);
+    currLayer = LayerInfo(name_lookup, false, DeviceType::CPU);
+
     if (static_cast<int>(LookupDetails.lifetime) == static_cast<int>(OperandLifeTime::CONSTANT_COPY)) {
         auto buf = const_cast<uint8_t*>(&mModel.operandValues[LookupDetails.location.offset]);
         auto len_out = sizeOfData(LookupDetails.type, LookupDetails.dimensions);
@@ -2641,12 +2645,12 @@ BaseOp* GnaPreparedModel::operationEmbeddingLookup(const Operation& operation) {
         embeddinglookupOp->setSubgraphInput();
         mInputPorts.emplace(std::make_pair(lookupIndex, currLayer));
     } else if(static_cast<int>(LookupDetails.lifetime) == static_cast<int>(OperandLifeTime::TEMPORARY_VARIABLE)) {
-        if (mIntermediateLayerMap.find(inputIndex) != mIntermediateLayerMap.end()) {
-            auto& halLayer = mIntermediateLayerMap.at(inputIndex);
-            halLayer.setInputNode(name, DeviceType::CPU);
+        if (mIntermediateLayerMap.find(lookupIndex) != mIntermediateLayerMap.end()) {
+            auto& halLayer = mIntermediateLayerMap.at(lookupIndex);
+            halLayer.setInputNode(name_lookup, DeviceType::CPU);
         } else {
-            mIntermediateLayerMap.emplace(std::make_pair(inputIndex,
-                                                        HalLayerInfo(name, DeviceType::CPU, "", DeviceType::None, false)));
+            mIntermediateLayerMap.emplace(std::make_pair(lookupIndex,
+                                                        HalLayerInfo(name_lookup, DeviceType::CPU, "", DeviceType::None, false)));
         }
     }
 
@@ -2655,10 +2659,10 @@ BaseOp* GnaPreparedModel::operationEmbeddingLookup(const Operation& operation) {
     } else if (static_cast<int>(OutOperandDetails.lifetime) == static_cast<int>(OperandLifeTime::TEMPORARY_VARIABLE)) {
         if (mIntermediateLayerMap.find(outputIndex) != mIntermediateLayerMap.end()) {
             auto& halLayer = mIntermediateLayerMap.at(outputIndex);
-            halLayer.setOutputNode(name, DeviceType::CPU);
+            halLayer.setOutputNode(name_lookup, DeviceType::CPU);
         } else {
             mIntermediateLayerMap.emplace(std::make_pair(outputIndex,
-                                                        HalLayerInfo("", DeviceType::None, name, DeviceType::CPU, false)));
+                                                        HalLayerInfo("", DeviceType::None, name_lookup, DeviceType::CPU, false)));
         }
     }
 
