@@ -104,6 +104,13 @@ static void floatToUint8(const float* src, uint8_t* dst, size_t size) {
     }
 }
 
+static void floatToint8(const float* src, int8_t* dst, size_t size) {
+    for (uint32_t i = 0; i < size; ++i) {
+        dst[i] = static_cast<int8_t>(src[i]);
+        ALOGV("%s input: %f output: %d ", __func__, src[i], dst[i]);
+    }
+}
+
 template <typename T_IExecutionCallback>
 void asyncExecute(const Request& request, MeasureTiming measure, BasePreparedModel* preparedModel,
                   time_point driverStart, const sp<T_IExecutionCallback>& callback) {
@@ -132,12 +139,17 @@ void asyncExecute(const Request& request, MeasureTiming measure, BasePreparedMod
         uint8_t* dest = destBlob->buffer().as<uint8_t*>();
         uint8_t* src = srcBlob->buffer().as<uint8_t*>();
         std::memcpy(dest, src, srcBlob->byteSize());
-        writeBufferToFile(inputNodeName, srcBlob->buffer().as<float*>(), srcBlob->size());
     }
-    ALOGD("Run");
+    ALOGD("%s Run", __func__);
 
     if (measure == MeasureTiming::YES) deviceStart = now();
-    plugin->infer();
+    try {
+        plugin->infer();
+    } catch (const std::exception& ex) {
+        ALOGE("%s Exception !!! %s", __func__, ex.what());
+        notify(callback, ErrorStatus::GENERAL_FAILURE, {}, kNoTiming);
+        return;
+    }
     if (measure == MeasureTiming::YES) deviceEnd = now();
 
     for (size_t i = 0; i < request.outputs.size(); i++) {
@@ -155,7 +167,9 @@ void asyncExecute(const Request& request, MeasureTiming measure, BasePreparedMod
         uint32_t rActualLength = 0;
         void* destPtr = modelInfo->getBlobFromMemoryPoolOut(request, i, rActualLength);
         auto outDims = srcBlob->getTensorDesc().getDims();
-        if (operandType == OperandType::TENSOR_BOOL8)
+        if (operandType == OperandType::TENSOR_BOOL8 ||
+            operandType == OperandType::TENSOR_QUANT8_ASYMM ||
+            operandType == OperandType::TENSOR_QUANT8_SYMM)
             expectedLength /= 4;  // 8bit expected instead of 32bit
         if (rActualLength != expectedLength) {
             ALOGE("%s Invalid length(%d) at outIndex(%d)", __func__, rActualLength, outIndex);
@@ -178,12 +192,19 @@ void asyncExecute(const Request& request, MeasureTiming measure, BasePreparedMod
                 floatToUint8(srcBlob->buffer().as<float*>(), (uint8_t*)destPtr, srcBlob->size());
                 break;
             }
+            case OperandType::TENSOR_QUANT8_ASYMM: {
+                floatToUint8(srcBlob->buffer().as<float*>(), (uint8_t*)destPtr, srcBlob->size());
+                break;
+            }
+            case OperandType::TENSOR_QUANT8_SYMM: {
+                floatToint8(srcBlob->buffer().as<float*>(), (int8_t*)destPtr, srcBlob->size());
+                break;
+            }
             default:
                 std::memcpy((uint8_t*)destPtr, srcBlob->buffer().as<uint8_t*>(),
                             srcBlob->byteSize());
                 break;
         }
-        writeBufferToFile(outputNodeName, srcBlob->buffer().as<float*>(), srcBlob->size());
     }
 
     if (!modelInfo->updateRequestPoolInfos()) {
@@ -233,13 +254,17 @@ static std::tuple<ErrorStatus, hidl_vec<V1_2::OutputShape>, Timing> executeSynch
         uint8_t* dest = destBlob->buffer().as<uint8_t*>();
         uint8_t* src = srcBlob->buffer().as<uint8_t*>();
         std::memcpy(dest, src, srcBlob->byteSize());
-        writeBufferToFile(inputNodeName, srcBlob->buffer().as<float*>(), srcBlob->size());
     }
 
-    ALOGD("Run");
+    ALOGD("%s Run", __func__);
 
     if (measure == MeasureTiming::YES) deviceStart = now();
-    plugin->infer();
+    try {
+        plugin->infer();
+    } catch (const std::exception& ex) {
+        ALOGE("%s Exception !!! %s", __func__, ex.what());
+        return {ErrorStatus::GENERAL_FAILURE, {}, kNoTiming};
+    }
     if (measure == MeasureTiming::YES) deviceEnd = now();
 
     for (size_t i = 0; i < request.outputs.size(); i++) {
@@ -257,7 +282,9 @@ static std::tuple<ErrorStatus, hidl_vec<V1_2::OutputShape>, Timing> executeSynch
         uint32_t rActualLength = 0;
         void* destPtr = modelInfo->getBlobFromMemoryPoolOut(request, i, rActualLength);
         auto outDims = srcBlob->getTensorDesc().getDims();
-        if (operandType == OperandType::TENSOR_BOOL8)
+        if (operandType == OperandType::TENSOR_BOOL8 ||
+            operandType == OperandType::TENSOR_QUANT8_ASYMM ||
+            operandType == OperandType::TENSOR_QUANT8_SYMM)
             expectedLength /= 4;  // 8bit expected instead of 32bit
         if (rActualLength != expectedLength) {
             ALOGE("%s Invalid length(%d) at outIndex(%d)", __func__, rActualLength, outIndex);
@@ -277,12 +304,19 @@ static std::tuple<ErrorStatus, hidl_vec<V1_2::OutputShape>, Timing> executeSynch
                 floatToUint8(srcBlob->buffer().as<float*>(), (uint8_t*)destPtr, srcBlob->size());
                 break;
             }
+            case OperandType::TENSOR_QUANT8_ASYMM: {
+                floatToUint8(srcBlob->buffer().as<float*>(), (uint8_t*)destPtr, srcBlob->size());
+                break;
+            }
+            case OperandType::TENSOR_QUANT8_SYMM: {
+                floatToint8(srcBlob->buffer().as<float*>(), (int8_t*)destPtr, srcBlob->size());
+                break;
+            }
             default:
                 std::memcpy((uint8_t*)destPtr, srcBlob->buffer().as<uint8_t*>(),
                             srcBlob->byteSize());
                 break;
         }
-        writeBufferToFile(outputNodeName, srcBlob->buffer().as<float*>(), srcBlob->size());
     }
 
     if (!modelInfo->updateRequestPoolInfos()) {

@@ -38,7 +38,7 @@ bool NnapiModelInfo::initializeRunTimeOperandInfo() {
     // Start by setting the runtime info to what's in the model.
     for (size_t i = 0; i < count; i++) {
         const Operand& from = mModel.main.operands[i];
-        dumpOperand(i, mModel);
+        dumpOperand(i, mModel.main);
         RunTimeOperandInfo& to = mOperands[i];
         to.dimensions.resize(from.dimensions.size());
         for (size_t j = 0; j < from.dimensions.size(); j++) {
@@ -64,7 +64,8 @@ bool NnapiModelInfo::initializeRunTimeOperandInfo() {
                 to.type = from.type;
                 break;
             case OperandType::TENSOR_QUANT8_ASYMM:
-                ALOGE("OperandType::TENSOR_QUANT8_ASYMM is not supported");
+            case OperandType::TENSOR_QUANT8_SYMM:
+                to.type = from.type;
                 break;
             default:
                 ALOGE("wrong operand type %d", from.type);
@@ -151,6 +152,7 @@ const uint8_t* NnapiModelInfo::GetOperandMemory(int index, uint32_t& lenOut) {
         //     "operand lifetime "
         //     "OperandLifeTime::MODEL_INPUT||MODEL_OUTPUT||NO_VALUE||TEMPORARY_VARIABLE");
         lenOut = sizeOfData(op.type, op.dimensions);
+        ALOGV("operand lifetime(%d), type(%d), lenOut(%d)", op.lifetime, op.type, lenOut);
         return nullptr;
     }
     ALOGE("operand is expected to be const, but lifetime is %d", op.lifetime);
@@ -204,7 +206,7 @@ Blob::Ptr NnapiModelInfo::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const ui
                     std::make_shared<InferenceEngine::TBlob<float>>(td, (float*)buf, len);
                 return blob;
             }
-        } else if (nn::convertToV1_3(op.lifetime) ==  V1_3::OperandLifeTime::SUBGRAPH_OUTPUT) {
+        } else if (op.lifetime ==  OperandLifeTime::SUBGRAPH_OUTPUT) {
             ALOGD("Create output blob !!!!");
             vec<unsigned int> order;
             InferenceEngine::Layout layout;
@@ -265,12 +267,41 @@ Blob::Ptr NnapiModelInfo::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const ui
                 std::make_shared<InferenceEngine::TBlob<uint8_t>>(td, (uint8_t*)buf, len);
             return blob;
         }
+    } else if (op.type == OperandType::TENSOR_QUANT8_ASYMM) {
+        ALOGV("check if tensors of type TENSOR_QUANT8_ASYMM supported");
+        InferenceEngine::TensorDesc td(InferenceEngine::Precision::U8, toDims(op.dimensions),
+                                       InferenceEngine::Layout::ANY);
+        if (buf == nullptr) {
+            ALOGD("TENSOR_QUANT8_ASYMM buf is NULL !!!!!!!!!!!!!!!");
+            InferenceEngine::TBlob<uint8_t>::Ptr blob =
+                std::make_shared<InferenceEngine::TBlob<uint8_t>>(td);
+            blob->allocate();
+            return blob;
+        } else {
+            InferenceEngine::TBlob<uint8_t>::Ptr blob =
+                std::make_shared<InferenceEngine::TBlob<uint8_t>>(td, (uint8_t*)buf, len);
+            return blob;
+        }
+    } else if (op.type == OperandType::TENSOR_QUANT8_SYMM) {
+        ALOGV("check if tensors of type TENSOR_QUANT8_SYMM supported");
+        InferenceEngine::TensorDesc td(InferenceEngine::Precision::I8, toDims(op.dimensions),
+                                       InferenceEngine::Layout::ANY);
+        if (buf == nullptr) {
+            ALOGD("TENSOR_QUANT8_SYMM buf is NULL !!!!!!!!!!!!!!!");
+            InferenceEngine::TBlob<int8_t>::Ptr blob =
+                std::make_shared<InferenceEngine::TBlob<int8_t>>(td);
+            blob->allocate();
+            return blob;
+        } else {
+            InferenceEngine::TBlob<int8_t>::Ptr blob =
+                std::make_shared<InferenceEngine::TBlob<int8_t>>(td, (int8_t*)buf, len);
+            return blob;
+        }
     }
     return nullptr;
 }
 
 IRBlob::Ptr NnapiModelInfo::GetConstOperandAsTensor(int operand_idx, int operation_idx) {
-    dumpOperand(operand_idx, mModel);
     const auto op = mModel.main.operands[operand_idx];
     uint32_t len;
 
@@ -357,7 +388,6 @@ IRBlob::Ptr NnapiModelInfo::GetConstOperandAsTensor(int operand_idx, int operati
 
 // Redundant.. Remove the code
 IRBlob::Ptr NnapiModelInfo::GetConstWeightsOperandAsTensor(uint32_t index) {
-    dumpOperand(index, mModel);
     const auto op = mModel.main.operands[index];
     uint32_t len;
     const uint8_t* buf = GetOperandMemory(index, len);
@@ -521,12 +551,14 @@ bool NnapiModelInfo::isOmittedInput(int operationIndex, uint32_t index) {
 }
 
 template int NnapiModelInfo::GetConstOperand<int>(unsigned int);
-template uint32_t NnapiModelInfo::GetConstOperand<uint32_t>(unsigned int);
 template float NnapiModelInfo::GetConstOperand<float>(unsigned int);
 template uint8_t NnapiModelInfo::GetConstOperand<uint8_t>(unsigned int);
+template int8_t NnapiModelInfo::GetConstOperand<int8_t>(unsigned int);
+template uint32_t NnapiModelInfo::GetConstOperand<uint32_t>(unsigned int);
 template int NnapiModelInfo::GetConstFromBuffer<int>(unsigned char const*, unsigned int);
 template float NnapiModelInfo::GetConstFromBuffer<float>(unsigned char const*, unsigned int);
 template uint8_t NnapiModelInfo::GetConstFromBuffer<uint8_t>(unsigned char const*, unsigned int);
+template int8_t NnapiModelInfo::GetConstFromBuffer<int8_t>(unsigned char const*, unsigned int);
 template uint32_t NnapiModelInfo::GetConstFromBuffer<uint32_t>(unsigned char const*, unsigned int);
 }  // namespace nnhal
 }  // namespace neuralnetworks

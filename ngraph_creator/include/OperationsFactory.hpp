@@ -2,11 +2,14 @@
 
 #include <Abs.hpp>
 #include <Add.hpp>
+#include <Argmax.hpp>
+#include <Argmin.hpp>
 #include <Average_Pool_2D.hpp>
 #include <Cast.hpp>
 #include <Concat.hpp>
 #include <Conv_2d.hpp>
 #include <Depthwise_Conv_2d.hpp>
+#include <Dequantize.hpp>
 #include <Div.hpp>
 #include <Equal.hpp>
 #include <Exp.hpp>
@@ -18,6 +21,7 @@
 #include <Less.hpp>
 #include <Less_Equal.hpp>
 #include <Log.hpp>
+#include <Log_Softmax.hpp>
 #include <Logical_And.hpp>
 #include <Logical_Not.hpp>
 #include <Logical_Or.hpp>
@@ -29,7 +33,11 @@
 #include <Mul.hpp>
 #include <Neg.hpp>
 #include <Not_Equal.hpp>
+#include <Pad.hpp>
+#include <Pad_V2.hpp>
 #include <Pow.hpp>
+#include <Quantize.hpp>
+#include <RSQRT.hpp>
 #include <Reduce_All.hpp>
 #include <Reduce_Any.hpp>
 #include <Reduce_Min.hpp>
@@ -39,12 +47,14 @@
 #include <Relu6.hpp>
 #include <Reshape.hpp>
 #include <SQRT.hpp>
+#include <Select.hpp>
 #include <Sin.hpp>
 #include <Softmax.hpp>
 #include <Split.hpp>
 #include <Squeeze.hpp>
 #include <Sub.hpp>
 #include <Tanh.hpp>
+#include <Topk_V2.hpp>
 #include <Transpose.hpp>
 
 namespace android {

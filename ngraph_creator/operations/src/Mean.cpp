@@ -11,12 +11,15 @@ Mean::Mean(int operationIndex) : OperationsBase(operationIndex) {
 
 bool Mean::validate() {
     // check output type
-    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) {
+    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
+        !checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
         return false;
     }
 
     // Check all input types
-    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) return false;
+    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
+        !checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM))
+        return false;
 
     if (!checkInputOperandType(1, (int32_t)OperandType::TENSOR_INT32)) return false;
 
@@ -35,18 +38,17 @@ bool Mean::validate() {
 
 std::shared_ptr<ngraph::Node> Mean::createNode() {
     // Creating input nodes
-    auto input = getInputNode<float>(0);
-    auto reduction_axes = getInputNode<int>(1);
+    std::shared_ptr<ngraph::Node> input;
+
+    input = getInputNode(0);
+
+    auto reduction_axes = getInputNode(1);
     auto reduce_dims = sModelInfo->ParseOperationInput<int>(mNnapiOperationIndex, 2);
     bool keep_dims = (reduce_dims > 0) ? true : false;
 
-    auto outputNode =
-        std::make_shared<ngraph::opset3::ReduceMean>(input, reduction_axes, keep_dims);
+    std::shared_ptr<ngraph::Node> outputNode;
+    outputNode = std::make_shared<ngraph::opset3::ReduceMean>(input, reduction_axes, keep_dims);
 
-    const auto op = sModelInfo->getOperand(mDefaultOutputIndex);
-    if (op.lifetime == V1_3::OperandLifeTime::SUBGRAPH_OUTPUT) {
-        addResultNode(mDefaultOutputIndex, outputNode);
-    }
     return outputNode;
 }
 

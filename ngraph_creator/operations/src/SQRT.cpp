@@ -25,14 +25,10 @@ bool SQRT::validate() {
 
 std::shared_ptr<ngraph::Node> SQRT::createNode() {
     // Creating input nodes
-    auto input = getInputNode<float>(0);
+    auto input = getInputNode(0);
 
     auto outputNode = std::make_shared<ngraph::opset3::Sqrt>(input);
 
-    const auto op = sModelInfo->getOperand(mDefaultOutputIndex);
-    if (op.lifetime == V1_3::OperandLifeTime::SUBGRAPH_OUTPUT) {
-        addResultNode(mDefaultOutputIndex, outputNode);
-    }
     return outputNode;
 }
 

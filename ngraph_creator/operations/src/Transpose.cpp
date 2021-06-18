@@ -11,12 +11,14 @@ Transpose::Transpose(int operationIndex) : OperationsBase(operationIndex) {
 
 bool Transpose::validate() {
     // check output type
-    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) {
+    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
+        !checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
         return false;
     }
 
     // Check all input types
-    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) {
+    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
+        !checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
         return false;
     }
 
@@ -26,7 +28,7 @@ bool Transpose::validate() {
 
     // TODO: Add Support for all_tensors_as_inputs
     const auto& dimsOperandIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 1);
-    const auto& dims = getInputOperandDimensions(dimsOperandIndex);
+    const auto& dims = getInputOperandDimensions(1);
     if (!dims.empty() && dims[0] != 0 && !sModelInfo->isOperandLifeTimeConst(dimsOperandIndex)) {
         ALOGE("%s Only Constant dimensions supported now", __func__);
         return false;
@@ -37,23 +39,23 @@ bool Transpose::validate() {
 
 std::shared_ptr<ngraph::Node> Transpose::createNode() {
     // Creating input nodes
-    auto input = getInputNode<float>(0);
+    std::shared_ptr<ngraph::Node> input;
+
+    input = getInputNode(0);
 
     std::shared_ptr<ngraph::Node> order;
 
     const auto& dims = getInputOperandDimensions(1);
     if (!dims.empty() && dims[0] != 0) {
-        order = getInputNode<int>(1);
+        order = getInputNode(1);
     } else {
-        order = ngraph::opset3::Constant::create(ngraph::element::i64, ngraph::Shape{0}, {0});
+        order = createConstNode(ngraph::element::i32, {0}, convertToVector(0));
     }
 
-    auto outputNode = std::make_shared<ngraph::opset3::Transpose>(input, order);
+    std::shared_ptr<ngraph::Node> outputNode;
 
-    const auto op = sModelInfo->getOperand(mDefaultOutputIndex);
-    if (op.lifetime == V1_3::OperandLifeTime::SUBGRAPH_OUTPUT) {
-        addResultNode(mDefaultOutputIndex, outputNode);
-    }
+    outputNode = std::make_shared<ngraph::opset3::Transpose>(input, order);
+
     return outputNode;
 }
 

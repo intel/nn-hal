@@ -13,7 +13,8 @@ Concat::Concat(int operationIndex) : OperationsBase(operationIndex) {
 
 bool Concat::validate() {
     // Check Output type
-    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) {
+    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
+        !checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
         return false;
     }
     // check concatenation axis
@@ -21,6 +22,12 @@ bool Concat::validate() {
              1;  // 0 ~ n-1: The list of n input tensors
     if (!checkInputOperandType(n, (int32_t)OperandType::INT32)) {
         return false;
+    }
+    for (int i = 0; i < n; i++) {
+        if (!isValidInputTensor(i)) {
+            ALOGE("%s Invalid dimensions for input", __func__);
+            return false;
+        }
     }
     ALOGV("%s PASSED", __func__);
     return true;
@@ -35,7 +42,7 @@ std::shared_ptr<ngraph::Node> Concat::createNode() {
     ALOGD("createNode n %d, axis %d", n, axis);
     for (int i = 0; i < n; i++) {
         auto inputIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, i);
-        auto inputOp = mNgraphNodes->getOperationOutput(inputIndex);
+        auto inputOp = getInputNode(i);
         const auto op = sModelInfo->getOperand(inputIndex);
         ALOGD("createNode inputIndex %d, lifetime %d", inputIndex, op.lifetime);
         if (mNgraphNodes->isForcedNchw(inputIndex)) {
@@ -47,10 +54,6 @@ std::shared_ptr<ngraph::Node> Concat::createNode() {
 
     std::shared_ptr<ngraph::Node> outputNode =
         std::make_shared<ngraph::opset3::Concat>(inputs, axis);
-    const auto op = sModelInfo->getOperand(mDefaultOutputIndex);
-    if (op.lifetime == V1_3::OperandLifeTime::SUBGRAPH_OUTPUT) {
-        addResultNode(mDefaultOutputIndex, outputNode);
-    }
     return outputNode;
 }
 

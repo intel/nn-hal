@@ -11,10 +11,14 @@ Squeeze::Squeeze(int operationIndex) : OperationsBase(operationIndex) {
 
 bool Squeeze::validate() {
     // check output type
-    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) return false;
+    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
+        !checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM))
+        return false;
 
     // Check all input types
-    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) return false;
+    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
+        !checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM))
+        return false;
 
     if (!checkInputOperandType(1, (int32_t)OperandType::TENSOR_INT32)) return false;
 
@@ -35,22 +39,21 @@ bool Squeeze::validate() {
 
 std::shared_ptr<ngraph::Node> Squeeze::createNode() {
     // Creating input nodes
-    auto input = getInputNode<float>(0);
+    std::shared_ptr<ngraph::Node> input;
+
+    input = getInputNode(0);
 
     std::shared_ptr<ngraph::Node> dims;
 
     if (!sModelInfo->isOmittedInput(mNnapiOperationIndex, 1))
-        dims = getInputNode<int>(1);
+        dims = getInputNode(1);
     else
-        dims = make_shared<ngraph::opset3::Constant>(ngraph::element::i64, ngraph::Shape{0},
-                                                     std::vector<int64_t>{});
+        dims = createConstNode(ngraph::element::i32, {0}, std::vector<int64_t>{});
 
-    auto outputNode = std::make_shared<ngraph::opset3::Squeeze>(input, dims);
+    std::shared_ptr<ngraph::Node> outputNode;
 
-    const auto op = sModelInfo->getOperand(mDefaultOutputIndex);
-    if (op.lifetime == V1_3::OperandLifeTime::SUBGRAPH_OUTPUT) {
-        addResultNode(mDefaultOutputIndex, outputNode);
-    }
+    outputNode = std::make_shared<ngraph::opset3::Squeeze>(input, dims);
+
     return outputNode;
 }
 

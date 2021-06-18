@@ -12,19 +12,21 @@ Reshape::Reshape(int operationIndex) : OperationsBase(operationIndex) {
 }
 
 bool Reshape::validate() {
-    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) {
+    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
+        !checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
         return false;
     }
-    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) {
+    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
+        !checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
         return false;
     }
     if (!checkInputOperandType(1, (int32_t)OperandType::TENSOR_INT32)) {
         return false;
     }
     const auto& dimsOperandIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 1);
-    if (!sModelInfo->isOperandLifeTimeConst(dimsOperandIndex)) {
+    if (!sModelInfo->isOperandLifeTimeConst(dimsOperandIndex) || !isValidInputTensor(1)) {
         // TODO: Support CPU_reshape_all_tensors_as_inputs
-        ALOGE("%s Only Constant dimensions supported now", __func__);
+        ALOGE("%s Only Constant non-zero dimensions supported now", __func__);
         return false;
     }
     ALOGV("%s PASSED", __func__);
@@ -37,7 +39,10 @@ std::shared_ptr<ngraph::Node> Reshape::createNode() {
     VLOGDIMS(L3, outDims, "Reshape::createNode dims");
 
     auto inputIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 0);
-    auto inputOp = mNgraphNodes->getOperationOutput(inputIndex);
+    std::shared_ptr<ngraph::Node> inputOp;
+
+    inputOp = getInputNode(0);
+
     const auto& inDims = getInputOperandDimensions(0);
     auto numInputElements = 1;
     int strechDim = -1;
@@ -75,10 +80,6 @@ std::shared_ptr<ngraph::Node> Reshape::createNode() {
 
     std::shared_ptr<ngraph::Node> outputNode =
         std::make_shared<ngraph::opset3::Reshape>(inputOp, shapeNode, true);
-
-    const auto outputOperand = sModelInfo->getOperand(mDefaultOutputIndex);
-    if (outputOperand.lifetime ==  V1_3::OperandLifeTime::SUBGRAPH_OUTPUT)
-        addResultNode(mDefaultOutputIndex, outputNode);
 
     return outputNode;
 }

@@ -12,13 +12,15 @@ Gather::Gather(int operationIndex) : OperationsBase(operationIndex) {
 bool Gather::validate() {
     // check output type
     if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkOutputOperandType(0, (int32_t)OperandType::TENSOR_INT32)) {
+        !checkOutputOperandType(0, (int32_t)OperandType::TENSOR_INT32) &&
+        !checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
         return false;
     }
 
     // Check all input types
     if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkInputOperandType(0, (int32_t)OperandType::TENSOR_INT32)) {
+        !checkInputOperandType(0, (int32_t)OperandType::TENSOR_INT32) &&
+        !checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
         return false;
     }
 
@@ -37,24 +39,17 @@ std::shared_ptr<ngraph::Node> Gather::createNode() {
     // Creating input nodes
     std::shared_ptr<ngraph::Node> gatherVals;
 
-    if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) {
-        gatherVals = getInputNode<float>(0);
-    }
+    gatherVals = getInputNode(0);
 
-    if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_INT32)) {
-        gatherVals = getInputNode<int>(0);
-    }
     // axis range [-n, n]
     auto axis = sModelInfo->ParseOperationInput<int>(mNnapiOperationIndex, 1);
-    auto axisNode = ngraph::opset3::Constant::create(ngraph::element::i64, {}, {axis});
-    auto indices = getInputNode<int>(2);
+    auto axisNode = createConstNode(ngraph::element::i32, {}, convertToVector(axis));
 
-    auto outputNode = std::make_shared<ngraph::opset3::Gather>(gatherVals, indices, axisNode);
+    auto indices = getInputNode(2);
 
-    const auto op = sModelInfo->getOperand(mDefaultOutputIndex);
-    if (op.lifetime == V1_3::OperandLifeTime::SUBGRAPH_OUTPUT) {
-        addResultNode(mDefaultOutputIndex, outputNode);
-    }
+    std::shared_ptr<ngraph::Node> outputNode;
+    outputNode = std::make_shared<ngraph::opset3::Gather>(gatherVals, indices, axisNode);
+
     return outputNode;
 }
 

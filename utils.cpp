@@ -462,7 +462,7 @@ bool RunTimePoolInfo::unmap_mem() {
         const size_t size = hidlMemory.size();
         if (hidlMemory.name() == "mmap_fd") {
             if (munmap(buffer, size)) {
-                VLOG(L1, "Unmap failed\n");
+                ALOGE("Unmap failed\n");
                 return false;
             }
             buffer = nullptr;
@@ -498,10 +498,11 @@ int sizeOfData(OperandType type, std::vector<uint32_t> dims) {
             size = 4;
             break;
         case OperandType::TENSOR_INT32:
+        case OperandType::INT32:
             size = 4;
             break;
         case OperandType::TENSOR_QUANT8_ASYMM:
-        case OperandType::INT32:
+        case OperandType::TENSOR_QUANT8_SYMM:
             size = 1;
             break;
 
