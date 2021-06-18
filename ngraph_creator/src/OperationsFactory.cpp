@@ -21,6 +21,10 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<Abs>(operationIndex);
         case OperationType::ADD:
             return std::make_shared<Add>(operationIndex);
+        case OperationType::ARGMAX:
+            return std::make_shared<Argmax>(operationIndex);
+        case OperationType::ARGMIN:
+            return std::make_shared<Argmin>(operationIndex);
         case OperationType::AVERAGE_POOL_2D:
             return std::make_shared<Average_Pool_2D>(operationIndex);
         case OperationType::CAST:
@@ -31,6 +35,8 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<Conv_2d>(operationIndex);
         case OperationType::DEPTHWISE_CONV_2D:
             return std::make_shared<Depthwise_Conv_2d>(operationIndex);
+        case OperationType::DEQUANTIZE:
+            return std::make_shared<Dequantize>(operationIndex);
         case OperationType::DIV:
             return std::make_shared<Div>(operationIndex);
         case OperationType::EQUAL:
@@ -51,6 +57,8 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<Less>(operationIndex);
         case OperationType::LESS_EQUAL:
             return std::make_shared<Less_Equal>(operationIndex);
+        case OperationType::LOG_SOFTMAX:
+            return std::make_shared<Log_Softmax>(operationIndex);
         case OperationType::LOG:
             return std::make_shared<Log>(operationIndex);
         case OperationType::LOGICAL_AND:
@@ -75,8 +83,14 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<Neg>(operationIndex);
         case OperationType::NOT_EQUAL:
             return std::make_shared<Not_Equal>(operationIndex);
+        case OperationType::PAD:
+            return std::make_shared<Pad>(operationIndex);
+        case OperationType::PAD_V2:
+            return std::make_shared<Pad_V2>(operationIndex);
         case OperationType::POW:
             return std::make_shared<Pow>(operationIndex);
+        case OperationType::QUANTIZE:
+            return std::make_shared<Quantize>(operationIndex);
         case OperationType::REDUCE_ALL:
             return std::make_shared<Reduce_All>(operationIndex);
         case OperationType::REDUCE_ANY:
@@ -93,6 +107,10 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<Relu6>(operationIndex);
         case OperationType::RESHAPE:
             return std::make_shared<Reshape>(operationIndex);
+        case OperationType::RSQRT:
+            return std::make_shared<RSQRT>(operationIndex);
+        case OperationType::SELECT:
+            return std::make_shared<Select>(operationIndex);
         case OperationType::SOFTMAX:
             return std::make_shared<Softmax>(operationIndex);
         case OperationType::SQRT:
@@ -107,6 +125,8 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<Sub>(operationIndex);
         case OperationType::TANH:
             return std::make_shared<Tanh>(operationIndex);
+        case OperationType::TOPK_V2:
+            return std::make_shared<Topk_V2>(operationIndex);
         case OperationType::TRANSPOSE:
             return std::make_shared<Transpose>(operationIndex);
         default:

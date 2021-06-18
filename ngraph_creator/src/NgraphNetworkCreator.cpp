@@ -34,7 +34,7 @@ bool NgraphNetworkCreator::createInputParams() {
         std::shared_ptr<ngraph::opset3::Parameter> inputParam;
         auto& nnapiOperand = mModelInfo->getOperand(i);
         auto& dims = nnapiOperand.dimensions;
-        ALOGI("createInputParams operand %d dims.size(%d)", i, dims.size());
+        ALOGV("createInputParams operand %d dims.size(%d)", i, dims.size());
         // keeping this condition to make VTS pass. Operation's optional input lifetime is supposed
         // to be "NO_VALUE"
         if (dims.size() > 0) {
@@ -61,6 +61,18 @@ bool NgraphNetworkCreator::createInputParams() {
                         ALOGV("createInputParams created inputIndex %d, type %d", i,
                               nnapiOperand.type);
                         break;
+                    case OperandType::TENSOR_QUANT8_ASYMM:
+                        inputParam = std::make_shared<ngraph::opset3::Parameter>(
+                            ngraph::element::u8, ngraph::Shape(dims.begin(), dims.end()));
+                        ALOGV("createInputParams created inputIndex %d, type %d", i,
+                              nnapiOperand.type);
+                        break;
+                    case OperandType::TENSOR_QUANT8_SYMM:
+                        inputParam = std::make_shared<ngraph::opset3::Parameter>(
+                            ngraph::element::i8, ngraph::Shape(dims.begin(), dims.end()));
+                        ALOGV("createInputParams created inputIndex %d, type %d", i,
+                              nnapiOperand.type);
+                        break;
                     default:
                         ALOGE("createInputParams Failure at inputIndex %d, type %d", i,
                               nnapiOperand.type);
@@ -81,7 +93,7 @@ bool NgraphNetworkCreator::createInputParams() {
 
 void NgraphNetworkCreator::getSupportedOperations(std::vector<bool>& supportedOperations) {
     for (int i = 0; i < mModelInfo->getOperationsSize(); i++) {
-        if (!mOperationNodes[i] || !mOperationNodes[i]->validate())
+        if (!mOperationNodes[i] || !mOperationNodes[i]->validateForPlugin())
             supportedOperations[i] = false;
         else
             supportedOperations[i] = true;
@@ -92,7 +104,7 @@ void NgraphNetworkCreator::getSupportedOperations(std::vector<bool>& supportedOp
 
 bool NgraphNetworkCreator::validateOperations() {
     for (int i = 0; i < mModelInfo->getOperationsSize(); i++) {
-        if (!mOperationNodes[i] || !mOperationNodes[i]->validate()) {
+        if (!mOperationNodes[i] || !mOperationNodes[i]->validateForPlugin()) {
             ALOGE("%s index %d, type %d not supported", __func__, i,
                   mModelInfo->getOperationType(i));
             return false;

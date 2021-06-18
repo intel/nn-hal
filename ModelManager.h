@@ -67,7 +67,6 @@ public:
 
     template <typename T>
     T GetConstOperand(uint32_t index) {
-        dumpOperand(index, mModel);
         uint32_t len;
         const uint8_t* buf = GetOperandMemory(index, len);
         return GetConstFromBuffer<T>(buf, len);
@@ -95,6 +94,16 @@ public:
 
     size_t getOperandsSize() { return mModel.main.operands.size(); }
 
+    const float getOperandScale(int index) {
+        auto operand = getOperand(index);
+        return operand.scale;
+    }
+
+    const int32_t getOperandZeroPoint(int index) {
+        auto operand = getOperand(index);
+        return operand.zeroPoint;
+    }
+
     RunTimeOperandInfo& getRuntimeOperand(uint32_t index) {
         return mOperands[mModel.main.inputIndexes[index]];
     }
@@ -121,11 +130,9 @@ public:
         uint32_t inputIndex = mModel.main.operations[operationIndex].inputs[index];
         const auto operand = mModel.main.operands[inputIndex];
         const auto value = GetConstOperand<T>(inputIndex);
-        VLOG(L1, "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
-        VLOG(L1, "Operation input index: %d, operand index: %d", index, inputIndex);
-        VLOG(L1, "Operation: %s", toString(mModel.main.[operationIndex]).c_str());
+        ALOGV("Operation input index: %d, operand index: %d", index, inputIndex);
+        ALOGV("Operation: %s", toString(mModel.main.operations[operationIndex]).c_str());
         printHelper<T>::print(value, toString(operand).c_str());
-        VLOG(L1, "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
 
         return value;
     }
@@ -135,7 +142,7 @@ public:
     std::vector<T> GetConstVecFromBuffer(const uint8_t* buf, uint32_t len) {
         int n = len / sizeof(T);
         if (n * sizeof(T) != len) {
-            VLOG(L1, "typeid(T).name() should be  multiples of %d bytes", sizeof(T));
+            ALOGE("typeid(T).name() should be  multiples of %d bytes", sizeof(T));
             nnAssert(false);
         }
 

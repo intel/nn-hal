@@ -12,10 +12,14 @@ Max_Pool_2d::Max_Pool_2d(int operationIndex) : OperationsBase(operationIndex) {
 
 bool Max_Pool_2d::validate() {
     // Check Output type
-    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) return false;
+    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
+        !checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM))
+        return false;
 
     // Check Input Type
-    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) return false;
+    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
+        !checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM))
+        return false;
 
     // Check Input Dimension size
     const auto& inputDimensionsSize = getInputOperandDimensions(0).size();
@@ -153,8 +157,11 @@ std::shared_ptr<ngraph::Node> Max_Pool_2d::createNode() {
         }
     }
 
-    auto inputNode = getInputNode<float>(0);
+    std::shared_ptr<ngraph::Node> inputNode;
     auto inputIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 0);
+
+    inputNode = getInputNode(0);
+
     if (mNgraphNodes->isForcedNchw(inputIndex)) {
         if (useNchw) {
             ALOGI("%s Forced NCHW done already but NCHW flag set at operationIndex %d", __func__,
@@ -182,14 +189,11 @@ std::shared_ptr<ngraph::Node> Max_Pool_2d::createNode() {
 
     auto outputNode = applyActivation(maxpoolNode, activationFn);
 
-    const auto outputLifetime = sModelInfo->getOperandLifetime(mDefaultOutputIndex);
-    if (outputLifetime ==  V1_3::OperandLifeTime::SUBGRAPH_OUTPUT) {
-        if (!useNchw) {
-            outputNode = transpose(NCHW_NHWC, outputNode);
-            mNgraphNodes->setForcedNchw(mDefaultOutputIndex, false);
-        }
-        addResultNode(mDefaultOutputIndex, outputNode);
+    if (!useNchw) {
+        outputNode = transpose(NCHW_NHWC, outputNode);
+        mNgraphNodes->setForcedNchw(mDefaultOutputIndex, false);
     }
+
     return outputNode;
 }
 

@@ -11,12 +11,14 @@ Relu::Relu(int operationIndex) : OperationsBase(operationIndex) {
 
 bool Relu::validate() {
     // check output type
-    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) {
+    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
+        !checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
         return false;
     }
 
     // Check all input types
-    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) {
+    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
+        !checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
         return false;
     }
 
@@ -25,14 +27,14 @@ bool Relu::validate() {
 
 std::shared_ptr<ngraph::Node> Relu::createNode() {
     // Creating input nodes
-    auto input = getInputNode<float>(0);
+    std::shared_ptr<ngraph::Node> input;
 
-    auto outputNode = std::make_shared<ngraph::opset3::Relu>(input);
+    input = getInputNode(0);
 
-    const auto op = sModelInfo->getOperand(mDefaultOutputIndex);
-    if (op.lifetime == V1_3::OperandLifeTime::SUBGRAPH_OUTPUT) {
-        addResultNode(mDefaultOutputIndex, outputNode);
-    }
+    std::shared_ptr<ngraph::Node> outputNode;
+
+    outputNode = std::make_shared<ngraph::opset3::Relu>(input);
+
     return outputNode;
 }
 

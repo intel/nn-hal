@@ -1,4 +1,5 @@
 #include <OperationsBase.hpp>
+#define LOG_TAG "OperationsBase"
 
 namespace android {
 namespace hardware {
@@ -54,8 +55,15 @@ std::shared_ptr<ngraph::Node> OperationsBase::createNodeForPlugin() { return cre
 
 // override connectOperationToGraph in case Operation has multiple outputs
 void OperationsBase::connectOperationToGraph() {
-    mNgraphNodes->setOutputAtOperandIndex(mDefaultOutputIndex,
-                                          createNodeForPlugin()->get_default_output());
+    auto outputNode = createNodeForPlugin();
+    const auto op = sModelInfo->getOperand(mDefaultOutputIndex);
+    if (op.type == OperandType::TENSOR_QUANT8_ASYMM) {
+        outputNode = QuantizeNode(outputNode, mDefaultOutputIndex, ngraph::element::u8);
+    }
+    if (op.lifetime == OperandLifeTime::SUBGRAPH_OUTPUT) {
+        addResultNode(mDefaultOutputIndex, outputNode);
+    }
+    mNgraphNodes->setOutputAtOperandIndex(mDefaultOutputIndex, outputNode->get_default_output());
 }
 
 void OperationsBase::addResultNode(size_t index, std::shared_ptr<ngraph::Node> resultNode) {
@@ -69,6 +77,16 @@ OperationsBase::OperationsBase(int operationIndex) : mNnapiOperationIndex(operat
 void OperationsBase::setNgraphNodes(std::shared_ptr<NgraphNodes> nodes) { mNgraphNodes = nodes; }
 
 bool OperationsBase::validate() { return true; }
+
+bool OperationsBase::validateForPlugin() {
+    // Only validates default input(initialized to 0)
+    // All other validations to be done at each operation's validate
+    if (!isValidInputTensor(mDefaultInputIndex)) {
+        ALOGE("%s Invalid dimensions for input", __func__);
+        return false;
+    }
+    return validate();
+}
 
 bool OperationsBase::checkOperandType(uint32_t operandIndex, const int32_t expectedOperandType,
                                       const std::string& strLogInfo) {
@@ -94,6 +112,67 @@ const vec<uint32_t> OperationsBase::getInputOperandDimensions(uint32_t inputInde
     const auto& operandIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, inputIndex);
     const auto& operand = sModelInfo->getOperand(operandIndex);
     return operand.dimensions;
+}
+
+bool OperationsBase::isValidInputTensor(uint32_t inputIndex) {
+    size_t size = 1;
+    const auto& dims = getInputOperandDimensions(inputIndex);
+    ALOGV("%s dims.size(%d)", __func__, dims.size());
+    if (dims.empty()) return false;
+
+    for (auto d : dims) size *= d;
+    if (size == 0) return false;
+
+    return true;
+}
+
+std::shared_ptr<ngraph::Node> OperationsBase::QuantizeNode(std::shared_ptr<ngraph::Node> input,
+                                                           size_t index,
+                                                           ngraph::element::Type quantizeType) {
+    auto floatElementType = ngraph::element::f32;
+    auto intElementType = ngraph::element::i32;
+
+    float inputScale = sModelInfo->getOperandScale(index);
+    int inputZeroPoint = sModelInfo->getOperandZeroPoint(index);
+
+    auto scale = createConstNode(floatElementType, {}, convertToVector(inputScale));
+    auto zeroPoint = createConstNode(intElementType, {}, convertToVector(inputZeroPoint));
+
+    if (input->get_element_type() != ngraph::element::f32)
+        input = std::make_shared<ngraph::opset3::Convert>(input, floatElementType);
+    auto div = std::make_shared<ngraph::opset3::Divide>(input, scale);
+    ngraph::op::v5::Round::RoundMode mode = ngraph::op::v5::Round::RoundMode::HALF_TO_EVEN;
+    auto round = std::make_shared<ngraph::op::v5::Round>(div, mode);
+    auto convertRound = std::make_shared<ngraph::opset3::Convert>(round, ngraph::element::i32);
+    auto sum = std::make_shared<ngraph::opset3::Add>(convertRound, zeroPoint);
+    auto data = make_shared<ngraph::opset3::Clamp>(sum, 0, 255);
+
+    auto outputNode = std::make_shared<ngraph::opset3::Convert>(data, quantizeType);
+
+    return outputNode;
+}
+
+std::shared_ptr<ngraph::Node> OperationsBase::DequantizeNode(std::shared_ptr<ngraph::Node> input,
+                                                             size_t index,
+                                                             ngraph::element::Type dequantizeType) {
+    auto floatElementType = ngraph::element::f32;
+    auto intElementType = ngraph::element::i32;
+
+    float inputScale = sModelInfo->getOperandScale(index);
+    int inputZeroPoint = sModelInfo->getOperandZeroPoint(index);
+
+    auto scale = createConstNode(floatElementType, {}, convertToVector(inputScale));
+    auto zeroPoint = createConstNode(intElementType, {}, convertToVector(inputZeroPoint));
+
+    if (input->get_element_type() != ngraph::element::i32)
+        input = std::make_shared<ngraph::opset3::Convert>(input, intElementType);
+    auto diff = std::make_shared<ngraph::opset3::Subtract>(input, zeroPoint);
+    auto convertDiff = std::make_shared<ngraph::opset3::Convert>(diff, floatElementType);
+    auto mul = std::make_shared<ngraph::opset3::Multiply>(convertDiff, scale);
+
+    auto outputNode = std::make_shared<ngraph::opset3::Convert>(mul, dequantizeType);
+
+    return outputNode;
 }
 
 }  // namespace nnhal
