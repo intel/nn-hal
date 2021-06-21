@@ -885,7 +885,7 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
                 break;
             case OperationType::DEQUANTIZE: {
                 auto OutOperandDetails = model.main.operands[operation.outputs[0]];
-                if (static_cast<int>(OutOperandDetails.type) == static_cast<int>(OperandType::TENSOR_FLOAT16)) {
+                if (static_cast<int>(OutOperandDetails.type) != static_cast<int>(OperandType::TENSOR_QUANT8_ASYMM_SIGNED)) {
                     return false;
                 }
                 VLOG(L1, "Supporting Dequantize !!!!");
@@ -903,12 +903,16 @@ bool PreparedModel::isOperationSupported(const Operation& operation, const Model
             case OperationType::TANH:
                 if (model.main.operands[operation.inputs[0]].dimensions.size() != 2)
                     return false;
+                else if (model.main.operands[operation.inputs[0]].dimensions[0] != 1)
+                    return false;
+                else if (model.main.operands[operation.inputs[0]].type != OperandType::TENSOR_QUANT8_ASYMM_SIGNED)
+                    return false;
                 VLOG(L1, "Supporting Tanh !!!!");
 		        break;
             case OperationType::EMBEDDING_LOOKUP:
                 VLOG(L1, "Supporting Embedding Lookup !!!!");
                 if (model.main.operands[operation.inputs[1]].type != OperandType::FLOAT32 || model.main.operands[operation.inputs[1]].type != OperandType::TENSOR_FLOAT32 ) {
-                   ALOGE("FullyConnected: Batch size of 0 is not supported");
+                   ALOGE("Embedding Lookup of non FLOAT32 not supported");
                     return false;
                 }
 		        break;
