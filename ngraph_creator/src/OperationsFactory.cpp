@@ -27,6 +27,8 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<Argmin>(operationIndex);
         case OperationType::AVERAGE_POOL_2D:
             return std::make_shared<Average_Pool_2D>(operationIndex);
+        case OperationType::BATCH_TO_SPACE_ND:
+            return std::make_shared<Batch_To_Space>(operationIndex);
         case OperationType::CAST:
             return std::make_shared<Cast>(operationIndex);
         case OperationType::CONCATENATION:
@@ -113,6 +115,8 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<Select>(operationIndex);
         case OperationType::SOFTMAX:
             return std::make_shared<Softmax>(operationIndex);
+        case OperationType::SPACE_TO_BATCH_ND:
+            return std::make_shared<Space_To_Batch>(operationIndex);
         case OperationType::SQRT:
             return std::make_shared<SQRT>(operationIndex);
         case OperationType::SIN:

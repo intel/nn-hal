@@ -5,6 +5,7 @@
 #include <Argmax.hpp>
 #include <Argmin.hpp>
 #include <Average_Pool_2D.hpp>
+#include <Batch_To_Space.hpp>
 #include <Cast.hpp>
 #include <Concat.hpp>
 #include <Conv_2d.hpp>
@@ -50,6 +51,7 @@
 #include <Select.hpp>
 #include <Sin.hpp>
 #include <Softmax.hpp>
+#include <Space_To_Batch.hpp>
 #include <Split.hpp>
 #include <Squeeze.hpp>
 #include <Sub.hpp>
