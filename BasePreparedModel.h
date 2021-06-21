@@ -19,9 +19,9 @@
 
 #include <android/hardware/neuralnetworks/1.2/IPreparedModel.h>
 #include <android/hardware/neuralnetworks/1.2/types.h>
-#include <android/hardware/neuralnetworks/1.3/IPreparedModel.h>
-#include <android/hardware/neuralnetworks/1.3/IFencedExecutionCallback.h>
 #include <android/hardware/neuralnetworks/1.3/IExecutionCallback.h>
+#include <android/hardware/neuralnetworks/1.3/IFencedExecutionCallback.h>
+#include <android/hardware/neuralnetworks/1.3/IPreparedModel.h>
 #include <android/hardware/neuralnetworks/1.3/types.h>
 #include <android/hidl/memory/1.0/IMemory.h>
 #include <hidlmemory/mapping.h>
@@ -79,22 +79,25 @@ public:
     Return<ErrorStatus> execute_1_2(const Request& request, MeasureTiming measure,
                                     const sp<V1_2::IExecutionCallback>& callback) override;
     Return<V1_3::ErrorStatus> execute_1_3(const V1_3::Request& request, V1_2::MeasureTiming measure,
-                                          const V1_3::OptionalTimePoint& deadline, const V1_3::OptionalTimeoutDuration& loopTimeoutDuration,
+                                          const V1_3::OptionalTimePoint& deadline,
+                                          const V1_3::OptionalTimeoutDuration& loopTimeoutDuration,
                                           const sp<V1_3::IExecutionCallback>& callback) override;
-    Return<void> executeSynchronously(const Request& request,V1_2::MeasureTiming measure, executeSynchronously_cb cb) override;
-    Return<void> executeSynchronously_1_3(const V1_3::Request& request, 
-                                         V1_2::MeasureTiming measure, 
-                                         const V1_3::OptionalTimePoint& deadline,
-                                          const V1_3::OptionalTimeoutDuration& loopTimeoutDuration, 
+    Return<void> executeSynchronously(const Request& request, V1_2::MeasureTiming measure,
+                                      executeSynchronously_cb cb) override;
+    Return<void> executeSynchronously_1_3(const V1_3::Request& request, V1_2::MeasureTiming measure,
+                                          const V1_3::OptionalTimePoint& deadline,
+                                          const V1_3::OptionalTimeoutDuration& loopTimeoutDuration,
                                           executeSynchronously_1_3_cb cb) override;
-    Return<void> configureExecutionBurst(const sp<V1_2::IBurstCallback>& callback,
-                                         const MQDescriptorSync<V1_2::FmqRequestDatum>& requestChannel, 
-                                         const MQDescriptorSync<V1_2::FmqResultDatum>& resultChannel, 
-                                         configureExecutionBurst_cb cb) override;
-    Return<void> executeFenced(const V1_3::Request& request, const hidl_vec<hidl_handle>& waitFor, V1_2::MeasureTiming measure,
-                               const V1_3::OptionalTimePoint& deadline, const V1_3::OptionalTimeoutDuration& loopTimeoutDuration, 
-                               const V1_3::OptionalTimeoutDuration& duration, executeFenced_cb cb) override;
-                                    
+    Return<void> configureExecutionBurst(
+        const sp<V1_2::IBurstCallback>& callback,
+        const MQDescriptorSync<V1_2::FmqRequestDatum>& requestChannel,
+        const MQDescriptorSync<V1_2::FmqResultDatum>& resultChannel,
+        configureExecutionBurst_cb cb) override;
+    Return<void> executeFenced(const V1_3::Request& request, const hidl_vec<hidl_handle>& waitFor,
+                               V1_2::MeasureTiming measure, const V1_3::OptionalTimePoint& deadline,
+                               const V1_3::OptionalTimeoutDuration& loopTimeoutDuration,
+                               const V1_3::OptionalTimeoutDuration& duration,
+                               executeFenced_cb cb) override;
 
     virtual bool initialize(const Model& model);
 

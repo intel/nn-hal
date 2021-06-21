@@ -1,1 +1,3 @@
 *.orig
+"\033\033:q"
+*.gitignore

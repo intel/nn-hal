@@ -144,10 +144,10 @@ const uint8_t* NnapiModelInfo::GetOperandMemory(int index, uint32_t& lenOut) {
         auto poolIndex = op.location.poolIndex;
         auto& r = mPoolInfos[poolIndex];
         return (const_cast<uint8_t*>(r.buffer + op.location.offset));
-    } else if (op.lifetime ==  V1_3::OperandLifeTime::TEMPORARY_VARIABLE ||
-               op.lifetime ==  V1_3::OperandLifeTime::SUBGRAPH_INPUT ||
-               op.lifetime ==  V1_3::OperandLifeTime::SUBGRAPH_OUTPUT ||
-               op.lifetime ==  V1_3::OperandLifeTime::NO_VALUE) {
+    } else if (op.lifetime == V1_3::OperandLifeTime::TEMPORARY_VARIABLE ||
+               op.lifetime == V1_3::OperandLifeTime::SUBGRAPH_INPUT ||
+               op.lifetime == V1_3::OperandLifeTime::SUBGRAPH_OUTPUT ||
+               op.lifetime == V1_3::OperandLifeTime::NO_VALUE) {
         // ALOGD(
         //     "operand lifetime "
         //     "OperandLifeTime::MODEL_INPUT||MODEL_OUTPUT||NO_VALUE||TEMPORARY_VARIABLE");
@@ -163,7 +163,7 @@ const uint8_t* NnapiModelInfo::GetOperandMemory(int index, uint32_t& lenOut) {
 Blob::Ptr NnapiModelInfo::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const uint8_t* buf,
                                                 uint32_t& len) {
     if (op.type == OperandType::TENSOR_FLOAT32 || op.type == OperandType::FLOAT32) {
-        if (nn::convertToV1_3(op.lifetime) ==  V1_3::OperandLifeTime::SUBGRAPH_INPUT) {
+        if (nn::convertToV1_3(op.lifetime) == V1_3::OperandLifeTime::SUBGRAPH_INPUT) {
             ALOGD("Create input blob !!!!");
             vec<unsigned int> order;
             InferenceEngine::Layout layout;
@@ -206,7 +206,7 @@ Blob::Ptr NnapiModelInfo::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const ui
                     std::make_shared<InferenceEngine::TBlob<float>>(td, (float*)buf, len);
                 return blob;
             }
-        } else if (op.lifetime ==  OperandLifeTime::SUBGRAPH_OUTPUT) {
+        } else if (op.lifetime == OperandLifeTime::SUBGRAPH_OUTPUT) {
             ALOGD("Create output blob !!!!");
             vec<unsigned int> order;
             InferenceEngine::Layout layout;
@@ -542,7 +542,7 @@ void* NnapiModelInfo::getBlobFromMemoryPoolOut(const Request& request, uint32_t 
 bool NnapiModelInfo::isOmittedInput(int operationIndex, uint32_t index) {
     uint32_t inputIndex = mModel.main.operations[operationIndex].inputs[index];
     const auto op = mModel.main.operands[inputIndex];
-    if (op.lifetime ==  V1_3::OperandLifeTime::NO_VALUE) {
+    if (op.lifetime == V1_3::OperandLifeTime::NO_VALUE) {
         ALOGD("index %d has life time NO_VALUE", index);
         return true;
     }

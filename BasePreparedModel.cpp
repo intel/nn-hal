@@ -21,8 +21,8 @@
 #include <log/log.h>
 #include <thread>
 #include "ExecutionBurstServer.h"
-#include "ValidateHal.h"
 #include "Utils.h"
+#include "ValidateHal.h"
 
 #define DISABLE_ALL_QUANT
 #define LOG_TAG "BasePreparedModel"
@@ -351,11 +351,10 @@ Return<void> BasePreparedModel::executeSynchronously(const Request& request, Mea
     return Void();
 }
 
-Return<void> BasePreparedModel::executeSynchronously_1_3(const V1_3::Request& request, 
-                                         V1_2::MeasureTiming measure, 
-                                         const V1_3::OptionalTimePoint& deadline,
-                                          const V1_3::OptionalTimeoutDuration& loopTimeoutDuration, 
-                                          executeSynchronously_1_3_cb cb){
+Return<void> BasePreparedModel::executeSynchronously_1_3(
+    const V1_3::Request& request, V1_2::MeasureTiming measure,
+    const V1_3::OptionalTimePoint& deadline,
+    const V1_3::OptionalTimeoutDuration& loopTimeoutDuration, executeSynchronously_1_3_cb cb) {
     ALOGV("Entering %s", __func__);
     time_point driverStart;
     if (measure == MeasureTiming::YES) driverStart = now();
@@ -371,10 +370,10 @@ Return<void> BasePreparedModel::executeSynchronously_1_3(const V1_3::Request& re
     return Void();
 }
 
-Return<void> BasePreparedModel::configureExecutionBurst(const sp<V1_2::IBurstCallback>& callback,
-                                                      const MQDescriptorSync<V1_2::FmqRequestDatum>& requestChannel, 
-                                                      const MQDescriptorSync<V1_2::FmqResultDatum>& resultChannel, 
-                                                      configureExecutionBurst_cb cb) {
+Return<void> BasePreparedModel::configureExecutionBurst(
+    const sp<V1_2::IBurstCallback>& callback,
+    const MQDescriptorSync<V1_2::FmqRequestDatum>& requestChannel,
+    const MQDescriptorSync<V1_2::FmqResultDatum>& resultChannel, configureExecutionBurst_cb cb) {
     ALOGV("Entering %s", __func__);
     const sp<V1_2::IBurstContext> burst =
         ExecutionBurstServer::create(callback, requestChannel, resultChannel, this);
@@ -401,17 +400,20 @@ Return<ErrorStatus> BasePreparedModel::execute_1_2(const Request& request, Measu
     return executeBase(request, measure, this, callback);
 }
 
-Return<V1_3::ErrorStatus> BasePreparedModel::execute_1_3(const V1_3::Request& request, V1_2::MeasureTiming measure,
-                                                  const V1_3::OptionalTimePoint& deadline, const V1_3::OptionalTimeoutDuration& loopTimeoutDuration,
-                                                  const sp<V1_3::IExecutionCallback>& callback) {
+Return<V1_3::ErrorStatus> BasePreparedModel::execute_1_3(
+    const V1_3::Request& request, V1_2::MeasureTiming measure,
+    const V1_3::OptionalTimePoint& deadline,
+    const V1_3::OptionalTimeoutDuration& loopTimeoutDuration,
+    const sp<V1_3::IExecutionCallback>& callback) {
     ALOGV("Entering %s", __func__);
     return convertToV1_3(executeBase(convertToV1_0(request), measure, this, callback));
-    //return V1_3::ErrorStatus::NONE;
 }
 
-Return<void> BasePreparedModel::executeFenced(const V1_3::Request& request, const hidl_vec<hidl_handle>& waitFor, V1_2::MeasureTiming measure,
-                               const V1_3::OptionalTimePoint& deadline, const V1_3::OptionalTimeoutDuration& loopTimeoutDuration, 
-                               const V1_3::OptionalTimeoutDuration& duration, executeFenced_cb cb){
+Return<void> BasePreparedModel::executeFenced(
+    const V1_3::Request& request, const hidl_vec<hidl_handle>& waitFor, V1_2::MeasureTiming measure,
+    const V1_3::OptionalTimePoint& deadline,
+    const V1_3::OptionalTimeoutDuration& loopTimeoutDuration,
+    const V1_3::OptionalTimeoutDuration& duration, executeFenced_cb cb) {
     ALOGV("Entering %s", __func__);
     return Void();
 }

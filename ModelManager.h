@@ -47,7 +47,7 @@ public:
     // Index into the operand vector
     V1_3::OperandLifeTime getOperandLifetime(uint32_t operandIdx) {
         auto tmpOperand = mModel.main.operands[operandIdx];
-        return (tmpOperand.lifetime);
+        return tmpOperand.lifetime;
     }
     OperandType getOperandType(uint32_t operandIdx) {
         auto tmpOperand = mModel.main.operands[operandIdx];

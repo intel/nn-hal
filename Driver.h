@@ -29,15 +29,15 @@
 #include <android/hardware/neuralnetworks/1.2/IPreparedModelCallback.h>
 #include <android/hardware/neuralnetworks/1.2/types.h>
 #include <android/hardware/neuralnetworks/1.3/IDevice.h>
-#include <android/hardware/neuralnetworks/1.3/types.h>
 #include <android/hardware/neuralnetworks/1.3/IExecutionCallback.h>
 #include <android/hardware/neuralnetworks/1.3/IPreparedModel.h>
 #include <android/hardware/neuralnetworks/1.3/IPreparedModelCallback.h>
+#include <android/hardware/neuralnetworks/1.3/types.h>
 
-#include <string>
 #include <android/hidl/memory/1.0/IMemory.h>
-#include "cutils/log.h"
+#include <string>
 #include "Utils.h"
+#include "cutils/log.h"
 
 namespace V1_3 = ::android::hardware::neuralnetworks::V1_3;
 namespace V1_2 = ::android::hardware::neuralnetworks::V1_2;
@@ -48,15 +48,6 @@ namespace android {
 namespace hardware {
 namespace neuralnetworks {
 namespace nnhal {
-
-enum class IntelDeviceType {
-    CPU,
-    GNA,
-    VPU,
-    OTHER
-};
-
-
 
 // For HAL-1.0 version
 using namespace ::android::hardware::neuralnetworks::V1_0;
@@ -91,7 +82,6 @@ using OperandLifeTime = ::android::hardware::neuralnetworks::V1_3::OperandLifeTi
 using Operation = ::android::hardware::neuralnetworks::V1_3::Operation;
 using Capabilities = ::android::hardware::neuralnetworks::V1_3::Capabilities;
 
-
 using ::android::hardware::MQDescriptorSync;
 using HidlToken = android::hardware::hidl_array<uint8_t, 32>;
 
@@ -125,11 +115,10 @@ public:
     Return<void> getCapabilities_1_2(getCapabilities_1_2_cb cb) override;
     Return<void> getSupportedOperations_1_2(const V1_2_Model& model,
                                             getSupportedOperations_1_2_cb cb) override;
-    Return<V1_0::ErrorStatus> prepareModel_1_2(const V1_2_Model& model, ExecutionPreference preference,
-                                         const hidl_vec<hidl_handle>& modelCache,
-                                         const hidl_vec<hidl_handle>& dataCache,
-                                         const HidlToken& token,
-                                         const sp<V1_2::IPreparedModelCallback>& callback) override;
+    Return<V1_0::ErrorStatus> prepareModel_1_2(
+        const V1_2_Model& model, ExecutionPreference preference,
+        const hidl_vec<hidl_handle>& modelCache, const hidl_vec<hidl_handle>& dataCache,
+        const HidlToken& token, const sp<V1_2::IPreparedModelCallback>& callback) override;
     Return<ErrorStatus> prepareModelFromCache(
         const hidl_vec<hidl_handle>& modelCache, const hidl_vec<hidl_handle>& dataCache,
         const HidlToken& token, const sp<V1_2::IPreparedModelCallback>& callback) override;
@@ -138,19 +127,16 @@ public:
     Return<void> getCapabilities_1_3(getCapabilities_1_3_cb cb) override;
     Return<void> getSupportedOperations_1_3(const Model& model,
                                             getSupportedOperations_1_3_cb cb) override;
-    Return<V1_3::ErrorStatus> prepareModel_1_3(const Model& model,
-                                               V1_1::ExecutionPreference preference,
-                                               V1_3::Priority priority,
-                                               const V1_3::OptionalTimePoint&,
-                                               const android::hardware::hidl_vec<android::hardware::hidl_handle>&,
-                                               const android::hardware::hidl_vec<android::hardware::hidl_handle>&,
-                                               const HidlToken&,
-                                               const android::sp<V1_3::IPreparedModelCallback>& cb) override;
+    Return<V1_3::ErrorStatus> prepareModel_1_3(
+        const Model& model, V1_1::ExecutionPreference preference, V1_3::Priority priority,
+        const V1_3::OptionalTimePoint&,
+        const android::hardware::hidl_vec<android::hardware::hidl_handle>&,
+        const android::hardware::hidl_vec<android::hardware::hidl_handle>&, const HidlToken&,
+        const android::sp<V1_3::IPreparedModelCallback>& cb) override;
     Return<V1_3::ErrorStatus> prepareModelFromCache_1_3(
         const V1_3::OptionalTimePoint&,
         const android::hardware::hidl_vec<android::hardware::hidl_handle>&,
-        const android::hardware::hidl_vec<android::hardware::hidl_handle>&,
-        const HidlToken&,
+        const android::hardware::hidl_vec<android::hardware::hidl_handle>&, const HidlToken&,
         const sp<V1_3::IPreparedModelCallback>& callback) override;
     Return<void> allocate(const V1_3::BufferDesc& desc,
                           const hidl_vec<sp<V1_3::IPreparedModel>>& preparedModels,

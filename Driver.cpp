@@ -25,7 +25,6 @@
 #include "ModelManager.h"
 #include "ValidateHal.h"
 
-
 #define LOG_TAG "Driver"
 
 namespace android {
@@ -35,8 +34,8 @@ namespace nnhal {
 
 using namespace android::nn;
 
-
-hidl_vec<V1_2::Capabilities::OperandPerformance> nonExtensionOperandPerformanceV1_2(V1_0::PerformanceInfo perf) {
+hidl_vec<V1_2::Capabilities::OperandPerformance> nonExtensionOperandPerformanceV1_2(
+    V1_0::PerformanceInfo perf) {
     using OpPerf = V1_2::Capabilities::OperandPerformance;
 
     // Note: range presents enumerators in declaration order, not in numerical order.
@@ -54,7 +53,8 @@ hidl_vec<V1_2::Capabilities::OperandPerformance> nonExtensionOperandPerformanceV
     return ret;
 }
 
-hidl_vec<Capabilities::OperandPerformance> nonExtensionOperandPerformance(V1_0::PerformanceInfo perf) {
+hidl_vec<Capabilities::OperandPerformance> nonExtensionOperandPerformance(
+    V1_0::PerformanceInfo perf) {
     using OpPerf = Capabilities::OperandPerformance;
 
     // Note: range presents enumerators in declaration order, not in numerical order.
@@ -194,7 +194,8 @@ static sp<BasePreparedModel> ModelFactory(const char* name, const Model& model) 
     return driverPreparedModel;
 }
 
-Return<ErrorStatus> Driver::prepareModel_1_2(const V1_2_Model& model, ExecutionPreference preference,
+Return<ErrorStatus> Driver::prepareModel_1_2(const V1_2_Model& model,
+                                             ExecutionPreference preference,
                                              const hidl_vec<hidl_handle>&,
                                              const hidl_vec<hidl_handle>&, const HidlToken&,
                                              const sp<V1_2::IPreparedModelCallback>& callback) {
@@ -210,7 +211,8 @@ Return<ErrorStatus> Driver::prepareModel_1_2(const V1_2_Model& model, ExecutionP
     }
 
     // TODO: make asynchronous later
-    sp<BasePreparedModel> driverPreparedModel = ModelFactory(mDeviceName.c_str(), convertToV1_3(model));
+    sp<BasePreparedModel> driverPreparedModel =
+        ModelFactory(mDeviceName.c_str(), convertToV1_3(model));
     if (driverPreparedModel == NULL) {
         ALOGE("failed to create preparedmodel");
         return ErrorStatus::INVALID_ARGUMENT;
@@ -243,7 +245,6 @@ Return<ErrorStatus> Driver::prepareModelFromCache(
     return ErrorStatus::GENERAL_FAILURE;
 }
 
-
 // For HAL-1.3 version
 Return<void> Driver::getCapabilities_1_3(getCapabilities_1_3_cb cb) {
     ALOGV("Entering %s", __func__);
@@ -257,13 +258,13 @@ Return<void> Driver::getCapabilities_1_3(getCapabilities_1_3_cb cb) {
 
         ALOGI("CPU MKLDNN driver Capabilities .execTime = 0.9f, .powerUsage = 0.9f");
         cb(V1_3::ErrorStatus::NONE, capabilities);
-     } 
-    //else if (mDeviceName.compare("GPU") == 0) {
-    //     ALOGI("GPU driver getCapabilities()");
-    //     V1_3::Capabilities capabilities = {
-    //         .relaxedFloat32toFloat16PerformanceScalar = {.execTime = 0.95f, .powerUsage = 0.85f},
-    //         .relaxedFloat32toFloat16PerformanceTensor = {.execTime = 0.95f, .powerUsage = 0.85f},
-    //         .operandPerformance = nonExtensionOperandPerformance({0.95f, 0.95f})};
+    }
+    // else if (mDeviceName.compare("GPU") == 0) {
+    //      ALOGI("GPU driver getCapabilities()");
+    //      V1_3::Capabilities capabilities = {
+    //          .relaxedFloat32toFloat16PerformanceScalar = {.execTime = 0.95f, .powerUsage =
+    //          0.85f}, .relaxedFloat32toFloat16PerformanceTensor = {.execTime = 0.95f, .powerUsage
+    //          = 0.85f}, .operandPerformance = nonExtensionOperandPerformance({0.95f, 0.95f})};
 
     //     ALOGI("GPU clDNN driver Capabilities .execTime = 0.95f, .powerUsage = 0.85f");
     //     cb(V1_3::ErrorStatus::NONE, capabilities);
@@ -297,10 +298,9 @@ Return<void> Driver::getCapabilities_1_3(getCapabilities_1_3_cb cb) {
 Return<void> Driver::getSupportedOperations_1_3(const Model& model,
                                                 getSupportedOperations_1_3_cb cb) {
     ALOGV("Entering %s", __func__);
-    
-	V1_2_Model modelv1_2= convertToV1_2(model); 
-    int count = modelv1_2.operations.size();
-    std::vector<bool> supported(count, false);
+
+    int count = model.main.operations.size();
+    std::vector<bool> supported(count, true);
 
     if (!validateModel(model)) {
         ALOGE("NNERR: %s failed at line no: %d\n", __func__, __LINE__);
@@ -317,50 +317,46 @@ Return<void> Driver::getSupportedOperations_1_3(const Model& model,
     return Void();
 }
 
-Return<V1_3::ErrorStatus> Driver::prepareModel_1_3(const Model& model,
-                                               V1_1::ExecutionPreference preference,
-                                               V1_3::Priority priority,
-                                               const V1_3::OptionalTimePoint&,
-                                               const android::hardware::hidl_vec<android::hardware::hidl_handle>&,
-                                               const android::hardware::hidl_vec<android::hardware::hidl_handle>&,
-                                               const HidlToken&,
-                                               const android::sp<V1_3::IPreparedModelCallback>& cb) {
+Return<V1_3::ErrorStatus> Driver::prepareModel_1_3(
+    const Model& model, V1_1::ExecutionPreference preference, V1_3::Priority priority,
+    const V1_3::OptionalTimePoint&,
+    const android::hardware::hidl_vec<android::hardware::hidl_handle>&,
+    const android::hardware::hidl_vec<android::hardware::hidl_handle>&, const HidlToken&,
+    const android::sp<V1_3::IPreparedModelCallback>& cb) {
     ALOGV("Entering %s", __func__);
 
-     if (cb.get() == nullptr) {
+    if (cb.get() == nullptr) {
         ALOGI("invalid callback passed to prepareModel");
         return V1_3::ErrorStatus::INVALID_ARGUMENT;
     }
 
-    if (!validateModel(model) || !validateExecutionPreference(preference) || !validatePriority(priority)) {
+    if (!validateModel(model) || !validateExecutionPreference(preference) ||
+        !validatePriority(priority)) {
         cb->notify_1_3(V1_3::ErrorStatus::INVALID_ARGUMENT, nullptr);
         ALOGI("validatemodel failed");
         return V1_3::ErrorStatus::INVALID_ARGUMENT;
     }
-    
-	sp<BasePreparedModel> driverPreparedModel = ModelFactory(mDeviceName.c_str(), model);
+
+    sp<BasePreparedModel> driverPreparedModel = ModelFactory(mDeviceName.c_str(), model);
     if (!driverPreparedModel->initialize(model)) {
         ALOGI("Failed to initialize prepared model");
         cb->notify_1_3(convertToV1_3(ErrorStatus::INVALID_ARGUMENT), nullptr);
-		return V1_3::ErrorStatus::NONE;
+        return V1_3::ErrorStatus::NONE;
     }
 
     cb->notify_1_3((V1_3::ErrorStatus::NONE), driverPreparedModel);
     ALOGV("Exiting %s", __func__);
     return convertToV1_3(ErrorStatus::NONE);
-
 }
 
 Return<V1_3::ErrorStatus> Driver::prepareModelFromCache_1_3(
-        const V1_3::OptionalTimePoint& timing,
-        const android::hardware::hidl_vec<android::hardware::hidl_handle>&,
-        const android::hardware::hidl_vec<android::hardware::hidl_handle>&,
-        const HidlToken&,
-        const sp<V1_3::IPreparedModelCallback>& callback)
-{
+    const V1_3::OptionalTimePoint& timing,
+    const android::hardware::hidl_vec<android::hardware::hidl_handle>&,
+    const android::hardware::hidl_vec<android::hardware::hidl_handle>&, const HidlToken&,
+    const sp<V1_3::IPreparedModelCallback>& callback) {
     ALOGV("V1_3::Driver::prepareModelFromCache_1_3()");
 
-        if (callback.get() == nullptr) {
+    if (callback.get() == nullptr) {
         ALOGI("invalid callback passed to prepareModel");
         return V1_3::ErrorStatus::INVALID_ARGUMENT;
     }
@@ -375,12 +371,13 @@ Return<V1_3::ErrorStatus> Driver::prepareModelFromCache_1_3(
 }
 
 Return<void> Driver::allocate(const V1_3::BufferDesc& desc,
-                        const hidl_vec<sp<V1_3::IPreparedModel>>& preparedModels,
-                        const hidl_vec<V1_3::BufferRole>& inputRoles,
-                        const hidl_vec<V1_3::BufferRole>& outputRoles,
-                        V1_3::IDevice::allocate_cb cb) {
-    ALOGV("hal_1_3::ArmnnDriver::allocate()");
+                              const hidl_vec<sp<V1_3::IPreparedModel>>& preparedModels,
+                              const hidl_vec<V1_3::BufferRole>& inputRoles,
+                              const hidl_vec<V1_3::BufferRole>& outputRoles,
+                              V1_3::IDevice::allocate_cb cb) {
+    ALOGV("Entering %s", __func__);
     cb(V1_3::ErrorStatus::GENERAL_FAILURE, nullptr, 0);
+    ALOGV("Exiting %s", __func__);
     return Void();
 }
 
@@ -406,7 +403,6 @@ Return<void> Driver::getSupportedExtensions(getSupportedExtensions_cb cb) {
     cb(ErrorStatus::NONE, {/* No extensions. */});
     return Void();
 }
-
 
 }  // namespace nnhal
 }  // namespace neuralnetworks
