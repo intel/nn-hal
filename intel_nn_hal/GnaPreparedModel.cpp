@@ -396,11 +396,11 @@ bool GnaPreparedModel::initialize(const hidl_vec<hidl_handle>& modelCache, const
         }
     }
 
-    if (!hasFC && quantizeCnt != 2 ) {
+    if (!hasFC && quantizeCnt != 2 && lstmCount == 2) {
         isEnc0Nw = true;
         modelNameStr = "Encoder0";
     }
-    else if (quantizeCnt == 2) {
+    else if (quantizeCnt == 2 && hasFC) {
         VLOG(L1, "initialize quantize %d", quantizeCnt);
         isJointNw = true;
         modelNameStr = "Joint";
@@ -409,21 +409,21 @@ bool GnaPreparedModel::initialize(const hidl_vec<hidl_handle>& modelCache, const
         if (lstmCount > 3) {
             isEnc1Nw = true;
             modelNameStr = "Encoder1";
-        } else {
+        } else if (lstmCount == 2){
             isDecoderNw = true;
             modelNameStr = "Decoder";
         }
     }
 
     // TODO Check operation supoorted or not, user may not call getOpertionSupported()
-    /*for (const auto& operation : mModel.main.operations) {
+    for (const auto& operation : mModel.main.operations) {
         success = isOperationSupported(operation, mModel, mTargetDevice);
         dumpOperationSupport(operation, success);
         if (!success) {
             VLOG(L1, "get unsupported operation in initialize()");
             return false;
         }
-    }*/
+    }
 
     success = setRunTimePoolInfosFromHidlMemories_1_3(&mPoolInfos, mModel.pools);
     if (!success) {
@@ -1110,7 +1110,7 @@ void GnaPreparedModel::executeGnaGraph() {
 
 bool GnaPreparedModel::updateMemoryAfterGraphExecution(const V1_3::Request& request) {
     auto reqOutputs = request.outputs;
-    for (auto i =0; i < mModelOutputIndices.size(); i++) {
+    for (auto i = 0; i < mModelOutputIndices.size(); i++) {
         auto index = mModelOutputIndices[i];
         RunTimeOperandInfo& operand = mOperands[index];
         const RequestArgument& arg = reqOutputs[i];
@@ -2485,12 +2485,6 @@ BaseOp* GnaPreparedModel::operationQuantize(const Operation& operation, bool dum
     RunTimeOperandInfo& inputOp = mOperands[inputIndex];
 
     auto operandDetails = mModel.main.operands[inputIndex];
-    if ( (static_cast<int>(operandDetails.lifetime) == static_cast<int>(OperandLifeTime::CONSTANT_COPY)) ||
-         (static_cast<int>(operandDetails.lifetime) == static_cast<int>(OperandLifeTime::CONSTANT_REFERENCE))) {
-		VLOG(L1, "Quantize Op input is of type const !!!!! Revaluate NW");
-        nnAssert(false);
-    }
-
     bool isFp16 = false;
     if (operandDetails.type == OperandType::FLOAT16 || operandDetails.type == OperandType::TENSOR_FLOAT16){
         VLOG(L1, "is FP16 Quantize\n");
@@ -2529,21 +2523,42 @@ BaseOp* GnaPreparedModel::operationQuantize(const Operation& operation, bool dum
             break;
     }
 
-    if (static_cast<int>(operandDetails.lifetime) == (int)V1_3_OperandLifeTime::SUBGRAPH_INPUT) {
-        quantOp->setSubgraphInput();
-
-        mInputPorts.emplace(std::make_pair(inputIndex, LayerInfo(name, false, DeviceType::CPU)));
-        quantOp->setInputIndex(inputIndex, 0);
-    } else if(static_cast<int>(operandDetails.lifetime) == static_cast<int>(OperandLifeTime::TEMPORARY_VARIABLE)) {
-        if (mIntermediateLayerMap.find(inputIndex) != mIntermediateLayerMap.end()) {
-            auto& halLayer = mIntermediateLayerMap.at(inputIndex);
-            halLayer.setInputNode(name, DeviceType::CPU);
-        } else {
-            mIntermediateLayerMap.emplace(std::make_pair(inputIndex,
-                                                        HalLayerInfo(name, DeviceType::CPU, "", DeviceType::None, false)));
+    switch(static_cast<int>(operandDetails.lifetime)) {
+        case static_cast<int>(OperandLifeTime::CONSTANT_COPY): {
+            auto buf = const_cast<uint8_t*>(&mModel.operandValues[operandDetails.location.offset]);
+            auto len_out = sizeOfData(operandDetails.type, operandDetails.dimensions);
+            quantOp->setInputData(inputIndex, buf, len_out);
+            break;
         }
+        case static_cast<int>(OperandLifeTime::CONSTANT_REFERENCE): {
+            auto poolIndex = operandDetails.location.poolIndex;
+            auto& r = mPoolInfos[poolIndex];
+            auto buf = const_cast<uint8_t*>(r.buffer + operandDetails.location.offset);
+            auto len_out = sizeOfData(operandDetails.type, operandDetails.dimensions);
+            quantOp->setInputData(inputIndex, buf, len_out);
+            break;
+        }
+        case static_cast<int>(V1_3_OperandLifeTime::SUBGRAPH_INPUT): {
+            quantOp->setSubgraphInput();
+            mInputPorts.emplace(std::make_pair(inputIndex, LayerInfo(name, false, DeviceType::CPU)));
+            break;
+        }
+        case static_cast<int>(OperandLifeTime::TEMPORARY_VARIABLE): {
+            if (mIntermediateLayerMap.find(inputIndex) != mIntermediateLayerMap.end()) {
+                auto& halLayer = mIntermediateLayerMap.at(inputIndex);
+                halLayer.setInputNode(name, DeviceType::CPU);
+            } else {
+                mIntermediateLayerMap.emplace(std::make_pair(inputIndex,
+                                                            HalLayerInfo(name, DeviceType::CPU, "", DeviceType::None, false)));
+            }
+            break;
+        }
+        default:
+            break;
     }
 
+
+    quantOp->setInputIndex(inputIndex, 0);
     quantOp->setOutputIndices({outIndex});
     quantOp->setInputIndices({inputIndex});
 

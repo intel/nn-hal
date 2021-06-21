@@ -149,7 +149,7 @@ Return<ErrorStatus> Driver::prepareModel_1_3(const Model& model, ExecutionPrefer
     if (!preparedModel->initialize(modelCache, token)) {
         ALOGE("failed to initialize preparedmodel");
         callback->notify(V1_0_ErrorStatus::INVALID_ARGUMENT, nullptr);
-        return ErrorStatus::NONE;
+        return ErrorStatus::INVALID_ARGUMENT;
     }
     callback->notify(V1_0_ErrorStatus::NONE, preparedModel);
 
