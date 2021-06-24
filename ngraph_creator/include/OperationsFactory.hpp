@@ -13,6 +13,7 @@
 #include <Div.hpp>
 #include <Equal.hpp>
 #include <Exp.hpp>
+#include <Expand_Dims.hpp>
 #include <Floor.hpp>
 #include <Gather.hpp>
 #include <Greater.hpp>

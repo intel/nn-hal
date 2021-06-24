@@ -23,6 +23,7 @@ cc_library_static {
         "operations/src/Div.cpp",
         "operations/src/Equal.cpp",
         "operations/src/Exp.cpp",
+        "operations/src/Expand_Dims.cpp",
         "operations/src/Floor.cpp",
         "operations/src/Gather.cpp",
         "operations/src/Greater.cpp",
