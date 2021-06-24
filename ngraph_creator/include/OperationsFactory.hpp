@@ -56,6 +56,7 @@
 #include <Relu1.hpp>
 #include <Relu6.hpp>
 #include <Reshape.hpp>
+#include <ResizeBilinear.hpp>
 #include <SQRT.hpp>
 #include <Select.hpp>
 #include <Sin.hpp>
