@@ -54,22 +54,25 @@ hidl_vec<V1_2::Capabilities::OperandPerformance> nonExtensionOperandPerformanceV
 }
 
 hidl_vec<Capabilities::OperandPerformance> nonExtensionOperandPerformance(
-    V1_0::PerformanceInfo perf) {
+        V1_0::PerformanceInfo perf) {
     using OpPerf = Capabilities::OperandPerformance;
 
     // Note: range presents enumerators in declaration order, not in numerical order.
-    static constexpr ::android::hardware::hidl_enum_range<OperandType> kOperandTypeRange;
+    static constexpr hidl_enum_range<OperandType> kOperandTypeRange;
 
-    hidl_vec<OpPerf> ret(kOperandTypeRange.end() - kOperandTypeRange.begin());
-
-    std::transform(kOperandTypeRange.begin(), kOperandTypeRange.end(), ret.begin(),
-                   [perf](OperandType type) {
-                       return Capabilities::OperandPerformance{type, perf};
-                   });
+    std::vector<OpPerf> ret;
+    ret.reserve(kOperandTypeRange.end() - kOperandTypeRange.begin());
+    for (OperandType type : kOperandTypeRange) {
+        if (static_cast<OperandType>(type) != OperandType::SUBGRAPH) {
+            ret.push_back(OpPerf{type, perf});
+        }
+    }
     std::sort(ret.begin(), ret.end(),
               [](const OpPerf& a, const OpPerf& b) { return a.type < b.type; });
-
-    return ret;
+    hidl_vec<OpPerf> ret1;
+    ret1 = ret;
+    
+    return ret1;
 }
 
 // For HAL-1.0 version
@@ -254,27 +257,33 @@ Return<void> Driver::getCapabilities_1_3(getCapabilities_1_3_cb cb) {
         Capabilities capabilities = {
             .relaxedFloat32toFloat16PerformanceScalar = {.execTime = 0.9f, .powerUsage = 0.9f},
             .relaxedFloat32toFloat16PerformanceTensor = {.execTime = 0.9f, .powerUsage = 0.9f},
-            .operandPerformance = nonExtensionOperandPerformance({0.9f, 0.9f})};
+            .operandPerformance = nonExtensionOperandPerformance({0.9f, 0.9f}),
+            .ifPerformance =  {.execTime = 0.9f, .powerUsage = 0.9f},
+            .whilePerformance =  {.execTime = 0.9f, .powerUsage = 0.9f}};
 
         ALOGI("CPU MKLDNN driver Capabilities .execTime = 0.9f, .powerUsage = 0.9f");
         cb(V1_3::ErrorStatus::NONE, capabilities);
     }
-    // else if (mDeviceName.compare("GPU") == 0) {
-    //      ALOGI("GPU driver getCapabilities()");
-    //      V1_3::Capabilities capabilities = {
-    //          .relaxedFloat32toFloat16PerformanceScalar = {.execTime = 0.95f, .powerUsage =
-    //          0.85f}, .relaxedFloat32toFloat16PerformanceTensor = {.execTime = 0.95f, .powerUsage
-    //          = 0.85f}, .operandPerformance = nonExtensionOperandPerformance({0.95f, 0.95f})};
+    else if (mDeviceName.compare("GPU") == 0) {
+         ALOGI("GPU driver getCapabilities()");
+         V1_3::Capabilities capabilities = {
+             .relaxedFloat32toFloat16PerformanceScalar = {.execTime = 0.95f, .powerUsage =0.85f},
+             .relaxedFloat32toFloat16PerformanceTensor = {.execTime = 0.95f, .powerUsage = 0.85f},
+             .operandPerformance = nonExtensionOperandPerformance({0.95f, 0.95f}),
+             .ifPerformance =  {.execTime = 0.95f, .powerUsage = 0.85f},
+             .whilePerformance =  {.execTime = 0.95f, .powerUsage = 0.85f}};
 
-    //     ALOGI("GPU clDNN driver Capabilities .execTime = 0.95f, .powerUsage = 0.85f");
-    //     cb(V1_3::ErrorStatus::NONE, capabilities);
-    // }
+        ALOGI("GPU clDNN driver Capabilities .execTime = 0.95f, .powerUsage = 0.85f");
+        cb(V1_3::ErrorStatus::NONE, capabilities);
+    }
     else if (mDeviceName.compare("GNA") == 0) {
         ALOGI("GPU driver getCapabilities()");
         Capabilities capabilities = {
             .relaxedFloat32toFloat16PerformanceScalar = {.execTime = 0.8f, .powerUsage = 0.8f},
             .relaxedFloat32toFloat16PerformanceTensor = {.execTime = 0.8f, .powerUsage = 0.8f},
-            .operandPerformance = nonExtensionOperandPerformance({0.8f, 0.8f})};
+            .operandPerformance = nonExtensionOperandPerformance({0.8f, 0.8f}),
+            .ifPerformance =  {.execTime = 0.8f, .powerUsage = 0.8f},
+            .whilePerformance =  {.execTime = 0.8f, .powerUsage = 0.8f}};
 
         ALOGI("GPU clDNN driver Capabilities .execTime = 0.95f, .powerUsage = 0.85f");
         cb(V1_3::ErrorStatus::NONE, capabilities);
@@ -283,7 +292,9 @@ Return<void> Driver::getCapabilities_1_3(getCapabilities_1_3_cb cb) {
         Capabilities capabilities = {
             .relaxedFloat32toFloat16PerformanceScalar = {.execTime = 1.1f, .powerUsage = 1.1f},
             .relaxedFloat32toFloat16PerformanceTensor = {.execTime = 1.1f, .powerUsage = 1.1f},
-            .operandPerformance = nonExtensionOperandPerformance({1.1f, 1.1f})};
+            .operandPerformance = nonExtensionOperandPerformance({1.1f, 1.1f}),
+            .ifPerformance =  {.execTime = 1.1f, .powerUsage = 1.1f},
+            .whilePerformance =  {.execTime = 1.1f, .powerUsage = 1.1f}};
 
         ALOGI("Myriad driver Capabilities .execTime = 1.1f, .powerUsage = 1.1f");
         cb(V1_3::ErrorStatus::NONE, capabilities);
