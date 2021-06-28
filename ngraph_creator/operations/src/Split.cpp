@@ -66,7 +66,7 @@ std::shared_ptr<ngraph::Node> Split::createNode() {
 
         mNgraphNodes->setOutputAtOperandIndex(outputIndex, outNode);
         const auto op = sModelInfo->getOperand(outputIndex);
-        if (op.lifetime == OperandLifeTime::MODEL_OUTPUT) {
+        if (op.lifetime == V1_3::OperandLifeTime::SUBGRAPH_OUTPUT) {
             addResultNode(outputIndex, outNode);
         }
     }

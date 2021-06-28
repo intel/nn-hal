@@ -54,7 +54,6 @@ std::shared_ptr<ngraph::Node> Concat::createNode() {
 
     std::shared_ptr<ngraph::Node> outputNode =
         std::make_shared<ngraph::opset3::Concat>(inputs, axis);
-
     return outputNode;
 }
 
