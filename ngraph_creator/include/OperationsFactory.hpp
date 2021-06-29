@@ -21,6 +21,7 @@
 #include <Gather.hpp>
 #include <Greater.hpp>
 #include <Greater_Equal.hpp>
+#include <L2_Normalization.hpp>
 #include <LSTM.hpp>
 #include <Less.hpp>
 #include <Less_Equal.hpp>

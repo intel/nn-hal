@@ -31,6 +31,7 @@ cc_library_static {
         "operations/src/Gather.cpp",
         "operations/src/Greater.cpp",
         "operations/src/Greater_Equal.cpp",
+        "operations/src/L2_Normalization.cpp",
         "operations/src/LSTM.cpp",
         "operations/src/Less.cpp",
         "operations/src/Less_Equal.cpp",
