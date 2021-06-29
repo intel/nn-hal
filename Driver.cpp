@@ -54,7 +54,7 @@ hidl_vec<V1_2::Capabilities::OperandPerformance> nonExtensionOperandPerformanceV
 }
 
 hidl_vec<Capabilities::OperandPerformance> nonExtensionOperandPerformance(
-        V1_0::PerformanceInfo perf) {
+    V1_0::PerformanceInfo perf) {
     using OpPerf = Capabilities::OperandPerformance;
 
     // Note: range presents enumerators in declaration order, not in numerical order.
@@ -71,42 +71,97 @@ hidl_vec<Capabilities::OperandPerformance> nonExtensionOperandPerformance(
               [](const OpPerf& a, const OpPerf& b) { return a.type < b.type; });
     hidl_vec<OpPerf> ret1;
     ret1 = ret;
-    
+
     return ret1;
+}
+
+static sp<BasePreparedModel> ModelFactory(const char* name, const Model& model) {
+    sp<BasePreparedModel> driverPreparedModel = NULL;
+
+    if (strcmp(name, "CPU") == 0)
+        driverPreparedModel = new CpuPreparedModel(model);
+    else if (strcmp(name, "GNA") == 0)
+        driverPreparedModel = new GnaPreparedModel(model);
+    return driverPreparedModel;
 }
 
 // For HAL-1.0 version
 Return<void> Driver::getCapabilities(getCapabilities_cb cb) {
     ALOGV("Entering %s", __func__);
-
-    return Void();
+    return getCapabilities_1_3(
+        [&](V1_3::ErrorStatus error, const V1_3::Capabilities& capabilities) {
+            // TODO(dgross): Do we need to check compliantWithV1_0(capabilities)?
+            cb(convertToV1_0(error), convertToV1_0(capabilities));
+        });
 }
 
 Return<void> Driver::getSupportedOperations(const V1_0_Model& model, getSupportedOperations_cb cb) {
     ALOGV("Entering %s", __func__);
-
-    return Void();
+    if (!validateModel(model)) {
+        ALOGE("NNERR: %s failed at line no: %d\n", __func__, __LINE__);
+        cb(V1_0::ErrorStatus::INVALID_ARGUMENT, {});
+        return Void();
+    }
+    return getSupportedOperations_1_3(
+        convertToV1_3(model), [&](V1_3::ErrorStatus status, const hidl_vec<bool>& supported) {
+            cb(convertToV1_0(status), supported);
+        });
 }
 
 Return<ErrorStatus> Driver::prepareModel(const V1_0_Model& model,
                                          const sp<V1_0::IPreparedModelCallback>& callback) {
     ALOGV("Entering %s", __func__);
+    if (callback.get() == nullptr) {
+        ALOGE("invalid callback passed to prepareModel");
+        return ErrorStatus::INVALID_ARGUMENT;
+    }
+    if (!validateModel(model)) {
+        callback->notify(ErrorStatus::INVALID_ARGUMENT, nullptr);
+        return ErrorStatus::INVALID_ARGUMENT;
+    }
 
+    // TODO: make asynchronous later
+    sp<BasePreparedModel> driverPreparedModel =
+        ModelFactory(mDeviceName.c_str(), convertToV1_3(model));
+    if (driverPreparedModel == NULL) {
+        ALOGE("failed to create preparedmodel");
+        return ErrorStatus::INVALID_ARGUMENT;
+    }
+    for (auto opn : model.operations) dumpOperation(opn);
+
+    if (!driverPreparedModel->initialize(convertToV1_3(model))) {
+        ALOGE("failed to initialize preparedmodel");
+        callback->notify(ErrorStatus::INVALID_ARGUMENT, nullptr);
+        return ErrorStatus::NONE;
+    }
+
+    callback->notify(ErrorStatus::NONE, driverPreparedModel);
+    ALOGV("Exiting %s", __func__);
     return ErrorStatus::NONE;
 }
 
 // For HAL-1.1 version
 Return<void> Driver::getCapabilities_1_1(getCapabilities_1_1_cb cb) {
     ALOGV("Entering %s", __func__);
-
-    return Void();
+    return getCapabilities_1_3(
+        [&](V1_3::ErrorStatus error, const V1_3::Capabilities& capabilities) {
+            // TODO(dgross): Do we need to check compliantWithV1_1(capabilities)?
+            cb(convertToV1_0(error), convertToV1_1(capabilities));
+        });
 }
 
 Return<void> Driver::getSupportedOperations_1_1(const V1_1_Model& model,
                                                 getSupportedOperations_1_1_cb cb) {
     ALOGV("Entering %s", __func__);
-
-    return Void();
+    if (!validateModel(model)) {
+        ALOGE("NNERR: %s failed at line no: %d\n", __func__, __LINE__);
+        cb(V1_0::ErrorStatus::INVALID_ARGUMENT, {});
+        return Void();
+    }
+    return getSupportedOperations_1_3(
+        convertToV1_3(model), [&](V1_3::ErrorStatus status, const hidl_vec<bool>& supported) {
+            cb(convertToV1_0(status), supported);
+        });
 }
 
 Return<ErrorStatus> Driver::prepareModel_1_1(const V1_1_Model& model,
@@ -114,6 +169,32 @@ Return<ErrorStatus> Driver::prepareModel_1_1(const V1_1_Model& model,
                                              const sp<V1_0::IPreparedModelCallback>& callback) {
     ALOGV("Entering %s", __func__);
 
+    if (callback.get() == nullptr) {
+        ALOGE("invalid callback passed to prepareModel");
+        return ErrorStatus::INVALID_ARGUMENT;
+    }
+    if (!validateModel(model) || !validateExecutionPreference(preference)) {
+        callback->notify(ErrorStatus::INVALID_ARGUMENT, nullptr);
+        return ErrorStatus::INVALID_ARGUMENT;
+    }
+
+    // TODO: make asynchronous later
+    sp<BasePreparedModel> driverPreparedModel =
+        ModelFactory(mDeviceName.c_str(), convertToV1_3(model));
+    if (driverPreparedModel == NULL) {
+        ALOGE("failed to create preparedmodel");
+        return ErrorStatus::INVALID_ARGUMENT;
+    }
+    for (auto opn : model.operations) dumpOperation(opn);
+
+    if (!driverPreparedModel->initialize(convertToV1_3(model))) {
+        ALOGE("failed to initialize preparedmodel");
+        callback->notify(ErrorStatus::INVALID_ARGUMENT, nullptr);
+        return ErrorStatus::NONE;
+    }
+
+    callback->notify(ErrorStatus::NONE, driverPreparedModel);
+    ALOGV("Exiting %s", __func__);
     return ErrorStatus::NONE;
 }
 
@@ -187,16 +268,6 @@ Return<void> Driver::getSupportedOperations_1_2(const V1_2_Model& model,
     return Void();
 }
 
-static sp<BasePreparedModel> ModelFactory(const char* name, const Model& model) {
-    sp<BasePreparedModel> driverPreparedModel = NULL;
-
-    if (strcmp(name, "CPU") == 0)
-        driverPreparedModel = new CpuPreparedModel(model);
-    else if (strcmp(name, "GNA") == 0)
-        driverPreparedModel = new GnaPreparedModel(model);
-    return driverPreparedModel;
-}
-
 Return<ErrorStatus> Driver::prepareModel_1_2(const V1_2_Model& model,
                                              ExecutionPreference preference,
                                              const hidl_vec<hidl_handle>&,
@@ -258,32 +329,30 @@ Return<void> Driver::getCapabilities_1_3(getCapabilities_1_3_cb cb) {
             .relaxedFloat32toFloat16PerformanceScalar = {.execTime = 0.9f, .powerUsage = 0.9f},
             .relaxedFloat32toFloat16PerformanceTensor = {.execTime = 0.9f, .powerUsage = 0.9f},
             .operandPerformance = nonExtensionOperandPerformance({0.9f, 0.9f}),
-            .ifPerformance =  {.execTime = 0.9f, .powerUsage = 0.9f},
-            .whilePerformance =  {.execTime = 0.9f, .powerUsage = 0.9f}};
+            .ifPerformance = {.execTime = 0.9f, .powerUsage = 0.9f},
+            .whilePerformance = {.execTime = 0.9f, .powerUsage = 0.9f}};
 
         ALOGI("CPU MKLDNN driver Capabilities .execTime = 0.9f, .powerUsage = 0.9f");
         cb(V1_3::ErrorStatus::NONE, capabilities);
-    }
-    else if (mDeviceName.compare("GPU") == 0) {
-         ALOGI("GPU driver getCapabilities()");
-         V1_3::Capabilities capabilities = {
-             .relaxedFloat32toFloat16PerformanceScalar = {.execTime = 0.95f, .powerUsage =0.85f},
-             .relaxedFloat32toFloat16PerformanceTensor = {.execTime = 0.95f, .powerUsage = 0.85f},
-             .operandPerformance = nonExtensionOperandPerformance({0.95f, 0.95f}),
-             .ifPerformance =  {.execTime = 0.95f, .powerUsage = 0.85f},
-             .whilePerformance =  {.execTime = 0.95f, .powerUsage = 0.85f}};
+    } else if (mDeviceName.compare("GPU") == 0) {
+        ALOGI("GPU driver getCapabilities()");
+        V1_3::Capabilities capabilities = {
+            .relaxedFloat32toFloat16PerformanceScalar = {.execTime = 0.95f, .powerUsage = 0.85f},
+            .relaxedFloat32toFloat16PerformanceTensor = {.execTime = 0.95f, .powerUsage = 0.85f},
+            .operandPerformance = nonExtensionOperandPerformance({0.95f, 0.95f}),
+            .ifPerformance = {.execTime = 0.95f, .powerUsage = 0.85f},
+            .whilePerformance = {.execTime = 0.95f, .powerUsage = 0.85f}};
 
         ALOGI("GPU clDNN driver Capabilities .execTime = 0.95f, .powerUsage = 0.85f");
         cb(V1_3::ErrorStatus::NONE, capabilities);
-    }
-    else if (mDeviceName.compare("GNA") == 0) {
+    } else if (mDeviceName.compare("GNA") == 0) {
         ALOGI("GPU driver getCapabilities()");
         Capabilities capabilities = {
             .relaxedFloat32toFloat16PerformanceScalar = {.execTime = 0.8f, .powerUsage = 0.8f},
             .relaxedFloat32toFloat16PerformanceTensor = {.execTime = 0.8f, .powerUsage = 0.8f},
             .operandPerformance = nonExtensionOperandPerformance({0.8f, 0.8f}),
-            .ifPerformance =  {.execTime = 0.8f, .powerUsage = 0.8f},
-            .whilePerformance =  {.execTime = 0.8f, .powerUsage = 0.8f}};
+            .ifPerformance = {.execTime = 0.8f, .powerUsage = 0.8f},
+            .whilePerformance = {.execTime = 0.8f, .powerUsage = 0.8f}};
 
         ALOGI("GPU clDNN driver Capabilities .execTime = 0.95f, .powerUsage = 0.85f");
         cb(V1_3::ErrorStatus::NONE, capabilities);
@@ -293,8 +362,8 @@ Return<void> Driver::getCapabilities_1_3(getCapabilities_1_3_cb cb) {
             .relaxedFloat32toFloat16PerformanceScalar = {.execTime = 1.1f, .powerUsage = 1.1f},
             .relaxedFloat32toFloat16PerformanceTensor = {.execTime = 1.1f, .powerUsage = 1.1f},
             .operandPerformance = nonExtensionOperandPerformance({1.1f, 1.1f}),
-            .ifPerformance =  {.execTime = 1.1f, .powerUsage = 1.1f},
-            .whilePerformance =  {.execTime = 1.1f, .powerUsage = 1.1f}};
+            .ifPerformance = {.execTime = 1.1f, .powerUsage = 1.1f},
+            .whilePerformance = {.execTime = 1.1f, .powerUsage = 1.1f}};
 
         ALOGI("Myriad driver Capabilities .execTime = 1.1f, .powerUsage = 1.1f");
         cb(V1_3::ErrorStatus::NONE, capabilities);
