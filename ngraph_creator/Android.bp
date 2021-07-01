@@ -24,6 +24,7 @@ cc_library_static {
         "operations/src/Equal.cpp",
         "operations/src/Exp.cpp",
         "operations/src/Floor.cpp",
+        "operations/src/FullyConnected.cpp",
         "operations/src/Gather.cpp",
         "operations/src/Greater.cpp",
         "operations/src/Greater_Equal.cpp",
