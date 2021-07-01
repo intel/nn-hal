@@ -16,8 +16,8 @@
 
 #define LOG_TAG "neuralnetworks-hal-service"
 
+#include <log/log.h>
 #include "Driver.h"
-#include "utils.h"
 #define MAX_LENGTH (255)
 
 #if __ANDROID__
@@ -35,13 +35,13 @@ int main(int argc, char* argv[]) {
         android::sp<Driver> device;
 
         if (strncmp(deviceType, "GNA", 3) == 0)
-            device = new Driver(nnhal::IntelDeviceType::GNA);
+            device = new Driver(android::hardware::neuralnetworks::nnhal::IntelDeviceType::GNA);
         else if (strncmp(deviceType, "VPU", 3) == 0)
-            device = new Driver(nnhal::IntelDeviceType::VPU);
+            device = new Driver(android::hardware::neuralnetworks::nnhal::IntelDeviceType::VPU);
         else if (strncmp(deviceType, "GPU", 3) == 0)
-            device = new Driver(nnhal::IntelDeviceType::GPU);
+            device = new Driver(android::hardware::neuralnetworks::nnhal::IntelDeviceType::GPU);
         else
-            device = new Driver(nnhal::IntelDeviceType::CPU);
+            device = new Driver(android::hardware::neuralnetworks::nnhal::IntelDeviceType::CPU);
 
         ALOGD("NN-HAL-1.2(%s) is ready.", deviceType);
         configureRpcThreadpool(4, true);
@@ -60,7 +60,7 @@ namespace hardware {
 namespace neuralnetworks {
 
 ::android::sp<V1_0::IDevice> V1_0::IDevice::getService(const std::string& serviceName, bool dummy) {
-    ALOGD("Initializaing the Intel NNHAL driver v1.3. Service name: %s", serviceName.c_str());
+    ALOGD("Initializaing the Intel NNHAL driver. Service name: %s", serviceName.c_str());
     return new nnhal::Driver(nnhal::IntelDeviceType::CPU);
 }
 
