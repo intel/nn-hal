@@ -55,6 +55,7 @@ cc_library_static {
         "operations/src/Reduce_Max.cpp",
         "operations/src/Reduce_Min.cpp",
         "operations/src/Reduce_Prod.cpp",
+        "operations/src/Reduce_Sum.cpp",
         "operations/src/Relu.cpp",
         "operations/src/Relu1.cpp",
         "operations/src/Relu6.cpp",

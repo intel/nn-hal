@@ -47,6 +47,7 @@
 #include <Reduce_Max.hpp>
 #include <Reduce_Min.hpp>
 #include <Reduce_Prod.hpp>
+#include <Reduce_Sum.hpp>
 #include <Relu.hpp>
 #include <Relu1.hpp>
 #include <Relu6.hpp>
