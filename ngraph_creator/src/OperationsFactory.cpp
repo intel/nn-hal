@@ -45,6 +45,8 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<Equal>(operationIndex);
         case OperationType::EXP:
             return std::make_shared<Exp>(operationIndex);
+        case OperationType::EXPAND_DIMS:
+            return std::make_shared<Expand_Dims>(operationIndex);
         case OperationType::FULLY_CONNECTED:
             return std::make_shared<FullyConnected>(operationIndex);
         case OperationType::FLOOR:
