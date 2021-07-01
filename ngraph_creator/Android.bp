@@ -52,6 +52,7 @@ cc_library_static {
         "operations/src/Quantize.cpp",
         "operations/src/Reduce_All.cpp",
         "operations/src/Reduce_Any.cpp",
+        "operations/src/Reduce_Max.cpp",
         "operations/src/Reduce_Min.cpp",
         "operations/src/Reduce_Prod.cpp",
         "operations/src/Relu.cpp",
