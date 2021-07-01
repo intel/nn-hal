@@ -99,6 +99,10 @@ cc_library_shared {
         "libngraph_creator",
     ],
 
+    defaults: [
+        "neuralnetworks_defaults"
+    ]
+
 }
 
 //##############################################################
@@ -138,6 +142,10 @@ cc_binary {
         "android.hardware.neuralnetworks@1.2-generic-impl",
         "android.hidl.allocator@1.0",
         "android.hidl.memory@1.0",
+    ],
+
+    defaults: [
+        "neuralnetworks_defaults"
     ],
 
     compile_multilib: "64",
