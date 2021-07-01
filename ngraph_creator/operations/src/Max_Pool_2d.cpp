@@ -178,10 +178,10 @@ std::shared_ptr<ngraph::Node> Max_Pool_2d::createNode() {
         ALOGD("%s Forced NCHW conversion at operationIndex %d", __func__, mNnapiOperationIndex);
     }
 
-    strides = {(size_t)stride_width, (size_t)stride_height};
-    kernel = {(size_t)filter_width, (size_t)filter_height};
-    pads_begin = {(size_t)padding_left, (size_t)padding_top};
-    pads_end = {(size_t)padding_right, (size_t)padding_bottom};
+    strides = {(size_t)stride_height, (size_t)stride_width};
+    kernel = {(size_t)filter_height, (size_t)filter_width};
+    pads_begin = {(size_t)padding_top, (size_t)padding_left};
+    pads_end = {(size_t)padding_bottom, (size_t)padding_right};
 
     auto maxpoolNode = std::make_shared<ngraph::opset3::MaxPool>(
         inputNode, ngraph::Strides(strides), ngraph::Shape(pads_begin), ngraph::Shape(pads_end),
