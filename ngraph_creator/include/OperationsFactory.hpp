@@ -54,6 +54,7 @@
 #include <Relu1.hpp>
 #include <Relu6.hpp>
 #include <Reshape.hpp>
+#include <ROI_Pooling.hpp>
 #include <SQRT.hpp>
 #include <Select.hpp>
 #include <Sin.hpp>
