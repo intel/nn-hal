@@ -260,10 +260,10 @@ std::shared_ptr<ngraph::Node> Depthwise_Conv_2d::createNode() {
         ALOGD("%s Forced NCHW conversion at operationIndex %d", __func__, mNnapiOperationIndex);
     }
 
-    strides = {(size_t)stride_width, (size_t)stride_height};
-    pads_begin = {padding_left, padding_top};
-    pads_end = {padding_right, padding_bottom};
-    dilations = {(size_t)dilation_width_factor, (size_t)dilation_height_factor};
+    strides = {(size_t)stride_height, (size_t)stride_width};
+    pads_begin = {padding_top, padding_left};
+    pads_end = {padding_bottom, padding_right};
+    dilations = {(size_t)dilation_height_factor, (size_t)dilation_width_factor};
 
     if (filterNode != nullptr) {
         std::vector<size_t> shape(&filterNode->get_shape()[0], &filterNode->get_shape()[0] + 4);
