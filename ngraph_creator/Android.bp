@@ -63,6 +63,7 @@ cc_library_static {
         "operations/src/Relu6.cpp",
         "operations/src/Reshape.cpp",
         "operations/src/RNN.cpp",
+        "operations/src/ROI_Pooling.cpp",
         "operations/src/RSQRT.cpp",
         "operations/src/Select.cpp",
         "operations/src/Softmax.cpp",
