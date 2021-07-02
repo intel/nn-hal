@@ -1,5 +1,4 @@
 #include <L2_Normalization.hpp>
-#include <NgraphHelper.hpp>
 #define LOG_TAG "L2_Normalization"
 
 namespace android {
@@ -28,11 +27,11 @@ bool L2_Normalization::validate() {
         ALOGE("%s Invalid dimensions size for input(%d)", __func__, inputRank);
         return false;
     }
+    // NN-HAL 1.2 specific optional input
     if (inputsSize == 2) {
         if (!checkInputOperandType(1, (int32_t)OperandType::INT32)) {
             return false;
         }
-        auto inputAxes = sModelInfo->ParseOperationInput<int32_t>(mNnapiOperationIndex, 1);
     }
 
     ALOGV("%s PASSED", __func__);
@@ -41,17 +40,20 @@ bool L2_Normalization::validate() {
 
 std::shared_ptr<ngraph::Node> L2_Normalization::createNode() {
     std::shared_ptr<ngraph::Node> inputNode;
-    float eps = 1e-6f;
-    auto epsMode = ngraph::op::EpsMode::MAX;
-    const auto inputRank = getInputOperandDimensions(0).size();
+
     int32_t inputAxes = -1;
     const auto& inputsSize = sModelInfo->getOperationInputsSize(mNnapiOperationIndex);
     ALOGD("%s inputsSize %d", __func__, inputsSize);
     inputNode = getInputNode(0);
+    // NN-HAL 1.2 specific optional input
     if (inputsSize == 2) {
         inputAxes = sModelInfo->ParseOperationInput<int32_t>(mNnapiOperationIndex, 1);
     }
     auto inputAxesNode = createConstNode(ngraph::element::i32, {1}, convertToVector(inputAxes));
+    // TODO: Add support for NNAPI feature level 4, if the elements along an axis are all zeros, the
+    // result is undefined. Since NNAPI feature level 4, if the elements along an axis are all
+    // zeros, the result is logical zero.
+
     /*
      *         output[batch, row, col, channel] =
      *         input[batch, row, col, channel] /
