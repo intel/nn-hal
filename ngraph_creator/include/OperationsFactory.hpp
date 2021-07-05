@@ -43,6 +43,7 @@
 #include <Pow.hpp>
 #include <Quantize.hpp>
 #include <RNN.hpp>
+#include <ROI_Pooling.hpp>
 #include <RSQRT.hpp>
 #include <Reduce_All.hpp>
 #include <Reduce_Any.hpp>
@@ -54,7 +55,6 @@
 #include <Relu1.hpp>
 #include <Relu6.hpp>
 #include <Reshape.hpp>
-#include <ROI_Pooling.hpp>
 #include <SQRT.hpp>
 #include <Select.hpp>
 #include <Sin.hpp>
