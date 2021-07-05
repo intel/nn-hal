@@ -18,4 +18,3 @@ public:
 }  // namespace neuralnetworks
 }  // namespace hardware
 }  // namespace android
-
