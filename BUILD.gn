@@ -131,6 +131,7 @@ shared_library("intel_nnhal") {
     "ngraph_creator/operations/src/RNN.cpp",
     "ngraph_creator/operations/src/ROI_Pooling.cpp",
     "ngraph_creator/operations/src/RSQRT.cpp",
+    "ngraph_creator/operations/src/ResizeBilinear.cpp",
     "ngraph_creator/operations/src/Select.cpp",
     "ngraph_creator/operations/src/Sin.cpp",
     "ngraph_creator/operations/src/Softmax.cpp",
