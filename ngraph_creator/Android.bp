@@ -20,6 +20,7 @@ cc_library_static {
         "operations/src/Channel_Shuffle.cpp",
         "operations/src/Concat.cpp",
         "operations/src/Conv_2d.cpp",
+        "operations/src/Depth_To_Space.cpp",
         "operations/src/Depthwise_Conv_2d.cpp",
         "operations/src/Dequantize.cpp",
         "operations/src/Div.cpp",
