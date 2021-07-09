@@ -135,6 +135,7 @@ shared_library("intel_nnhal") {
     "ngraph_creator/operations/src/Sin.cpp",
     "ngraph_creator/operations/src/Softmax.cpp",
     "ngraph_creator/operations/src/Space_To_Batch.cpp",
+    "ngraph_creator/operations/src/Space_To_Depth.cpp",
     "ngraph_creator/operations/src/Split.cpp",
     "ngraph_creator/operations/src/SQRT.cpp",
     "ngraph_creator/operations/src/Squeeze.cpp",
