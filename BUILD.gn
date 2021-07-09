@@ -84,6 +84,7 @@ shared_library("intel_nnhal") {
     "ngraph_creator/operations/src/Channel_Shuffle.cpp",
     "ngraph_creator/operations/src/Concat.cpp",
     "ngraph_creator/operations/src/Conv_2d.cpp",
+    "ngraph_creator/operations/src/Depth_To_Space.cpp",
     "ngraph_creator/operations/src/Depthwise_Conv_2d.cpp",
     "ngraph_creator/operations/src/Dequantize.cpp",
     "ngraph_creator/operations/src/Div.cpp",
