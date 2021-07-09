@@ -17,7 +17,17 @@ namespace nnhal {
 
 class OperationsBase {
 protected:
-    enum ConversionType { NHWC_NCHW, NCHW_NHWC, IHWO_OIHW, OHWI_OIHW, NHC_NCH, NCH_NHC, NC_CN };
+    enum ConversionType {
+        NHWC_NCHW,
+        NCHW_NHWC,
+        IHWO_OIHW,
+        OHWI_OIHW,
+        NHWC_CWHN,
+        CWHN_NHWC,
+        NHC_NCH,
+        NCH_NHC,
+        NC_CN
+    };
     uint32_t mDefaultOutputIndex;
     uint32_t mDefaultInputIndex = 0;
     int mNnapiOperationIndex;
@@ -69,7 +79,8 @@ protected:
                     input = createConstNode(elementType, toNgraphShape(operandDims), operandValues);
                     break;
                 }
-                case OperandType::TENSOR_QUANT8_SYMM: {
+                case OperandType::TENSOR_QUANT8_SYMM:
+                case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL: {
                     elementType = ngraph::element::i8;
                     auto operandValues = sModelInfo->GetConstVecOperand<int8_t>(operandIndex);
                     input = createConstNode(elementType, toNgraphShape(operandDims), operandValues);
