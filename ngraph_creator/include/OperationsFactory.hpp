@@ -63,6 +63,7 @@
 #include <Sin.hpp>
 #include <Softmax.hpp>
 #include <Space_To_Batch.hpp>
+#include <Space_To_Depth.hpp>
 #include <Split.hpp>
 #include <Squeeze.hpp>
 #include <Sub.hpp>

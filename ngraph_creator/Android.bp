@@ -71,6 +71,7 @@ cc_library_static {
         "operations/src/Select.cpp",
         "operations/src/Softmax.cpp",
         "operations/src/Space_To_Batch.cpp",
+        "operations/src/Space_To_Depth.cpp",
         "operations/src/SQRT.cpp",
         "operations/src/Sin.cpp",
         "operations/src/Split.cpp",
