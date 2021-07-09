@@ -65,6 +65,7 @@ bool NnapiModelInfo::initializeRunTimeOperandInfo() {
                 break;
             case OperandType::TENSOR_QUANT8_ASYMM:
             case OperandType::TENSOR_QUANT8_SYMM:
+            case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL:
                 to.type = from.type;
                 break;
             default:
@@ -282,12 +283,15 @@ Blob::Ptr NnapiModelInfo::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const ui
                 std::make_shared<InferenceEngine::TBlob<uint8_t>>(td, (uint8_t*)buf, len);
             return blob;
         }
-    } else if (op.type == OperandType::TENSOR_QUANT8_SYMM) {
-        ALOGV("check if tensors of type TENSOR_QUANT8_SYMM supported");
+    } else if (op.type == OperandType::TENSOR_QUANT8_SYMM ||
+               op.type == OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL) {
+        ALOGV(
+            "check if tensors of type TENSOR_QUANT8_SYMM/TENSOR_QUANT8_SYMM_PER_CHANNEL  "
+            "supported");
         InferenceEngine::TensorDesc td(InferenceEngine::Precision::I8, toDims(op.dimensions),
                                        InferenceEngine::Layout::ANY);
         if (buf == nullptr) {
-            ALOGD("TENSOR_QUANT8_SYMM buf is NULL !!!!!!!!!!!!!!!");
+            ALOGD("TENSOR_QUANT8_SYMM/TENSOR_QUANT8_SYMM_PER_CHANNEL buf is NULL !!!!!!!!!!!!!!!");
             InferenceEngine::TBlob<int8_t>::Ptr blob =
                 std::make_shared<InferenceEngine::TBlob<int8_t>>(td);
             blob->allocate();

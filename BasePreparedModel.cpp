@@ -163,7 +163,8 @@ void asyncExecute(const Request& request, MeasureTiming measure, BasePreparedMod
         auto outDims = srcBlob->getTensorDesc().getDims();
         if (operandType == OperandType::TENSOR_BOOL8 ||
             operandType == OperandType::TENSOR_QUANT8_ASYMM ||
-            operandType == OperandType::TENSOR_QUANT8_SYMM)
+            operandType == OperandType::TENSOR_QUANT8_SYMM ||
+            operandType == OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL)
             expectedLength /= 4;  // 8bit expected instead of 32bit
         if (rActualLength != expectedLength) {
             ALOGE("%s Invalid length(%d) at outIndex(%d)", __func__, rActualLength, outIndex);
@@ -190,7 +191,8 @@ void asyncExecute(const Request& request, MeasureTiming measure, BasePreparedMod
                 floatToUint8(srcBlob->buffer().as<float*>(), (uint8_t*)destPtr, srcBlob->size());
                 break;
             }
-            case OperandType::TENSOR_QUANT8_SYMM: {
+            case OperandType::TENSOR_QUANT8_SYMM:
+            case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL: {
                 floatToint8(srcBlob->buffer().as<float*>(), (int8_t*)destPtr, srcBlob->size());
                 break;
             }
@@ -278,7 +280,8 @@ static std::tuple<ErrorStatus, hidl_vec<V1_2::OutputShape>, Timing> executeSynch
         auto outDims = srcBlob->getTensorDesc().getDims();
         if (operandType == OperandType::TENSOR_BOOL8 ||
             operandType == OperandType::TENSOR_QUANT8_ASYMM ||
-            operandType == OperandType::TENSOR_QUANT8_SYMM)
+            operandType == OperandType::TENSOR_QUANT8_SYMM ||
+            operandType == OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL)
             expectedLength /= 4;  // 8bit expected instead of 32bit
         if (rActualLength != expectedLength) {
             ALOGE("%s Invalid length(%d) at outIndex(%d)", __func__, rActualLength, outIndex);
@@ -302,7 +305,8 @@ static std::tuple<ErrorStatus, hidl_vec<V1_2::OutputShape>, Timing> executeSynch
                 floatToUint8(srcBlob->buffer().as<float*>(), (uint8_t*)destPtr, srcBlob->size());
                 break;
             }
-            case OperandType::TENSOR_QUANT8_SYMM: {
+            case OperandType::TENSOR_QUANT8_SYMM:
+            case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL: {
                 floatToint8(srcBlob->buffer().as<float*>(), (int8_t*)destPtr, srcBlob->size());
                 break;
             }
