@@ -59,6 +59,8 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<Greater>(operationIndex);
         case OperationType::GREATER_EQUAL:
             return std::make_shared<Greater_Equal>(operationIndex);
+        case OperationType::INSTANCE_NORMALIZATION:
+            return std::make_shared<Instance_Normalization>(operationIndex);
         case OperationType::L2_NORMALIZATION:
             return std::make_shared<L2_Normalization>(operationIndex);
         case OperationType::LSTM:
