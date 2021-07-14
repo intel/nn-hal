@@ -10,6 +10,7 @@
 #include <Channel_Shuffle.hpp>
 #include <Concat.hpp>
 #include <Conv_2d.hpp>
+#include <Depth_To_Space.hpp>
 #include <Depthwise_Conv_2d.hpp>
 #include <Dequantize.hpp>
 #include <Div.hpp>
@@ -62,6 +63,7 @@
 #include <Sin.hpp>
 #include <Softmax.hpp>
 #include <Space_To_Batch.hpp>
+#include <Space_To_Depth.hpp>
 #include <Split.hpp>
 #include <Squeeze.hpp>
 #include <Sub.hpp>

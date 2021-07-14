@@ -37,6 +37,8 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<Concat>(operationIndex);
         case OperationType::CONV_2D:
             return std::make_shared<Conv_2d>(operationIndex);
+        case OperationType::DEPTH_TO_SPACE:
+            return std::make_shared<Depth_To_Space>(operationIndex);
         case OperationType::DEPTHWISE_CONV_2D:
             return std::make_shared<Depthwise_Conv_2d>(operationIndex);
         case OperationType::DEQUANTIZE:
@@ -137,6 +139,8 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<Softmax>(operationIndex);
         case OperationType::SPACE_TO_BATCH_ND:
             return std::make_shared<Space_To_Batch>(operationIndex);
+        case OperationType::SPACE_TO_DEPTH:
+            return std::make_shared<Space_To_Depth>(operationIndex);
         case OperationType::SQRT:
             return std::make_shared<SQRT>(operationIndex);
         case OperationType::SIN:

@@ -17,12 +17,14 @@ bool Conv_2d::validate() {
         !checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM))
         return false;
 
-    for (int i = 0; i < 2; i++) {
-        // Check input/filter operands(0/1) are of type TENSOR_FLOAT32/TENSOR_QUANT8_ASYMM
-        if (!checkInputOperandType(i, (int32_t)OperandType::TENSOR_FLOAT32) &&
-            !checkInputOperandType(i, (int32_t)OperandType::TENSOR_QUANT8_ASYMM))
-            return false;
-    }
+    // Check input/filter operands(0/1) are of type TENSOR_FLOAT32/TENSOR_QUANT8_ASYMM
+    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
+        !checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM))
+        return false;
+    if (!checkInputOperandType(1, (int32_t)OperandType::TENSOR_FLOAT32) &&
+        !checkInputOperandType(1, (int32_t)OperandType::TENSOR_QUANT8_ASYMM) &&
+        !checkInputOperandType(1, (int32_t)OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL))
+        return false;
     // Check bias type
     if (!checkInputOperandType(2, (int32_t)OperandType::TENSOR_FLOAT32) &&
         !checkInputOperandType(2, (int32_t)OperandType::TENSOR_INT32))
@@ -40,44 +42,11 @@ bool Conv_2d::validate() {
         return false;
     }
 
-    const auto& inputsSize = sModelInfo->getOperationInputsSize(mNnapiOperationIndex);
-
-    if (inputsSize >= 10 && inputsSize <= 13 &&
-        !checkInputOperandType(7, (int32_t)OperandType::BOOL)) {
-        // Checking input types for explicit padding
-        for (int i = 3; i < 10; i++) {
-            if (!checkInputOperandType(i, (int32_t)OperandType::INT32)) return false;
-        }
-
-        if (inputsSize > 10 && inputsSize <= 13) {
-            switch (inputsSize) {
-                case 13:
-                    if (!checkInputOperandType(12, (int32_t)OperandType::INT32)) return false;
-                case 12:
-                    if (!checkInputOperandType(11, (int32_t)OperandType::INT32)) return false;
-                case 11:
-                    if (!checkInputOperandType(10, (int32_t)OperandType::BOOL)) return false;
-                default:
-                    break;
-            }
-        }
-    } else if (inputsSize >= 7 && inputsSize <= 10) {
-        // Checking input types for implicit padding
-        for (int i = 3; i < 7; i++) {
-            if (!checkInputOperandType(i, (int32_t)OperandType::INT32)) return false;
-        }
-
-        if (inputsSize > 7 && inputsSize <= 10) {
-            switch (inputsSize) {
-                case 10:
-                    if (!checkInputOperandType(9, (int32_t)OperandType::INT32)) return false;
-                case 9:
-                    if (!checkInputOperandType(8, (int32_t)OperandType::INT32)) return false;
-                case 8:
-                    if (!checkInputOperandType(7, (int32_t)OperandType::BOOL)) return false;
-                default:
-                    break;
-            }
+    if (checkInputOperandType(1, (int32_t)OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL)) {
+        const auto& operandIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 1);
+        const auto& operand = sModelInfo->getOperand(operandIndex);
+        if (operand.extraParams.channelQuant().channelDim != 0) {
+            return false;
         }
     }
 
@@ -224,7 +193,29 @@ std::shared_ptr<ngraph::Node> Conv_2d::createNode() {
     filterNode = getInputNode(1);
     biasNode = getInputNode(2);
 
-    if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
+    if (checkInputOperandType(1, (int32_t)OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL)) {
+        auto filterIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 1);
+        const auto& filterOperand = sModelInfo->getOperand(filterIndex);
+        vec<float> filterScales = filterOperand.extraParams.channelQuant().scales;
+        float inputScale = sModelInfo->getOperandScale(0);
+        auto filterScales_node =
+            createConstNode(ngraph::element::f32, ngraph::Shape{filterScales.size()}, filterScales);
+        auto inputScales_node =
+            createConstNode(ngraph::element::f32, ngraph::Shape{1}, convertToVector(inputScale));
+        filterNode = transpose(NHWC_CWHN, filterNode);
+        auto filterNodeConvert =
+            std::make_shared<ngraph::opset3::Convert>(filterNode, ngraph::element::f32);
+        auto filterNodeMulScales =
+            std::make_shared<ngraph::opset3::Multiply>(filterNodeConvert, filterScales_node);
+        filterNode = transpose(CWHN_NHWC, filterNodeMulScales);
+        // for quant symm per channel type inputs, bias is of type TENSOR_INT32. For TENSOR_INT32
+        // type, dequantization is not applied during node creation
+        // bias_scale[i] = input_scale * filter_scale[i]
+        auto biasScalMultiplier =
+            std::make_shared<ngraph::opset3::Multiply>(filterScales_node, inputScales_node);
+        biasNode = std::make_shared<ngraph::opset3::Convert>(biasNode, ngraph::element::f32);
+        biasNode = std::make_shared<ngraph::opset3::Multiply>(biasNode, biasScalMultiplier);
+    } else if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
         // for quant type inputs, bias is of type TENSOR_INT32. For TENSOR_INT32 type,
         // dequantization is not applied during node creation
         biasNode = DequantizeNode(biasNode, biasIndex, ngraph::element::f32);
@@ -232,20 +223,8 @@ std::shared_ptr<ngraph::Node> Conv_2d::createNode() {
 
     // OpenVino expects filter in OIHW format
     filterNode = transpose(OHWI_OIHW, filterNode);
-    if (mNgraphNodes->isForcedNchw(inputIndex)) {
-        if (useNchw) {
-            ALOGI("%s Forced NCHW done already but NCHW flag set at operationIndex %d", __func__,
-                  mNnapiOperationIndex);
-            inputNode = transpose(NCHW_NHWC, inputNode);
-            mNgraphNodes->setForcedNchw(mDefaultOutputIndex, false);
-        } else {
-            // Already forced NCHW, propogate the flag
-            mNgraphNodes->setForcedNchw(mDefaultOutputIndex, true);
-        }
-    } else if (!useNchw) {  // No conversion needed if useNchw set
+    if (!useNchw) {  // No conversion needed if useNchw set
         inputNode = transpose(NHWC_NCHW, inputNode);
-        mNgraphNodes->setForcedNchw(mDefaultOutputIndex, true);
-        ALOGD("%s Forced NCHW conversion at operationIndex %d", __func__, mNnapiOperationIndex);
     }
 
     strides = {(size_t)stride_height, (size_t)stride_width};
@@ -270,7 +249,6 @@ std::shared_ptr<ngraph::Node> Conv_2d::createNode() {
 
     if (!useNchw) {
         outputNode = transpose(NCHW_NHWC, outputNode);
-        mNgraphNodes->setForcedNchw(mDefaultOutputIndex, false);
     }
 
     return outputNode;

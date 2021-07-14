@@ -25,6 +25,12 @@ std::shared_ptr<ngraph::Node> OperationsBase::transpose(ConversionType type,
         case OHWI_OIHW:
             order = {0, 3, 1, 2};
             break;
+        case NHWC_CWHN:
+            order = {3, 2, 1, 0};
+            break;
+        case CWHN_NHWC:
+            order = {3, 2, 1, 0};
+            break;
         case NHC_NCH:
             order = {0, 2, 1};
             break;
