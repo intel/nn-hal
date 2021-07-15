@@ -144,9 +144,6 @@ std::shared_ptr<ngraph::Node> Grouped_Conv_2d::createNode() {
     }
 
     std::shared_ptr<ngraph::Node> inputNode, filterNode, biasNode;
-
-    const auto& inputIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 0);
-    const auto& filterIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 1);
     const auto& biasIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 2);
 
     inputNode = getInputNode(0);
@@ -158,21 +155,16 @@ std::shared_ptr<ngraph::Node> Grouped_Conv_2d::createNode() {
         const auto& filterOperand = sModelInfo->getOperand(filterIndex);
         vec<float> filterScales = filterOperand.extraParams.channelQuant().scales;
         float inputScale = sModelInfo->getOperandScale(0);
-        auto filterScales_node =
+        auto filterScalesNode =
             createConstNode(ngraph::element::f32, ngraph::Shape{filterScales.size()}, filterScales);
-        auto inputScales_node =
+        auto inputScalesNode =
             createConstNode(ngraph::element::f32, ngraph::Shape{1}, convertToVector(inputScale));
-        filterNode = transpose(NHWC_CWHN, filterNode);
-        auto filterNodeConvert =
-            std::make_shared<ngraph::opset3::Convert>(filterNode, ngraph::element::f32);
-        auto filterNodeMulScales =
-            std::make_shared<ngraph::opset3::Multiply>(filterNodeConvert, filterScales_node);
-        filterNode = transpose(CWHN_NHWC, filterNodeMulScales);
+
         // for quant symm per channel type inputs, bias is of type TENSOR_INT32. For TENSOR_INT32
         // type, dequantization is not applied during node creation
         // bias_scale[i] = input_scale * filter_scale[i]
         auto biasScalMultiplier =
-            std::make_shared<ngraph::opset3::Multiply>(filterScales_node, inputScales_node);
+            std::make_shared<ngraph::opset3::Multiply>(filterScalesNode, inputScalesNode);
         biasNode = std::make_shared<ngraph::opset3::Convert>(biasNode, ngraph::element::f32);
         biasNode = std::make_shared<ngraph::opset3::Multiply>(biasNode, biasScalMultiplier);
     } else if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {

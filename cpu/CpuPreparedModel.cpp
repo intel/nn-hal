@@ -45,7 +45,7 @@ bool CpuPreparedModel::initialize() {
         cnnNetworkPtr->serialize("/data/vendor/neuralnetworks/ngraph_ir.xml",
                                  "/data/vendor/neuralnetworks/ngraph_ir.bin");
 #else
-        ngraph_net->serialize("/tmp/ngraph_ir.xml", "/tmp/ngraph_ir.bin");
+        cnnNetworkPtr->serialize("/tmp/ngraph_ir.xml", "/tmp/ngraph_ir.bin");
 #endif
         mPlugin = std::make_shared<IENetwork>(cnnNetworkPtr);
         mPlugin->loadNetwork();
