@@ -107,8 +107,11 @@ protected:
             input = mNgraphNodes->getOperationOutput(operandIndex).get_node_shared_ptr();
         }
 
-        if (operandType == OperandType::TENSOR_QUANT8_ASYMM && dequantize) {
-            input = DequantizeNode(input, operandIndex, ngraph::element::f32);
+        if (dequantize) {
+            if (operandType == OperandType::TENSOR_QUANT8_ASYMM ||
+                operandType == OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL) {
+                input = DequantizeNode(input, operandIndex, ngraph::element::f32);
+            }
         }
 
         return input;
@@ -136,7 +139,8 @@ protected:
 
     std::shared_ptr<ngraph::Node> QuantizeNode(std::shared_ptr<ngraph::Node> input, size_t index,
                                                ngraph::element::Type quantizeType);
-    std::shared_ptr<ngraph::Node> DequantizeNode(std::shared_ptr<ngraph::Node> input, size_t index,
+    std::shared_ptr<ngraph::Node> DequantizeNode(std::shared_ptr<ngraph::Node> input,
+                                                 uint32_t index,
                                                  ngraph::element::Type dequantizeType);
 
     const Operand& getInputOperand(uint32_t index) {

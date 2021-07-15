@@ -167,25 +167,25 @@ shared_library("intel_nnhal") {
     "intel_nn_hal/graphAPI",
     "intel_nn_hal/graphAPI/builderLayerNorm",
     "intel_nn_hal/dl",
-    "../intel-openvino-dev/inference-engine/src/inference_engine",
-    "../intel-openvino-dev/inference-engine/thirdparty/pugixml/src",
     "../intel-openvino-dev/inference-engine/include",
+    "../intel-openvino-dev/inference-engine/include/cldnn",
     "../intel-openvino-dev/inference-engine/include/cpp",
     "../intel-openvino-dev/inference-engine/include/details",
     "../intel-openvino-dev/inference-engine/include/details/os",
-    "../intel-openvino-dev/inference-engine/include/cldnn",
     "../intel-openvino-dev/inference-engine/include/gna",
     "../intel-openvino-dev/inference-engine/include/hetero",
     "../intel-openvino-dev/inference-engine/include/mkldnn",
     "../intel-openvino-dev/inference-engine/include/openvx",
     "../intel-openvino-dev/inference-engine/include/vpu",
-    "../intel-openvino-dev/inference-engine/src/inference_engine",
     "../intel-openvino-dev/inference-engine/src/dumper",
+    "../intel-openvino-dev/inference-engine/src/inference_engine",
     "../intel-openvino-dev/inference-engine/src/inference_engine/cpp_interfaces",
     "../intel-openvino-dev/inference-engine/src/inference_engine/cpp_interfaces/base",
     "../intel-openvino-dev/inference-engine/src/inference_engine/cpp_interfaces/impl",
     "../intel-openvino-dev/inference-engine/src/inference_engine/cpp_interfaces/interface",
-    "../intel-openvino-dev/inference-engine/thirdparty/pugixml/src/",
+    "../intel-openvino-dev/inference-engine/src/inference_engine/include/ie",
+    "../intel-openvino-dev/inference-engine/src/inference_engine/include/ie/cpp",
+    "../intel-openvino-dev/thirdparty/pugixml/src/",
     "../intel-openvino-dev/ngraph/core/include",
   ]
   libs = [
@@ -227,9 +227,9 @@ static_library("pugixml") {
     "-DIMPLEMENT_INFERENCE_ENGINE_API",
   ]
   sources = [
-    "../intel-openvino-dev/inference-engine/thirdparty/pugixml/src/pugixml.cpp"
+    "../intel-openvino-dev/thirdparty/pugixml/src/pugixml.cpp"
   ]
   include_dirs = [
-   "../intel-openvino-dev/inference-engine/thirdparty/pugixml/src",
+   "../intel-openvino-dev/thirdparty/pugixml/src",
   ]
 }

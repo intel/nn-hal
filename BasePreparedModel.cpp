@@ -157,7 +157,7 @@ void asyncExecute(const Request& request, MeasureTiming measure, BasePreparedMod
             float* dest = destBlob->buffer().as<float*>();
             _Float16* src = (_Float16*)srcPtr;
 
-            for (auto i = 0; i < len / 2; i++) {
+            for (unsigned int i = 0; i < len / 2; i++) {
                 dest[i] = src[i];
             }
         } else {
@@ -188,10 +188,10 @@ void asyncExecute(const Request& request, MeasureTiming measure, BasePreparedMod
         ALOGD("Output index: %d layername : %s", outIndex, outputNodeName.c_str());
         auto srcBlob = plugin->getBlob(outputNodeName);
         auto operandType = modelInfo->getOperandType(outIndex);
-        uint32_t expectedLength = srcBlob->byteSize();
-        uint32_t rActualLength = 0;
-        void* destPtr = modelInfo->getBlobFromMemoryPoolOut(request, i, rActualLength);
-        auto outDims = srcBlob->getTensorDesc().getDims();
+        uint32_t actualLength = srcBlob->byteSize();
+        uint32_t expectedLength = 0;
+        void* destPtr = modelInfo->getBlobFromMemoryPoolOut(request, i, expectedLength);
+        auto outputBlobDims = srcBlob->getTensorDesc().getDims();
 
         ALOGD("output precision: %d", static_cast<int>(srcBlob->getTensorDesc().getPrecision()));
 
@@ -200,27 +200,40 @@ void asyncExecute(const Request& request, MeasureTiming measure, BasePreparedMod
             case OperandType::TENSOR_QUANT8_ASYMM:
             case OperandType::TENSOR_QUANT8_SYMM:
             case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL:
-                expectedLength /= 4;
+                actualLength /= 4;
                 break;
             case OperandType::TENSOR_FLOAT16:
-                expectedLength /= 2;
+                actualLength /= 2;
                 break;
             default:
                 ALOGV("Operand type is 4 bytes !!");
                 break;
         }
 
-        if (rActualLength != expectedLength) {
+        bool outputSizeMismatch = false;
+        if (actualLength != expectedLength) {
             ALOGE("%s Invalid length at outIndex(%d) Actual:%d Expected:%d", __func__, outIndex,
-                  rActualLength, expectedLength);
-            // Notify Insufficient Buffer Length to modelInfo
-            modelInfo->updateOutputshapes(i, outDims, false);
+                  actualLength, expectedLength);
+            outputSizeMismatch = true;
+        }
+
+        // TODO: bug identified with OV2021.4 where for Pad operation, if the output dimensions is 1
+        // output dimension is coming as 0
+        if ((outputBlobDims.size() == 0) && (actualLength != 0)) {
+            std::vector<size_t> rdims = {1};
+            modelInfo->updateOutputshapes(i, rdims, outputSizeMismatch ? false : true);
+        } else
+            modelInfo->updateOutputshapes(i, outputBlobDims, outputSizeMismatch ? false : true);
+
+        if (outputSizeMismatch) {
+            ALOGE(
+                "Mismatch in actual and exepcted output sizes. Return with "
+                "OUTPUT_INSUFFICIENT_SIZE error");
             notify(callback, ErrorStatus::OUTPUT_INSUFFICIENT_SIZE, modelInfo->getOutputShapes(),
                    kNoTiming);
             return;
-        } else {
-            modelInfo->updateOutputshapes(i, outDims);
         }
+
         switch (operandType) {
             case OperandType::TENSOR_INT32:
             case OperandType::TENSOR_FLOAT32: {
@@ -302,7 +315,7 @@ static std::tuple<ErrorStatus, hidl_vec<V1_2::OutputShape>, Timing> executeSynch
             float* dest = destBlob->buffer().as<float*>();
             _Float16* src = (_Float16*)srcPtr;
 
-            for (auto i = 0; i < len / 2; i++) {
+            for (unsigned int i = 0; i < len / 2; i++) {
                 dest[i] = src[i];
             }
         } else {
@@ -333,10 +346,10 @@ static std::tuple<ErrorStatus, hidl_vec<V1_2::OutputShape>, Timing> executeSynch
         ALOGD("Output index: %d layername : %s", outIndex, outputNodeName.c_str());
         auto srcBlob = plugin->getBlob(outputNodeName);
         auto operandType = modelInfo->getOperandType(outIndex);
-        uint32_t expectedLength = srcBlob->byteSize();
-        uint32_t rActualLength = 0;
-        void* destPtr = modelInfo->getBlobFromMemoryPoolOut(request, i, rActualLength);
-        auto outDims = srcBlob->getTensorDesc().getDims();
+        uint32_t actualLength = srcBlob->byteSize();
+        uint32_t expectedLength = 0;
+        void* destPtr = modelInfo->getBlobFromMemoryPoolOut(request, i, expectedLength);
+        auto outputBlobDims = srcBlob->getTensorDesc().getDims();
 
         ALOGD("output precision: %d", static_cast<int>(srcBlob->getTensorDesc().getPrecision()));
 
@@ -345,22 +358,38 @@ static std::tuple<ErrorStatus, hidl_vec<V1_2::OutputShape>, Timing> executeSynch
             case OperandType::TENSOR_QUANT8_ASYMM:
             case OperandType::TENSOR_QUANT8_SYMM:
             case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL:
-                expectedLength /= 4;
+                actualLength /= 4;
                 break;
             case OperandType::TENSOR_FLOAT16:
-                expectedLength /= 2;
+                actualLength /= 2;
                 break;
             default:
                 ALOGV("Operand type is 4 bytes !!");
                 break;
         }
-        if (rActualLength != expectedLength) {
-            ALOGE("%s Invalid length(%d) at outIndex(%d)", __func__, rActualLength, outIndex);
-            // Notify Insufficient Buffer Length to modelInfo
-            modelInfo->updateOutputshapes(i, outDims, false);
-            return {ErrorStatus::OUTPUT_INSUFFICIENT_SIZE, modelInfo->getOutputShapes(), kNoTiming};
+
+        bool outputSizeMismatch = false;
+        if (actualLength != expectedLength) {
+            ALOGE("%s Invalid length at outIndex(%d) Actual:%d Expected:%d", __func__, outIndex,
+                  actualLength, expectedLength);
+            outputSizeMismatch = true;
+        }
+
+        // TODO: bug identified with OV2021.4 where for Pad operation, if the output dimensions is 1
+        // output dimension is coming as 0
+        if ((outputBlobDims.size() == 0) && (actualLength != 0)) {
+            std::vector<size_t> rdims = {1};
+            modelInfo->updateOutputshapes(i, rdims, outputSizeMismatch ? false : true);
         } else
-            modelInfo->updateOutputshapes(i, outDims);
+            modelInfo->updateOutputshapes(i, outputBlobDims, outputSizeMismatch ? false : true);
+
+        if (outputSizeMismatch) {
+            ALOGE(
+                "Mismatch in actual and exepcted output sizes. Return with "
+                "OUTPUT_INSUFFICIENT_SIZE error");
+            return {ErrorStatus::OUTPUT_INSUFFICIENT_SIZE, modelInfo->getOutputShapes(), kNoTiming};
+        }
+
         switch (operandType) {
             case OperandType::TENSOR_INT32:
             case OperandType::TENSOR_FLOAT32: {
