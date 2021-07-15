@@ -12,7 +12,6 @@ bool NnapiModelInfo::updateOutputshapes(size_t outputIndex, std::vector<size_t>&
     auto& outputShapeDims = mOutputShapes[outputIndex].dimensions;
     mOutputShapes[outputIndex].isSufficient = isLengthSufficient;
     if (outputDims.size() < outputShapeDims.size()) {
-        ALOGE("%s Output size mismatch at index(%zu)", __func__, outputIndex);
         return false;
     }
     for (size_t i = 0; i < outputShapeDims.size(); i++) {
