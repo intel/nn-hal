@@ -154,27 +154,16 @@ std::shared_ptr<ngraph::Node> OperationsBase::QuantizeNode(std::shared_ptr<ngrap
 std::shared_ptr<ngraph::Node> OperationsBase::DequantizeNode(std::shared_ptr<ngraph::Node> input,
                                                              size_t index,
                                                              ngraph::element::Type dequantizeType) {
-    auto floatElementType = ngraph::element::f32;
-    auto intElementType = ngraph::element::i32;
+    float scale = sModelInfo->getOperandScale(index);
+    float zeroPoint = static_cast<float>(sModelInfo->getOperandZeroPoint(index));
+    auto scaleVec = createConstNode(ngraph::element::f32, {}, convertToVector(scale));
+    auto zeroPointVec = createConstNode(ngraph::element::f32, {}, convertToVector(zeroPoint));
 
-    float inputScale = sModelInfo->getOperandScale(index);
-    int inputZeroPoint = sModelInfo->getOperandZeroPoint(index);
+    input = std::make_shared<ngraph::opset3::Convert>(input, ngraph::element::f32);
+    auto diff = std::make_shared<ngraph::opset3::Subtract>(input, zeroPointVec);
+    auto mul = std::make_shared<ngraph::opset3::Multiply>(diff, scaleVec);
 
-    auto scale = createConstNode(floatElementType, {}, convertToVector(inputScale));
-    auto zeroPoint = createConstNode(intElementType, {}, convertToVector(inputZeroPoint));
-
-    if (input->get_element_type() != ngraph::element::i32)
-        input = std::make_shared<ngraph::opset3::Convert>(input, intElementType);
-    auto diff = std::make_shared<ngraph::opset3::Subtract>(input, zeroPoint);
-    auto convertDiff = std::make_shared<ngraph::opset3::Convert>(diff, floatElementType);
-    auto mul = std::make_shared<ngraph::opset3::Multiply>(convertDiff, scale);
-    std::shared_ptr<ngraph::Node> outputNode;
-    if (mul->get_element_type() != dequantizeType)
-        outputNode = std::make_shared<ngraph::opset3::Convert>(mul, dequantizeType);
-    else
-        outputNode = mul;
-
-    return outputNode;
+    return mul;
 }
 
 }  // namespace nnhal

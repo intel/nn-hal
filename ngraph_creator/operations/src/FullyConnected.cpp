@@ -17,22 +17,13 @@ bool FullyConnected::validate() {
     auto input2 = getInputOperand(2);
     auto output0 = getOutputOperand(0);
 
-    if (input0.type != OperandType::TENSOR_FLOAT32) {
-        ALOGD("%s: Input operand 0 is not of type FP32. Unsupported operation", __func__);
-        return false;
-    }
-
-    if (output0.type != OperandType::TENSOR_FLOAT32) {
-        ALOGD("%s Output operand 0 is not of type FP32 / I32. Unsupported operation", __func__);
-        return false;
-    }
-
+    //TODO: Verify TENSOR_QUANT8_ASYMM_SIGNED with 1.3 nnhal driver
     // Input 2 should be of same type of Input 0
     if (input0.type != input2.type) {
         return false;
     }
 
-    if (input0.dimensions[0] == 0) {
+    if (!isZeroSizedInput(0)) {
         ALOGE("%s Batch size of 0 is not supported", __func__);
         return false;
     }

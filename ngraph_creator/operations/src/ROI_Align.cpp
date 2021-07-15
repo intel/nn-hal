@@ -84,11 +84,13 @@ std::shared_ptr<ngraph::Node> ROI_Align::createNode() {
     auto height_ratio = sModelInfo->ParseOperationInput<float>(
         mNnapiOperationIndex,
         5);  // ratio from the height of original image to the height of feature map.
-    auto width_ratio = sModelInfo->ParseOperationInput<float>(
-        mNnapiOperationIndex,
-        6);  // ratio from the width of original image to the height of feature map.
+    //TODO: Since same ratio is applied on height and width, commenting
+    //the width_ratio and sampling_pts_w currently
+    //auto width_ratio = sModelInfo->ParseOperationInput<float>(
+    //    mNnapiOperationIndex,
+    //    6);  // ratio from the width of original image to the height of feature map.
     auto sampling_pts_h = sModelInfo->ParseOperationInput<int32_t>(mNnapiOperationIndex, 7);
-    auto sampling_pts_w = sModelInfo->ParseOperationInput<int32_t>(mNnapiOperationIndex, 8);
+    //auto sampling_pts_w = sModelInfo->ParseOperationInput<int32_t>(mNnapiOperationIndex, 8);
     auto layout = sModelInfo->ParseOperationInput<uint8_t>(mNnapiOperationIndex, 9);
 
     if (layout) useNchw = true;
