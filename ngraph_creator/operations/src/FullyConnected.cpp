@@ -14,15 +14,8 @@ FullyConnected::FullyConnected(int operationIndex) : OperationsBase(operationInd
 // once the vpu and gna plugin support if confirmed
 bool FullyConnected::validate() {
     auto input0 = getInputOperand(0);
-    auto input2 = getInputOperand(2);
-    auto output0 = getOutputOperand(0);
 
-    // Input 2 should be of same type of Input 0
-    if (input0.type != input2.type) {
-        return false;
-    }
-
-    if (input0.dimensions[0] == 0) {
+    if (isZeroSizedInput(0)) {
         ALOGE("%s Batch size of 0 is not supported", __func__);
         return false;
     }
@@ -37,8 +30,8 @@ bool FullyConnected::validate() {
 }
 
 std::shared_ptr<ngraph::Node> FullyConnected::createNode() {
-    std::shared_ptr<ngraph::Node> inputNode = getInputNode(0, false);
-    std::shared_ptr<ngraph::Node> weightsNode = getInputNode(1, false);
+    std::shared_ptr<ngraph::Node> inputNode = getInputNode(0);
+    std::shared_ptr<ngraph::Node> weightsNode = getInputNode(1);
     std::shared_ptr<ngraph::Node> biasNode, multiplyNode, addNode, activationNode;
 
     auto inputDims = getInputOperand(0).dimensions;
@@ -60,6 +53,12 @@ std::shared_ptr<ngraph::Node> FullyConnected::createNode() {
 
     if (!sModelInfo->isOmittedInput(mNnapiOperationIndex, 2) && biasDims.size() != 0) {
         biasNode = getInputNode(2);
+
+        if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM))
+            biasNode =
+                DequantizeNode(biasNode, sModelInfo->getOperationInput(mNnapiOperationIndex, 2),
+                               ngraph::element::f32);
+
         addNode = std::make_shared<ngraph::opset3::Add>(multiplyNode, biasNode,
                                                         ngraph::op::AutoBroadcastType::NUMPY);
     } else {
