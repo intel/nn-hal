@@ -1350,6 +1350,7 @@ void GnaPreparedModel::executeModel(const V1_3::Request& request) {
                     uint8_t* dest = destBlob->buffer().as<uint8_t*>();
                     uint8_t* src = srcBlob->buffer().as<uint8_t*>();
                     std::memcpy(dest, src, srcBlob->byteSize());
+                    srcBlob->deallocate();
                 }
             }
         } else {
@@ -1388,24 +1389,28 @@ void GnaPreparedModel::executeModel(const V1_3::Request& request) {
                         auto element = gnaPluginPtr->getOutputsInfo().find(gnaLayerName);
                         if (element != gnaPluginPtr->getOutputsInfo().end()) {
                             Blob::Ptr srcBlob = gnaPluginPtr->getInferRequest().GetBlob(gnaLayerName);
-                            int8_t* destPtr = new int8_t[srcBlob->size()];
-                            ptrsToDelete.emplace_back(destPtr);
 
                             if (op.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED) {
-                                float * opGetBlob = srcBlob->buffer().as<float*>();
-                                #ifdef PERF_COUNTERS
-                                    quantizeToQuant8Signed(srcBlob->buffer().as<float*>(),
-                                                            (int8_t*)destPtr, op.shape(), runtimeMetrics);
-                                #else
-                                    quantizeToQuant8Signed(srcBlob->buffer().as<float*>(),
-                                                            (int8_t*)destPtr, op.shape());
-                                #endif
+                                BaseOp* currOp = opcontainer->getCpuOpFromLayerName(cpuLayerName);
+                                if (!dummyOpMap[inputInd]) {
+                                    int8_t* destPtr = new int8_t[srcBlob->size()];
+                                    ptrsToDelete.emplace_back(destPtr);
+                                    float * opGetBlob = srcBlob->buffer().as<float*>();
+                                    #ifdef PERF_COUNTERS
+                                        quantizeToQuant8Signed(srcBlob->buffer().as<float*>(),
+                                                                (int8_t*)destPtr, op.shape(), runtimeMetrics);
+                                    #else
+                                        quantizeToQuant8Signed(srcBlob->buffer().as<float*>(),
+                                                                (int8_t*)destPtr, op.shape());
+                                    #endif
+                                    currOp->setInputData(inputInd, destPtr, srcBlob->size());
+                                } else {
+                                    currOp->setInputData(inputInd, srcBlob->buffer().as<void*>(), srcBlob->size());
+                                }
                             } else {
                                 VLOG(L1, "op type for copying to CPU is different from TENSOR_QUANT8_ASYMM_SIGNED !!!!");
 								nnAssert(false);
                             }
-                            BaseOp* op = opcontainer->getCpuOpFromLayerName(cpuLayerName);
-                            op->setInputData(inputInd, destPtr, srcBlob->size());
                         } else {
                             VLOG(L1, "Unable to find GNA Layer for CPU graph!!");
                         }
@@ -1473,7 +1478,7 @@ void GnaPreparedModel::executeModel(const V1_3::Request& request) {
     }
 
     for (auto ptr: ptrsToDelete) {
-        delete ptr;
+        delete[] ptr;
     }
 
     for (auto runtimeInfo : mRuntimeRequestPoolInfos) {
@@ -2406,7 +2411,7 @@ BaseOp* GnaPreparedModel::operationDequantize(const Operation& operation, bool d
     static int count = 0;
     std::string name = "dequantize-cpu-" + std::to_string(count++);
     uint32_t inputIndex = operation.inputs[0], outIndex = operation.outputs[0];
-
+    dummyOpMap[inputIndex] = dummyOp;
     auto operandDetails = mModel.main.operands[operation.inputs[0]];
     if ( (static_cast<int>(operandDetails.lifetime) == static_cast<int>(OperandLifeTime::CONSTANT_COPY)) ||
          (static_cast<int>(operandDetails.lifetime) == static_cast<int>(OperandLifeTime::CONSTANT_REFERENCE))) {
@@ -2483,7 +2488,7 @@ BaseOp* GnaPreparedModel::operationQuantize(const Operation& operation, bool dum
     std::string name = "quantize-cpu-" + std::to_string(count++);
     uint32_t inputIndex = operation.inputs[0], outIndex = operation.outputs[0];
     RunTimeOperandInfo& inputOp = mOperands[inputIndex];
-
+    dummyOpMap[inputIndex] = dummyOp;
     auto operandDetails = mModel.main.operands[inputIndex];
     bool isFp16 = false;
     if (operandDetails.type == OperandType::FLOAT16 || operandDetails.type == OperandType::TENSOR_FLOAT16){

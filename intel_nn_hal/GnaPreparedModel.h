@@ -72,7 +72,7 @@ class GnaPreparedModel : public PreparedModel {
     IRBuilder::ModelBuilder* mBuilderModel;
     GnaNetwork* gnaPluginPtr;
     std::vector<IRBlob::Ptr> mModelIRBlobs; /*intermediate IRBlobs to be deallocated after network is loaded into the Plugin */
-
+    std::map<uint32_t, bool> dummyOpMap;
     std::vector<OpContainer*> mNwManager;
 
     bool isDecoderNw = false;
