@@ -62,6 +62,10 @@ class DequantizeOp : public BaseOp {
         }
 
         bool  run() {
+            if (dummyOp_) {
+                output = (void*)inputDataPtr;
+                return true;
+            }
             const T* inputBuf = reinterpret_cast<const T*>(inputDataPtr);
             deq_output = new float[inputLen];
 
@@ -74,30 +78,16 @@ class DequantizeOp : public BaseOp {
             return true;
         }
 
-        float*  run(const uint8_t* inputData, const uint32_t len) {
-            deq_output = new float[len];
-
-            int32_t value;
-            const T* inputBuf = reinterpret_cast<const T*>(inputData);
-            for (int i = 0; i < len; ++i) {
-                value = *(inputBuf + i);
-                deq_output[i] = static_cast<float>(scale * (value - zeroPoint));
-            }
-            output = deq_output;
-
-            return deq_output;
-        }
-
         std::string getLayerName() { return layerName; }
 
         void cleanup() {
             if (deq_output && !dummyOp_)
-                delete deq_output;
+                delete[] deq_output;
         }
 
         ~DequantizeOp() {
             if (deq_output && !dummyOp_)
-                delete deq_output;
+                delete[] deq_output;
         }
 };
 
