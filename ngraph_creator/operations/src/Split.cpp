@@ -43,7 +43,7 @@ std::shared_ptr<ngraph::Node> Split::createNode() {
     auto outputNode =
         std::make_shared<ngraph::opset3::Split>(splitNode, axisNode, numSplits)->outputs();
 
-    for (int i = 0; i < numSplits; i++) {
+    for (size_t i = 0; i < numSplits; i++) {
         auto outputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, i);
         // TODO: remove this dummy convert
         std::shared_ptr<ngraph::Node> outNode;

@@ -60,9 +60,6 @@ std::shared_ptr<ngraph::Node> ROI_Pooling::createNode() {
     auto height_ratio = sModelInfo->ParseOperationInput<float>(
         mNnapiOperationIndex,
         5);  // ratio from the height of original image to the height of feature map.
-    auto width_ratio = sModelInfo->ParseOperationInput<float>(
-        mNnapiOperationIndex,
-        6);  // ratio from the width of original image to the height of feature map.
     auto layout = sModelInfo->ParseOperationInput<uint8_t>(mNnapiOperationIndex, 7);
 
     if (layout) useNchw = true;

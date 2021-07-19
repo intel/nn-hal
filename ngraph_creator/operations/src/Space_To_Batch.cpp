@@ -72,7 +72,7 @@ std::shared_ptr<ngraph::Node> Space_To_Batch::createNode() {
     auto half_size = pad_2d.size() / 2;
     std::vector<int32_t> pad_0(half_size);
     std::vector<int32_t> pad_1(half_size);
-    for (int i = 0; i < half_size; i++) {
+    for (size_t i = 0; i < half_size; i++) {
         pad_0[i] = pad_2d[2 * i];
         pad_1[i] = pad_2d[2 * i + 1];
     }

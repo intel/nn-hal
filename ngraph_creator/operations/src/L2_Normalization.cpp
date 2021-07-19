@@ -16,7 +16,6 @@ bool L2_Normalization::validate() {
         !checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
         return false;
     }
-    const auto& inputsSize = sModelInfo->getOperationInputsSize(mNnapiOperationIndex);
     // Check all input types
     if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
         !checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {

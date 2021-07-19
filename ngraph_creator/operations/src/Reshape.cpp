@@ -37,10 +37,7 @@ std::shared_ptr<ngraph::Node> Reshape::createNode() {
     const auto& dimsOperandIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 1);
     auto outDims = sModelInfo->GetConstVecOperand<int32_t>(dimsOperandIndex);
     VLOGDIMS(L3, outDims, "Reshape::createNode dims");
-
-    auto inputIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 0);
     std::shared_ptr<ngraph::Node> inputOp;
-
     inputOp = getInputNode(0);
 
     const auto& inDims = getInputOperandDimensions(0);
@@ -48,9 +45,9 @@ std::shared_ptr<ngraph::Node> Reshape::createNode() {
     int strechDim = -1;
     auto numOutputElements = 1;
 
-    for (auto i = 0; i < inDims.size(); i++) numInputElements *= inDims[i];
+    for (size_t i = 0; i < inDims.size(); i++) numInputElements *= inDims[i];
 
-    for (auto i = 0; i < outDims.size(); i++) {
+    for (size_t i = 0; i < outDims.size(); i++) {
         if ((int)outDims[i] < 0) {
             strechDim = i;
             continue;

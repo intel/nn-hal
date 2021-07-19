@@ -163,9 +163,6 @@ std::shared_ptr<ngraph::Node> Transpose_Conv_2D::createNode() {
     }
 
     std::shared_ptr<ngraph::Node> inputNode, filterNode, biasNode;
-
-    const auto& inputIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 0);
-    const auto& filterIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 1);
     const auto& biasIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 2);
 
     inputNode = getInputNode(0);

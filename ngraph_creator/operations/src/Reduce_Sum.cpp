@@ -26,8 +26,7 @@ bool Reduce_Sum::validate() {
     // ConvertReduce transformation and produces empty constant with [0] to reshape input [1, 1, 1]
     // to [] shape
     const auto dims = getInputOperandDimensions(0);
-    bool isDimsOne = true;
-    if (std::count(std::begin(dims), std::end(dims), dims.front()) == dims.size()) {
+    if ((unsigned int)(std::count(std::begin(dims), std::end(dims), dims.front())) == dims.size()) {
         if (dims[0] == 1) return false;
     }
 

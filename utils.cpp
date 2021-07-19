@@ -317,7 +317,7 @@ size_t product(const vec<T>& dims) {
 
 TensorDims permuteDims(const TensorDims& src, const vec<unsigned int>& order) {
     TensorDims ret;
-    for (int i = 0; i < src.size(); i++) {
+    for (size_t i = 0; i < src.size(); i++) {
         ret.push_back(src[order[i]]);
     }
     return ret;
@@ -335,7 +335,7 @@ IRBlob::Ptr Permute(IRBlob::Ptr ptr, const vec<unsigned int>& order) {
 
 size_t sizeOfTensor(const TensorDims& dims) {
     size_t ret = dims[0];
-    for (int i = 1; i < dims.size(); ++i) ret *= dims[i];
+    for (size_t i = 1; i < dims.size(); ++i) ret *= dims[i];
     return ret;
 }
 
@@ -456,7 +456,7 @@ void writeBufferToFile(std::string filename, const float* buf, size_t length) {
 
     std::ofstream ofs;
     ofs.open(filename.c_str(), std::ofstream::out | std::ofstream::trunc);
-    for (auto i = 0; i < length; i++) {
+    for (size_t i = 0; i < length; i++) {
         ofs << buf[i] << "\n";
     }
     ofs.close();

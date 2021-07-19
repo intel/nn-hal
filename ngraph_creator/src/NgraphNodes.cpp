@@ -10,7 +10,7 @@ NgraphNodes::NgraphNodes(size_t operandsSize, size_t resultsSize) {
     mOutputAtOperandIndex.resize(operandsSize);
     mForcedNchw.assign(operandsSize, false);
     mResultNodes.reserve(resultsSize);
-    ALOGV("%s Constructed operandsSize %d, resultsSize %d", __func__, operandsSize, resultsSize);
+    ALOGV("%s Constructed operandsSize %zu, resultsSize %zu", __func__, operandsSize, resultsSize);
 }
 
 NgraphNodes::~NgraphNodes() { ALOGV("%s Destructed", __func__); }
@@ -19,7 +19,7 @@ void NgraphNodes::addInputParam(std::shared_ptr<ngraph::opset3::Parameter> inPar
     mInputParams.push_back(inParam);
 }
 void NgraphNodes::setOutputAtOperandIndex(size_t index, ngraph::Output<ngraph::Node> output) {
-    ALOGV("%s index %d", __func__, index);
+    ALOGV("%s index %zu", __func__, index);
     mOutputAtOperandIndex[index] = output;
 }
 ngraph::Output<ngraph::Node> NgraphNodes::getOperationOutput(size_t index) {
@@ -27,21 +27,21 @@ ngraph::Output<ngraph::Node> NgraphNodes::getOperationOutput(size_t index) {
 }
 
 void NgraphNodes::setResultNode(size_t outputIndex, std::shared_ptr<ngraph::Node> resultNode) {
-    ALOGD("setResultNode %u", outputIndex);
+    ALOGD("setResultNode %zu", outputIndex);
     mResultNodes.push_back(resultNode);
 }
 
 const std::string& NgraphNodes::getNodeName(size_t index) {
     if (mNodeNames.find(index) == mNodeNames.end()) {
         mNodeNames[index] = mOutputAtOperandIndex[index].get_node_shared_ptr()->get_name();
-        ALOGD("%s index %d, name %s", __func__, index, mNodeNames[index].c_str());
+        ALOGD("%s index %zu, name %s", __func__, index, mNodeNames[index].c_str());
     }
-    ALOGV("%s index %d, name %s", __func__, index, mNodeNames[index].c_str());
+    ALOGV("%s index %zu, name %s", __func__, index, mNodeNames[index].c_str());
     return mNodeNames[index];
 }
 // remove null input node parameter
 void NgraphNodes::removeInputParameter(std::string name, size_t index) {
-    for (int i = 0; i < mInputParams.size(); i++) {
+    for (size_t i = 0; i < mInputParams.size(); i++) {
         if (name.compare(mInputParams[i]->get_name()) == 0) {
             mInputParams.erase(mInputParams.begin() + i);
             setInvalidNode(index);
