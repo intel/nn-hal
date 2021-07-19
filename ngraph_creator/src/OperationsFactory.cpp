@@ -135,6 +135,8 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<RSQRT>(operationIndex);
         case OperationType::RESIZE_BILINEAR:
             return std::make_shared<ResizeBilinear>(operationIndex);
+        case OperationType::RESIZE_NEAREST_NEIGHBOR:
+            return std::make_shared<ResizeNearestNeighbor>(operationIndex);
         case OperationType::SELECT:
             return std::make_shared<Select>(operationIndex);
         case OperationType::SOFTMAX:
