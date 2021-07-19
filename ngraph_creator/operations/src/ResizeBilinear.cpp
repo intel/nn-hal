@@ -51,13 +51,13 @@ std::shared_ptr<ngraph::Node> ResizeBilinear::createNode() {
     switch (inputsSize) {
         case 6:
             half_pixel = sModelInfo->ParseOperationInput<uint8_t>(mNnapiOperationIndex, 5);
-	    __attribute__((fallthrough));
+            __attribute__((fallthrough));
         case 5:
             align_corners = sModelInfo->ParseOperationInput<uint8_t>(mNnapiOperationIndex, 4);
-	    __attribute__((fallthrough));
+            __attribute__((fallthrough));
         case 4:
             layout = sModelInfo->ParseOperationInput<uint8_t>(mNnapiOperationIndex, 3);
-	    __attribute__((fallthrough));
+            __attribute__((fallthrough));
         default:
             break;
     }
