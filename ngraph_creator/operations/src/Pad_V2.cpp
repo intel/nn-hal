@@ -68,7 +68,7 @@ std::shared_ptr<ngraph::Node> Pad_V2::createNode() {
     auto half_size = paddings_2d.size() / 2;
     std::vector<int32_t> paddings_0(half_size);
     std::vector<int32_t> paddings_1(half_size);
-    for (int i = 0; i < half_size; i++) {
+    for (unsigned long i = 0; i < half_size; i++) {
         paddings_0[i] = paddings_2d[2 * i];
         paddings_1[i] = paddings_2d[2 * i + 1];
     }

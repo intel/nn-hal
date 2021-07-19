@@ -15,7 +15,7 @@ NgraphNetworkCreator::NgraphNetworkCreator(std::shared_ptr<NnapiModelInfo> model
       mOpFactoryInstance(deviceType, mModelInfo, mNgraphNodes) {
     auto nnapiOperationsSize = mModelInfo->getOperationsSize();
     mOperationNodes.resize(nnapiOperationsSize);
-    for (int index = 0; index < nnapiOperationsSize; index++) {
+    for (size_t index = 0; index < nnapiOperationsSize; index++) {
         const auto& nnapiOperationType = mModelInfo->getOperationType(index);
         auto operationNode = mOpFactoryInstance.getOperation(index, nnapiOperationType);
         if (operationNode == nullptr) {
@@ -34,7 +34,7 @@ bool NgraphNetworkCreator::createInputParams() {
         std::shared_ptr<ngraph::opset3::Parameter> inputParam;
         auto& nnapiOperand = mModelInfo->getOperand(i);
         auto& dims = nnapiOperand.dimensions;
-        ALOGV("createInputParams operand %d dims.size(%d)", i, dims.size());
+        ALOGV("createInputParams operand %d dims.size(%zu)", i, dims.size());
         // keeping this condition to make VTS pass. Operation's optional input lifetime is supposed
         // to be "NO_VALUE"
         if (dims.size() > 0) {
@@ -94,20 +94,20 @@ bool NgraphNetworkCreator::createInputParams() {
 }
 
 void NgraphNetworkCreator::getSupportedOperations(std::vector<bool>& supportedOperations) {
-    for (int i = 0; i < mModelInfo->getOperationsSize(); i++) {
+    for (size_t i = 0; i < mModelInfo->getOperationsSize(); i++) {
         if (!mOperationNodes[i] || !mOperationNodes[i]->validateForPlugin())
             supportedOperations[i] = false;
         else
             supportedOperations[i] = true;
-        ALOGD("%s index %d, type %d, supported : %d", __func__, i, mModelInfo->getOperationType(i),
+        ALOGD("%s index %zu type %d, supported : %d", __func__, i, mModelInfo->getOperationType(i),
               static_cast<int>(supportedOperations[i]));
     }
 }
 
 bool NgraphNetworkCreator::validateOperations() {
-    for (int i = 0; i < mModelInfo->getOperationsSize(); i++) {
+    for (size_t i = 0; i < mModelInfo->getOperationsSize(); i++) {
         if (!mOperationNodes[i] || !mOperationNodes[i]->validateForPlugin()) {
-            ALOGE("%s index %d, type %d not supported", __func__, i,
+            ALOGE("%s index %zu type %d not supported", __func__, i,
                   mModelInfo->getOperationType(i));
             return false;
         }
@@ -118,7 +118,7 @@ bool NgraphNetworkCreator::validateOperations() {
 bool NgraphNetworkCreator::initializeModel() {
     ALOGV("%s Called", __func__);
     if (!createInputParams()) return false;
-    for (int i = 0; i < mModelInfo->getOperationsSize(); i++) {
+    for (size_t i = 0; i < mModelInfo->getOperationsSize(); i++) {
         if (mOperationNodes[i] == nullptr) {
             ALOGE("initializeModel Failure at type %d", mModelInfo->getOperationType(i));
             return false;

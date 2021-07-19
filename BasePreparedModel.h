@@ -43,17 +43,6 @@ namespace android {
 namespace hardware {
 namespace neuralnetworks {
 namespace nnhal {
-namespace {
-
-using time_point = std::chrono::steady_clock::time_point;
-
-auto now() { return std::chrono::steady_clock::now(); };
-
-auto microsecondsDuration(decltype(now()) end, decltype(now()) start) {
-    return std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
-};
-
-}  // namespace
 
 template <class T>
 using vec = std::vector<T>;

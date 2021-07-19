@@ -52,20 +52,17 @@ shared_library("intel_nnhal") {
     "//common-mk:visibility_default",
   ]
   cflags_cc = [
-    "-Wno-unused-variable",
     "-Wno-unused-parameter",
     "-Wno-non-virtual-dtor",
     "-Wno-missing-field-initializers",
     "-Wno-extern-c-compat",
-    "-Wno-unused-local-typedef",
     "-Wno-unused-private-field",
     "-Wno-invalid-partial-specialization",
-    "-Wno-array-bounds",
     "-D_FORTIFY_SOURCE=2",
     "-fexceptions",
     "-fvisibility=default",
     "-DIMPLEMENT_INFERENCE_ENGINE_API",
-    "-DNN_DEBUG"
+    "-Wno-macro-redefined"
   ]
   deps=[
     ":pugixml"
@@ -99,6 +96,7 @@ shared_library("intel_nnhal") {
     "ngraph_creator/operations/src/Grouped_Conv_2d.cpp",
     "ngraph_creator/operations/src/Instance_Normalization.cpp",
     "ngraph_creator/operations/src/L2_Normalization.cpp",
+    "ngraph_creator/operations/src/L2Pooling2D.cpp",
     "ngraph_creator/operations/src/Less_Equal.cpp",
     "ngraph_creator/operations/src/Less.cpp",
     "ngraph_creator/operations/src/Log.cpp",
@@ -194,9 +192,6 @@ shared_library("intel_nnhal") {
     "rt",
     "nnapi-support",
     "ngraph",
-    #"inference_engine_legacy", 
-    #"inference_engine_c_api",
-    #"inference_engine_preproc",
     "inference_engine",
     "nn-common", 
     "ssl",

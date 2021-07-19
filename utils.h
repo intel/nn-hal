@@ -90,10 +90,10 @@ enum PaddingScheme {
               size > 2 ? (d)[2] : 0, size > 3 ? (d)[3] : 0);                         \
     } while (0)
 
-#define dumpOperand(index, model)                              \
-    do {                                                       \
-        const auto op = model.operands[index];                 \
-        ALOGI("Operand (%d) %s", index, toString(op).c_str()); \
+#define dumpOperand(index, model)                               \
+    do {                                                        \
+        const auto op = model.operands[index];                  \
+        ALOGI("Operand (%zu) %s", index, toString(op).c_str()); \
     } while (0)
 
 #define dumpOperation(operation)                             \
@@ -217,29 +217,28 @@ size_t getSizeFromInts(int lower, int higher);
 
 size_t sizeOfTensor(const TensorDims& dims);
 
-#ifdef NN_DEBUG
-template <typename T>
-void printBuffer(T* buf, int num, int items, const char* format, uint32_t buf_len) {
-    const size_t maxlen = 1024;
-    char str[maxlen] = {0};
-    int start = 0;
-    int n = 0;
-    while (n < num) {
-        int offset = 0;
-        n = (n + items) > num ? num : n + items;
-        offset = snprintf(str, sizeof(str) - strnlen(str, maxlen), "[%d->%d]:\t", start, n);
-        for (int i = start; i < n; i++) {
-            if (i < buf_len) {
-                offset +=
-                    snprintf(str + offset, sizeof(str) - strnlen(str, maxlen), format, buf[i]);
-            }
-        }
-        start = n;
-        ALOGV("%s", str);
-    }
-}
+// #ifdef NN_DEBUG
+// template <typename T>
+// void printBuffer(T* buf, int num, int items, const char* format, uint32_t buf_len) {
+//     const size_t maxlen = 1024;
+//     char str[maxlen] = {0};
+//     uint32_t start = 0, n = 0;
+//     while (n < num) {
+//         int offset = 0;
+//         n = (n + items) > num ? num : n + items;
+//         offset = snprintf(str, sizeof(str) - strnlen(str, maxlen), "[%d->%d]:\t", start, n);
+//         for (uint32_t i = start; i < n; i++) {
+//             if (i < buf_len) {
+//                 offset +=
+//                     snprintf(str + offset, sizeof(str) - strnlen(str, maxlen), format, buf[i]);
+//             }
+//         }
+//         start = n;
+//         ALOGV("%s", str);
+//     }
+// }
 
-#endif
+// #endif
 
 template <typename T>
 T getOperandConstVal(const Model& model, const Operand& operand) {
