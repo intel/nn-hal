@@ -26,7 +26,7 @@ bool Instance_Normalization::validate() {
     }
     const auto inputRank = getInputOperandDimensions(0).size();
     if ((inputRank > 4) || (!isValidInputTensor(0))) {
-        ALOGE("%s Invalid dimensions size for input(%d)", __func__, inputRank);
+        ALOGE("%s Invalid dimensions size for input(%lu)", __func__, inputRank);
         return false;
     }
 
@@ -40,7 +40,7 @@ std::shared_ptr<ngraph::Node> Instance_Normalization::createNode() {
     std::shared_ptr<ngraph::Node> inputNode;
     bool useNchw = false;
     const auto& inputsSize = sModelInfo->getOperationInputsSize(mNnapiOperationIndex);
-    ALOGD("%s inputsSize %d", __func__, inputsSize);
+    ALOGD("%s inputsSize %lu", __func__, inputsSize);
 
     // Read inputs
     inputNode = getInputNode(0);
@@ -60,12 +60,16 @@ std::shared_ptr<ngraph::Node> Instance_Normalization::createNode() {
     auto gammaNode = createConstNode(ngraph::element::f32, {1}, convertToVector(gamma));
     auto betaNode = createConstNode(ngraph::element::f32, {1}, convertToVector(beta));
 
-    // Axis along which mean and variance is calulated
+#if __ANDROID__  // TODO: upgrade OpenVino version
+    std::shared_ptr<ngraph::Node> mvnNode =
+        std::make_shared<ngraph::opset3::MVN>(inputNode, false, normalize_variance, epsilon);
+#else
+    // Axis along which mean and variance is calculated
     std::vector<int32_t> axes{2, 3};
     std::shared_ptr<ngraph::Node> inputAxesNode = createConstNode(ngraph::element::i32, {2}, axes);
-
     std::shared_ptr<ngraph::Node> mvnNode = std::make_shared<ngraph::op::v6::MVN>(
         inputNode, inputAxesNode, normalize_variance, epsilon, ngraph::op::MVNEpsMode::INSIDE_SQRT);
+#endif
     auto mulGamma = std::make_shared<ngraph::opset3::Multiply>(
         mvnNode, gammaNode, ngraph::op::AutoBroadcastType::NUMPY);
     std::shared_ptr<ngraph::Node> outputNode =
