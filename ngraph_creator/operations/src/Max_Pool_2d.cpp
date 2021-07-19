@@ -134,8 +134,6 @@ std::shared_ptr<ngraph::Node> Max_Pool_2d::createNode() {
     }
 
     std::shared_ptr<ngraph::Node> inputNode;
-    auto inputIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 0);
-
     inputNode = getInputNode(0);
 
     if (!useNchw) {  // No conversion needed if useNchw set

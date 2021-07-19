@@ -65,6 +65,8 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<Grouped_Conv_2d>(operationIndex);
         case OperationType::INSTANCE_NORMALIZATION:
             return std::make_shared<Instance_Normalization>(operationIndex);
+        case OperationType::L2_POOL_2D:
+            return std::make_shared<L2Pooling2D>(operationIndex);
         case OperationType::L2_NORMALIZATION:
             return std::make_shared<L2_Normalization>(operationIndex);
         case OperationType::LSTM:

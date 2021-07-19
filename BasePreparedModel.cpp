@@ -64,6 +64,28 @@ static Return<void> notify(const sp<V1_2::IExecutionCallback>& callback, const E
     return callback->notify_1_2(status, outputShapes, timing);
 }
 
+static void floatToUint8(const float* src, uint8_t* dst, size_t size) {
+    for (uint32_t i = 0; i < size; ++i) {
+        dst[i] = static_cast<uint8_t>(src[i]);
+        ALOGV("%s input: %f output: %d ", __func__, src[i], dst[i]);
+    }
+}
+
+static void floatToint8(const float* src, int8_t* dst, size_t size) {
+    for (uint32_t i = 0; i < size; ++i) {
+        dst[i] = static_cast<int8_t>(src[i]);
+        ALOGV("%s input: %f output: %d ", __func__, src[i], dst[i]);
+    }
+}
+
+namespace {
+using time_point = std::chrono::steady_clock::time_point;
+auto now() { return std::chrono::steady_clock::now(); };
+auto microsecondsDuration(decltype(now()) end, decltype(now()) start) {
+    return std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+};
+}  // namespace
+
 template <typename T_IExecutionCallback>
 Return<ErrorStatus> executeBase(const Request& request, MeasureTiming measure,
                                 BasePreparedModel* preparedModel,
@@ -89,20 +111,6 @@ Return<ErrorStatus> executeBase(const Request& request, MeasureTiming measure,
     }).detach();
     ALOGV("Exiting %s", __func__);
     return ErrorStatus::NONE;
-}
-
-static void floatToUint8(const float* src, uint8_t* dst, size_t size) {
-    for (uint32_t i = 0; i < size; ++i) {
-        dst[i] = static_cast<uint8_t>(src[i]);
-        ALOGV("%s input: %f output: %d ", __func__, src[i], dst[i]);
-    }
-}
-
-static void floatToint8(const float* src, int8_t* dst, size_t size) {
-    for (uint32_t i = 0; i < size; ++i) {
-        dst[i] = static_cast<int8_t>(src[i]);
-        ALOGV("%s input: %f output: %d ", __func__, src[i], dst[i]);
-    }
 }
 
 template <typename T_IExecutionCallback>
@@ -167,7 +175,8 @@ void asyncExecute(const Request& request, MeasureTiming measure, BasePreparedMod
             operandType == OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL)
             expectedLength /= 4;  // 8bit expected instead of 32bit
         if (rActualLength != expectedLength) {
-            ALOGE("%s Invalid length(%d) at outIndex(%d)", __func__, rActualLength, outIndex);
+            ALOGE("%s Invalid length at outIndex(%d) Actual:%d Expected:%d", __func__, outIndex,
+                  rActualLength, expectedLength);
             // Notify Insufficient Buffer Length to modelInfo
             modelInfo->updateOutputshapes(i, outDims, false);
             notify(callback, ErrorStatus::OUTPUT_INSUFFICIENT_SIZE, modelInfo->getOutputShapes(),

@@ -35,6 +35,7 @@ cc_library_static {
         "operations/src/Grouped_Conv_2d.cpp",
         "operations/src/Instance_Normalization.cpp",
         "operations/src/L2_Normalization.cpp",
+        "operations/src/L2Pooling2D.cpp",
         "operations/src/LSTM.cpp",
         "operations/src/Less.cpp",
         "operations/src/Less_Equal.cpp",

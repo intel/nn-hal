@@ -15,9 +15,9 @@ bool NnapiModelInfo::updateOutputshapes(size_t outputIndex, std::vector<size_t>&
         ALOGE("%s Output size mismatch at index(%zu)", __func__, outputIndex);
         return false;
     }
-    for (int i = 0; i < outputShapeDims.size(); i++) {
+    for (size_t i = 0; i < outputShapeDims.size(); i++) {
         if (outputShapeDims[i] != outputDims[i]) {
-            ALOGD("%s Updating dim(%d) at Output index(%zu)", __func__, i, outputIndex);
+            ALOGD("%s Updating dim(%zu) at Output index(%zu)", __func__, i, outputIndex);
             outputShapeDims[i] = outputDims[i];
         }
     }
@@ -36,12 +36,12 @@ bool NnapiModelInfo::initializeRunTimeOperandInfo() {
     mOutputShapes.resize(mModel.outputIndexes.size());
 
     // Start by setting the runtime info to what's in the model.
-    for (int i = 0; i < count; i++) {
+    for (size_t i = 0; i < count; i++) {
         const Operand& from = mModel.operands[i];
         dumpOperand(i, mModel);
         RunTimeOperandInfo& to = mOperands[i];
         to.dimensions.resize(from.dimensions.size());
-        for (int j = 0; j < from.dimensions.size(); j++) {
+        for (size_t j = 0; j < from.dimensions.size(); j++) {
             to.dimensions[j] = from.dimensions[j];
         }
 

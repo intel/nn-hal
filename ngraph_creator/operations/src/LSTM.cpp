@@ -172,13 +172,9 @@ std::shared_ptr<ngraph::Node> LSTM::createNode() {
         projection_weights, projection_bias, initial_hidden_state, initial_cell_state;
     uint32_t activationFn;
     float cell_state_clipping, proj_clipping;
-
-    const auto& inputNode_dims = getInputOperandDimensions(0);
     const auto& initial_hidden_state_dims = getInputOperandDimensions(18);
     const auto& initial_cell_state_dims = getInputOperandDimensions(19);
 
-    auto batch_size = inputNode_dims[0];
-    auto input_size = inputNode_dims[1];
     auto num_units = initial_cell_state_dims[1];
     auto output_size = initial_hidden_state_dims[1];
 

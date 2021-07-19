@@ -20,7 +20,7 @@ bool Concat::validate() {
     // check concatenation axis
     auto n = sModelInfo->getOperationInputsSize(mNnapiOperationIndex) -
              1;  // 0 ~ n-1: The list of n input tensors
-    for (int i = 0; i < n; i++) {
+    for (size_t i = 0; i < n; i++) {
         if (!isValidInputTensor(i)) {
             ALOGE("%s Invalid dimensions for input", __func__);
             return false;
@@ -37,7 +37,7 @@ std::shared_ptr<ngraph::Node> Concat::createNode() {
                                                           n);  // n: concatenation axis
     std::vector<ngraph::Output<ngraph::Node>> inputs;
     ALOGD("createNode n %lu, axis %d", n, axis);
-    for (int i = 0; i < n; i++) {
+    for (size_t i = 0; i < n; i++) {
         auto inputIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, i);
         auto inputOp = getInputNode(i);
         const auto op = sModelInfo->getOperand(inputIndex);
