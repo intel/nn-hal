@@ -75,11 +75,12 @@ hidl_vec<Capabilities::OperandPerformance> nonExtensionOperandPerformance(
     return ret1;
 }
 
-static sp<BasePreparedModel> ModelFactory(const char* name, const Model& model) {
+static sp<BasePreparedModel> ModelFactory(const char* name, const Model& model,
+                                          const Driver* driver) {
     sp<BasePreparedModel> driverPreparedModel = NULL;
 
     if (strcmp(name, "CPU") == 0)
-        driverPreparedModel = new CpuPreparedModel(model);
+        driverPreparedModel = new CpuPreparedModel(model, driver);
     else if (strcmp(name, "GNA") == 0)
         driverPreparedModel = new GnaPreparedModel(model);
     return driverPreparedModel;
@@ -122,7 +123,7 @@ Return<ErrorStatus> Driver::prepareModel(const V1_0_Model& model,
 
     // TODO: make asynchronous later
     sp<BasePreparedModel> driverPreparedModel =
-        ModelFactory(mDeviceName.c_str(), convertToV1_3(model));
+        ModelFactory(mDeviceName.c_str(), convertToV1_3(model), this);
     if (driverPreparedModel == NULL) {
         ALOGE("failed to create preparedmodel");
         return ErrorStatus::INVALID_ARGUMENT;
@@ -180,7 +181,7 @@ Return<ErrorStatus> Driver::prepareModel_1_1(const V1_1_Model& model,
 
     // TODO: make asynchronous later
     sp<BasePreparedModel> driverPreparedModel =
-        ModelFactory(mDeviceName.c_str(), convertToV1_3(model));
+        ModelFactory(mDeviceName.c_str(), convertToV1_3(model), this);
     if (driverPreparedModel == NULL) {
         ALOGE("failed to create preparedmodel");
         return ErrorStatus::INVALID_ARGUMENT;
@@ -286,7 +287,7 @@ Return<ErrorStatus> Driver::prepareModel_1_2(const V1_2_Model& model,
 
     // TODO: make asynchronous later
     sp<BasePreparedModel> driverPreparedModel =
-        ModelFactory(mDeviceName.c_str(), convertToV1_3(model));
+        ModelFactory(mDeviceName.c_str(), convertToV1_3(model), this);
     if (driverPreparedModel == NULL) {
         ALOGE("failed to create preparedmodel");
         return ErrorStatus::INVALID_ARGUMENT;
@@ -417,15 +418,15 @@ Return<V1_3::ErrorStatus> Driver::prepareModel_1_3(
         return V1_3::ErrorStatus::INVALID_ARGUMENT;
     }
 
-    sp<BasePreparedModel> driverPreparedModel = ModelFactory(mDeviceName.c_str(), model);
+    sp<BasePreparedModel> driverPreparedModel = ModelFactory(mDeviceName.c_str(), model, this);
     if (!driverPreparedModel->initialize(model)) {
         ALOGI("Failed to initialize prepared model");
         cb->notify_1_3(convertToV1_3(ErrorStatus::INVALID_ARGUMENT), nullptr);
         return V1_3::ErrorStatus::NONE;
     }
-
     cb->notify_1_3((V1_3::ErrorStatus::NONE), driverPreparedModel);
     ALOGV("Exiting %s", __func__);
+
     return convertToV1_3(ErrorStatus::NONE);
 }
 

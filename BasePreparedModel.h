@@ -72,6 +72,11 @@ public:
         mModelInfo = std::make_shared<NnapiModelInfo>(model);
     }
 
+    BasePreparedModel(const std::string device, const Model& model, const Driver* driver)
+        : mTargetDevice(device), mModel(model), mDriver(driver) {
+        mModelInfo = std::make_shared<NnapiModelInfo>(model);
+    }
+
     virtual ~BasePreparedModel() { deinitialize(); }
 
     Return<ErrorStatus> execute(const Request& request,
@@ -114,6 +119,28 @@ protected:
     std::shared_ptr<NnapiModelInfo> mModelInfo;
     std::shared_ptr<NgraphNetworkCreator> mNgc;
     std::shared_ptr<IIENetwork> mPlugin;
+
+    Model mModel;
+    std::vector<nn::RunTimePoolInfo> mPoolInfos;
+    const Driver* mDriver;
+};
+
+class BaseFencedExecutionCallback : public V1_3::IFencedExecutionCallback {
+public:
+    BaseFencedExecutionCallback(Timing timingSinceLaunch, Timing timingAfterFence,
+                                V1_3::ErrorStatus error)
+        : kTimingSinceLaunch(timingSinceLaunch),
+          kTimingAfterFence(timingAfterFence),
+          kErrorStatus(error) {}
+    Return<void> getExecutionInfo(getExecutionInfo_cb callback) override {
+        callback(kErrorStatus, kTimingSinceLaunch, kTimingAfterFence);
+        return Void();
+    }
+
+private:
+    const Timing kTimingSinceLaunch;
+    const Timing kTimingAfterFence;
+    const V1_3::ErrorStatus kErrorStatus;
 };
 
 }  // namespace nnhal

@@ -28,6 +28,7 @@
 #include <android/hardware/neuralnetworks/1.2/IPreparedModel.h>
 #include <android/hardware/neuralnetworks/1.2/IPreparedModelCallback.h>
 #include <android/hardware/neuralnetworks/1.2/types.h>
+#include <android/hardware/neuralnetworks/1.3/IBuffer.h>
 #include <android/hardware/neuralnetworks/1.3/IDevice.h>
 #include <android/hardware/neuralnetworks/1.3/IExecutionCallback.h>
 #include <android/hardware/neuralnetworks/1.3/IPreparedModel.h>
@@ -36,6 +37,8 @@
 
 #include <android/hidl/memory/1.0/IMemory.h>
 #include <string>
+#include "BufferTracker.h"
+#include "CpuExecutor.h"
 #include "Utils.h"
 #include "cutils/log.h"
 
@@ -93,7 +96,13 @@ using HidlToken = android::hardware::hidl_array<uint8_t, 32>;
 class Driver : public ::android::hardware::neuralnetworks::V1_3::IDevice {
 public:
     Driver() {}
-    Driver(const char* name) : mDeviceName(name) {}
+    Driver(const char* name,
+           const nn::IOperationResolver* operationResolver = nn::BuiltinOperationResolver::get())
+        : mDeviceName(name),
+          mOperationResolver(operationResolver),
+          mBufferTracker(nn::BufferTracker::create()) {
+        nn::initVLogMask();
+    }
 
     ~Driver() override {}
 
@@ -150,8 +159,13 @@ public:
     Return<void> getSupportedExtensions(getSupportedExtensions_cb) override;
     Return<void> getNumberOfCacheFilesNeeded(getNumberOfCacheFilesNeeded_cb cb) override;
 
+    nn::CpuExecutor getExecutor() const { return nn::CpuExecutor(mOperationResolver); }
+    const std::shared_ptr<nn::BufferTracker>& getBufferTracker() const { return mBufferTracker; }
+
 protected:
     std::string mDeviceName;
+    const nn::IOperationResolver* mOperationResolver;
+    const std::shared_ptr<nn::BufferTracker> mBufferTracker;
 };
 
 }  // namespace nnhal

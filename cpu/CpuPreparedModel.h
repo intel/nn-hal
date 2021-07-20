@@ -34,7 +34,8 @@ namespace nnhal {
 
 class CpuPreparedModel : public BasePreparedModel {
 public:
-    CpuPreparedModel(const Model& model) : BasePreparedModel("CPU", model) {}
+    CpuPreparedModel(const Model& model, const Driver* driver)
+        : BasePreparedModel("CPU", model, driver) {}
     ~CpuPreparedModel() { deinitialize(); }
 
     bool initialize(const Model& model) override;

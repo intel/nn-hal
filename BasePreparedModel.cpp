@@ -50,6 +50,44 @@ T getScalarData(const RunTimeOperandInfo& info) {
     return data[0];
 }
 
+static std::tuple<V1_3::ErrorStatus, std::vector<nn::RunTimePoolInfo>,
+                  std::vector<std::shared_ptr<nn::ManagedBuffer>>>
+createRunTimePoolInfos(const V1_3::Request& request, const Driver& driver,
+                       const BasePreparedModel* preparedModel) {
+    std::vector<nn::RunTimePoolInfo> requestPoolInfos;
+    std::vector<std::shared_ptr<nn::ManagedBuffer>> bufferWrappers;
+    requestPoolInfos.reserve(request.pools.size());
+    bufferWrappers.reserve(request.pools.size());
+    for (uint32_t i = 0; i < request.pools.size(); i++) {
+        auto& pool = request.pools[i];
+        switch (pool.getDiscriminator()) {
+            case V1_3::Request::MemoryPool::hidl_discriminator::hidlMemory: {
+                auto buffer = nn::RunTimePoolInfo::createFromHidlMemory(pool.hidlMemory());
+                if (!buffer.has_value()) {
+                    LOG(ERROR) << "createRuntimeMemoriesFromMemoryPools -- could not map pools";
+                    return {V1_3::ErrorStatus::GENERAL_FAILURE, {}, {}};
+                }
+                requestPoolInfos.push_back(std::move(*buffer));
+                bufferWrappers.push_back(nullptr);
+            } break;
+            case V1_3::Request::MemoryPool::hidl_discriminator::token: {
+                auto bufferWrapper = driver.getBufferTracker()->get(pool.token());
+                if (bufferWrapper == nullptr) {
+                    return {V1_3::ErrorStatus::INVALID_ARGUMENT, {}, {}};
+                }
+                const auto validationStatus =
+                    bufferWrapper->validateRequest(i, request, preparedModel);
+                if (validationStatus != V1_3::ErrorStatus::NONE) {
+                    return {validationStatus, {}, {}};
+                }
+                requestPoolInfos.push_back(bufferWrapper->createRunTimePoolInfo());
+                bufferWrappers.push_back(std::move(bufferWrapper));
+            } break;
+        }
+    }
+    return {V1_3::ErrorStatus::NONE, std::move(requestPoolInfos), std::move(bufferWrappers)};
+}
+
 bool BasePreparedModel::initialize(const Model& model) {
     ALOGV("Entering %s", __func__);
     return true;
@@ -330,8 +368,8 @@ static std::tuple<ErrorStatus, hidl_vec<V1_2::OutputShape>, Timing> executeSynch
                          .timeInDriver = uint64_t(microsecondsDuration(driverEnd, driverStart))};
         return {ErrorStatus::NONE, modelInfo->getOutputShapes(), timing};
     }
-    return {ErrorStatus::NONE, modelInfo->getOutputShapes(), kNoTiming};
     ALOGV("Exiting %s", __func__);
+    return {ErrorStatus::NONE, modelInfo->getOutputShapes(), kNoTiming};
 }
 
 Return<void> BasePreparedModel::executeSynchronously(const Request& request, MeasureTiming measure,
@@ -385,6 +423,7 @@ Return<void> BasePreparedModel::configureExecutionBurst(
         cb(ErrorStatus::NONE, burst);
         ALOGI("%s burst created", __func__);
     }
+    ALOGV("Exiting %s", __func__);
     return Void();
 }
 
@@ -411,10 +450,104 @@ Return<V1_3::ErrorStatus> BasePreparedModel::execute_1_3(
 
 Return<void> BasePreparedModel::executeFenced(
     const V1_3::Request& request, const hidl_vec<hidl_handle>& waitFor, V1_2::MeasureTiming measure,
-    const V1_3::OptionalTimePoint& deadline,
+    const V1_3::OptionalTimePoint& halDeadline,
     const V1_3::OptionalTimeoutDuration& loopTimeoutDuration,
     const V1_3::OptionalTimeoutDuration& duration, executeFenced_cb cb) {
     ALOGV("Entering %s", __func__);
+
+    time_point driverStart, driverEnd, deviceStart, deviceEnd;
+    if (measure == MeasureTiming::YES) driverStart = now();
+
+    if (!validateRequest(request, mModelInfo->getModel(), /*allowUnspecifiedOutput=*/false)) {
+        cb(V1_3::ErrorStatus::INVALID_ARGUMENT, hidl_handle(nullptr), nullptr);
+        return Void();
+    }
+    const auto deadline = makeDeadline(halDeadline);
+    if (hasDeadlinePassed(deadline)) {
+        cb(V1_3::ErrorStatus::MISSED_DEADLINE_PERSISTENT, hidl_handle(nullptr), nullptr);
+        return Void();
+    }
+
+    // Wait for the dependent events to signal
+    for (const auto& fenceHandle : waitFor) {
+        if (!fenceHandle.getNativeHandle()) {
+            cb(V1_3::ErrorStatus::INVALID_ARGUMENT, hidl_handle(nullptr), nullptr);
+            return Void();
+        }
+        int syncFenceFd = fenceHandle.getNativeHandle()->data[0];
+        if (syncWait(syncFenceFd, -1) != FenceState::SIGNALED) {
+            ALOGV("%s syncWait failed", __func__);
+            cb(V1_3::ErrorStatus::GENERAL_FAILURE, hidl_handle(nullptr), nullptr);
+            return Void();
+        }
+    }
+
+    // Update deadline if the timeout duration is closer than the deadline.
+    auto closestDeadline = deadline;
+    if (duration.getDiscriminator() != OptionalTimeoutDuration::hidl_discriminator::none) {
+        const auto timeoutDurationDeadline = makeDeadline(duration.nanoseconds());
+        if (!closestDeadline.has_value() || *closestDeadline > timeoutDurationDeadline) {
+            closestDeadline = timeoutDurationDeadline;
+        }
+    }
+
+    time_point driverStartAfterFence;
+    if (measure == MeasureTiming::YES) driverStartAfterFence = now();
+
+    const auto [poolStatus, requestPoolInfos, bufferWrappers] =
+        createRunTimePoolInfos(request, *mDriver, this);
+    if (poolStatus != V1_3::ErrorStatus::NONE) {
+        cb(poolStatus, hidl_handle(nullptr), nullptr);
+        return Void();
+    }
+
+    CpuExecutor executor = mDriver->getExecutor();
+    if (loopTimeoutDuration.getDiscriminator() !=
+        OptionalTimeoutDuration::hidl_discriminator::none) {
+        executor.setLoopTimeout(loopTimeoutDuration.nanoseconds());
+    }
+    if (closestDeadline.has_value()) {
+        executor.setDeadline(*closestDeadline);
+    }
+    if (measure == MeasureTiming::YES) deviceStart = now();
+    int n = executor.run(mModel, request, mPoolInfos, requestPoolInfos);
+    if (measure == MeasureTiming::YES) deviceEnd = now();
+    ALOGV("%s executor.run returned %d", __func__, n);
+    V1_3::ErrorStatus executionStatus = convertResultCodeToErrorStatus(n);
+    if (executionStatus != V1_3::ErrorStatus::NONE) {
+        cb(executionStatus, hidl_handle(nullptr), nullptr);
+        return Void();
+    }
+
+    // Set output memories to the initialized state.
+    if (executionStatus == V1_3::ErrorStatus::NONE) {
+        for (const auto& output : request.outputs) {
+            const uint32_t poolIndex = output.location.poolIndex;
+            const auto& pool = request.pools[poolIndex];
+            if (pool.getDiscriminator() == V1_3::Request::MemoryPool::hidl_discriminator::token) {
+                bufferWrappers[poolIndex]->setInitialized(true);
+            }
+        }
+    }
+
+    Timing timingSinceLaunch = {.timeOnDevice = UINT64_MAX, .timeInDriver = UINT64_MAX};
+    Timing timingAfterFence = {.timeOnDevice = UINT64_MAX, .timeInDriver = UINT64_MAX};
+    if (measure == MeasureTiming::YES) {
+        driverEnd = now();
+        timingSinceLaunch = {
+            .timeOnDevice = uint64_t(microsecondsDuration(deviceEnd, deviceStart)),
+            .timeInDriver = uint64_t(microsecondsDuration(driverEnd, driverStart))};
+        timingAfterFence = {
+            .timeOnDevice = uint64_t(microsecondsDuration(deviceEnd, deviceStart)),
+            .timeInDriver = uint64_t(microsecondsDuration(driverEnd, driverStartAfterFence))};
+        ALOGV("executeFenced timingSinceLaunch = %s", toString(timingSinceLaunch).c_str());
+        ALOGV("executeFenced timingAfterFence = %s", toString(timingAfterFence).c_str());
+    }
+    sp<BaseFencedExecutionCallback> fencedExecutionCallback =
+        new BaseFencedExecutionCallback(timingSinceLaunch, timingAfterFence, executionStatus);
+    cb(executionStatus, hidl_handle(nullptr), fencedExecutionCallback);
+
+    ALOGV("Exiting %s", __func__);
     return Void();
 }
 
