@@ -1,4 +1,5 @@
 #include <Not_Equal.hpp>
+#define LOG_TAG "Not_Equal"
 
 namespace android {
 namespace hardware {

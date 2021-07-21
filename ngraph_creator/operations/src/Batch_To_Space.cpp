@@ -23,12 +23,6 @@ bool Batch_To_Space::validate() {
     if (!checkInputOperandType(1, (int32_t)OperandType::TENSOR_INT32)) {
         return false;
     }
-    const auto& inputsSize = sModelInfo->getOperationInputsSize(mNnapiOperationIndex);
-    if (inputsSize == 3) {
-        if (!checkInputOperandType(2, (int32_t)OperandType::BOOL)) {
-            return false;
-        }
-    }
 
     // Check input rank
     const auto inputRank = getInputOperandDimensions(0).size();
@@ -51,7 +45,7 @@ std::shared_ptr<ngraph::Node> Batch_To_Space::createNode() {
     int32_t layout = 0;
     bool useNchw = false;
     const auto& inputsSize = sModelInfo->getOperationInputsSize(mNnapiOperationIndex);
-    ALOGD("%s inputsSize %d", __func__, inputsSize);
+    ALOGD("%s inputsSize %lu", __func__, inputsSize);
 
     auto inputNode = getInputNode(0);
     auto& inDims = getInputOperandDimensions(0);

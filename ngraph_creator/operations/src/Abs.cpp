@@ -1,4 +1,5 @@
 #include <Abs.hpp>
+#define LOG_TAG "Abs"
 
 namespace android {
 namespace hardware {

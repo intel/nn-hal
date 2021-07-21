@@ -25,10 +25,6 @@ bool Topk_V2::validate() {
         return false;
     }
 
-    if (!checkInputOperandType(1, (int32_t)OperandType::INT32)) {
-        return false;
-    }
-
     return true;
 }
 

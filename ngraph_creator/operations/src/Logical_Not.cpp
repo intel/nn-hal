@@ -1,4 +1,5 @@
 #include <Logical_Not.hpp>
+#define LOG_TAG "Logical_Not"
 
 namespace android {
 namespace hardware {

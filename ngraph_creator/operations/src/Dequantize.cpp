@@ -1,4 +1,5 @@
 #include <Dequantize.hpp>
+#define LOG_TAG "Dequantize"
 
 namespace android {
 namespace hardware {

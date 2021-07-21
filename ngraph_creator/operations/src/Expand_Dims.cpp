@@ -25,8 +25,6 @@ bool Expand_Dims::validate() {
         return false;
     }
 
-    if (!checkInputOperandType(1, (int32_t)OperandType::INT32)) return false;
-
     // Check input rank
     const auto inputRank = getInputOperandDimensions(0).size();
     if (inputRank < 1) return false;

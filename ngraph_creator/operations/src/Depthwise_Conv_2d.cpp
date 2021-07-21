@@ -34,7 +34,7 @@ bool Depthwise_Conv_2d::validate() {
     const auto& inputDimensionsSize = getInputOperandDimensions(0).size();
     const auto& filterDimensionsSize = getInputOperandDimensions(1).size();
     if (inputDimensionsSize != 4 || filterDimensionsSize != 4) {
-        ALOGE("%s Invalid dimensions size for input(%d) or filter(%d)", __func__,
+        ALOGE("%s Invalid dimensions size for input(%lu) or filter(%lu)", __func__,
               inputDimensionsSize, filterDimensionsSize);
         return false;
     }
@@ -59,7 +59,7 @@ bool Depthwise_Conv_2d::validate() {
 
 std::shared_ptr<ngraph::Node> Depthwise_Conv_2d::createNode() {
     const auto& inputsSize = sModelInfo->getOperationInputsSize(mNnapiOperationIndex);
-    ALOGD("%s inputsSize %d", __func__, inputsSize);
+    ALOGD("%s inputsSize %lu", __func__, inputsSize);
     bool isImplicit = false, isExplicit = false;
 
     if (inputsSize >= 11 && inputsSize <= 14 &&
@@ -75,7 +75,7 @@ std::shared_ptr<ngraph::Node> Depthwise_Conv_2d::createNode() {
     int32_t dilation_width_factor = 1, dilation_height_factor = 1;
     int32_t depthwise_multiplier;
     int32_t activationFn;
-    int32_t layout;
+    int32_t layout = 0;
     int32_t padding_scheme;
     int32_t input_width, input_height, input_channel;
     int32_t filter_width, filter_height;
@@ -112,11 +112,14 @@ std::shared_ptr<ngraph::Node> Depthwise_Conv_2d::createNode() {
                 case 14:
                     dilation_height_factor =
                         sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 13);
+                    __attribute__((fallthrough));
                 case 13:
                     dilation_width_factor =
                         sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 12);
+                    __attribute__((fallthrough));
                 case 12:
                     layout = sModelInfo->ParseOperationInput<uint8_t>(mNnapiOperationIndex, 11);
+                    __attribute__((fallthrough));
                 default:
                     break;
             }
@@ -153,11 +156,14 @@ std::shared_ptr<ngraph::Node> Depthwise_Conv_2d::createNode() {
                 case 11:
                     dilation_height_factor =
                         sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 10);
+                    __attribute__((fallthrough));
                 case 10:
                     dilation_width_factor =
                         sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 9);
+                    __attribute__((fallthrough));
                 case 9:
                     layout = sModelInfo->ParseOperationInput<uint8_t>(mNnapiOperationIndex, 8);
+                    __attribute__((fallthrough));
                 default:
                     break;
             }
@@ -183,14 +189,12 @@ std::shared_ptr<ngraph::Node> Depthwise_Conv_2d::createNode() {
             calculateExplicitPadding(input_height, stride_height, filter_height, 1, &padding_top,
                                      &padding_bottom);
             auto_pad = ngraph::op::PadType::SAME_UPPER;
-        } else if (padding_scheme == 2) {
+        } else {
             auto_pad = ngraph::op::PadType::VALID;
             padding_left = 0;
             padding_right = 0;
             padding_top = 0;
             padding_bottom = 0;
-        } else {
-            auto_pad = ngraph::op::PadType::NOTSET;
         }
     }
 
@@ -245,7 +249,7 @@ std::shared_ptr<ngraph::Node> Depthwise_Conv_2d::createNode() {
         std::vector<size_t> shape(&filterNode->get_shape()[0], &filterNode->get_shape()[0] + 4);
         shape[0] /= input_channel;
         shape.insert(shape.begin(), input_channel);
-        ALOGD("%s final filternode shape %d", __func__, shape.size());
+        ALOGD("%s final filternode shape %lu", __func__, shape.size());
 
         auto shapeNode = createConstNode(ngraph::element::i32, ngraph::Shape{shape.size()}, shape);
 

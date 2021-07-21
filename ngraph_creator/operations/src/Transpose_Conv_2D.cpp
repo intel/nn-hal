@@ -34,7 +34,7 @@ bool Transpose_Conv_2D::validate() {
     const auto& inputDimensionsSize = getInputOperandDimensions(0).size();
     const auto& filterDimensionsSize = getInputOperandDimensions(1).size();
     if (inputDimensionsSize != 4 || filterDimensionsSize != 4) {
-        ALOGE("%s Invalid dimensions size for input(%d) or filter(%d)", __func__,
+        ALOGE("%s Invalid dimensions size for input(%lu) or filter(%lu)", __func__,
               inputDimensionsSize, filterDimensionsSize);
         return false;
     }
@@ -57,7 +57,7 @@ bool Transpose_Conv_2D::validate() {
 
 std::shared_ptr<ngraph::Node> Transpose_Conv_2D::createNode() {
     const auto& inputsSize = sModelInfo->getOperationInputsSize(mNnapiOperationIndex);
-    ALOGD("%s inputsSize %d", __func__, inputsSize);
+    ALOGD("%s inputsSize %lu", __func__, inputsSize);
 
     bool isImplicit = false, isExplicit = false;
 
@@ -149,10 +149,8 @@ std::shared_ptr<ngraph::Node> Transpose_Conv_2D::createNode() {
 
         if (padding_scheme == 1) {
             auto_pad = ngraph::op::PadType::SAME_UPPER;
-        } else if (padding_scheme == 2) {
-            auto_pad = ngraph::op::PadType::VALID;
         } else {
-            auto_pad = ngraph::op::PadType::NOTSET;
+            auto_pad = ngraph::op::PadType::VALID;
         }
 
         outputShapeNode =

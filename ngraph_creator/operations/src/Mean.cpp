@@ -1,4 +1,5 @@
 #include <Mean.hpp>
+#define LOG_TAG "Mean"
 
 namespace android {
 namespace hardware {
@@ -22,8 +23,6 @@ bool Mean::validate() {
         return false;
 
     if (!checkInputOperandType(1, (int32_t)OperandType::TENSOR_INT32)) return false;
-
-    if (!checkInputOperandType(2, (int32_t)OperandType::INT32)) return false;
 
     // TODO: Add Support for all_tensors_as_inputs
     const auto& axesOperandIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 1);

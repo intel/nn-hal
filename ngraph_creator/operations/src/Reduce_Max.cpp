@@ -24,8 +24,6 @@ bool Reduce_Max::validate() {
 
     if (!checkInputOperandType(1, (int32_t)OperandType::TENSOR_INT32)) return false;
 
-    if (!checkInputOperandType(2, (int32_t)OperandType::BOOL)) return false;
-
     // TODO: Remove this condition, Issue with "CNNNetworkImpl" in OpenVINO 2021.2, fixed in 2021.4
     // Issue is with input of shape [1, 1, 1] => Reduce_Max is converted to Reshape using
     // ConvertReduce transformation and produces empty constant with [0] to reshape input [1, 1, 1]

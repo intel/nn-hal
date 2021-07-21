@@ -1,4 +1,5 @@
 #include <Floor.hpp>
+#define LOG_TAG "Floor"
 
 namespace android {
 namespace hardware {

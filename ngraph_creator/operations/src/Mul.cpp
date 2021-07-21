@@ -1,4 +1,5 @@
 #include <Mul.hpp>
+#define LOG_TAG "Mul"
 
 namespace android {
 namespace hardware {
@@ -21,10 +22,6 @@ bool Mul::validate() {
         if (!checkInputOperandType(i, (int32_t)OperandType::TENSOR_FLOAT32) &&
             !checkInputOperandType(i, (int32_t)OperandType::TENSOR_QUANT8_ASYMM))
             return false;
-    }
-
-    if (!checkInputOperandType(2, (int32_t)OperandType::INT32)) {
-        return false;
     }
 
     return true;

@@ -1,4 +1,5 @@
 #include <Div.hpp>
+#define LOG_TAG "Div"
 
 namespace android {
 namespace hardware {
@@ -18,10 +19,6 @@ bool Div::validate() {
     // Check all input types
     for (int i = 0; i <= 1; i++) {
         if (!checkInputOperandType(i, (int32_t)OperandType::TENSOR_FLOAT32)) return false;
-    }
-
-    if (!checkInputOperandType(2, (int32_t)OperandType::INT32)) {
-        return false;
     }
 
     return true;

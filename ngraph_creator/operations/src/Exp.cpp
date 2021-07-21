@@ -1,4 +1,5 @@
 #include <Exp.hpp>
+#define LOG_TAG "Exp"
 
 namespace android {
 namespace hardware {

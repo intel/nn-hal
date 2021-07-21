@@ -46,16 +46,6 @@ std::shared_ptr<ngraph::Node> OperationsBase::transpose(ConversionType type,
     return std::make_shared<ngraph::opset3::Transpose>(input, order_node);
 }
 
-std::shared_ptr<ngraph::Node> OperationsBase::toNCHW(size_t inputIndex, size_t outputIndex) {
-    auto inNode = mNgraphNodes->getOperationOutput(inputIndex).get_node_shared_ptr();
-    if (mNgraphNodes->isForcedNchw(inputIndex))
-        return inNode;
-    else {
-        mNgraphNodes->setForcedNchw(outputIndex, true);
-        return transpose(NHWC_NCHW, inNode);
-    }
-}
-
 // override createNodeForPlugin in case sPluginType specific implementation is required
 std::shared_ptr<ngraph::Node> OperationsBase::createNodeForPlugin() { return createNode(); }
 
@@ -123,7 +113,7 @@ const vec<uint32_t> OperationsBase::getInputOperandDimensions(uint32_t inputInde
 bool OperationsBase::isValidInputTensor(uint32_t inputIndex) {
     size_t size = 1;
     const auto& dims = getInputOperandDimensions(inputIndex);
-    ALOGV("%s dims.size(%d)", __func__, dims.size());
+    ALOGV("%s dims.size(%lu)", __func__, dims.size());
     if (dims.empty()) return false;
 
     for (auto d : dims) size *= d;
@@ -151,9 +141,12 @@ std::shared_ptr<ngraph::Node> OperationsBase::QuantizeNode(std::shared_ptr<ngrap
     auto round = std::make_shared<ngraph::op::v5::Round>(div, mode);
     auto convertRound = std::make_shared<ngraph::opset3::Convert>(round, ngraph::element::i32);
     auto sum = std::make_shared<ngraph::opset3::Add>(convertRound, zeroPoint);
-    auto data = make_shared<ngraph::opset3::Clamp>(sum, 0, 255);
-
-    auto outputNode = std::make_shared<ngraph::opset3::Convert>(data, quantizeType);
+    auto data = std::make_shared<ngraph::opset3::Clamp>(sum, 0, 255);
+    std::shared_ptr<ngraph::Node> outputNode;
+    if (data->get_element_type() != quantizeType)
+        outputNode = std::make_shared<ngraph::opset3::Convert>(data, quantizeType);
+    else
+        outputNode = data;
 
     return outputNode;
 }
@@ -175,8 +168,11 @@ std::shared_ptr<ngraph::Node> OperationsBase::DequantizeNode(std::shared_ptr<ngr
     auto diff = std::make_shared<ngraph::opset3::Subtract>(input, zeroPoint);
     auto convertDiff = std::make_shared<ngraph::opset3::Convert>(diff, floatElementType);
     auto mul = std::make_shared<ngraph::opset3::Multiply>(convertDiff, scale);
-
-    auto outputNode = std::make_shared<ngraph::opset3::Convert>(mul, dequantizeType);
+    std::shared_ptr<ngraph::Node> outputNode;
+    if (mul->get_element_type() != dequantizeType)
+        outputNode = std::make_shared<ngraph::opset3::Convert>(mul, dequantizeType);
+    else
+        outputNode = mul;
 
     return outputNode;
 }

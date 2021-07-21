@@ -20,9 +20,6 @@ bool Argmin::validate() {
     if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_INT32)) {
         return false;
     }
-    if (!checkInputOperandType(1, (int32_t)OperandType::INT32)) {
-        return false;
-    }
     ALOGV("%s PASSED", __func__);
     return true;
 }

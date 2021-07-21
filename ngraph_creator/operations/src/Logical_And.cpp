@@ -1,4 +1,5 @@
 #include <Logical_And.hpp>
+#define LOG_TAG "Logical_And"
 
 namespace android {
 namespace hardware {
