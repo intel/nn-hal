@@ -68,6 +68,7 @@
 #include <Tanh.hpp>
 #include <Topk_V2.hpp>
 #include <Transpose.hpp>
+#include <Transpose_Conv_2D.hpp>
 
 namespace android {
 namespace hardware {

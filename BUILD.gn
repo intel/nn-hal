@@ -142,6 +142,7 @@ shared_library("intel_nnhal") {
     "ngraph_creator/operations/src/Sub.cpp",
     "ngraph_creator/operations/src/Tanh.cpp",
     "ngraph_creator/operations/src/Topk_V2.cpp",
+    "ngraph_creator/operations/src/Transpose_Conv_2D.cpp",
     "ngraph_creator/operations/src/Transpose.cpp",
     "service.cpp",
     "Driver.cpp",
