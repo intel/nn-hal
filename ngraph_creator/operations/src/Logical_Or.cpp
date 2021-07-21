@@ -1,4 +1,5 @@
 #include <Logical_Or.hpp>
+#define LOG_TAG "Logical_Or"
 
 namespace android {
 namespace hardware {

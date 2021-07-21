@@ -1,4 +1,5 @@
 #include <Sin.hpp>
+#define LOG_TAG "Sin"
 
 namespace android {
 namespace hardware {

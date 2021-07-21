@@ -1,4 +1,5 @@
 #include <Relu6.hpp>
+#define LOG_TAG "Relu6"
 
 namespace android {
 namespace hardware {

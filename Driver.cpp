@@ -220,7 +220,7 @@ Return<ErrorStatus> Driver::prepareModel_1_2(const Model& model, ExecutionPrefer
     }
     for (auto opn : model.operations) dumpOperation(opn);
 
-    if (!driverPreparedModel->initialize(model)) {
+    if (!driverPreparedModel->initialize()) {
         ALOGE("failed to initialize preparedmodel");
         callback->notify(ErrorStatus::INVALID_ARGUMENT, nullptr);
         return ErrorStatus::NONE;

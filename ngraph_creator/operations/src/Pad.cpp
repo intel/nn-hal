@@ -63,7 +63,7 @@ std::shared_ptr<ngraph::Node> Pad::createNode() {
 
     auto outputNode = std::make_shared<ngraph::opset3::Pad>(inputNode, pads_begin, pads_end,
                                                             ngraph::op::PadMode::CONSTANT);
-    ALOGV("outputNode Shape Size : %d", outputNode->get_shape().size());
+    ALOGV("outputNode Shape Size : %lu", outputNode->get_shape().size());
 
     return outputNode;
 }

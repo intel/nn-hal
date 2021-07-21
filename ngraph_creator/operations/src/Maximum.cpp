@@ -1,4 +1,5 @@
 #include <Maximum.hpp>
+#define LOG_TAG "Maximum"
 
 namespace android {
 namespace hardware {

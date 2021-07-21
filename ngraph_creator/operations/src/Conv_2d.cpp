@@ -33,7 +33,7 @@ bool Conv_2d::validate() {
     const auto& inputDimensionsSize = getInputOperandDimensions(0).size();
     const auto& filterDimensionsSize = getInputOperandDimensions(1).size();
     if (inputDimensionsSize != 4 || filterDimensionsSize != 4) {
-        ALOGE("%s Invalid dimensions size for input(%d) or filter(%d)", __func__,
+        ALOGE("%s Invalid dimensions size for input(%lu) or filter(%lu)", __func__,
               inputDimensionsSize, filterDimensionsSize);
         return false;
     }
@@ -56,7 +56,7 @@ bool Conv_2d::validate() {
 
 std::shared_ptr<ngraph::Node> Conv_2d::createNode() {
     const auto& inputsSize = sModelInfo->getOperationInputsSize(mNnapiOperationIndex);
-    ALOGD("%s inputsSize %d", __func__, inputsSize);
+    ALOGD("%s inputsSize %lu", __func__, inputsSize);
 
     bool isImplicit = false, isExplicit = false;
 
@@ -107,11 +107,14 @@ std::shared_ptr<ngraph::Node> Conv_2d::createNode() {
                 case 13:
                     dilation_height_factor =
                         sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 12);
+                    __attribute__((fallthrough));
                 case 12:
                     dilation_width_factor =
                         sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 11);
+                    __attribute__((fallthrough));
                 case 11:
                     layout = sModelInfo->ParseOperationInput<uint8_t>(mNnapiOperationIndex, 10);
+                    __attribute__((fallthrough));
                 default:
                     break;
             }
@@ -144,11 +147,14 @@ std::shared_ptr<ngraph::Node> Conv_2d::createNode() {
                 case 10:
                     dilation_height_factor =
                         sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 9);
+                    __attribute__((fallthrough));
                 case 9:
                     dilation_width_factor =
                         sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 8);
+                    __attribute__((fallthrough));
                 case 8:
                     layout = sModelInfo->ParseOperationInput<uint8_t>(mNnapiOperationIndex, 7);
+                    __attribute__((fallthrough));
                 default:
                     break;
             }
@@ -172,14 +178,12 @@ std::shared_ptr<ngraph::Node> Conv_2d::createNode() {
             calculateExplicitPadding(input_height, stride_height, filter_height, 1, &padding_top,
                                      &padding_bottom);
             auto_pad = ngraph::op::PadType::SAME_UPPER;
-        } else if (padding_scheme == 2) {
+        } else {
             auto_pad = ngraph::op::PadType::VALID;
             padding_left = 0;
             padding_right = 0;
             padding_top = 0;
             padding_bottom = 0;
-        } else {
-            auto_pad = ngraph::op::PadType::NOTSET;
         }
     }
 

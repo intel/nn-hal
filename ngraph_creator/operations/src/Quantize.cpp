@@ -1,4 +1,5 @@
 #include <Quantize.hpp>
+#define LOG_TAG "Quantize"
 
 namespace android {
 namespace hardware {

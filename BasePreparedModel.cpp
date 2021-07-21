@@ -49,7 +49,7 @@ T getScalarData(const RunTimeOperandInfo& info) {
     return data[0];
 }
 
-bool BasePreparedModel::initialize(const Model& model) {
+bool BasePreparedModel::initialize() {
     ALOGV("Entering %s", __func__);
     return true;
 }

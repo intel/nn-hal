@@ -37,7 +37,7 @@ public:
     GnaPreparedModel(const Model& model) : BasePreparedModel(IntelDeviceType::GNA, model) {}
     ~GnaPreparedModel() { deinitialize(); }
 
-    bool initialize(const Model& model) override;
+    bool initialize() override;
     Return<void> configureExecutionBurst(
         const sp<V1_2::IBurstCallback>& callback,
         const MQDescriptorSync<V1_2::FmqRequestDatum>& requestChannel,

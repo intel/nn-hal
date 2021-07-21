@@ -27,13 +27,6 @@ bool Space_To_Batch::validate() {
         return false;
     }
 
-    const auto& inputsSize = sModelInfo->getOperationInputsSize(mNnapiOperationIndex);
-    if (inputsSize == 4) {
-        if (!checkInputOperandType(3, (int32_t)OperandType::BOOL)) {
-            return false;
-        }
-    }
-
     // Check input rank
     const auto inputRank = getInputOperandDimensions(0).size();
 

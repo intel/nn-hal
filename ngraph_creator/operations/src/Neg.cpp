@@ -1,4 +1,5 @@
 #include <Neg.hpp>
+#define LOG_TAG "Neg"
 
 namespace android {
 namespace hardware {

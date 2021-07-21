@@ -1,4 +1,5 @@
 #include <Greater.hpp>
+#define LOG_TAG "Greater"
 
 namespace android {
 namespace hardware {

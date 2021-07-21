@@ -25,8 +25,6 @@ void NgraphNodes::setOutputAtOperandIndex(size_t index, ngraph::Output<ngraph::N
 ngraph::Output<ngraph::Node> NgraphNodes::getOperationOutput(size_t index) {
     return mOutputAtOperandIndex[index];
 }
-bool NgraphNodes::isForcedNchw(size_t index) { return mForcedNchw[index]; }
-void NgraphNodes::setForcedNchw(size_t index, bool flag) { mForcedNchw[index] = flag; }
 
 void NgraphNodes::setResultNode(size_t outputIndex, std::shared_ptr<ngraph::Node> resultNode) {
     ALOGD("setResultNode %u", outputIndex);

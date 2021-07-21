@@ -30,14 +30,6 @@ bool Channel_Shuffle::validate() {
             __func__);
         return false;
     }
-    if (!checkInputOperandType(1, (int32_t)OperandType::INT32)) {
-        ALOGE("%s: Input operand 1 is not of type I32. Unsupported operation", __func__);
-        return false;
-    }
-    if (!checkInputOperandType(2, (int32_t)OperandType::INT32)) {
-        ALOGE("%s: Input operand 2 is not of type I32. Unsupported operation", __func__);
-        return false;
-    }
 
     // Check input rank
     const int64_t inputRank = getInputOperandDimensions(0).size();
@@ -49,7 +41,7 @@ bool Channel_Shuffle::validate() {
     // Check axis range
     int64_t axis = sModelInfo->ParseOperationInput<int>(mNnapiOperationIndex, 2);
     if (!(axis >= -inputRank && axis < inputRank)) {
-        ALOGE("%s Axis not in the range [-inputRank, inputRank)", __func__, axis);
+        ALOGE("%s Axis %ld not in the range [-inputRank, inputRank)", __func__, axis);
         return false;
     }
 

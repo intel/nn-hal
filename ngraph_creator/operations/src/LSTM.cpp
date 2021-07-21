@@ -54,15 +54,6 @@ bool LSTM::validate() {
         if (!checkInputOperandType(i, (int32_t)OperandType::TENSOR_FLOAT32)) return false;
     }
 
-    // check input activation type
-    if (!checkInputOperandType(20, (int32_t)OperandType::INT32)) {
-        return false;
-    }
-    // check input clipping threashold for cell state and output projection layer
-    for (int i = 21; i <= 22; i++) {
-        if (!checkInputOperandType(i, (int32_t)OperandType::FLOAT32)) return false;
-    }
-
     if (inputsSize == 27) {
         for (int i = 23; i <= 26; i++) {
             if (!checkInputOperandType(i, (int32_t)OperandType::TENSOR_FLOAT32)) return false;
@@ -402,23 +393,25 @@ std::shared_ptr<ngraph::Node> LSTM::createNode() {
 
 std::shared_ptr<ngraph::Node> LSTM::add(const ngraph::Output<ngraph::Node>& lhs,
                                         const ngraph::Output<ngraph::Node>& rhs) {
-    return {make_shared<ngraph::opset3::Add>(lhs, rhs, ngraph::op::AutoBroadcastType::NUMPY)};
+    return {std::make_shared<ngraph::opset3::Add>(lhs, rhs, ngraph::op::AutoBroadcastType::NUMPY)};
 }
 
 std::shared_ptr<ngraph::Node> LSTM::sub(const ngraph::Output<ngraph::Node>& lhs,
                                         const ngraph::Output<ngraph::Node>& rhs) {
-    return {make_shared<ngraph::opset3::Subtract>(lhs, rhs, ngraph::op::AutoBroadcastType::NUMPY)};
+    return {
+        std::make_shared<ngraph::opset3::Subtract>(lhs, rhs, ngraph::op::AutoBroadcastType::NUMPY)};
 }
 
 std::shared_ptr<ngraph::Node> LSTM::mul(const ngraph::Output<ngraph::Node>& lhs,
                                         const ngraph::Output<ngraph::Node>& rhs) {
-    return {make_shared<ngraph::opset3::Multiply>(lhs, rhs, ngraph::op::AutoBroadcastType::NUMPY)};
+    return {
+        std::make_shared<ngraph::opset3::Multiply>(lhs, rhs, ngraph::op::AutoBroadcastType::NUMPY)};
 }
 
 std::shared_ptr<ngraph::Node> LSTM::matMul(const ngraph::Output<ngraph::Node>& lhs,
                                            const ngraph::Output<ngraph::Node>& rhs,
                                            bool transpose_lhs, bool transpose_rhs) {
-    return {make_shared<ngraph::opset3::MatMul>(lhs, rhs, transpose_lhs, transpose_rhs)};
+    return {std::make_shared<ngraph::opset3::MatMul>(lhs, rhs, transpose_lhs, transpose_rhs)};
 }
 
 std::shared_ptr<ngraph::Node> LSTM::clip(const ngraph::Output<ngraph::Node>& data,
@@ -426,7 +419,7 @@ std::shared_ptr<ngraph::Node> LSTM::clip(const ngraph::Output<ngraph::Node>& dat
     if (m_clip == 0.f) {
         return data.get_node_shared_ptr();
     }
-    return make_shared<ngraph::opset3::Clamp>(data, -m_clip, m_clip);
+    return std::make_shared<ngraph::opset3::Clamp>(data, -m_clip, m_clip);
 }
 std::shared_ptr<ngraph::Node> LSTM::applyActivation(const std::shared_ptr<ngraph::Node>& arg,
                                                     int activationFn) const {

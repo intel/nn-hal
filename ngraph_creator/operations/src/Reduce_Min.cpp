@@ -1,4 +1,5 @@
 #include <Reduce_Min.hpp>
+#define LOG_TAG "Reduce_Min"
 
 namespace android {
 namespace hardware {
@@ -22,8 +23,6 @@ bool Reduce_Min::validate() {
         return false;
 
     if (!checkInputOperandType(1, (int32_t)OperandType::TENSOR_INT32)) return false;
-
-    if (!checkInputOperandType(2, (int32_t)OperandType::BOOL)) return false;
 
     return true;
 }

@@ -12,12 +12,12 @@ bool NnapiModelInfo::updateOutputshapes(size_t outputIndex, std::vector<size_t>&
     auto& outputShapeDims = mOutputShapes[outputIndex].dimensions;
     mOutputShapes[outputIndex].isSufficient = isLengthSufficient;
     if (outputDims.size() < outputShapeDims.size()) {
-        ALOGE("%s Output size mismatch at index(%d)", __func__, outputIndex);
+        ALOGE("%s Output size mismatch at index(%zu)", __func__, outputIndex);
         return false;
     }
     for (int i = 0; i < outputShapeDims.size(); i++) {
         if (outputShapeDims[i] != outputDims[i]) {
-            ALOGD("%s Updating dim(%d) at Output index(%d)", __func__, i, outputIndex);
+            ALOGD("%s Updating dim(%d) at Output index(%zu)", __func__, i, outputIndex);
             outputShapeDims[i] = outputDims[i];
         }
     }
@@ -27,7 +27,7 @@ bool NnapiModelInfo::updateOutputshapes(size_t outputIndex, std::vector<size_t>&
 bool NnapiModelInfo::initializeRunTimeOperandInfo() {
     // initialize runtime operand info from model.
     const size_t count = mModel.operands.size();
-    ALOGD("Operand size = %d\n", count);
+    ALOGD("Operand size = %zu\n", count);
     if (!count) {
         ALOGE("NNERR:Operand Count is 0");
         return false;
@@ -36,12 +36,12 @@ bool NnapiModelInfo::initializeRunTimeOperandInfo() {
     mOutputShapes.resize(mModel.outputIndexes.size());
 
     // Start by setting the runtime info to what's in the model.
-    for (size_t i = 0; i < count; i++) {
+    for (int i = 0; i < count; i++) {
         const Operand& from = mModel.operands[i];
         dumpOperand(i, mModel);
         RunTimeOperandInfo& to = mOperands[i];
         to.dimensions.resize(from.dimensions.size());
-        for (size_t j = 0; j < from.dimensions.size(); j++) {
+        for (int j = 0; j < from.dimensions.size(); j++) {
             to.dimensions[j] = from.dimensions[j];
         }
 
@@ -122,7 +122,7 @@ template <typename T>
 T NnapiModelInfo::GetConstFromBuffer(const uint8_t* buf, uint32_t len) {
     // ALOGD("buf: %p, len: %d", buf, len);
     if (len != sizeof(T)) {
-        ALOGE("fix me: typeid(T).name() should be %d bytes", sizeof(T));
+        ALOGE("fix me: typeid(T).name() should be %lu bytes", sizeof(T));
         // fix me if buffer is of type float and if float and OperandLifeTime::CONSTANT_REFERENCE
         nnAssert(false);
     }
@@ -481,7 +481,7 @@ IRBlob::Ptr NnapiModelInfo::GetConstWeightsOperandAsTensor(uint32_t index) {
 }
 
 bool NnapiModelInfo::setRunTimePoolInfosFromHidlMemories(const hidl_vec<hidl_memory>& pools) {
-    ALOGD("Number of pools: %d", pools.size());
+    ALOGD("Number of pools: %zu", pools.size());
     mRequestPoolInfos.resize(pools.size());
     for (size_t i = 0; i < pools.size(); i++) {
         auto& poolInfo = mRequestPoolInfos[i];

@@ -1,4 +1,5 @@
 #include <Tanh.hpp>
+#define LOG_TAG "Tanh"
 
 namespace android {
 namespace hardware {

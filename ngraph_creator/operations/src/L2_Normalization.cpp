@@ -24,14 +24,8 @@ bool L2_Normalization::validate() {
     }
     const auto inputRank = getInputOperandDimensions(0).size();
     if ((inputRank > 4) || (!isValidInputTensor(0))) {
-        ALOGE("%s Invalid dimensions size for input(%d)", __func__, inputRank);
+        ALOGE("%s Invalid dimensions size for input(%lu)", __func__, inputRank);
         return false;
-    }
-    // NN-HAL 1.2 specific optional input
-    if (inputsSize == 2) {
-        if (!checkInputOperandType(1, (int32_t)OperandType::INT32)) {
-            return false;
-        }
     }
 
     ALOGV("%s PASSED", __func__);
@@ -43,7 +37,7 @@ std::shared_ptr<ngraph::Node> L2_Normalization::createNode() {
 
     int32_t inputAxes = -1;
     const auto& inputsSize = sModelInfo->getOperationInputsSize(mNnapiOperationIndex);
-    ALOGD("%s inputsSize %d", __func__, inputsSize);
+    ALOGD("%s inputsSize %lu", __func__, inputsSize);
     inputNode = getInputNode(0);
     // NN-HAL 1.2 specific optional input
     if (inputsSize == 2) {

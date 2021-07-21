@@ -20,15 +20,7 @@ bool Log_Softmax::validate() {
         !checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
         return false;
     }
-    if (!checkInputOperandType(1, (int32_t)OperandType::FLOAT32)) {
-        return false;
-    }
-    const auto& inputsSize = sModelInfo->getOperationInputsSize(mNnapiOperationIndex);
-    if (inputsSize == 3) {
-        if (!checkInputOperandType(2, (int32_t)OperandType::INT32)) {
-            return false;
-        }
-    }
+
     ALOGV("%s PASSED", __func__);
     return true;
 }

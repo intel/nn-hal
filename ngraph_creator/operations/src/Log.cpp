@@ -1,4 +1,5 @@
 #include <Log.hpp>
+#define LOG_TAG "Log"
 
 namespace android {
 namespace hardware {

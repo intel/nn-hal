@@ -1,4 +1,5 @@
 #include <Minimum.hpp>
+#define LOG_TAG "Minimum"
 
 namespace android {
 namespace hardware {

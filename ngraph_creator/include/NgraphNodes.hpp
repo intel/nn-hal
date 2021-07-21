@@ -29,8 +29,6 @@ public:
     void addInputParam(std::shared_ptr<ngraph::opset3::Parameter> inParam);
     void setOutputAtOperandIndex(size_t index, ngraph::Output<ngraph::Node> output);
     ngraph::Output<ngraph::Node> getOperationOutput(size_t index);
-    bool isForcedNchw(size_t index);
-    void setForcedNchw(size_t index, bool flag);
     void setResultNode(size_t outputIndex, std::shared_ptr<ngraph::Node> resultNode);
 
     const std::string& getNodeName(size_t index);

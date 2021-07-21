@@ -1,4 +1,5 @@
 #include <RSQRT.hpp>
+#define LOG_TAG "RSQRT"
 
 namespace android {
 namespace hardware {
