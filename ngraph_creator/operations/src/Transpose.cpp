@@ -1,4 +1,5 @@
 #include <Transpose.hpp>
+#define LOG_TAG "Transpose"
 
 namespace android {
 namespace hardware {
@@ -19,10 +20,6 @@ bool Transpose::validate() {
     // Check all input types
     if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
         !checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        return false;
-    }
-
-    if (!checkInputOperandType(1, (int32_t)OperandType::TENSOR_INT32)) {
         return false;
     }
 

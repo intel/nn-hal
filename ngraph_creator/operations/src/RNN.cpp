@@ -27,10 +27,6 @@ bool RNN::validate() {
         }
     }
 
-    if (!checkInputOperandType(5, (int32_t)OperandType::INT32)) {
-        return false;
-    }
-
     return true;
 }
 

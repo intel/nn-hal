@@ -25,30 +25,8 @@ bool Average_Pool_2D::validate() {
     // Check Input Dimension size
     const auto& inputDimensionsSize = getInputOperandDimensions(0).size();
     if (inputDimensionsSize != 4) {
-        ALOGE("%s Invalid dimensions size for input(%d)", __func__, inputDimensionsSize);
+        ALOGE("%s Invalid dimensions size for input(%lu)", __func__, inputDimensionsSize);
         return false;
-    }
-
-    const auto& inputsSize = sModelInfo->getOperationInputsSize(mNnapiOperationIndex);
-
-    if (inputsSize >= 10 && inputsSize <= 11) {
-        // Checking input types for explicit padding
-        for (int i = 1; i < 10; i++) {
-            if (!checkInputOperandType(i, (int32_t)OperandType::INT32)) return false;
-        }
-
-        if (inputsSize == 11) {
-            if (!checkInputOperandType(10, (int32_t)OperandType::BOOL)) return false;
-        }
-    } else if (inputsSize >= 7 && inputsSize <= 8) {
-        // Checking input types for implicit padding
-        for (int i = 1; i < 7; i++) {
-            if (!checkInputOperandType(i, (int32_t)OperandType::INT32)) return false;
-        }
-
-        if (inputsSize == 8) {
-            if (!checkInputOperandType(7, (int32_t)OperandType::BOOL)) return false;
-        }
     }
 
     ALOGV("%s PASSED", __func__);
@@ -63,7 +41,7 @@ std::shared_ptr<ngraph::Node> Average_Pool_2D::createNode() {
 
     inputNode = getInputNode(0);
 
-    ALOGD("%s inputsSize %d", __func__, inputsSize);
+    ALOGD("%s inputsSize %lu", __func__, inputsSize);
 
     bool isImplicit = false, isExplicit = false;
 
@@ -144,30 +122,17 @@ std::shared_ptr<ngraph::Node> Average_Pool_2D::createNode() {
 
             auto_pad = ngraph::op::PadType::SAME_UPPER;
 
-        } else if (padding_scheme == 2) {
+        } else {
             padding_left = 0;
             padding_right = 0;
             padding_top = 0;
             padding_bottom = 0;
             auto_pad = ngraph::op::PadType::VALID;
-        } else
-            auto_pad = ngraph::op::PadType::NOTSET;
+        }
     }
 
-    if (mNgraphNodes->isForcedNchw(inputIndex)) {
-        if (useNchw) {
-            ALOGI("%s Forced NCHW done already but NCHW flag set at operationIndex %d", __func__,
-                  mNnapiOperationIndex);
-            inputNode = transpose(NCHW_NHWC, inputNode);
-            mNgraphNodes->setForcedNchw(mDefaultOutputIndex, false);
-        } else {
-            // Already forced NCHW, propogate the flag
-            mNgraphNodes->setForcedNchw(mDefaultOutputIndex, true);
-        }
-    } else if (!useNchw) {  // No conversion needed if useNchw set
+    if (!useNchw) {  // No conversion needed if useNchw set
         inputNode = transpose(NHWC_NCHW, inputNode);
-        mNgraphNodes->setForcedNchw(mDefaultOutputIndex, true);
-        ALOGD("%s Forced NCHW conversion at operationIndex %d", __func__, mNnapiOperationIndex);
     }
 
     strides = {(size_t)stride_height, (size_t)stride_width};
@@ -183,7 +148,6 @@ std::shared_ptr<ngraph::Node> Average_Pool_2D::createNode() {
 
     if (!useNchw) {
         outputNode = transpose(NCHW_NHWC, outputNode);
-        mNgraphNodes->setForcedNchw(mDefaultOutputIndex, false);
     }
 
     return outputNode;

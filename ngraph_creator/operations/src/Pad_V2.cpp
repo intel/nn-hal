@@ -25,9 +25,6 @@ bool Pad_V2::validate() {
     if (!checkInputOperandType(1, (int32_t)OperandType::TENSOR_INT32)) {
         return false;
     }
-    if (!checkInputOperandType(2, (int32_t)OperandType::FLOAT32) &&
-        !checkInputOperandType(2, (int32_t)OperandType::INT32))
-        return false;
 
     // Check input rank
     const auto inputRank = getInputOperandDimensions(0).size();

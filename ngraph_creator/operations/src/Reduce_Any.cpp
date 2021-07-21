@@ -1,4 +1,5 @@
 #include <Reduce_Any.hpp>
+#define LOG_TAG "Reduce_Any"
 
 namespace android {
 namespace hardware {
@@ -19,8 +20,6 @@ bool Reduce_Any::validate() {
     if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_BOOL8)) return false;
 
     if (!checkInputOperandType(1, (int32_t)OperandType::TENSOR_INT32)) return false;
-
-    if (!checkInputOperandType(2, (int32_t)OperandType::BOOL)) return false;
 
     return true;
 }

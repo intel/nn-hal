@@ -1,4 +1,5 @@
 #include <Sub.hpp>
+#define LOG_TAG "Sub"
 
 namespace android {
 namespace hardware {
@@ -22,10 +23,6 @@ bool Sub::validate() {
             !checkInputOperandType(i, (int32_t)OperandType::TENSOR_QUANT8_ASYMM))
             return false;
         ;
-    }
-
-    if (!checkInputOperandType(2, (int32_t)OperandType::INT32)) {
-        return false;
     }
 
     return true;

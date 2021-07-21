@@ -1,4 +1,5 @@
 #include <Gather.hpp>
+#define LOG_TAG "Gather"
 
 namespace android {
 namespace hardware {
@@ -21,10 +22,6 @@ bool Gather::validate() {
     if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
         !checkInputOperandType(0, (int32_t)OperandType::TENSOR_INT32) &&
         !checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        return false;
-    }
-
-    if (!checkInputOperandType(1, (int32_t)OperandType::INT32)) {
         return false;
     }
 

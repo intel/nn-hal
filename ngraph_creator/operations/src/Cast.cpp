@@ -1,4 +1,5 @@
 #include <Cast.hpp>
+#define LOG_TAG "Cast"
 
 namespace android {
 namespace hardware {
@@ -54,7 +55,7 @@ std::shared_ptr<ngraph::Node> Cast::createNode() {
         } else if (checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
             auto convertInput =
                 std::make_shared<ngraph::opset3::Convert>(input, ngraph::element::i32);
-            input = make_shared<ngraph::opset3::Clamp>(convertInput, 0, 255);
+            input = std::make_shared<ngraph::opset3::Clamp>(convertInput, 0, 255);
             elementType = ngraph::element::u8;
         }
         outputNode = std::make_shared<ngraph::opset3::Convert>(input, elementType);

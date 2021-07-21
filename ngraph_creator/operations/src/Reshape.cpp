@@ -70,11 +70,6 @@ std::shared_ptr<ngraph::Node> Reshape::createNode() {
               numOutputElements);
     }
 
-    if (mNgraphNodes->isForcedNchw(inputIndex)) {
-        inputOp = transpose(NCHW_NHWC, inputOp);
-        mNgraphNodes->setForcedNchw(mDefaultOutputIndex, false);
-    }
-
     auto shapeNode = std::make_shared<ngraph::opset3::Constant>(
         ngraph::element::i32, ngraph::Shape{outDims.size()}, outDims.data());
 

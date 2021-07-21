@@ -1,4 +1,5 @@
 #include <Logistic.hpp>
+#define LOG_TAG "Logistic"
 
 namespace android {
 namespace hardware {

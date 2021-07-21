@@ -214,10 +214,6 @@ IRBlob::Ptr Permute(IRBlob::Ptr ptr, const vec<unsigned int>& order);
 uint32_t getNumberOfElements(const vec<uint32_t>& dims);
 
 size_t getSizeFromInts(int lower, int higher);
-// shape is nchw, dims depends on layout
-TensorDims dimsToShape(const std::vector<uint32_t>& dims, InferenceEngine::Layout layout);
-// shape is nchw, dims depends on format
-std::vector<uint32_t>& shapeToDims(const TensorDims& shape, InferenceEngine::Layout layout);
 
 size_t sizeOfTensor(const TensorDims& dims);
 

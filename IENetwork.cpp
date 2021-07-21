@@ -35,14 +35,14 @@ bool IENetwork::loadNetwork() {
         for (auto input : mInputInfo) {
             auto dims = input.second->getTensorDesc().getDims();
             for (auto i : dims) {
-                ALOGI(" Dimes : %d", i);
+                ALOGI(" Dimes : %lu", i);
             }
             ALOGI("Name: %s ", input.first.c_str());
         }
         for (auto output : mOutputInfo) {
             auto dims = output.second->getTensorDesc().getDims();
             for (auto i : dims) {
-                ALOGI(" Dimes : %d", i);
+                ALOGI(" Dimes : %lu", i);
             }
             ALOGI("Name: %s ", output.first.c_str());
         }

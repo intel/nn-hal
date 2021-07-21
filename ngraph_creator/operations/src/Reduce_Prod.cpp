@@ -1,4 +1,5 @@
 #include <Reduce_Prod.hpp>
+#define LOG_TAG "Reduce_Prod"
 
 namespace android {
 namespace hardware {
@@ -19,8 +20,6 @@ bool Reduce_Prod::validate() {
     if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) return false;
 
     if (!checkInputOperandType(1, (int32_t)OperandType::TENSOR_INT32)) return false;
-
-    if (!checkInputOperandType(2, (int32_t)OperandType::BOOL)) return false;
 
     return true;
 }
