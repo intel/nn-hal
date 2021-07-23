@@ -69,6 +69,7 @@ cc_library_static {
         "operations/src/ResizeBilinear.cpp",
         "operations/src/ResizeNearestNeighbor.cpp",
         "operations/src/RNN.cpp",
+        "operations/src/ROI_Align.cpp",
         "operations/src/ROI_Pooling.cpp",
         "operations/src/RSQRT.cpp",
         "operations/src/Select.cpp",
