@@ -138,6 +138,16 @@ protected:
         return sModelInfo->getOperand(outputIdx);
     }
 
+    bool isZeroSizedInput(uint32_t index) {
+        auto inputIdx = sModelInfo->getOperationInput(mNnapiOperationIndex, index);
+        auto operand = sModelInfo->getOperand(inputIdx);
+        auto& dims = operand.dimensions;
+
+        if ((dims.size() > 0) && (dims[0] != 0)) return false;
+
+        return true;
+    }
+
 public:
     static std::shared_ptr<NnapiModelInfo> sModelInfo;
     static IntelDeviceType sPluginType;

@@ -129,6 +129,8 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<Reshape>(operationIndex);
         case OperationType::RNN:
             return std::make_shared<RNN>(operationIndex);
+        case OperationType::ROI_ALIGN:
+            return std::make_shared<ROI_Align>(operationIndex);
         case OperationType::ROI_POOLING:
             return std::make_shared<ROI_Pooling>(operationIndex);
         case OperationType::RSQRT:
