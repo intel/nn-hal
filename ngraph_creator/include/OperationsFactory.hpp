@@ -47,6 +47,7 @@
 #include <Pow.hpp>
 #include <Quantize.hpp>
 #include <RNN.hpp>
+#include <ROI_Align.hpp>
 #include <ROI_Pooling.hpp>
 #include <RSQRT.hpp>
 #include <Reduce_All.hpp>
