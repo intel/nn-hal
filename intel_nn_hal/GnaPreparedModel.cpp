@@ -197,7 +197,8 @@ bool GnaPreparedModel::constructGNAGraph(std::pair<int, int> indices) {
     gnaPluginPtr->loadNetwork(passed_network, isDecoderNw);
 #endif
     for (auto item:mModelIRBlobs) {
-        item->deallocate();
+        if (item->deallocate() == false)
+            ALOGI("%s deallocating IR an IR blob returns false", __func__);
     }
     gnaPluginPtr->queryState();
     gnaPluginPtr->reset();
