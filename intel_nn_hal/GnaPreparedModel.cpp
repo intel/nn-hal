@@ -2886,7 +2886,6 @@ IRBlob::Ptr GnaPreparedModel::GetConstOperandAsTensor(int operand_index, int ope
                 }
                 if (op.lifetime == V1_3_OperandLifeTime::CONSTANT_COPY || op.lifetime == V1_3_OperandLifeTime::CONSTANT_REFERENCE) {
                     mModelIRBlobs.push_back(blob);
-                    buf = nullptr;
                 }
                 return blob;
             } else {
@@ -2917,7 +2916,6 @@ IRBlob::Ptr GnaPreparedModel::GetConstOperandAsTensor(int operand_index, int ope
                 }
                 if (op.lifetime == V1_3_OperandLifeTime::CONSTANT_COPY || op.lifetime == V1_3_OperandLifeTime::CONSTANT_REFERENCE) {
                     mModelIRBlobs.push_back(blob);
-                    buf = nullptr;
                 }
                 return blob;
             }
