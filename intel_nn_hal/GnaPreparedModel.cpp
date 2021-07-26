@@ -2756,7 +2756,6 @@ IRBlob::Ptr GnaPreparedModel::GetConstWeightsOperandAsTensor(uint32_t index)
             else {
                 InferenceEngine::TBlob<float>::Ptr blob =
                             std::make_shared<InferenceEngine::TBlob<float>>(td, (float *)buf, len);
-                blob->allocate();
             }
             return blob;
         } else {
@@ -2883,7 +2882,6 @@ IRBlob::Ptr GnaPreparedModel::GetConstOperandAsTensor(int operand_index, int ope
 #endif
                 } else {
                     blob = std::make_shared<InferenceEngine::TBlob<float>>(td, (float *)buf, len);
-                    blob->allocate();
                 }
                 if (op.lifetime == V1_3_OperandLifeTime::CONSTANT_COPY || op.lifetime == V1_3_OperandLifeTime::CONSTANT_REFERENCE) {
                     mModelIRBlobs.push_back(blob);
@@ -2987,7 +2985,6 @@ Blob::Ptr GnaPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const 
 #endif
                 } else {
                     blob = std::make_shared<InferenceEngine::TBlob<float>>(td, (float *)buf, len);
-                    blob->allocate();
                 }
                 return blob;
             } else {
