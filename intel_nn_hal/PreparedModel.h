@@ -259,7 +259,6 @@ protected:
     uint32_t mPadreq;
 
     InferenceEngine::ICNNNetwork  *mCnnNetbuilder;
-    std::map<int, IRBlob::Ptr> mOpIndex2BlobMap;
 };
 
 class VpuPreparedModel : public PreparedModel {
