@@ -1694,7 +1694,7 @@ bool GnaPreparedModel::operationTANH(const Operation& operation) {
 
     if (mBuilderModel == nullptr) {
         VLOG(L1, "mBuilder = nullptr !!!");
-        // ASSERT
+        return false;
     }
 
     std::vector<std::string> inLayers;
