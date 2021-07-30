@@ -197,7 +197,8 @@ bool GnaPreparedModel::constructGNAGraph(std::pair<int, int> indices) {
     gnaPluginPtr->loadNetwork(passed_network, isDecoderNw);
 #endif
     for (auto item:mModelIRBlobs) {
-        item->deallocate();
+        if (item->deallocate() == false)
+            ALOGI("%s deallocating IR an IR blob returns false", __func__);
     }
     gnaPluginPtr->queryState();
     gnaPluginPtr->reset();
@@ -1598,23 +1599,11 @@ bool GnaPreparedModel::operationAdd(const Operation& operation) {
         return (int)op.lifetime;
     };
 
-    auto getIRBlobFromOperand = [&](uint32_t idx, uint32_t offset) {
-        const auto op = mModel.main.operands[idx];
-
-        auto blob = GetConstOperandAsTensor(idx, offset);
-        if (op.lifetime == V1_3_OperandLifeTime::SUBGRAPH_INPUT)
-        {
-            mOpIndex2BlobMap[idx] = blob;
-        }
-
-        return blob;
-    };
-
     IRBuilder::BuilderADDLayer::AddParams params;
-    params.input1.data = getIRBlobFromOperand(operation.inputs[0], 0);
+    params.input1.data = GetConstOperandAsTensor(operation.inputs[0], 0);
     params.input1.lifeTime = getV1_3_OperandLifeTime(operation.inputs[0]);
 
-    params.input2.data = getIRBlobFromOperand(operation.inputs[1], 1);
+    params.input2.data = GetConstOperandAsTensor(operation.inputs[1], 1);
     params.input2.lifeTime = getV1_3_OperandLifeTime(operation.inputs[1]);
 
     auto input1Dims = params.input1.data->getTensorDesc().getDims();
@@ -1696,20 +1685,8 @@ bool GnaPreparedModel::operationTANH(const Operation& operation) {
         return (int)op.lifetime;
     };
 
-    auto getIRBlobFromOperand = [&](uint32_t idx, uint32_t offset) {
-        const auto op = mModel.main.operands[idx];
-
-        auto blob = GetConstOperandAsTensor(idx, offset);
-        if (op.lifetime == V1_3_OperandLifeTime::SUBGRAPH_INPUT)
-        {
-            mOpIndex2BlobMap[idx] = blob;
-        }
-
-        return blob;
-    };
-
     IRBuilder::BuilderTANHLayer::TanhParams params;
-    params.input.data = getIRBlobFromOperand(operation.inputs[0], 0);
+    params.input.data = GetConstOperandAsTensor(operation.inputs[0], 0);
     params.input.lifeTime = getV1_3_OperandLifeTime(operation.inputs[0]);
 
     auto inputDims = params.input.data->getTensorDesc().getDims();
@@ -1722,7 +1699,7 @@ bool GnaPreparedModel::operationTANH(const Operation& operation) {
 
     if (mBuilderModel == nullptr) {
         VLOG(L1, "mBuilder = nullptr !!!");
-        // ASSERT
+        return false;
     }
 
     std::vector<std::string> inLayers;
@@ -1788,17 +1765,6 @@ bool GnaPreparedModel::operationFullyConnected(const Operation& operation) {
         return (int)op.lifetime;
     };
 
-    auto getIRBlobFromOperand = [&](uint32_t idx, uint32_t offset) {
-        const auto op = mModel.main.operands[idx];
-        auto blob = GetConstOperandAsTensor(idx, offset);
-        if (op.lifetime == V1_3_OperandLifeTime::SUBGRAPH_INPUT)
-        {
-            mOpIndex2BlobMap[idx] = blob;
-        }
-
-        return blob;
-    };
-
     auto validateOperand = [&](uint32_t idx, uint32_t offset) {
         const auto op = mModel.main.operands[idx];
         auto len_out = op.location.length;
@@ -1810,12 +1776,12 @@ bool GnaPreparedModel::operationFullyConnected(const Operation& operation) {
 
     IRBuilder::BuilderFCLayer::FCParams params;
     params.input.lifeTime = getV1_3_OperandLifeTime(operation.inputs[0]);
-    params.input.data = getIRBlobFromOperand(operation.inputs[0], 0);
+    params.input.data = GetConstOperandAsTensor(operation.inputs[0], 0);
 
-    params.weights.data = getIRBlobFromOperand(operation.inputs[1], 1);
+    params.weights.data = GetConstOperandAsTensor(operation.inputs[1], 1);
     params.weights.lifeTime = getV1_3_OperandLifeTime(operation.inputs[1]);
 
-    params.bias.data = getIRBlobFromOperand(operation.inputs[2], 2);
+    params.bias.data = GetConstOperandAsTensor(operation.inputs[2], 2);
     params.bias.lifeTime = getV1_3_OperandLifeTime(operation.inputs[2]);
 
     uint32_t len;
@@ -1979,19 +1945,6 @@ bool GnaPreparedModel::operationLSTM(const Operation& operation)
         return (int)op.lifetime;
     };
 
-    auto getIRBlobFromOperand = [&](uint32_t idx, uint32_t offset) {
-        const auto op = mModel.main.operands[idx];
-
-        auto blob = GetConstOperandAsTensor(idx, offset);
-        if (op.lifetime == V1_3_OperandLifeTime::SUBGRAPH_INPUT)
-        {
-            mOpIndex2BlobMap[idx] = blob;
-            VLOG(L1, "blob idx=%d (model_input) ptr=%p", idx, blob.get());
-        }
-
-        return blob;
-    };
-
     IRBuilder::LstmLayer::LstmCellDescription lstmDesc;
 	lstmDesc.clippingThresholdCellState     = 0;
     lstmDesc.clippingThresholdProjState     = 0;
@@ -2048,65 +2001,65 @@ bool GnaPreparedModel::operationLSTM(const Operation& operation)
 
     VLOG(L1, "Lstm cell description %s", lstmDescription.c_str());
 
-    params.input.data = getIRBlobFromOperand(operation.inputs[0], 0);
+    params.input.data = GetConstOperandAsTensor(operation.inputs[0], 0);
     params.input.lifeTime = getV1_3_OperandLifeTime(operation.inputs[0]);
 
-    params.outputState.data = getIRBlobFromOperand(operation.inputs[18], 18);
+    params.outputState.data = GetConstOperandAsTensor(operation.inputs[18], 18);
     params.outputState.lifeTime = getV1_3_OperandLifeTime(operation.inputs[18]);
 
-    params.cellState.data = getIRBlobFromOperand(operation.inputs[19], 19);
+    params.cellState.data = GetConstOperandAsTensor(operation.inputs[19], 19);
     params.cellState.lifeTime = getV1_3_OperandLifeTime(operation.inputs[19]);
 
-    params.input2inputWeights.data     = getIRBlobFromOperand(operation.inputs[1], 1);
+    params.input2inputWeights.data     = GetConstOperandAsTensor(operation.inputs[1], 1);
     params.input2inputWeights.lifeTime = getV1_3_OperandLifeTime(operation.inputs[1]);
 
-    params.input2ForgetWeights.data     = getIRBlobFromOperand(operation.inputs[2], 2);
+    params.input2ForgetWeights.data     = GetConstOperandAsTensor(operation.inputs[2], 2);
     params.input2ForgetWeights.lifeTime    = getV1_3_OperandLifeTime(operation.inputs[2]);
 
-    params.input2CellWeights.data     = getIRBlobFromOperand(operation.inputs[3], 3);
+    params.input2CellWeights.data     = GetConstOperandAsTensor(operation.inputs[3], 3);
     params.input2CellWeights.lifeTime     = getV1_3_OperandLifeTime(operation.inputs[3]);
 
-    params.input2OutputWeights.data     = getIRBlobFromOperand(operation.inputs[4], 4);
+    params.input2OutputWeights.data     = GetConstOperandAsTensor(operation.inputs[4], 4);
     params.input2OutputWeights.lifeTime     = getV1_3_OperandLifeTime(operation.inputs[4]);
 
-    params.recurrant2inputWeights.data     = getIRBlobFromOperand(operation.inputs[5], 5);
+    params.recurrant2inputWeights.data     = GetConstOperandAsTensor(operation.inputs[5], 5);
     params.recurrant2inputWeights.lifeTime     = getV1_3_OperandLifeTime(operation.inputs[5]);
 
-    params.recurrant2ForgetWeights.data     = getIRBlobFromOperand(operation.inputs[6], 6);
+    params.recurrant2ForgetWeights.data     = GetConstOperandAsTensor(operation.inputs[6], 6);
     params.recurrant2ForgetWeights.lifeTime     = getV1_3_OperandLifeTime(operation.inputs[6]);
 
-    params.recurrant2CellWeights.data     = getIRBlobFromOperand(operation.inputs[7], 7);
+    params.recurrant2CellWeights.data     = GetConstOperandAsTensor(operation.inputs[7], 7);
     params.recurrant2CellWeights.lifeTime     = getV1_3_OperandLifeTime(operation.inputs[7]);
 
-    params.recurrant2OutputWeights.data     = getIRBlobFromOperand(operation.inputs[8], 8);
+    params.recurrant2OutputWeights.data     = GetConstOperandAsTensor(operation.inputs[8], 8);
     params.recurrant2OutputWeights.lifeTime     = getV1_3_OperandLifeTime(operation.inputs[8]);
 
-    params.cell2InputWeights.data     = getIRBlobFromOperand(operation.inputs[9], 9);
+    params.cell2InputWeights.data     = GetConstOperandAsTensor(operation.inputs[9], 9);
     params.cell2InputWeights.lifeTime     = getV1_3_OperandLifeTime(operation.inputs[9]);
 
-    params.cell2ForgetWeights.data     = getIRBlobFromOperand(operation.inputs[10], 10);
+    params.cell2ForgetWeights.data     = GetConstOperandAsTensor(operation.inputs[10], 10);
     params.cell2ForgetWeights.lifeTime     = getV1_3_OperandLifeTime(operation.inputs[10]);
 
-    params.cell2OutputWeights.data  = getIRBlobFromOperand(operation.inputs[11], 11);
+    params.cell2OutputWeights.data  = GetConstOperandAsTensor(operation.inputs[11], 11);
     params.cell2OutputWeights.lifeTime  = getV1_3_OperandLifeTime(operation.inputs[11]);
 
-    params.inputGateBias.data = getIRBlobFromOperand(operation.inputs[12], 12);
+    params.inputGateBias.data = GetConstOperandAsTensor(operation.inputs[12], 12);
     params.inputGateBias.lifeTime = getV1_3_OperandLifeTime(operation.inputs[12]);
 
-    params.forgetGateBias.data   = getIRBlobFromOperand(operation.inputs[13], 13);
+    params.forgetGateBias.data   = GetConstOperandAsTensor(operation.inputs[13], 13);
     params.forgetGateBias.lifeTime   = getV1_3_OperandLifeTime(operation.inputs[13]);
 
-    params.cellBias.data = getIRBlobFromOperand(operation.inputs[14], 14);
+    params.cellBias.data = GetConstOperandAsTensor(operation.inputs[14], 14);
     params.cellBias.lifeTime = getV1_3_OperandLifeTime(operation.inputs[14]);
 
-    params.outputGateBias.data    = getIRBlobFromOperand(operation.inputs[15], 15);
+    params.outputGateBias.data    = GetConstOperandAsTensor(operation.inputs[15], 15);
     params.outputGateBias.lifeTime    = getV1_3_OperandLifeTime(operation.inputs[15]);
 
     if (lstmDesc.projectionLayerEnabled) {
-        params.projectionWeights.data       = getIRBlobFromOperand(operation.inputs[16], 16);
+        params.projectionWeights.data       = GetConstOperandAsTensor(operation.inputs[16], 16);
         params.projectionWeights.lifeTime       = getV1_3_OperandLifeTime(operation.inputs[16]);
 
-        params.projectionBias.data    = getIRBlobFromOperand(operation.inputs[17], 17);
+        params.projectionBias.data    = GetConstOperandAsTensor(operation.inputs[17], 17);
         params.projectionBias.lifeTime    = getV1_3_OperandLifeTime(operation.inputs[17]);
     }
 
@@ -2206,18 +2159,6 @@ bool GnaPreparedModel::operationQuantizedLSTM(const Operation& operation)
         return (int)op.lifetime;
     };
 
-    auto getIRBlobFromOperand = [&](uint32_t idx, uint32_t offset) {
-        const auto op = mModel.main.operands[idx];
-
-        auto blob = GetConstOperandAsTensor(idx, offset);
-        if (op.lifetime == V1_3_OperandLifeTime::SUBGRAPH_INPUT)
-        {
-            mOpIndex2BlobMap[idx] = blob;
-        }
-
-        return blob;
-    };
-
     IRBuilder::LstmLayer::LstmCellDescription lstmDesc;
     lstmDesc.clippingThresholdCellState     = 0;
     lstmDesc.clippingThresholdProjState     = 0;
@@ -2259,67 +2200,67 @@ bool GnaPreparedModel::operationQuantizedLSTM(const Operation& operation)
     params.useLayerNorm = true;
     params.useBatchedLayerNorm = true;
 
-    params.input.data = getIRBlobFromOperand(operation.inputs[0], 0);
+    params.input.data = GetConstOperandAsTensor(operation.inputs[0], 0);
     params.input.lifeTime = getV1_3_OperandLifeTime(operation.inputs[0]);
 
-    params.outputState.data = getIRBlobFromOperand(operation.inputs[18], 18);
+    params.outputState.data = GetConstOperandAsTensor(operation.inputs[18], 18);
     params.outputState.lifeTime = getV1_3_OperandLifeTime(operation.inputs[18]);
 
-    params.cellState.data = getIRBlobFromOperand(operation.inputs[19], 19);
+    params.cellState.data = GetConstOperandAsTensor(operation.inputs[19], 19);
     params.cellState.lifeTime = getV1_3_OperandLifeTime(operation.inputs[19]);
 
     if (!lstmDesc.cifgEnabled) {
-        params.input2inputWeights.data     = getIRBlobFromOperand(operation.inputs[1], 1);
+        params.input2inputWeights.data     = GetConstOperandAsTensor(operation.inputs[1], 1);
         params.input2inputWeights.lifeTime = getV1_3_OperandLifeTime(operation.inputs[1]);
 
-        params.recurrant2inputWeights.data     = getIRBlobFromOperand(operation.inputs[5], 5);
+        params.recurrant2inputWeights.data     = GetConstOperandAsTensor(operation.inputs[5], 5);
         params.recurrant2inputWeights.lifeTime     = getV1_3_OperandLifeTime(operation.inputs[5]);
 
-        params.inputGateBias.data = getIRBlobFromOperand(operation.inputs[12], 12);
+        params.inputGateBias.data = GetConstOperandAsTensor(operation.inputs[12], 12);
         params.inputGateBias.lifeTime = getV1_3_OperandLifeTime(operation.inputs[12]);
     }
 
-    params.input2ForgetWeights.data     = getIRBlobFromOperand(operation.inputs[2], 2);
+    params.input2ForgetWeights.data     = GetConstOperandAsTensor(operation.inputs[2], 2);
     params.input2ForgetWeights.lifeTime    = getV1_3_OperandLifeTime(operation.inputs[2]);
 
-    params.input2CellWeights.data     = getIRBlobFromOperand(operation.inputs[3], 3);
+    params.input2CellWeights.data     = GetConstOperandAsTensor(operation.inputs[3], 3);
     params.input2CellWeights.lifeTime     = getV1_3_OperandLifeTime(operation.inputs[3]);
 
-    params.input2OutputWeights.data     = getIRBlobFromOperand(operation.inputs[4], 4);
+    params.input2OutputWeights.data     = GetConstOperandAsTensor(operation.inputs[4], 4);
     params.input2OutputWeights.lifeTime     = getV1_3_OperandLifeTime(operation.inputs[4]);
 
-    params.recurrant2ForgetWeights.data     = getIRBlobFromOperand(operation.inputs[6], 6);
+    params.recurrant2ForgetWeights.data     = GetConstOperandAsTensor(operation.inputs[6], 6);
     params.recurrant2ForgetWeights.lifeTime     = getV1_3_OperandLifeTime(operation.inputs[6]);
 
-    params.recurrant2CellWeights.data     = getIRBlobFromOperand(operation.inputs[7], 7);
+    params.recurrant2CellWeights.data     = GetConstOperandAsTensor(operation.inputs[7], 7);
     params.recurrant2CellWeights.lifeTime     = getV1_3_OperandLifeTime(operation.inputs[7]);
 
-    params.recurrant2OutputWeights.data     = getIRBlobFromOperand(operation.inputs[8], 8);
+    params.recurrant2OutputWeights.data     = GetConstOperandAsTensor(operation.inputs[8], 8);
     params.recurrant2OutputWeights.lifeTime     = getV1_3_OperandLifeTime(operation.inputs[8]);
 
-    params.cell2InputWeights.data     = getIRBlobFromOperand(operation.inputs[9], 9);
+    params.cell2InputWeights.data     = GetConstOperandAsTensor(operation.inputs[9], 9);
     params.cell2InputWeights.lifeTime     = getV1_3_OperandLifeTime(operation.inputs[9]);
 
-    params.cell2ForgetWeights.data     = getIRBlobFromOperand(operation.inputs[10], 10);
+    params.cell2ForgetWeights.data     = GetConstOperandAsTensor(operation.inputs[10], 10);
     params.cell2ForgetWeights.lifeTime     = getV1_3_OperandLifeTime(operation.inputs[10]);
 
-    params.cell2OutputWeights.data  = getIRBlobFromOperand(operation.inputs[11], 11);
+    params.cell2OutputWeights.data  = GetConstOperandAsTensor(operation.inputs[11], 11);
     params.cell2OutputWeights.lifeTime  = getV1_3_OperandLifeTime(operation.inputs[11]);
 
-    params.forgetGateBias.data   = getIRBlobFromOperand(operation.inputs[13], 13);
+    params.forgetGateBias.data   = GetConstOperandAsTensor(operation.inputs[13], 13);
     params.forgetGateBias.lifeTime   = getV1_3_OperandLifeTime(operation.inputs[13]);
 
-    params.cellBias.data = getIRBlobFromOperand(operation.inputs[14], 14);
+    params.cellBias.data = GetConstOperandAsTensor(operation.inputs[14], 14);
     params.cellBias.lifeTime = getV1_3_OperandLifeTime(operation.inputs[14]);
 
-    params.outputGateBias.data    = getIRBlobFromOperand(operation.inputs[15], 15);
+    params.outputGateBias.data    = GetConstOperandAsTensor(operation.inputs[15], 15);
     params.outputGateBias.lifeTime    = getV1_3_OperandLifeTime(operation.inputs[15]);
 
     if (lstmDesc.projectionLayerEnabled) {
-        params.projectionWeights.data       = getIRBlobFromOperand(operation.inputs[16], 16);
+        params.projectionWeights.data       = GetConstOperandAsTensor(operation.inputs[16], 16);
         params.projectionWeights.lifeTime       = getV1_3_OperandLifeTime(operation.inputs[16]);
 
-        params.projectionBias.data    = getIRBlobFromOperand(operation.inputs[17], 17);
+        params.projectionBias.data    = GetConstOperandAsTensor(operation.inputs[17], 17);
         params.projectionBias.lifeTime    = getV1_3_OperandLifeTime(operation.inputs[17]);
     }
 
@@ -2761,7 +2702,6 @@ IRBlob::Ptr GnaPreparedModel::GetConstWeightsOperandAsTensor(uint32_t index)
             else {
                 InferenceEngine::TBlob<float>::Ptr blob =
                             std::make_shared<InferenceEngine::TBlob<float>>(td, (float *)buf, len);
-                blob->allocate();
             }
             return blob;
         } else {
@@ -2888,11 +2828,9 @@ IRBlob::Ptr GnaPreparedModel::GetConstOperandAsTensor(int operand_index, int ope
 #endif
                 } else {
                     blob = std::make_shared<InferenceEngine::TBlob<float>>(td, (float *)buf, len);
-                    blob->allocate();
                 }
                 if (op.lifetime == V1_3_OperandLifeTime::CONSTANT_COPY || op.lifetime == V1_3_OperandLifeTime::CONSTANT_REFERENCE) {
                     mModelIRBlobs.push_back(blob);
-                    buf = nullptr;
                 }
                 return blob;
             } else {
@@ -2923,7 +2861,6 @@ IRBlob::Ptr GnaPreparedModel::GetConstOperandAsTensor(int operand_index, int ope
                 }
                 if (op.lifetime == V1_3_OperandLifeTime::CONSTANT_COPY || op.lifetime == V1_3_OperandLifeTime::CONSTANT_REFERENCE) {
                     mModelIRBlobs.push_back(blob);
-                    buf = nullptr;
                 }
                 return blob;
             }
@@ -2992,7 +2929,6 @@ Blob::Ptr GnaPreparedModel::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const 
 #endif
                 } else {
                     blob = std::make_shared<InferenceEngine::TBlob<float>>(td, (float *)buf, len);
-                    blob->allocate();
                 }
                 return blob;
             } else {

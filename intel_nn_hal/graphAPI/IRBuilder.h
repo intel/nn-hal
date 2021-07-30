@@ -166,10 +166,6 @@ public:
                                             std::vector<std::string>& inputLayerNames);
     std::shared_ptr<InferenceEngine::ICNNNetwork> convertBuilder();
 
-    void addToBlobLayerMap(IRBlob::Ptr blob, int index)
-    {
-        mBlob2LayerIdxMap[blob] = index;
-    }
     int layer_name_count = 0;
 
     std::map<IRBlob::Ptr, int> mBlob2LayerIdxMap;
