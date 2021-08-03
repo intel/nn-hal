@@ -26,19 +26,19 @@ bool NnapiModelInfo::updateOutputshapes(size_t outputIndex, std::vector<size_t>&
 
 bool NnapiModelInfo::initializeRunTimeOperandInfo() {
     // initialize runtime operand info from model.
-    const size_t count = mModel.operands.size();
+    const size_t count = mModel.main.operands.size();
     ALOGD("Operand size = %zu\n", count);
     if (!count) {
         ALOGE("NNERR:Operand Count is 0");
         return false;
     }
     mOperands.resize(count);
-    mOutputShapes.resize(mModel.outputIndexes.size());
+    mOutputShapes.resize(mModel.main.outputIndexes.size());
 
     // Start by setting the runtime info to what's in the model.
     for (size_t i = 0; i < count; i++) {
-        const Operand& from = mModel.operands[i];
-        dumpOperand(i, mModel);
+        const Operand& from = mModel.main.operands[i];
+        dumpOperand(i, mModel.main);
         RunTimeOperandInfo& to = mOperands[i];
         to.dimensions.resize(from.dimensions.size());
         for (size_t j = 0; j < from.dimensions.size(); j++) {
@@ -95,8 +95,8 @@ bool NnapiModelInfo::initializeRunTimeOperandInfo() {
                 to.numberOfUsesLeft = 0;
                 break;
             }
-            case OperandLifeTime::MODEL_INPUT:
-            case OperandLifeTime::MODEL_OUTPUT:
+            case OperandLifeTime::SUBGRAPH_INPUT:
+            case OperandLifeTime::SUBGRAPH_OUTPUT:
             case OperandLifeTime::NO_VALUE:
                 to.buffer = nullptr;
                 to.numberOfUsesLeft = 0;
@@ -107,8 +107,8 @@ bool NnapiModelInfo::initializeRunTimeOperandInfo() {
         }
     }
 
-    for (uint32_t i = 0; i < mModel.outputIndexes.size(); i++) {
-        const uint32_t operandIndex = mModel.outputIndexes[i];
+    for (uint32_t i = 0; i < mModel.main.outputIndexes.size(); i++) {
+        const uint32_t operandIndex = mModel.main.outputIndexes[i];
         const RunTimeOperandInfo& from = mOperands[operandIndex];
         mOutputShapes[i].dimensions = from.dimensions;
         mOutputShapes[i].isSufficient = true;
@@ -131,7 +131,7 @@ T NnapiModelInfo::GetConstFromBuffer(const uint8_t* buf, uint32_t len) {
 
 const uint8_t* NnapiModelInfo::GetOperandMemory(int index, uint32_t& lenOut) {
     ALOGV("%s", __func__);
-    const auto op = mModel.operands[index];
+    const auto op = mModel.main.operands[index];
     lenOut = op.location.length;
     if (op.lifetime == OperandLifeTime::CONSTANT_COPY) {
         ALOGV("operand lifetime OperandLifeTime::CONSTANT_COPY");
@@ -146,8 +146,8 @@ const uint8_t* NnapiModelInfo::GetOperandMemory(int index, uint32_t& lenOut) {
         auto& r = mPoolInfos[poolIndex];
         return (const_cast<uint8_t*>(r.buffer + op.location.offset));
     } else if (op.lifetime == OperandLifeTime::TEMPORARY_VARIABLE ||
-               op.lifetime == OperandLifeTime::MODEL_INPUT ||
-               op.lifetime == OperandLifeTime::MODEL_OUTPUT ||
+               op.lifetime == OperandLifeTime::SUBGRAPH_INPUT ||
+               op.lifetime == OperandLifeTime::SUBGRAPH_OUTPUT ||
                op.lifetime == OperandLifeTime::NO_VALUE) {
         // ALOGD(
         //     "operand lifetime "
@@ -164,7 +164,7 @@ const uint8_t* NnapiModelInfo::GetOperandMemory(int index, uint32_t& lenOut) {
 Blob::Ptr NnapiModelInfo::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const uint8_t* buf,
                                                 uint32_t& len) {
     if (op.type == OperandType::TENSOR_FLOAT32 || op.type == OperandType::FLOAT32) {
-        if (op.lifetime == OperandLifeTime::MODEL_INPUT) {
+        if (op.lifetime == OperandLifeTime::SUBGRAPH_INPUT) {
             ALOGD("Create input blob !!!!");
             vec<unsigned int> order;
             InferenceEngine::Layout layout;
@@ -197,7 +197,7 @@ Blob::Ptr NnapiModelInfo::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const ui
             InferenceEngine::TensorDesc td(InferenceEngine::Precision::FP32, inputOpDims, layout);
 
             if (buf == nullptr) {
-                ALOGD("MODEL_INPUT buf is NULL !!!!!!!!!!!!!!!");
+                ALOGD("SUBGRAPH_INPUT buf is NULL !!!!!!!!!!!!!!!");
                 InferenceEngine::TBlob<float>::Ptr blob =
                     std::make_shared<InferenceEngine::TBlob<float>>(td);
                 blob->allocate();
@@ -207,7 +207,7 @@ Blob::Ptr NnapiModelInfo::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const ui
                     std::make_shared<InferenceEngine::TBlob<float>>(td, (float*)buf, len);
                 return blob;
             }
-        } else if (op.lifetime == OperandLifeTime::MODEL_OUTPUT) {
+        } else if (op.lifetime == OperandLifeTime::SUBGRAPH_OUTPUT) {
             ALOGD("Create output blob !!!!");
             vec<unsigned int> order;
             InferenceEngine::Layout layout;
@@ -226,7 +226,7 @@ Blob::Ptr NnapiModelInfo::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const ui
             InferenceEngine::TensorDesc td(InferenceEngine::Precision::FP32, toDims(op.dimensions),
                                            layout);  // nhwc
             if (buf == nullptr) {
-                ALOGD("MODEL_OUTPUT buf is NULL !!!!!!!!!!!!!!!");
+                ALOGD("SUBGRAPH_OUTPUT buf is NULL !!!!!!!!!!!!!!!");
                 InferenceEngine::TBlob<float>::Ptr blob =
                     std::make_shared<InferenceEngine::TBlob<float>>(td);
                 blob->allocate();
@@ -306,7 +306,7 @@ Blob::Ptr NnapiModelInfo::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const ui
 }
 
 IRBlob::Ptr NnapiModelInfo::GetConstOperandAsTensor(int operand_idx, int operation_idx) {
-    const auto op = mModel.operands[operand_idx];
+    const auto op = mModel.main.operands[operand_idx];
     uint32_t len;
 
     const uint8_t* buf = GetOperandMemory(operand_idx, len);
@@ -392,7 +392,7 @@ IRBlob::Ptr NnapiModelInfo::GetConstOperandAsTensor(int operand_idx, int operati
 
 // Redundant.. Remove the code
 IRBlob::Ptr NnapiModelInfo::GetConstWeightsOperandAsTensor(uint32_t index) {
-    const auto op = mModel.operands[index];
+    const auto op = mModel.main.operands[index];
     uint32_t len;
     const uint8_t* buf = GetOperandMemory(index, len);
     ALOGD("NnapiModelInfo:: Operand: index: %d, len: %d, buf: %p", index, len, buf);
@@ -494,7 +494,7 @@ bool NnapiModelInfo::setRunTimePoolInfosFromHidlMemories(const hidl_vec<hidl_mem
 }
 
 Blob::Ptr NnapiModelInfo::getBlobFromMemoryPoolIn(const Request& request, uint32_t index) {
-    RunTimeOperandInfo& operand = mOperands[mModel.inputIndexes[index]];
+    RunTimeOperandInfo& operand = mOperands[mModel.main.inputIndexes[index]];
     const V1_0::RequestArgument& arg = request.inputs[index];
     auto poolIndex = arg.location.poolIndex;
     nnAssert(poolIndex < mRequestPoolInfos.size());
@@ -518,7 +518,7 @@ Blob::Ptr NnapiModelInfo::getBlobFromMemoryPoolIn(const Request& request, uint32
 
 void* NnapiModelInfo::getBlobFromMemoryPoolOut(const Request& request, uint32_t index,
                                                uint32_t& rBufferLength) {
-    RunTimeOperandInfo& operand = mOperands[mModel.outputIndexes[index]];
+    RunTimeOperandInfo& operand = mOperands[mModel.main.outputIndexes[index]];
     const V1_0::RequestArgument& arg = request.outputs[index];
     auto poolIndex = arg.location.poolIndex;
     nnAssert(poolIndex < mRequestPoolInfos.size());
@@ -544,8 +544,8 @@ void* NnapiModelInfo::getBlobFromMemoryPoolOut(const Request& request, uint32_t 
 }
 
 bool NnapiModelInfo::isOmittedInput(int operationIndex, uint32_t index) {
-    uint32_t inputIndex = mModel.operations[operationIndex].inputs[index];
-    const auto op = mModel.operands[inputIndex];
+    uint32_t inputIndex = mModel.main.operations[operationIndex].inputs[index];
+    const auto op = mModel.main.operands[inputIndex];
     if (op.lifetime == OperandLifeTime::NO_VALUE) {
         ALOGD("index %d has life time NO_VALUE", index);
         return true;
