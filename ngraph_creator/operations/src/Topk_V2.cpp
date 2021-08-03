@@ -65,7 +65,7 @@ std::shared_ptr<ngraph::Node> Topk_V2::createNode() {
         mNgraphNodes->setOutputAtOperandIndex(outputIndex, outNode);
         ALOGD("%s Set Output index %d", __func__, outputIndex);
         const auto op = sModelInfo->getOperand(outputIndex);
-        if (op.lifetime == OperandLifeTime::MODEL_OUTPUT) {
+        if (op.lifetime == OperandLifeTime::SUBGRAPH_OUTPUT) {
             addResultNode(outputIndex, outNode);
             ALOGD("%s Add result %d", __func__, outputIndex);
         }

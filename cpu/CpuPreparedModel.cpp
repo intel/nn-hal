@@ -24,7 +24,7 @@ void CpuPreparedModel::deinitialize() {
     ALOGV("Exiting %s", __func__);
 }
 
-bool CpuPreparedModel::initialize() {
+bool CpuPreparedModel::initialize(const Model& model) {
     ALOGV("Entering %s", __func__);
     if (!mModelInfo->initRuntimeInfo()) {
         ALOGE("Failed to initialize Model runtime parameters!!");
