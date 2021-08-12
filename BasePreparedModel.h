@@ -105,6 +105,24 @@ protected:
     std::shared_ptr<IIENetwork> mPlugin;
 };
 
+class BaseFencedExecutionCallback : public V1_3::IFencedExecutionCallback {
+public:
+    BaseFencedExecutionCallback(Timing timingSinceLaunch, Timing timingAfterFence,
+                                V1_3::ErrorStatus error)
+        : kTimingSinceLaunch(timingSinceLaunch),
+          kTimingAfterFence(timingAfterFence),
+          kErrorStatus(error) {}
+    Return<void> getExecutionInfo(getExecutionInfo_cb callback) override {
+        callback(kErrorStatus, kTimingSinceLaunch, kTimingAfterFence);
+        return Void();
+    }
+
+private:
+    const Timing kTimingSinceLaunch;
+    const Timing kTimingAfterFence;
+    const V1_3::ErrorStatus kErrorStatus;
+};
+
 }  // namespace nnhal
 }  // namespace neuralnetworks
 }  // namespace hardware

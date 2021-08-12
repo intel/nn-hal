@@ -118,8 +118,7 @@ Return<ErrorStatus> Driver::prepareModel(const V1_0_Model& model,
         return ErrorStatus::INVALID_ARGUMENT;
     }
 
-    sp<BasePreparedModel> driverPreparedModel =
-        ModelFactory(mDeviceType, convertToV1_3(model));
+    sp<BasePreparedModel> driverPreparedModel = ModelFactory(mDeviceType, convertToV1_3(model));
     if (driverPreparedModel == NULL) {
         ALOGE("failed to create preparedmodel");
         return ErrorStatus::INVALID_ARGUMENT;
@@ -174,8 +173,7 @@ Return<ErrorStatus> Driver::prepareModel_1_1(const V1_1_Model& model,
         return ErrorStatus::INVALID_ARGUMENT;
     }
 
-    sp<BasePreparedModel> driverPreparedModel =
-        ModelFactory(mDeviceType, convertToV1_3(model));
+    sp<BasePreparedModel> driverPreparedModel = ModelFactory(mDeviceType, convertToV1_3(model));
     if (driverPreparedModel == NULL) {
         ALOGE("failed to create preparedmodel");
         return ErrorStatus::INVALID_ARGUMENT;
@@ -280,8 +278,7 @@ Return<ErrorStatus> Driver::prepareModel_1_2(const V1_2_Model& model,
     }
 
     // TODO: make asynchronous later
-    sp<BasePreparedModel> driverPreparedModel =
-        ModelFactory(mDeviceType, convertToV1_3(model));
+    sp<BasePreparedModel> driverPreparedModel = ModelFactory(mDeviceType, convertToV1_3(model));
     if (driverPreparedModel == NULL) {
         ALOGE("failed to create preparedmodel");
         return ErrorStatus::INVALID_ARGUMENT;
@@ -439,7 +436,8 @@ Return<V1_3::ErrorStatus> Driver::prepareModelFromCache_1_3(
 
     const auto ret = callback->notify_1_3(V1_3::ErrorStatus::GENERAL_FAILURE, nullptr);
     if (!ret.isOk()) {
-        ALOGE("Error when calling IPreparedModelCallback::notify_1_3: %s", ret.description().c_str());
+        ALOGE("Error when calling IPreparedModelCallback::notify_1_3: %s",
+              ret.description().c_str());
     }
     ALOGV("Exiting %s", __func__);
     return V1_3::ErrorStatus::GENERAL_FAILURE;

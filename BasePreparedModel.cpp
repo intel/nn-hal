@@ -128,7 +128,8 @@ void asyncExecute(const Request& request, MeasureTiming measure, BasePreparedMod
     auto ngraphNw = preparedModel->getNgraphNwCreator();
     time_point driverEnd, deviceStart, deviceEnd;
     std::vector<RunTimePoolInfo> requestPoolInfos;
-    if (!modelInfo->setRunTimePoolInfosFromHidlMemories(request.pools)) {
+    auto errorStatus = modelInfo->setRunTimePoolInfosFromHidlMemories(request.pools);
+    if (errorStatus != ErrorStatus::NONE) {
         notify(callback, ErrorStatus::GENERAL_FAILURE, {}, kNoTiming);
         return;
     }
@@ -246,7 +247,8 @@ static std::tuple<ErrorStatus, hidl_vec<V1_2::OutputShape>, Timing> executeSynch
     auto ngraphNw = preparedModel->getNgraphNwCreator();
     time_point driverEnd, deviceStart, deviceEnd;
     std::vector<RunTimePoolInfo> requestPoolInfos;
-    if (!modelInfo->setRunTimePoolInfosFromHidlMemories(request.pools)) {
+    auto errorStatus = modelInfo->setRunTimePoolInfosFromHidlMemories(request.pools);
+    if (errorStatus != ErrorStatus::NONE) {
         ALOGE("Failed to set runtime pool info from HIDL memories");
         return {ErrorStatus::GENERAL_FAILURE, {}, kNoTiming};
     }
@@ -424,12 +426,145 @@ Return<V1_3::ErrorStatus> BasePreparedModel::execute_1_3(
 }
 
 Return<void> BasePreparedModel::executeFenced(
-    const V1_3::Request& request, const hidl_vec<hidl_handle>& waitFor, V1_2::MeasureTiming measure,
-    const V1_3::OptionalTimePoint& deadline,
+    const V1_3::Request& request1_3, const hidl_vec<hidl_handle>& waitFor,
+    V1_2::MeasureTiming measure, const V1_3::OptionalTimePoint& deadline,
     const V1_3::OptionalTimeoutDuration& loopTimeoutDuration,
     const V1_3::OptionalTimeoutDuration& duration, executeFenced_cb cb) {
     ALOGV("Entering %s", __func__);
-    //TODO: Add support
+
+    time_point driverStart, driverEnd, deviceStart, deviceEnd, driverAfterFence;
+    if (measure == MeasureTiming::YES) driverStart = now();
+
+    if (!validateRequest(request1_3, mModelInfo->getModel(), /*allowUnspecifiedOutput=*/false)) {
+        cb(V1_3::ErrorStatus::INVALID_ARGUMENT, hidl_handle(nullptr), nullptr);
+        return Void();
+    }
+
+    auto errorStatus = mModelInfo->setRunTimePoolInfosFromHidlMemories(request1_3.pools);
+    if (errorStatus != V1_3::ErrorStatus::NONE) {
+        cb(errorStatus, hidl_handle(nullptr), nullptr);
+        return Void();
+    }
+
+    // rest of the interfaces are based on 1.0 request
+    auto request = convertToV1_0(request1_3);
+
+    // Wait for the dependent events to signal
+    for (const auto& fenceHandle : waitFor) {
+        if (!fenceHandle.getNativeHandle()) {
+            cb(V1_3::ErrorStatus::INVALID_ARGUMENT, hidl_handle(nullptr), nullptr);
+            return Void();
+        }
+        int syncFenceFd = fenceHandle.getNativeHandle()->data[0];
+        if (syncWait(syncFenceFd, -1) != FenceState::SIGNALED) {
+            ALOGV("%s syncWait failed", __func__);
+            cb(V1_3::ErrorStatus::GENERAL_FAILURE, hidl_handle(nullptr), nullptr);
+            return Void();
+        }
+    }
+    if (measure == MeasureTiming::YES) driverAfterFence = now();
+
+    for (size_t i = 0; i < request.inputs.size(); i++) {
+        auto inIndex = mModelInfo->getModelInputIndex(i);
+        auto srcBlob = mModelInfo->getBlobFromMemoryPoolIn(request, i);
+
+        const std::string& inputNodeName = mNgc->getNodeName(inIndex);
+        if (inputNodeName == "") {
+            ALOGD("Ignorning input at index(%d), since it is invalid", inIndex);
+            continue;
+        }
+        ALOGD("Input index: %d layername : %s", inIndex, inputNodeName.c_str());
+        auto destBlob = mPlugin->getBlob(inputNodeName);
+        uint8_t* dest = destBlob->buffer().as<uint8_t*>();
+        uint8_t* src = srcBlob->buffer().as<uint8_t*>();
+        std::memcpy(dest, src, srcBlob->byteSize());
+    }
+    ALOGD("%s Run", __func__);
+
+    if (measure == MeasureTiming::YES) deviceStart = now();
+    try {
+        mPlugin->infer();
+    } catch (const std::exception& ex) {
+        ALOGE("%s Exception !!! %s", __func__, ex.what());
+        cb(V1_3::ErrorStatus::GENERAL_FAILURE, hidl_handle(nullptr), nullptr);
+        return Void();
+    }
+    if (measure == MeasureTiming::YES) deviceEnd = now();
+
+    for (size_t i = 0; i < request.outputs.size(); i++) {
+        auto outIndex = mModelInfo->getModelOutputIndex(i);
+        ALOGI("OutputIndex: %d", outIndex);
+        const std::string& outputNodeName = mNgc->getNodeName(outIndex);
+        if (outputNodeName == "") {
+            ALOGD("Ignorning output at index(%d), since it is invalid", outIndex);
+            continue;
+        }
+        ALOGD("Output index: %d layername : %s", outIndex, outputNodeName.c_str());
+        auto srcBlob = mPlugin->getBlob(outputNodeName);
+        auto operandType = mModelInfo->getOperandType(outIndex);
+        uint32_t expectedLength = srcBlob->byteSize();
+        uint32_t rActualLength = 0;
+        void* destPtr = mModelInfo->getBlobFromMemoryPoolOut(request, i, rActualLength);
+        auto outDims = srcBlob->getTensorDesc().getDims();
+        if (operandType == OperandType::TENSOR_BOOL8 ||
+            operandType == OperandType::TENSOR_QUANT8_ASYMM ||
+            operandType == OperandType::TENSOR_QUANT8_SYMM)
+            expectedLength /= 4;  // 8bit expected instead of 32bit
+        if (rActualLength != expectedLength) {
+            ALOGE("%s Invalid length(%d) at outIndex(%d)", __func__, rActualLength, outIndex);
+            // Notify Insufficient Buffer Length to modelInfo
+            mModelInfo->updateOutputshapes(i, outDims, false);
+            cb(V1_3::ErrorStatus::OUTPUT_INSUFFICIENT_SIZE, hidl_handle(nullptr), nullptr);
+            return Void();
+        } else {
+            mModelInfo->updateOutputshapes(i, outDims);
+        }
+        switch (operandType) {
+            case OperandType::TENSOR_INT32:
+            case OperandType::TENSOR_FLOAT32: {
+                std::memcpy((uint8_t*)destPtr, srcBlob->buffer().as<uint8_t*>(),
+                            srcBlob->byteSize());
+                break;
+            }
+            case OperandType::TENSOR_BOOL8: {
+                floatToUint8(srcBlob->buffer().as<float*>(), (uint8_t*)destPtr, srcBlob->size());
+                break;
+            }
+            case OperandType::TENSOR_QUANT8_ASYMM: {
+                floatToUint8(srcBlob->buffer().as<float*>(), (uint8_t*)destPtr, srcBlob->size());
+                break;
+            }
+            case OperandType::TENSOR_QUANT8_SYMM: {
+                floatToint8(srcBlob->buffer().as<float*>(), (int8_t*)destPtr, srcBlob->size());
+                break;
+            }
+            default:
+                std::memcpy((uint8_t*)destPtr, srcBlob->buffer().as<uint8_t*>(),
+                            srcBlob->byteSize());
+                break;
+        }
+    }
+
+    if (!mModelInfo->updateRequestPoolInfos()) {
+        ALOGE("Failed to update the request pool infos");
+    }
+
+    Timing timingSinceLaunch = {.timeOnDevice = UINT64_MAX, .timeInDriver = UINT64_MAX};
+    Timing timingAfterFence = {.timeOnDevice = UINT64_MAX, .timeInDriver = UINT64_MAX};
+
+    if (measure == MeasureTiming::YES) {
+        driverEnd = now();
+        timingSinceLaunch = {
+            .timeOnDevice = uint64_t(microsecondsDuration(deviceEnd, deviceStart)),
+            .timeInDriver = uint64_t(microsecondsDuration(driverEnd, driverStart))};
+        timingAfterFence = {
+            .timeOnDevice = uint64_t(microsecondsDuration(deviceEnd, deviceStart)),
+            .timeInDriver = uint64_t(microsecondsDuration(driverEnd, driverAfterFence))};
+    }
+
+    sp<BaseFencedExecutionCallback> fencedExecutionCallback = new BaseFencedExecutionCallback(
+        timingSinceLaunch, timingAfterFence, V1_3::ErrorStatus::NONE);
+    cb(V1_3::ErrorStatus::NONE, hidl_handle(nullptr), fencedExecutionCallback);
     ALOGV("Exiting %s", __func__);
     return Void();
 }
