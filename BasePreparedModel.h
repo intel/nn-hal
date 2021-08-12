@@ -96,6 +96,8 @@ public:
 
     std::shared_ptr<IIENetwork> getPlugin() { return mPlugin; }
 
+    std::shared_ptr<InferenceEngine::CNNNetwork> cnnNetworkPtr;
+
 protected:
     virtual void deinitialize();
 

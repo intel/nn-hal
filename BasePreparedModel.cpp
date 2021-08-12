@@ -84,6 +84,13 @@ static void floatToint8(const float* src, int8_t* dst, size_t size) {
     }
 }
 
+static void floatToFloat16(const float* src, _Float16* dst, size_t size) {
+    for (uint32_t i = 0; i < size; ++i) {
+        dst[i] = src[i];
+        ALOGV("%s input: %f output: %f ", __func__, src[i], dst[i]);
+    }
+}
+
 namespace {
 using time_point = std::chrono::steady_clock::time_point;
 auto now() { return std::chrono::steady_clock::now(); };
@@ -135,8 +142,9 @@ void asyncExecute(const Request& request, MeasureTiming measure, BasePreparedMod
     }
 
     for (size_t i = 0; i < request.inputs.size(); i++) {
+        uint32_t len;
         auto inIndex = modelInfo->getModelInputIndex(i);
-        auto srcBlob = modelInfo->getBlobFromMemoryPoolIn(request, i);
+        void* srcPtr = modelInfo->getBlobFromMemoryPoolIn(request, i, len);
 
         const std::string& inputNodeName = ngraphNw->getNodeName(inIndex);
         if (inputNodeName == "") {
@@ -145,9 +153,17 @@ void asyncExecute(const Request& request, MeasureTiming measure, BasePreparedMod
         }
         ALOGD("Input index: %d layername : %s", inIndex, inputNodeName.c_str());
         auto destBlob = plugin->getBlob(inputNodeName);
-        uint8_t* dest = destBlob->buffer().as<uint8_t*>();
-        uint8_t* src = srcBlob->buffer().as<uint8_t*>();
-        std::memcpy(dest, src, srcBlob->byteSize());
+        if (modelInfo->getOperandType(inIndex) == OperandType::TENSOR_FLOAT16) {
+            float* dest = destBlob->buffer().as<float*>();
+            _Float16* src = (_Float16*)srcPtr;
+
+            for (auto i = 0; i < len / 2; i++) {
+                dest[i] = src[i];
+            }
+        } else {
+            uint8_t* dest = destBlob->buffer().as<uint8_t*>();
+            std::memcpy(dest, (uint8_t*)srcPtr, len);
+        }
     }
     ALOGD("%s Run", __func__);
 
@@ -176,11 +192,24 @@ void asyncExecute(const Request& request, MeasureTiming measure, BasePreparedMod
         uint32_t rActualLength = 0;
         void* destPtr = modelInfo->getBlobFromMemoryPoolOut(request, i, rActualLength);
         auto outDims = srcBlob->getTensorDesc().getDims();
-        if (operandType == OperandType::TENSOR_BOOL8 ||
-            operandType == OperandType::TENSOR_QUANT8_ASYMM ||
-            operandType == OperandType::TENSOR_QUANT8_SYMM ||
-            operandType == OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL)
-            expectedLength /= 4;  // 8bit expected instead of 32bit
+
+        ALOGD("output precision: %d", static_cast<int>(srcBlob->getTensorDesc().getPrecision()));
+
+        switch (operandType) {
+            case OperandType::TENSOR_BOOL8:
+            case OperandType::TENSOR_QUANT8_ASYMM:
+            case OperandType::TENSOR_QUANT8_SYMM:
+            case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL:
+                expectedLength /= 4;
+                break;
+            case OperandType::TENSOR_FLOAT16:
+                expectedLength /= 2;
+                break;
+            default:
+                ALOGV("Operand type is 4 bytes !!");
+                break;
+        }
+
         if (rActualLength != expectedLength) {
             ALOGE("%s Invalid length at outIndex(%d) Actual:%d Expected:%d", __func__, outIndex,
                   rActualLength, expectedLength);
@@ -210,6 +239,10 @@ void asyncExecute(const Request& request, MeasureTiming measure, BasePreparedMod
             case OperandType::TENSOR_QUANT8_SYMM:
             case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL: {
                 floatToint8(srcBlob->buffer().as<float*>(), (int8_t*)destPtr, srcBlob->size());
+                break;
+            }
+            case OperandType::TENSOR_FLOAT16: {
+                floatToFloat16(srcBlob->buffer().as<float*>(), (_Float16*)destPtr, srcBlob->size());
                 break;
             }
             default:
@@ -254,8 +287,9 @@ static std::tuple<ErrorStatus, hidl_vec<V1_2::OutputShape>, Timing> executeSynch
     }
 
     for (size_t i = 0; i < request.inputs.size(); i++) {
+        uint32_t len;
         auto inIndex = modelInfo->getModelInputIndex(i);
-        auto srcBlob = modelInfo->getBlobFromMemoryPoolIn(request, i);
+        void* srcPtr = modelInfo->getBlobFromMemoryPoolIn(request, i, len);
 
         const std::string& inputNodeName = ngraphNw->getNodeName(inIndex);
         if (inputNodeName == "") {
@@ -264,9 +298,17 @@ static std::tuple<ErrorStatus, hidl_vec<V1_2::OutputShape>, Timing> executeSynch
         }
         ALOGD("Input index: %d layername : %s", inIndex, inputNodeName.c_str());
         auto destBlob = plugin->getBlob(inputNodeName);
-        uint8_t* dest = destBlob->buffer().as<uint8_t*>();
-        uint8_t* src = srcBlob->buffer().as<uint8_t*>();
-        std::memcpy(dest, src, srcBlob->byteSize());
+        if (modelInfo->getOperandType(inIndex) == OperandType::TENSOR_FLOAT16) {
+            float* dest = destBlob->buffer().as<float*>();
+            _Float16* src = (_Float16*)srcPtr;
+
+            for (auto i = 0; i < len / 2; i++) {
+                dest[i] = src[i];
+            }
+        } else {
+            uint8_t* dest = destBlob->buffer().as<uint8_t*>();
+            std::memcpy(dest, (uint8_t*)srcPtr, len);
+        }
     }
 
     ALOGD("%s Run", __func__);
@@ -295,11 +337,23 @@ static std::tuple<ErrorStatus, hidl_vec<V1_2::OutputShape>, Timing> executeSynch
         uint32_t rActualLength = 0;
         void* destPtr = modelInfo->getBlobFromMemoryPoolOut(request, i, rActualLength);
         auto outDims = srcBlob->getTensorDesc().getDims();
-        if (operandType == OperandType::TENSOR_BOOL8 ||
-            operandType == OperandType::TENSOR_QUANT8_ASYMM ||
-            operandType == OperandType::TENSOR_QUANT8_SYMM ||
-            operandType == OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL)
-            expectedLength /= 4;  // 8bit expected instead of 32bit
+
+        ALOGD("output precision: %d", static_cast<int>(srcBlob->getTensorDesc().getPrecision()));
+
+        switch (operandType) {
+            case OperandType::TENSOR_BOOL8:
+            case OperandType::TENSOR_QUANT8_ASYMM:
+            case OperandType::TENSOR_QUANT8_SYMM:
+            case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL:
+                expectedLength /= 4;
+                break;
+            case OperandType::TENSOR_FLOAT16:
+                expectedLength /= 2;
+                break;
+            default:
+                ALOGV("Operand type is 4 bytes !!");
+                break;
+        }
         if (rActualLength != expectedLength) {
             ALOGE("%s Invalid length(%d) at outIndex(%d)", __func__, rActualLength, outIndex);
             // Notify Insufficient Buffer Length to modelInfo
@@ -325,6 +379,10 @@ static std::tuple<ErrorStatus, hidl_vec<V1_2::OutputShape>, Timing> executeSynch
             case OperandType::TENSOR_QUANT8_SYMM:
             case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL: {
                 floatToint8(srcBlob->buffer().as<float*>(), (int8_t*)destPtr, srcBlob->size());
+                break;
+            }
+            case OperandType::TENSOR_FLOAT16: {
+                floatToFloat16(srcBlob->buffer().as<float*>(), (_Float16*)destPtr, srcBlob->size());
                 break;
             }
             default:
