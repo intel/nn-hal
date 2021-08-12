@@ -11,21 +11,6 @@ Pad_V2::Pad_V2(int operationIndex) : OperationsBase(operationIndex) {
 }
 
 bool Pad_V2::validate() {
-    // check output type
-    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        return false;
-    }
-
-    // Check all input types
-    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        return false;
-    }
-    if (!checkInputOperandType(1, (int32_t)OperandType::TENSOR_INT32)) {
-        return false;
-    }
-
     // Check input rank
     const auto inputRank = getInputOperandDimensions(0).size();
     if (inputRank > 4) return false;
@@ -53,6 +38,9 @@ std::shared_ptr<ngraph::Node> Pad_V2::createNode() {
     if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) {
         auto pad_scalar_value = sModelInfo->ParseOperationInput<float>(mNnapiOperationIndex, 2);
         pad_value = createConstNode(ngraph::element::f32, {}, convertToVector(pad_scalar_value));
+    } else if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT16)) {
+        auto pad_scalar_value = sModelInfo->ParseOperationInput<_Float16>(mNnapiOperationIndex, 2);
+        pad_value = createConstNode(ngraph::element::f16, {}, convertToVector(pad_scalar_value));
     } else if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
         auto pad_scalar_value = sModelInfo->ParseOperationInput<int>(mNnapiOperationIndex, 2);
         pad_value = createConstNode(ngraph::element::i32, {}, convertToVector(pad_scalar_value));

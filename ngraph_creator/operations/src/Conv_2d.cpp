@@ -12,23 +12,6 @@ Conv_2d::Conv_2d(int operationIndex) : OperationsBase(operationIndex) {
 }
 
 bool Conv_2d::validate() {
-    // Check Output type
-    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM))
-        return false;
-
-    // Check input/filter operands(0/1) are of type TENSOR_FLOAT32/TENSOR_QUANT8_ASYMM
-    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM))
-        return false;
-    if (!checkInputOperandType(1, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkInputOperandType(1, (int32_t)OperandType::TENSOR_QUANT8_ASYMM) &&
-        !checkInputOperandType(1, (int32_t)OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL))
-        return false;
-    // Check bias type
-    if (!checkInputOperandType(2, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkInputOperandType(2, (int32_t)OperandType::TENSOR_INT32))
-        return false;
     // Check Input, Filter Dimension size
     const auto& inputDimensionsSize = getInputOperandDimensions(0).size();
     const auto& filterDimensionsSize = getInputOperandDimensions(1).size();
@@ -90,7 +73,8 @@ std::shared_ptr<ngraph::Node> Conv_2d::createNode() {
         filter_width = filterDimensions[2];
         filter_height = filterDimensions[1];
     }
-
+    // TODO: create a generic function to support conv, depthwise, grouped_conv and transpose_conv
+    // operations
     if (isExplicit) {
         padding_left = sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 3);
         padding_right = sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 4);

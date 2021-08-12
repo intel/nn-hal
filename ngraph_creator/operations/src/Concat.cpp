@@ -12,11 +12,6 @@ Concat::Concat(int operationIndex) : OperationsBase(operationIndex) {
 }
 
 bool Concat::validate() {
-    // Check Output type
-    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        return false;
-    }
     // check concatenation axis
     auto n = sModelInfo->getOperationInputsSize(mNnapiOperationIndex) -
              1;  // 0 ~ n-1: The list of n input tensors

@@ -11,19 +11,6 @@ Reduce_Max::Reduce_Max(int operationIndex) : OperationsBase(operationIndex) {
 }
 
 bool Reduce_Max::validate() {
-    // check output type
-    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        return false;
-    }
-
-    // Check all input types
-    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM))
-        return false;
-
-    if (!checkInputOperandType(1, (int32_t)OperandType::TENSOR_INT32)) return false;
-
     // TODO: Remove this condition, Issue with "CNNNetworkImpl" in OpenVINO 2021.2, fixed in 2021.4
     // Issue is with input of shape [1, 1, 1] => Reduce_Max is converted to Reshape using
     // ConvertReduce transformation and produces empty constant with [0] to reshape input [1, 1, 1]

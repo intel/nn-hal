@@ -12,14 +12,6 @@ Argmin::Argmin(int operationIndex) : OperationsBase(operationIndex) {
 }
 
 bool Argmin::validate() {
-    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkInputOperandType(0, (int32_t)OperandType::TENSOR_INT32) &&
-        !checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        return false;
-    }
-    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_INT32)) {
-        return false;
-    }
     ALOGV("%s PASSED", __func__);
     return true;
 }

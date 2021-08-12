@@ -37,6 +37,7 @@ bool NgraphNetworkCreator::createInputParams() {
         ALOGV("createInputParams operand %d dims.size(%zu)", i, dims.size());
         // keeping this condition to make VTS pass. Operation's optional input lifetime is supposed
         // to be "NO_VALUE"
+        // TODO: Remove these checks to support zero_sized input tensors
         if (dims.size() > 0) {
             if (dims[0] != 0) {
                 switch (nnapiOperand.type) {

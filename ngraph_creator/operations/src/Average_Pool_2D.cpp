@@ -12,16 +12,6 @@ Average_Pool_2D::Average_Pool_2D(int operationIndex) : OperationsBase(operationI
 }
 
 bool Average_Pool_2D::validate() {
-    // Check Output type
-    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM))
-        return false;
-
-    // Check Input Type
-    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM))
-        return false;
-
     // Check Input Dimension size
     const auto& inputDimensionsSize = getInputOperandDimensions(0).size();
     if (inputDimensionsSize != 4) {

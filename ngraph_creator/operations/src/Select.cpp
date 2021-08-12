@@ -11,29 +11,7 @@ Select::Select(int operationIndex) : OperationsBase(operationIndex) {
 }
 
 bool Select::validate() {
-    // check output type
-    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkOutputOperandType(0, (int32_t)OperandType::TENSOR_INT32) &&
-        !checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        return false;
-    }
-
-    // Check all input types
-    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_BOOL8)) {
-        return false;
-    }
-
-    if (!checkInputOperandType(1, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkInputOperandType(1, (int32_t)OperandType::TENSOR_INT32) &&
-        !checkInputOperandType(1, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        return false;
-    }
-
-    if (!checkInputOperandType(2, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkInputOperandType(2, (int32_t)OperandType::TENSOR_INT32) &&
-        !checkInputOperandType(2, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        return false;
-    }
+    ALOGV("%s PASSED", __func__);
     return true;
 }
 
