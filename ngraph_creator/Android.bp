@@ -128,4 +128,9 @@ cc_library_static {
         "android.hidl.allocator@1.0",
         "android.hidl.memory@1.0",
     ],
+
+    defaults: [
+        "neuralnetworks_defaults"
+    ]
+
 }
