@@ -26,6 +26,11 @@ protected:
         CWHN_NHWC,
         NHC_NCH,
         NCH_NHC,
+        CNH_NHC,
+        NCH_HNC,
+        HNC_NCH,
+        NHC_CNH,
+        NHCW_NHWC,
         NC_CN
     };
     uint32_t mDefaultOutputIndex;
@@ -82,6 +87,12 @@ protected:
                 case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL: {
                     elementType = ngraph::element::i8;
                     auto operandValues = sModelInfo->GetConstVecOperand<int8_t>(operandIndex);
+                    input = createConstNode(elementType, toNgraphShape(operandDims), operandValues);
+                    break;
+                }
+                case OperandType::TENSOR_FLOAT16: {
+                    elementType = ngraph::element::f16;
+                    auto operandValues = sModelInfo->GetConstVecOperand<_Float16>(operandIndex);
                     input = createConstNode(elementType, toNgraphShape(operandDims), operandValues);
                     break;
                 }
