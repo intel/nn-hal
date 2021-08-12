@@ -60,6 +60,10 @@ bool NnapiModelInfo::initializeRunTimeOperandInfo() {
             case OperandType::TENSOR_INT32:
                 to.type = from.type;
                 break;
+            case OperandType::TENSOR_FLOAT16:
+            case OperandType::FLOAT16:
+                to.type = from.type;
+                break;
             case OperandType::TENSOR_BOOL8:
                 to.type = from.type;
                 break;
@@ -163,7 +167,8 @@ const uint8_t* NnapiModelInfo::GetOperandMemory(int index, uint32_t& lenOut) {
 
 Blob::Ptr NnapiModelInfo::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const uint8_t* buf,
                                                 uint32_t& len) {
-    if (op.type == OperandType::TENSOR_FLOAT32 || op.type == OperandType::FLOAT32) {
+    if (op.type == OperandType::TENSOR_FLOAT32 || op.type == OperandType::FLOAT32 ||
+        op.type == OperandType::TENSOR_FLOAT16) {
         if (op.lifetime == OperandLifeTime::MODEL_INPUT) {
             ALOGD("Create input blob !!!!");
             vec<unsigned int> order;
@@ -493,7 +498,8 @@ bool NnapiModelInfo::setRunTimePoolInfosFromHidlMemories(const hidl_vec<hidl_mem
     return true;
 }
 
-Blob::Ptr NnapiModelInfo::getBlobFromMemoryPoolIn(const Request& request, uint32_t index) {
+void* NnapiModelInfo::getBlobFromMemoryPoolIn(const Request& request, uint32_t index,
+                                              uint32_t& rBufferLength) {
     RunTimeOperandInfo& operand = mOperands[mModel.inputIndexes[index]];
     const V1_0::RequestArgument& arg = request.inputs[index];
     auto poolIndex = arg.location.poolIndex;
@@ -512,8 +518,9 @@ Blob::Ptr NnapiModelInfo::getBlobFromMemoryPoolIn(const Request& request, uint32
     operand.length = arg.location.length;
     ALOGI("%s Operand length:%d pointer:%p offset:%d pool index: %d", __func__, operand.length,
           (r.buffer + arg.location.offset), arg.location.offset, poolIndex);
-    return GetInOutOperandAsBlob(operand, const_cast<uint8_t*>(r.buffer + arg.location.offset),
-                                 operand.length);
+    rBufferLength = operand.length;
+
+    return (r.buffer + arg.location.offset);
 }
 
 void* NnapiModelInfo::getBlobFromMemoryPoolOut(const Request& request, uint32_t index,
@@ -559,11 +566,13 @@ template float NnapiModelInfo::GetConstOperand<float>(unsigned int);
 template uint8_t NnapiModelInfo::GetConstOperand<uint8_t>(unsigned int);
 template int8_t NnapiModelInfo::GetConstOperand<int8_t>(unsigned int);
 template uint32_t NnapiModelInfo::GetConstOperand<uint32_t>(unsigned int);
+template _Float16 NnapiModelInfo::GetConstOperand<_Float16>(unsigned int);
 template int NnapiModelInfo::GetConstFromBuffer<int>(unsigned char const*, unsigned int);
 template float NnapiModelInfo::GetConstFromBuffer<float>(unsigned char const*, unsigned int);
 template uint8_t NnapiModelInfo::GetConstFromBuffer<uint8_t>(unsigned char const*, unsigned int);
 template int8_t NnapiModelInfo::GetConstFromBuffer<int8_t>(unsigned char const*, unsigned int);
 template uint32_t NnapiModelInfo::GetConstFromBuffer<uint32_t>(unsigned char const*, unsigned int);
+template _Float16 NnapiModelInfo::GetConstFromBuffer<_Float16>(unsigned char const*, unsigned int);
 }  // namespace nnhal
 }  // namespace neuralnetworks
 }  // namespace hardware
