@@ -12,21 +12,6 @@ Space_To_Batch::Space_To_Batch(int operationIndex) : OperationsBase(operationInd
 }
 
 bool Space_To_Batch::validate() {
-    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        return false;
-    }
-    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        return false;
-    }
-    if (!checkInputOperandType(1, (int32_t)OperandType::TENSOR_INT32)) {
-        return false;
-    }
-    if (!checkInputOperandType(2, (int32_t)OperandType::TENSOR_INT32)) {
-        return false;
-    }
-
     // Check input rank
     const auto inputRank = getInputOperandDimensions(0).size();
 

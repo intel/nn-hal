@@ -11,16 +11,7 @@ Logical_Not::Logical_Not(int operationIndex) : OperationsBase(operationIndex) {
 }
 
 bool Logical_Not::validate() {
-    // check output type
-    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_BOOL8)) {
-        return false;
-    }
-
-    // Check all input types
-    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_BOOL8)) {
-        return false;
-    }
-
+    ALOGV("%s PASSED", __func__);
     return true;
 }
 

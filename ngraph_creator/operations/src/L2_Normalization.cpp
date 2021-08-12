@@ -11,16 +11,6 @@ L2_Normalization::L2_Normalization(int operationIndex) : OperationsBase(operatio
 }
 
 bool L2_Normalization::validate() {
-    // check output type
-    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        return false;
-    }
-    // Check all input types
-    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        return false;
-    }
     const auto inputRank = getInputOperandDimensions(0).size();
     if ((inputRank > 4) || (!isValidInputTensor(0))) {
         ALOGE("%s Invalid dimensions size for input(%lu)", __func__, inputRank);

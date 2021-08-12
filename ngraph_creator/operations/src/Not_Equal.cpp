@@ -11,25 +11,7 @@ Not_Equal::Not_Equal(int operationIndex) : OperationsBase(operationIndex) {
 }
 
 bool Not_Equal::validate() {
-    // check output type
-    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_BOOL8)) {
-        return false;
-    }
-
-    // Check all input types
-    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkInputOperandType(0, (int32_t)OperandType::TENSOR_INT32) &&
-        !checkInputOperandType(0, (int32_t)OperandType::TENSOR_BOOL8) &&
-        !checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        return false;
-    }
-    if (!checkInputOperandType(1, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkInputOperandType(1, (int32_t)OperandType::TENSOR_INT32) &&
-        !checkInputOperandType(1, (int32_t)OperandType::TENSOR_BOOL8) &&
-        !checkInputOperandType(1, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        return false;
-    }
-
+    ALOGV("%s PASSED", __func__);
     return true;
 }
 

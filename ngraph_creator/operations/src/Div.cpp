@@ -11,16 +11,7 @@ Div::Div(int operationIndex) : OperationsBase(operationIndex) {
 }
 
 bool Div::validate() {
-    // check output type
-    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) {
-        return false;
-    }
-
-    // Check all input types
-    for (int i = 0; i <= 1; i++) {
-        if (!checkInputOperandType(i, (int32_t)OperandType::TENSOR_FLOAT32)) return false;
-    }
-
+    ALOGV("%s PASSED", __func__);
     return true;
 }
 

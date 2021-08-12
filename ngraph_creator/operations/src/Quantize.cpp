@@ -11,16 +11,7 @@ Quantize::Quantize(int operationIndex) : OperationsBase(operationIndex) {
 }
 
 bool Quantize::validate() {
-    // check output type
-    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        return false;
-    }
-
-    // Check all input types
-    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) {
-        return false;
-    }
-
+    ALOGV("%s PASSED", __func__);
     return true;
 }
 

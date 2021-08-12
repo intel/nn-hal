@@ -11,26 +11,6 @@ Channel_Shuffle::Channel_Shuffle(int operationIndex) : OperationsBase(operationI
 }
 
 bool Channel_Shuffle::validate() {
-    // check output type
-    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        ALOGE(
-            "%s: Output operand 0 is not of type TENSOR_FLOAT32/TENSOR_QUANT8_ASYMM. Unsupported "
-            "operation",
-            __func__);
-        return false;
-    }
-
-    // Check all input types
-    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        ALOGE(
-            "%s: Input operand 0 is not of type TENSOR_FLOAT32/TENSOR_QUANT8_ASYMM. Unsupported "
-            "operation",
-            __func__);
-        return false;
-    }
-
     // Check input rank
     const int64_t inputRank = getInputOperandDimensions(0).size();
     if (inputRank > 4 || inputRank <= 0) {

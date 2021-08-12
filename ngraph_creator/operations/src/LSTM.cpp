@@ -18,13 +18,6 @@ LSTM::LSTM(int operationIndex) : OperationsBase(operationIndex) {
 }
 
 bool LSTM::validate() {
-    // Check all Output types
-    for (int i = 0; i <= 3; i++) {
-        // Check iscratch_buffer, output state(h_t), cell state(C_t) and output(o_t) are of type
-        // TENSOR_FLOAT32
-        if (!checkOutputOperandType(i, (int32_t)OperandType::TENSOR_FLOAT32)) return false;
-    }
-
     const auto& inputsSize = sModelInfo->getOperationInputsSize(mNnapiOperationIndex);
     const auto& outputsSize = sModelInfo->getOperationOutputsSize(mNnapiOperationIndex);
 
@@ -33,55 +26,6 @@ bool LSTM::validate() {
     }
 
     if (outputsSize != 4) return false;
-
-    // check 0, 18, 19 input values
-    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) return false;
-    if (!checkInputOperandType(18, (int32_t)OperandType::TENSOR_FLOAT32)) return false;
-    if (!checkInputOperandType(19, (int32_t)OperandType::TENSOR_FLOAT32)) return false;
-
-    // check input type for 2,3,4
-    for (int i = 2; i <= 4; i++) {
-        if (!checkInputOperandType(i, (int32_t)OperandType::TENSOR_FLOAT32)) return false;
-    }
-
-    // check input type for 6,7,8
-    for (int i = 6; i <= 8; i++) {
-        if (!checkInputOperandType(i, (int32_t)OperandType::TENSOR_FLOAT32)) return false;
-    }
-
-    // check input type for 13,14,15
-    for (int i = 13; i <= 15; i++) {
-        if (!checkInputOperandType(i, (int32_t)OperandType::TENSOR_FLOAT32)) return false;
-    }
-
-    if (inputsSize == 27) {
-        for (int i = 23; i <= 26; i++) {
-            if (!checkInputOperandType(i, (int32_t)OperandType::TENSOR_FLOAT32)) return false;
-        }
-    }
-
-    if (!sModelInfo->isOmittedInput(mNnapiOperationIndex, 1) &&
-        !sModelInfo->isOmittedInput(mNnapiOperationIndex, 5) &&
-        !sModelInfo->isOmittedInput(mNnapiOperationIndex, 12)) {
-        // CIFG diabled, check input types
-        if (!checkInputOperandType(1, (int32_t)OperandType::TENSOR_FLOAT32)) return false;
-        if (!checkInputOperandType(5, (int32_t)OperandType::TENSOR_FLOAT32)) return false;
-        if (!checkInputOperandType(12, (int32_t)OperandType::TENSOR_FLOAT32)) return false;
-    }
-
-    if (!sModelInfo->isOmittedInput(mNnapiOperationIndex, 9) &&
-        !sModelInfo->isOmittedInput(mNnapiOperationIndex, 10) &&
-        !sModelInfo->isOmittedInput(mNnapiOperationIndex, 11)) {
-        // peephole enabled, check input types
-        if (!checkInputOperandType(9, (int32_t)OperandType::TENSOR_FLOAT32)) return false;
-        if (!checkInputOperandType(10, (int32_t)OperandType::TENSOR_FLOAT32)) return false;
-        if (!checkInputOperandType(11, (int32_t)OperandType::TENSOR_FLOAT32)) return false;
-    }
-
-    if (!sModelInfo->isOmittedInput(mNnapiOperationIndex, 16)) {
-        // projection used, check input types
-        if (!checkInputOperandType(16, (int32_t)OperandType::TENSOR_FLOAT32)) return false;
-    }
 
     ALOGV("%s PASSED", __func__);
     return true;
@@ -244,10 +188,16 @@ std::shared_ptr<ngraph::Node> LSTM::createNode() {
     initial_cell_state = getInputNode(19);    // C_{t-1}
 
     activationFn = sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 20);
-    cell_state_clipping = sModelInfo->ParseOperationInput<float>(mNnapiOperationIndex, 21);
 
-    if (isProjectionUsed)
-        proj_clipping = sModelInfo->ParseOperationInput<float>(mNnapiOperationIndex, 22);
+    if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT16)) {
+        cell_state_clipping = sModelInfo->ParseOperationInput<_Float16>(mNnapiOperationIndex, 21);
+        if (isProjectionUsed)
+            proj_clipping = sModelInfo->ParseOperationInput<_Float16>(mNnapiOperationIndex, 22);
+    } else {
+        cell_state_clipping = sModelInfo->ParseOperationInput<float>(mNnapiOperationIndex, 21);
+        if (isProjectionUsed)
+            proj_clipping = sModelInfo->ParseOperationInput<float>(mNnapiOperationIndex, 22);
+    }
 
     std::shared_ptr<ngraph::Node> i_t, f_t, c_t, o_t;
     std::shared_ptr<ngraph::Node> scratchBuffer;

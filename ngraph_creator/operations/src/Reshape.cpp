@@ -12,17 +12,6 @@ Reshape::Reshape(int operationIndex) : OperationsBase(operationIndex) {
 }
 
 bool Reshape::validate() {
-    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        return false;
-    }
-    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        return false;
-    }
-    if (!checkInputOperandType(1, (int32_t)OperandType::TENSOR_INT32)) {
-        return false;
-    }
     const auto& dimsOperandIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 1);
     if (!sModelInfo->isOperandLifeTimeConst(dimsOperandIndex) || !isValidInputTensor(1)) {
         // TODO: Support CPU_reshape_all_tensors_as_inputs

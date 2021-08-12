@@ -11,20 +11,7 @@ Split::Split(int operationIndex) : OperationsBase(operationIndex) {
 }
 
 bool Split::validate() {
-    // check output type
-    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkOutputOperandType(0, (int32_t)OperandType::TENSOR_INT32) &&
-        !checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        return false;
-    }
-
-    // Check all input types
-    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkInputOperandType(0, (int32_t)OperandType::TENSOR_INT32) &&
-        !checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        return false;
-    }
-
+    ALOGV("%s PASSED", __func__);
     return true;
 }
 
@@ -50,6 +37,9 @@ std::shared_ptr<ngraph::Node> Split::createNode() {
         if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) {
             outNode =
                 std::make_shared<ngraph::opset3::Convert>(outputNode[i], ngraph::element::f32);
+        } else if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT16)) {
+            outNode =
+                std::make_shared<ngraph::opset3::Convert>(outputNode[i], ngraph::element::f16);
         } else if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_INT32)) {
             outNode =
                 std::make_shared<ngraph::opset3::Convert>(outputNode[i], ngraph::element::i32);
