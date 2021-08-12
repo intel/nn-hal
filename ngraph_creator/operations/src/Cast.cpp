@@ -11,20 +11,7 @@ Cast::Cast(int operationIndex) : OperationsBase(operationIndex) {
 }
 
 bool Cast::validate() {
-    // check output type
-    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkOutputOperandType(0, (int32_t)OperandType::TENSOR_INT32) &&
-        !checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        return false;
-    }
-
-    // Check all input types
-    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkInputOperandType(0, (int32_t)OperandType::TENSOR_INT32) &&
-        !checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        return false;
-    }
-
+    ALOGV("%s PASSED", __func__);
     return true;
 }
 
@@ -50,6 +37,8 @@ std::shared_ptr<ngraph::Node> Cast::createNode() {
     } else {
         if (checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) {
             elementType = ngraph::element::f32;
+        } else if (checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT16)) {
+            elementType = ngraph::element::f16;
         } else if (checkOutputOperandType(0, (int32_t)OperandType::TENSOR_INT32)) {
             elementType = ngraph::element::i32;
         } else if (checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
