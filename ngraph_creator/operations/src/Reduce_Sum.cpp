@@ -11,16 +11,6 @@ Reduce_Sum::Reduce_Sum(int operationIndex) : OperationsBase(operationIndex) {
 }
 
 bool Reduce_Sum::validate() {
-    // check output type
-    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) {
-        return false;
-    }
-
-    // Check all input types
-    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) return false;
-
-    if (!checkInputOperandType(1, (int32_t)OperandType::TENSOR_INT32)) return false;
-
     // TODO: Remove this condition, Issue with "CNNNetworkImpl" in OpenVINO 2021.2, fixed in 2021.4
     // Issue is with input of shape [1, 1, 1] => Reduce_Sum is converted to Reshape using
     // ConvertReduce transformation and produces empty constant with [0] to reshape input [1, 1, 1]

@@ -11,18 +11,7 @@ Neg::Neg(int operationIndex) : OperationsBase(operationIndex) {
 }
 
 bool Neg::validate() {
-    // check output type
-    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkOutputOperandType(0, (int32_t)OperandType::TENSOR_INT32)) {
-        return false;
-    }
-
-    // Check all input types
-    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkInputOperandType(0, (int32_t)OperandType::TENSOR_INT32)) {
-        return false;
-    }
-
+    ALOGV("%s PASSED", __func__);
     return true;
 }
 

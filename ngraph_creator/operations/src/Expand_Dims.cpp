@@ -11,20 +11,6 @@ Expand_Dims::Expand_Dims(int operationIndex) : OperationsBase(operationIndex) {
 }
 
 bool Expand_Dims::validate() {
-    // check output type
-    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkOutputOperandType(0, (int32_t)OperandType::TENSOR_INT32) &&
-        !checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        return false;
-    }
-
-    // Check all input types
-    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkInputOperandType(0, (int32_t)OperandType::TENSOR_INT32) &&
-        !checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        return false;
-    }
-
     // Check input rank
     const auto inputRank = getInputOperandDimensions(0).size();
     if (inputRank < 1) return false;

@@ -11,16 +11,7 @@ Reduce_Prod::Reduce_Prod(int operationIndex) : OperationsBase(operationIndex) {
 }
 
 bool Reduce_Prod::validate() {
-    // check output type
-    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) {
-        return false;
-    }
-
-    // Check all input types
-    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) return false;
-
-    if (!checkInputOperandType(1, (int32_t)OperandType::TENSOR_INT32)) return false;
-
+    ALOGV("%s PASSED", __func__);
     return true;
 }
 

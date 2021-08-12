@@ -11,12 +11,6 @@ L2Pooling2D::L2Pooling2D(int operationIndex) : OperationsBase(operationIndex) {
 }
 
 bool L2Pooling2D::validate() {
-    // check output type
-    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) {
-        ALOGE("L2Pooling2D operation supported only for Float32 inputs");
-        return false;
-    }
-
     ALOGV("%s PASSED", __func__);
     return true;
 }

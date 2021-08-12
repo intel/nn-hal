@@ -11,23 +11,6 @@ Max_Pool_2d::Max_Pool_2d(int operationIndex) : OperationsBase(operationIndex) {
 }
 
 bool Max_Pool_2d::validate() {
-    // Check Output type
-    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM))
-        return false;
-
-    // Check Input Type
-    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM))
-        return false;
-
-    // Check Input Dimension size
-    const auto& inputDimensionsSize = getInputOperandDimensions(0).size();
-    if (inputDimensionsSize != 4) {
-        ALOGE("%s Invalid dimensions size for input(%lu)", __func__, inputDimensionsSize);
-        return false;
-    }
-
     ALOGV("%s PASSED", __func__);
     return true;
 }
