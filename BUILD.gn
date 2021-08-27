@@ -194,9 +194,10 @@ shared_library("intel_nnhal") {
     "nnapi-support",
     "ngraph",
     "inference_engine",
-    "nn-common", 
+    "nn-common",
     "ssl",
-    "crypto"
+    "crypto",
+    "MKLDNNPlugin"
   ]
   lib_dirs = [
     "${sysroot}/usr/local/deployment_tools/inference_engine/lib/intel64/",
