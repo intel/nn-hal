@@ -77,6 +77,8 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<Space_To_Depth>(operationIndex);
         case OperationType::SQUEEZE:
             return std::make_shared<Squeeze>(operationIndex);
+        case OperationType::STRIDED_SLICE:
+            return std::make_shared<Strided_Slice>(operationIndex);
         case OperationType::SUB:
             return std::make_shared<Sub>(operationIndex);
         case OperationType::TANH:

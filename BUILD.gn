@@ -102,6 +102,7 @@ shared_library("intel_nnhal") {
     "ngraph_creator/operations/src/Space_To_Batch.cpp",
     "ngraph_creator/operations/src/Space_To_Depth.cpp",
     "ngraph_creator/operations/src/Squeeze.cpp",
+    "ngraph_creator/operations/src/Strided_Slice.cpp",
     "ngraph_creator/operations/src/Sub.cpp",
     "ngraph_creator/operations/src/Tanh.cpp",
     "ngraph_creator/operations/src/Transpose.cpp",
