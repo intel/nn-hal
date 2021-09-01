@@ -40,6 +40,7 @@ cc_library_static {
         "operations/src/Space_To_Batch.cpp",
         "operations/src/Space_To_Depth.cpp",
         "operations/src/Squeeze.cpp",
+        "operations/src/Strided_Slice.cpp",
         "operations/src/Sub.cpp",
         "operations/src/Tanh.cpp",
         "operations/src/Transpose.cpp"
