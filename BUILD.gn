@@ -80,6 +80,7 @@ shared_library("intel_nnhal") {
     "ngraph_creator/operations/src/Depthwise_Conv_2d.cpp",
     "ngraph_creator/operations/src/Dequantize.cpp",
     "ngraph_creator/operations/src/Div.cpp",
+    "ngraph_creator/operations/src/Embedding_Lookup.cpp",
     "ngraph_creator/operations/src/Floor.cpp",
     "ngraph_creator/operations/src/FullyConnected.cpp",
     "ngraph_creator/operations/src/L2_Normalization.cpp",

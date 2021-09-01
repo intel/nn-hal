@@ -35,6 +35,8 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<Dequantize>(operationIndex);
         case OperationType::DIV:
             return std::make_shared<Div>(operationIndex);
+        case OperationType::EMBEDDING_LOOKUP:
+            return std::make_shared<Embedding_Lookup>(operationIndex);
         case OperationType::FULLY_CONNECTED:
             return std::make_shared<FullyConnected>(operationIndex);
         case OperationType::FLOOR:
