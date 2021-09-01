@@ -9,6 +9,7 @@
 #include <Depthwise_Conv_2d.hpp>
 #include <Dequantize.hpp>
 #include <Div.hpp>
+#include <Embedding_Lookup.hpp>
 #include <Floor.hpp>
 #include <FullyConnected.hpp>
 #include <L2Pooling2D.hpp>
