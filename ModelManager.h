@@ -121,9 +121,6 @@ public:
     }
 
     const uint8_t* GetOperandMemory(int index, uint32_t& lenOut);
-    IRBlob::Ptr GetConstOperandAsTensor(int operand_idx, int operation_idx);
-    Blob::Ptr GetInOutOperandAsBlob(RunTimeOperandInfo& op, const uint8_t* buf, uint32_t& len);
-    IRBlob::Ptr GetConstWeightsOperandAsTensor(uint32_t index);  // Redundant
 
     template <typename T>
     T ParseOperationInput(int operationIndex, uint32_t index) {
@@ -180,8 +177,6 @@ public:
         return true;
     }
 
-    std::vector<V1_2::OutputShape> getOutputShapes() { return mOutputShapes; }
-
     void unmapRuntimeMemPools() {
         for (auto runtimeInfo : mRequestPoolInfos) {
             runtimeInfo.unmap_mem();
@@ -199,7 +194,6 @@ private:
     std::vector<RunTimePoolInfo> mPoolInfos;
     std::vector<RunTimeOperandInfo> mOperands;
     std::vector<RunTimePoolInfo> mRequestPoolInfos;
-    std::vector<V1_2::OutputShape> mOutputShapes;
 };
 
 }  // namespace nnhal

@@ -25,14 +25,6 @@ bool Conv_2d::validate() {
         return false;
     }
 
-    if (checkInputOperandType(1, (int32_t)OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL)) {
-        const auto& operandIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 1);
-        const auto& operand = sModelInfo->getOperand(operandIndex);
-        if (operand.extraParams.channelQuant().channelDim != 0) {
-            return false;
-        }
-    }
-
     ALOGV("%s PASSED", __func__);
     return true;
 }
@@ -43,10 +35,9 @@ std::shared_ptr<ngraph::Node> Conv_2d::createNode() {
 
     bool isImplicit = false, isExplicit = false;
 
-    if (inputsSize >= 10 && inputsSize <= 13 &&
-        !checkInputOperandType(7, (int32_t)OperandType::BOOL)) {
+    if (inputsSize == 10) {
         isExplicit = true;
-    } else if (inputsSize >= 7 && inputsSize <= 10) {
+    } else if (inputsSize == 7) {
         isImplicit = true;
     }
 
@@ -178,24 +169,7 @@ std::shared_ptr<ngraph::Node> Conv_2d::createNode() {
     filterNode = getInputNode(1);
     biasNode = getInputNode(2);
 
-    if (checkInputOperandType(1, (int32_t)OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL)) {
-        auto filterIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 1);
-        const auto& filterOperand = sModelInfo->getOperand(filterIndex);
-        vec<float> filterScales = filterOperand.extraParams.channelQuant().scales;
-        float inputScale = sModelInfo->getOperandScale(0);
-        auto filterScalesNode =
-            createConstNode(ngraph::element::f32, ngraph::Shape{filterScales.size()}, filterScales);
-        auto inputScalesNode =
-            createConstNode(ngraph::element::f32, ngraph::Shape{1}, convertToVector(inputScale));
-
-        // for quant symm per channel type inputs, bias is of type TENSOR_INT32. For TENSOR_INT32
-        // type, dequantization is not applied during node creation
-        // bias_scale[i] = input_scale * filter_scale[i]
-        auto biasScalMultiplier =
-            std::make_shared<ngraph::opset3::Multiply>(filterScalesNode, inputScalesNode);
-        biasNode = std::make_shared<ngraph::opset3::Convert>(biasNode, ngraph::element::f32);
-        biasNode = std::make_shared<ngraph::opset3::Multiply>(biasNode, biasScalMultiplier);
-    } else if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
+    if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
         // for quant type inputs, bias is of type TENSOR_INT32. For TENSOR_INT32 type,
         // dequantization is not applied during node creation
         biasNode = DequantizeNode(biasNode, biasIndex, ngraph::element::f32);

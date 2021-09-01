@@ -149,7 +149,6 @@ struct RunTimeOperandInfo {
     uint32_t length;
     OperandLifeTime lifetime;
     uint32_t numberOfUsesLeft;
-    Operand::ExtraParams extraParams;
     Shape shape() const {
         return {
             .type = type,

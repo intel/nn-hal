@@ -7,22 +7,6 @@ namespace hardware {
 namespace neuralnetworks {
 namespace nnhal {
 
-bool NnapiModelInfo::updateOutputshapes(size_t outputIndex, std::vector<size_t>& outputDims,
-                                        bool isLengthSufficient) {
-    auto& outputShapeDims = mOutputShapes[outputIndex].dimensions;
-    mOutputShapes[outputIndex].isSufficient = isLengthSufficient;
-    if (outputDims.size() < outputShapeDims.size()) {
-        return false;
-    }
-    for (size_t i = 0; i < outputShapeDims.size(); i++) {
-        if (outputShapeDims[i] != outputDims[i]) {
-            ALOGD("%s Updating dim(%zu) at Output index(%zu)", __func__, i, outputIndex);
-            outputShapeDims[i] = outputDims[i];
-        }
-    }
-    return true;
-}
-
 bool NnapiModelInfo::initializeRunTimeOperandInfo() {
     // initialize runtime operand info from model.
     const size_t count = mModel.operands.size();
@@ -32,7 +16,6 @@ bool NnapiModelInfo::initializeRunTimeOperandInfo() {
         return false;
     }
     mOperands.resize(count);
-    mOutputShapes.resize(mModel.outputIndexes.size());
 
     // Start by setting the runtime info to what's in the model.
     for (size_t i = 0; i < count; i++) {
@@ -53,22 +36,12 @@ bool NnapiModelInfo::initializeRunTimeOperandInfo() {
                 break;
             case OperandType::INT32:
             case OperandType::UINT32:
-            case OperandType::BOOL:
                 nnAssert(to.scale == 0);
                 FALLTHROUGH_INTENDED;
             case OperandType::TENSOR_INT32:
                 to.type = from.type;
                 break;
-            case OperandType::TENSOR_FLOAT16:
-            case OperandType::FLOAT16:
-                to.type = from.type;
-                break;
-            case OperandType::TENSOR_BOOL8:
-                to.type = from.type;
-                break;
             case OperandType::TENSOR_QUANT8_ASYMM:
-            case OperandType::TENSOR_QUANT8_SYMM:
-            case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL:
                 to.type = from.type;
                 break;
             default:
@@ -113,8 +86,6 @@ bool NnapiModelInfo::initializeRunTimeOperandInfo() {
     for (uint32_t i = 0; i < mModel.outputIndexes.size(); i++) {
         const uint32_t operandIndex = mModel.outputIndexes[i];
         const RunTimeOperandInfo& from = mOperands[operandIndex];
-        mOutputShapes[i].dimensions = from.dimensions;
-        mOutputShapes[i].isSufficient = true;
     }
 
     return true;
@@ -161,326 +132,6 @@ const uint8_t* NnapiModelInfo::GetOperandMemory(int index, uint32_t& lenOut) {
     }
     ALOGE("operand is expected to be const, but lifetime is %d", op.lifetime);
     nnAssert(false);  // temp fix since some time const operand set as TEMPORARY_VARIABLE
-    return nullptr;
-}
-
-Blob::Ptr NnapiModelInfo::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const uint8_t* buf,
-                                                uint32_t& len) {
-    if (op.type == OperandType::TENSOR_FLOAT32 || op.type == OperandType::FLOAT32 ||
-        op.type == OperandType::TENSOR_FLOAT16) {
-        if (op.lifetime == OperandLifeTime::MODEL_INPUT) {
-            ALOGD("Create input blob !!!!");
-            vec<unsigned int> order;
-            InferenceEngine::Layout layout;
-            bool isOrderSet = false;
-            if (op.dimensions.size() == 4) {
-                order = {0, 3, 1, 2};  // nhwc -> nchw
-                layout = InferenceEngine::Layout::NCHW;
-                isOrderSet = true;
-            } else if (op.dimensions.size() == 2) {
-                order = {0, 1};
-                layout = InferenceEngine::Layout::NC;
-                isOrderSet = true;
-            } else if (op.dimensions.size() == 1) {
-                layout = InferenceEngine::Layout::C;
-                isOrderSet = false;
-            } else {
-                layout = InferenceEngine::Layout::ANY;
-                isOrderSet = false;
-            }
-
-            auto inputDims = toDims(op.dimensions);
-
-            TensorDims inputOpDims;
-
-            if (!isOrderSet)
-                inputOpDims = inputDims;
-            else
-                inputOpDims = permuteDims(inputDims, order);
-
-            InferenceEngine::TensorDesc td(InferenceEngine::Precision::FP32, inputOpDims, layout);
-
-            if (buf == nullptr) {
-                ALOGD("MODEL_INPUT buf is NULL !!!!!!!!!!!!!!!");
-                InferenceEngine::TBlob<float>::Ptr blob =
-                    std::make_shared<InferenceEngine::TBlob<float>>(td);
-                blob->allocate();
-                return blob;
-            } else {
-                InferenceEngine::TBlob<float>::Ptr blob =
-                    std::make_shared<InferenceEngine::TBlob<float>>(td, (float*)buf, len);
-                return blob;
-            }
-        } else if (op.lifetime == OperandLifeTime::MODEL_OUTPUT) {
-            ALOGD("Create output blob !!!!");
-            vec<unsigned int> order;
-            InferenceEngine::Layout layout;
-            if (op.dimensions.size() == 4) {
-                layout = InferenceEngine::Layout::NHWC;
-            } else if (op.dimensions.size() == 2) {
-                layout = InferenceEngine::Layout::NC;
-            } else if (op.dimensions.size() == 3) {
-                layout = InferenceEngine::Layout::CHW;
-                ALOGI("Anoob : GetInOutOperandAsBlob output already transposed to NHWC");
-            } else if (op.dimensions.size() == 1) {
-                layout = InferenceEngine::Layout::C;
-            } else {
-                layout = InferenceEngine::Layout::ANY;
-            }
-            InferenceEngine::TensorDesc td(InferenceEngine::Precision::FP32, toDims(op.dimensions),
-                                           layout);  // nhwc
-            if (buf == nullptr) {
-                ALOGD("MODEL_OUTPUT buf is NULL !!!!!!!!!!!!!!!");
-                InferenceEngine::TBlob<float>::Ptr blob =
-                    std::make_shared<InferenceEngine::TBlob<float>>(td);
-                blob->allocate();
-                return blob;
-            } else {
-                InferenceEngine::TBlob<float>::Ptr blob =
-                    InferenceEngine::make_shared_blob<float>(td, (float*)buf);
-                return blob;
-            }
-        }
-    } else if (op.type == OperandType::TENSOR_INT32 || op.type == OperandType::INT32) {
-        ALOGV("check if const tensors of type IN32 supported");
-        InferenceEngine::TensorDesc td(InferenceEngine::Precision::I32, toDims(op.dimensions),
-                                       InferenceEngine::Layout::ANY);
-        if (buf == nullptr) {
-            ALOGD("TENSOR_INT32 buf is NULL !!!!!!!!!!!!!!!");
-            InferenceEngine::TBlob<int32_t>::Ptr blob =
-                std::make_shared<InferenceEngine::TBlob<int32_t>>(td);
-            blob->allocate();
-            return blob;
-        } else {
-            InferenceEngine::TBlob<int32_t>::Ptr blob =
-                std::make_shared<InferenceEngine::TBlob<int32_t>>(td, (int32_t*)buf, len);
-            return blob;
-        }
-    } else if (op.type == OperandType::TENSOR_BOOL8 || op.type == OperandType::BOOL) {
-        ALOGV("check if const tensors of type BOOL supported");
-        // nnAssert(true);
-        InferenceEngine::TensorDesc td(InferenceEngine::Precision::BOOL, toDims(op.dimensions),
-                                       InferenceEngine::Layout::ANY);
-        if (buf == nullptr) {
-            ALOGD("TENSOR_BOOL8 buf is NULL !!!!!!!!!!!!!!!");
-            InferenceEngine::TBlob<uint8_t>::Ptr blob =
-                std::make_shared<InferenceEngine::TBlob<uint8_t>>(td);
-            blob->allocate();
-            return blob;
-        } else {
-            InferenceEngine::TBlob<uint8_t>::Ptr blob =
-                std::make_shared<InferenceEngine::TBlob<uint8_t>>(td, (uint8_t*)buf, len);
-            return blob;
-        }
-    } else if (op.type == OperandType::TENSOR_QUANT8_ASYMM) {
-        ALOGV("check if tensors of type TENSOR_QUANT8_ASYMM supported");
-        InferenceEngine::TensorDesc td(InferenceEngine::Precision::U8, toDims(op.dimensions),
-                                       InferenceEngine::Layout::ANY);
-        if (buf == nullptr) {
-            ALOGD("TENSOR_QUANT8_ASYMM buf is NULL !!!!!!!!!!!!!!!");
-            InferenceEngine::TBlob<uint8_t>::Ptr blob =
-                std::make_shared<InferenceEngine::TBlob<uint8_t>>(td);
-            blob->allocate();
-            return blob;
-        } else {
-            InferenceEngine::TBlob<uint8_t>::Ptr blob =
-                std::make_shared<InferenceEngine::TBlob<uint8_t>>(td, (uint8_t*)buf, len);
-            return blob;
-        }
-    } else if (op.type == OperandType::TENSOR_QUANT8_SYMM ||
-               op.type == OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL) {
-        ALOGV(
-            "check if tensors of type TENSOR_QUANT8_SYMM/TENSOR_QUANT8_SYMM_PER_CHANNEL  "
-            "supported");
-        InferenceEngine::TensorDesc td(InferenceEngine::Precision::I8, toDims(op.dimensions),
-                                       InferenceEngine::Layout::ANY);
-        if (buf == nullptr) {
-            ALOGD("TENSOR_QUANT8_SYMM/TENSOR_QUANT8_SYMM_PER_CHANNEL buf is NULL !!!!!!!!!!!!!!!");
-            InferenceEngine::TBlob<int8_t>::Ptr blob =
-                std::make_shared<InferenceEngine::TBlob<int8_t>>(td);
-            blob->allocate();
-            return blob;
-        } else {
-            InferenceEngine::TBlob<int8_t>::Ptr blob =
-                std::make_shared<InferenceEngine::TBlob<int8_t>>(td, (int8_t*)buf, len);
-            return blob;
-        }
-    }
-    return nullptr;
-}
-
-IRBlob::Ptr NnapiModelInfo::GetConstOperandAsTensor(int operand_idx, int operation_idx) {
-    const auto op = mModel.operands[operand_idx];
-    uint32_t len;
-
-    const uint8_t* buf = GetOperandMemory(operand_idx, len);
-    ALOGD("NnapiModelInfo:: operand_index: %d, operation_index :%d,len: %d, buf: %p", operand_idx,
-          operation_idx, len, buf);
-
-    if (op.type == OperandType::TENSOR_FLOAT32 || op.type == OperandType::FLOAT32) {
-        vec<unsigned int> order;
-        InferenceEngine::Layout layout;
-        bool isOrderSet = false;
-        if (op.dimensions.size() == 4) {
-            order = {0, 3, 1, 2};                    // nhwc -> nchw
-            layout = InferenceEngine::Layout::OIHW;  // weights layout
-            isOrderSet = true;
-        } else if (op.dimensions.size() == 2) {
-            order = {0, 1};
-            layout = InferenceEngine::Layout::NC;
-            isOrderSet = true;
-        } else if (op.dimensions.size() == 1) {
-            layout = InferenceEngine::Layout::C;
-            isOrderSet = false;
-        } else {
-            layout = InferenceEngine::Layout::ANY;
-            isOrderSet = false;
-        }
-
-        auto inputDims = toDims(op.dimensions);
-
-        TensorDims inputOpDims;
-
-        if (!isOrderSet)
-            inputOpDims = inputDims;
-        else
-            inputOpDims = permuteDims(inputDims, order);
-
-        InferenceEngine::TensorDesc td(InferenceEngine::Precision::FP32, inputOpDims, layout);
-
-        if (buf == nullptr) {
-            ALOGD("TENSOR_FLOAT32 buf is NULL !!!!!!!!!!!!!!!");
-            InferenceEngine::TBlob<float>::Ptr blob =
-                std::make_shared<InferenceEngine::TBlob<float>>(td);
-            blob->allocate();
-            return blob;
-        } else {
-            InferenceEngine::TBlob<float>::Ptr blob =
-                std::make_shared<InferenceEngine::TBlob<float>>(td, (float*)buf, len);
-            return blob;
-        }
-    } else if (op.type == OperandType::TENSOR_INT32 || op.type == OperandType::INT32) {
-        ALOGV("check if const tensors of type IN32 supported");
-        InferenceEngine::TensorDesc td(InferenceEngine::Precision::I32, toDims(op.dimensions),
-                                       InferenceEngine::Layout::ANY);
-        if (buf == nullptr) {
-            ALOGD("TENSOR_INT32 buf is NULL !!!!!!!!!!!!!!!");
-            InferenceEngine::TBlob<int32_t>::Ptr blob =
-                std::make_shared<InferenceEngine::TBlob<int32_t>>(td);
-            blob->allocate();
-            return blob;
-        } else {
-            InferenceEngine::TBlob<int32_t>::Ptr blob =
-                std::make_shared<InferenceEngine::TBlob<int32_t>>(td, (int32_t*)buf, len);
-            return blob;
-        }
-    } else if (op.type == OperandType::TENSOR_BOOL8 || op.type == OperandType::BOOL) {
-        ALOGV("check if const tensors of type BOOL supported");
-        // nnAssert(true);
-        InferenceEngine::TensorDesc td(InferenceEngine::Precision::BOOL, toDims(op.dimensions),
-                                       InferenceEngine::Layout::ANY);
-        if (buf == nullptr) {
-            ALOGD("TENSOR_BOOL8 buf is NULL !!!!!!!!!!!!!!!");
-            InferenceEngine::TBlob<uint8_t>::Ptr blob =
-                std::make_shared<InferenceEngine::TBlob<uint8_t>>(td);
-            blob->allocate();
-            return blob;
-        } else {
-            InferenceEngine::TBlob<uint8_t>::Ptr blob =
-                std::make_shared<InferenceEngine::TBlob<uint8_t>>(td, (uint8_t*)buf, len);
-            return blob;
-        }
-    }
-    return nullptr;
-}
-
-// Redundant.. Remove the code
-IRBlob::Ptr NnapiModelInfo::GetConstWeightsOperandAsTensor(uint32_t index) {
-    const auto op = mModel.operands[index];
-    uint32_t len;
-    const uint8_t* buf = GetOperandMemory(index, len);
-    ALOGD("NnapiModelInfo:: Operand: index: %d, len: %d, buf: %p", index, len, buf);
-    if (op.type == OperandType::TENSOR_FLOAT32 || op.type == OperandType::FLOAT32) {
-        vec<unsigned int> order;
-        InferenceEngine::Layout layout;
-        bool isOrderSet = false;
-        if (op.dimensions.size() == 4) {
-            // order = {0,3,1,2};  //nhwc -> nchw
-            order = {3, 0, 1, 2};                    // IHWO -> OIHW for depth conv
-            layout = InferenceEngine::Layout::OIHW;  // weights layout
-            isOrderSet = true;
-        } else if (op.dimensions.size() == 2) {
-            order = {0, 1};
-            layout = InferenceEngine::Layout::NC;
-            isOrderSet = true;
-        } else if (op.dimensions.size() == 1) {
-            layout = InferenceEngine::Layout::C;
-            isOrderSet = false;
-        } else {
-            layout = InferenceEngine::Layout::ANY;
-            isOrderSet = false;
-        }
-
-        auto inputDims = toDims(op.dimensions);
-
-        TensorDims inputOpDims;
-
-        if (!isOrderSet)
-            inputOpDims = inputDims;
-        else
-            inputOpDims = permuteDims(inputDims, order);
-
-        InferenceEngine::TensorDesc td(InferenceEngine::Precision::FP32, inputOpDims, layout);
-
-        if (buf == nullptr) {
-            ALOGD("TENSOR_FLOAT32 buf is NULL !!!!!!!!!!!!!!!");
-            InferenceEngine::TBlob<float>::Ptr blob =
-                std::make_shared<InferenceEngine::TBlob<float>>(td);
-            blob->allocate();
-            return blob;
-        } else {
-            if (inputDims.size() != 4) {
-                InferenceEngine::TBlob<float>::Ptr blob =
-                    std::make_shared<InferenceEngine::TBlob<float>>(td, (float*)buf, len);
-                return blob;
-            } else {
-                InferenceEngine::TBlob<float>::Ptr blob =
-                    std::make_shared<InferenceEngine::TBlob<float>>(td, (float*)buf, len);
-                return blob;
-            }
-        }
-    } else if (op.type == OperandType::TENSOR_INT32 || op.type == OperandType::INT32) {
-        ALOGV("check if const tensors of type IN32 supported");
-        InferenceEngine::TensorDesc td(InferenceEngine::Precision::I32, toDims(op.dimensions),
-                                       InferenceEngine::Layout::ANY);
-        if (buf == nullptr) {
-            ALOGD("TENSOR_INT32 buf is NULL !!!!!!!!!!!!!!!");
-            InferenceEngine::TBlob<int32_t>::Ptr blob =
-                std::make_shared<InferenceEngine::TBlob<int32_t>>(td);
-            blob->allocate();
-            return blob;
-        } else {
-            InferenceEngine::TBlob<int32_t>::Ptr blob =
-                std::make_shared<InferenceEngine::TBlob<int32_t>>(td, (int32_t*)buf, len);
-            return blob;
-        }
-    } else if (op.type == OperandType::TENSOR_BOOL8 || op.type == OperandType::BOOL) {
-        ALOGV("check if const tensors of type BOOL supported");
-        // nnAssert(true);
-        InferenceEngine::TensorDesc td(InferenceEngine::Precision::BOOL, toDims(op.dimensions),
-                                       InferenceEngine::Layout::ANY);
-        if (buf == nullptr) {
-            ALOGD("TENSOR_BOOL8 buf is NULL !!!!!!!!!!!!!!!");
-            InferenceEngine::TBlob<uint8_t>::Ptr blob =
-                std::make_shared<InferenceEngine::TBlob<uint8_t>>(td);
-            blob->allocate();
-            return blob;
-        } else {
-            InferenceEngine::TBlob<uint8_t>::Ptr blob =
-                std::make_shared<InferenceEngine::TBlob<uint8_t>>(td, (uint8_t*)buf, len);
-            return blob;
-        }
-    }
     return nullptr;
 }
 
@@ -565,13 +216,11 @@ template float NnapiModelInfo::GetConstOperand<float>(unsigned int);
 template uint8_t NnapiModelInfo::GetConstOperand<uint8_t>(unsigned int);
 template int8_t NnapiModelInfo::GetConstOperand<int8_t>(unsigned int);
 template uint32_t NnapiModelInfo::GetConstOperand<uint32_t>(unsigned int);
-template _Float16 NnapiModelInfo::GetConstOperand<_Float16>(unsigned int);
 template int NnapiModelInfo::GetConstFromBuffer<int>(unsigned char const*, unsigned int);
 template float NnapiModelInfo::GetConstFromBuffer<float>(unsigned char const*, unsigned int);
 template uint8_t NnapiModelInfo::GetConstFromBuffer<uint8_t>(unsigned char const*, unsigned int);
 template int8_t NnapiModelInfo::GetConstFromBuffer<int8_t>(unsigned char const*, unsigned int);
 template uint32_t NnapiModelInfo::GetConstFromBuffer<uint32_t>(unsigned char const*, unsigned int);
-template _Float16 NnapiModelInfo::GetConstFromBuffer<_Float16>(unsigned char const*, unsigned int);
 }  // namespace nnhal
 }  // namespace neuralnetworks
 }  // namespace hardware

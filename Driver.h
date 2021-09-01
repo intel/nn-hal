@@ -23,11 +23,6 @@
 #include <android/hardware/neuralnetworks/1.0/types.h>
 #include <android/hardware/neuralnetworks/1.1/IDevice.h>
 #include <android/hardware/neuralnetworks/1.1/types.h>
-#include <android/hardware/neuralnetworks/1.2/IDevice.h>
-#include <android/hardware/neuralnetworks/1.2/IExecutionCallback.h>
-#include <android/hardware/neuralnetworks/1.2/IPreparedModel.h>
-#include <android/hardware/neuralnetworks/1.2/IPreparedModelCallback.h>
-#include <android/hardware/neuralnetworks/1.2/types.h>
 
 #include <string>
 
@@ -46,18 +41,12 @@ using V1_0_Capabilities = ::android::hardware::neuralnetworks::V1_0::Capabilitie
 
 // For HAL-1.1 version
 using namespace ::android::hardware::neuralnetworks::V1_1;
-using V1_1_Model = ::android::hardware::neuralnetworks::V1_1::Model;
-using V1_1_Operation = ::android::hardware::neuralnetworks::V1_1::Operation;
-using V1_1_Capabilities = ::android::hardware::neuralnetworks::V1_1::Capabilities;
-
-// For HAL-1.2 version
-using namespace ::android::hardware::neuralnetworks::V1_2;
-using Model = ::android::hardware::neuralnetworks::V1_2::Model;
-using Operand = ::android::hardware::neuralnetworks::V1_2::Operand;
-using Operation = ::android::hardware::neuralnetworks::V1_2::Operation;
-using OperationType = ::android::hardware::neuralnetworks::V1_2::OperationType;
-using OperandType = ::android::hardware::neuralnetworks::V1_2::OperandType;
-using Capabilities = ::android::hardware::neuralnetworks::V1_2::Capabilities;
+using Model = ::android::hardware::neuralnetworks::V1_1::Model;
+using Operation = ::android::hardware::neuralnetworks::V1_1::Operation;
+using Capabilities = ::android::hardware::neuralnetworks::V1_1::Capabilities;
+using Operand = ::android::hardware::neuralnetworks::V1_0::Operand;
+using OperationType = ::android::hardware::neuralnetworks::V1_1::OperationType;
+using OperandType = ::android::hardware::neuralnetworks::V1_0::OperandType;
 
 using ::android::hardware::MQDescriptorSync;
 using HidlToken = android::hardware::hidl_array<uint8_t, 32>;
@@ -67,7 +56,7 @@ using HidlToken = android::hardware::hidl_array<uint8_t, 32>;
 //
 // Since these drivers simulate hardware, they must run the computations
 // on the CPU.  An actual driver would not do that.
-class Driver : public ::android::hardware::neuralnetworks::V1_2::IDevice {
+class Driver : public ::android::hardware::neuralnetworks::V1_1::IDevice {
 public:
     Driver() {}
     Driver(IntelDeviceType device) : mDeviceType(device) {}
@@ -83,28 +72,12 @@ public:
 
     // For HAL-1.1 version
     Return<void> getCapabilities_1_1(getCapabilities_1_1_cb cb) override;
-    Return<void> getSupportedOperations_1_1(const V1_1_Model& model,
+    Return<void> getSupportedOperations_1_1(const Model& model,
                                             getSupportedOperations_1_1_cb cb) override;
-    Return<ErrorStatus> prepareModel_1_1(const V1_1_Model& model, ExecutionPreference preference,
+    Return<ErrorStatus> prepareModel_1_1(const Model& model, ExecutionPreference preference,
                                          const sp<V1_0::IPreparedModelCallback>& callback) override;
 
-    // For HAL-1.2 version
-    Return<void> getCapabilities_1_2(getCapabilities_1_2_cb cb) override;
-    Return<void> getSupportedOperations_1_2(const Model& model,
-                                            getSupportedOperations_1_2_cb cb) override;
-    Return<ErrorStatus> prepareModel_1_2(const Model& model, ExecutionPreference preference,
-                                         const hidl_vec<hidl_handle>& modelCache,
-                                         const hidl_vec<hidl_handle>& dataCache,
-                                         const HidlToken& token,
-                                         const sp<V1_2::IPreparedModelCallback>& callback) override;
-    Return<ErrorStatus> prepareModelFromCache(
-        const hidl_vec<hidl_handle>& modelCache, const hidl_vec<hidl_handle>& dataCache,
-        const HidlToken& token, const sp<V1_2::IPreparedModelCallback>& callback) override;
     Return<DeviceStatus> getStatus() override;
-    Return<void> getVersionString(getVersionString_cb cb) override;
-    Return<void> getType(getType_cb cb) override;
-    Return<void> getSupportedExtensions(getSupportedExtensions_cb) override;
-    Return<void> getNumberOfCacheFilesNeeded(getNumberOfCacheFilesNeeded_cb cb) override;
 
 protected:
     IntelDeviceType mDeviceType;

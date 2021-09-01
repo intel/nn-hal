@@ -20,7 +20,6 @@
 #include <cutils/properties.h>
 #include <log/log.h>
 #include <thread>
-#include "ExecutionBurstServer.h"
 #include "ValidateHal.h"
 
 #define DISABLE_ALL_QUANT
@@ -32,8 +31,6 @@ namespace neuralnetworks {
 namespace nnhal {
 
 using namespace android::nn;
-
-static const Timing kNoTiming = {.timeOnDevice = UINT64_MAX, .timeInDriver = UINT64_MAX};
 
 void BasePreparedModel::deinitialize() {
     ALOGV("Entering %s", __func__);
@@ -54,34 +51,15 @@ bool BasePreparedModel::initialize() {
     return true;
 }
 
-static Return<void> notify(const sp<V1_0::IExecutionCallback>& callback, const ErrorStatus& status,
-                           const hidl_vec<OutputShape>&, Timing) {
+static Return<void> notify(const sp<V1_0::IExecutionCallback>& callback,
+                           const ErrorStatus& status) {
     return callback->notify(status);
-}
-
-static Return<void> notify(const sp<V1_2::IExecutionCallback>& callback, const ErrorStatus& status,
-                           const hidl_vec<OutputShape>& outputShapes, Timing timing) {
-    return callback->notify_1_2(status, outputShapes, timing);
 }
 
 static void floatToUint8(const float* src, uint8_t* dst, size_t size) {
     for (uint32_t i = 0; i < size; ++i) {
         dst[i] = static_cast<uint8_t>(src[i]);
         ALOGV("%s input: %f output: %d ", __func__, src[i], dst[i]);
-    }
-}
-
-static void floatToint8(const float* src, int8_t* dst, size_t size) {
-    for (uint32_t i = 0; i < size; ++i) {
-        dst[i] = static_cast<int8_t>(src[i]);
-        ALOGV("%s input: %f output: %d ", __func__, src[i], dst[i]);
-    }
-}
-
-static void floatToFloat16(const float* src, _Float16* dst, size_t size) {
-    for (uint32_t i = 0; i < size; ++i) {
-        dst[i] = src[i];
-        ALOGV("%s input: %f output: %f ", __func__, src[i], dst[i]);
     }
 }
 
@@ -94,35 +72,31 @@ auto microsecondsDuration(decltype(now()) end, decltype(now()) start) {
 }  // namespace
 
 template <typename T_IExecutionCallback>
-Return<ErrorStatus> executeBase(const Request& request, MeasureTiming measure,
-                                BasePreparedModel* preparedModel,
+Return<ErrorStatus> executeBase(const Request& request, BasePreparedModel* preparedModel,
                                 const sp<T_IExecutionCallback>& callback) {
     ALOGV("Entering %s", __func__);
-
-    time_point driverStart;
-    if (measure == MeasureTiming::YES) driverStart = now();
 
     if (callback.get() == nullptr) {
         ALOGE("invalid callback passed to execute");
         return ErrorStatus::INVALID_ARGUMENT;
     }
     if (!validateRequest(request, preparedModel->getModelInfo()->getModel())) {
-        notify(callback, ErrorStatus::INVALID_ARGUMENT, {}, kNoTiming);
+        notify(callback, ErrorStatus::INVALID_ARGUMENT);
         return ErrorStatus::INVALID_ARGUMENT;
     }
 
     // This thread is intentionally detached because the driver service
     // is expected to live forever.
-    std::thread([preparedModel, request, measure, driverStart, callback] {
-        asyncExecute(request, measure, preparedModel, driverStart, callback);
+    std::thread([preparedModel, request, callback] {
+        asyncExecute(request, preparedModel, callback);
     }).detach();
     ALOGV("Exiting %s", __func__);
     return ErrorStatus::NONE;
 }
 
 template <typename T_IExecutionCallback>
-void asyncExecute(const Request& request, MeasureTiming measure, BasePreparedModel* preparedModel,
-                  time_point driverStart, const sp<T_IExecutionCallback>& callback) {
+void asyncExecute(const Request& request, BasePreparedModel* preparedModel,
+                  const sp<T_IExecutionCallback>& callback) {
     ALOGV("Entering %s", __func__);
     auto modelInfo = preparedModel->getModelInfo();
     auto plugin = preparedModel->getPlugin();
@@ -130,7 +104,7 @@ void asyncExecute(const Request& request, MeasureTiming measure, BasePreparedMod
     time_point driverEnd, deviceStart, deviceEnd;
     std::vector<RunTimePoolInfo> requestPoolInfos;
     if (!modelInfo->setRunTimePoolInfosFromHidlMemories(request.pools)) {
-        notify(callback, ErrorStatus::GENERAL_FAILURE, {}, kNoTiming);
+        notify(callback, ErrorStatus::GENERAL_FAILURE);
         return;
     }
 
@@ -146,30 +120,18 @@ void asyncExecute(const Request& request, MeasureTiming measure, BasePreparedMod
         }
         ALOGD("Input index: %d layername : %s", inIndex, inputNodeName.c_str());
         auto destBlob = plugin->getBlob(inputNodeName);
-        if (modelInfo->getOperandType(inIndex) == OperandType::TENSOR_FLOAT16) {
-            float* dest = destBlob->buffer().as<float*>();
-            _Float16* src = (_Float16*)srcPtr;
 
-            for (unsigned int i = 0; i < len / 2; i++) {
-                dest[i] = src[i];
-            }
-        } else {
-            uint8_t* dest = destBlob->buffer().as<uint8_t*>();
-            std::memcpy(dest, (uint8_t*)srcPtr, len);
-        }
+        uint8_t* dest = destBlob->buffer().as<uint8_t*>();
+        std::memcpy(dest, (uint8_t*)srcPtr, len);
     }
     ALOGD("%s Run", __func__);
-
-    if (measure == MeasureTiming::YES) deviceStart = now();
     try {
         plugin->infer();
     } catch (const std::exception& ex) {
         ALOGE("%s Exception !!! %s", __func__, ex.what());
-        notify(callback, ErrorStatus::GENERAL_FAILURE, {}, kNoTiming);
+        notify(callback, ErrorStatus::GENERAL_FAILURE);
         return;
     }
-    if (measure == MeasureTiming::YES) deviceEnd = now();
-
     for (size_t i = 0; i < request.outputs.size(); i++) {
         auto outIndex = modelInfo->getModelOutputIndex(i);
         ALOGI("OutputIndex: %d", outIndex);
@@ -189,42 +151,12 @@ void asyncExecute(const Request& request, MeasureTiming measure, BasePreparedMod
         ALOGD("output precision: %d", static_cast<int>(srcBlob->getTensorDesc().getPrecision()));
 
         switch (operandType) {
-            case OperandType::TENSOR_BOOL8:
             case OperandType::TENSOR_QUANT8_ASYMM:
-            case OperandType::TENSOR_QUANT8_SYMM:
-            case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL:
                 actualLength /= 4;
-                break;
-            case OperandType::TENSOR_FLOAT16:
-                actualLength /= 2;
                 break;
             default:
                 ALOGV("Operand type is 4 bytes !!");
                 break;
-        }
-
-        bool outputSizeMismatch = false;
-        if (actualLength != expectedLength) {
-            ALOGE("%s Invalid length at outIndex(%d) Actual:%d Expected:%d", __func__, outIndex,
-                  actualLength, expectedLength);
-            outputSizeMismatch = true;
-        }
-
-        // TODO: bug identified with OV2021.4 where for Pad operation, if the output dimensions is 1
-        // output dimension is coming as 0
-        if ((outputBlobDims.size() == 0) && (actualLength != 0)) {
-            std::vector<size_t> rdims = {1};
-            modelInfo->updateOutputshapes(i, rdims, outputSizeMismatch ? false : true);
-        } else
-            modelInfo->updateOutputshapes(i, outputBlobDims, outputSizeMismatch ? false : true);
-
-        if (outputSizeMismatch) {
-            ALOGE(
-                "Mismatch in actual and exepcted output sizes. Return with "
-                "OUTPUT_INSUFFICIENT_SIZE error");
-            notify(callback, ErrorStatus::OUTPUT_INSUFFICIENT_SIZE, modelInfo->getOutputShapes(),
-                   kNoTiming);
-            return;
         }
 
         switch (operandType) {
@@ -234,21 +166,8 @@ void asyncExecute(const Request& request, MeasureTiming measure, BasePreparedMod
                             srcBlob->byteSize());
                 break;
             }
-            case OperandType::TENSOR_BOOL8: {
-                floatToUint8(srcBlob->buffer().as<float*>(), (uint8_t*)destPtr, srcBlob->size());
-                break;
-            }
             case OperandType::TENSOR_QUANT8_ASYMM: {
                 floatToUint8(srcBlob->buffer().as<float*>(), (uint8_t*)destPtr, srcBlob->size());
-                break;
-            }
-            case OperandType::TENSOR_QUANT8_SYMM:
-            case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL: {
-                floatToint8(srcBlob->buffer().as<float*>(), (int8_t*)destPtr, srcBlob->size());
-                break;
-            }
-            case OperandType::TENSOR_FLOAT16: {
-                floatToFloat16(srcBlob->buffer().as<float*>(), (_Float16*)destPtr, srcBlob->size());
                 break;
             }
             default:
@@ -263,216 +182,17 @@ void asyncExecute(const Request& request, MeasureTiming measure, BasePreparedMod
     }
 
     Return<void> returned;
-    if (measure == MeasureTiming::YES) {
-        driverEnd = now();
-        Timing timing = {.timeOnDevice = uint64_t(microsecondsDuration(deviceEnd, deviceStart)),
-                         .timeInDriver = uint64_t(microsecondsDuration(driverEnd, driverStart))};
-        returned = notify(callback, ErrorStatus::NONE, modelInfo->getOutputShapes(), timing);
-    } else {
-        returned = notify(callback, ErrorStatus::NONE, modelInfo->getOutputShapes(), kNoTiming);
-    }
+    returned = notify(callback, ErrorStatus::NONE);
     if (!returned.isOk()) {
         ALOGE("hidl callback failed to return properly: %s", returned.description().c_str());
     }
     ALOGV("Exiting %s", __func__);
 }
 
-static std::tuple<ErrorStatus, hidl_vec<V1_2::OutputShape>, Timing> executeSynchronouslyBase(
-    const Request& request, MeasureTiming measure, BasePreparedModel* preparedModel,
-    time_point driverStart) {
-    ALOGV("Entering %s", __func__);
-    auto modelInfo = preparedModel->getModelInfo();
-    auto plugin = preparedModel->getPlugin();
-    auto ngraphNw = preparedModel->getNgraphNwCreator();
-    time_point driverEnd, deviceStart, deviceEnd;
-    std::vector<RunTimePoolInfo> requestPoolInfos;
-    if (!modelInfo->setRunTimePoolInfosFromHidlMemories(request.pools)) {
-        ALOGE("Failed to set runtime pool info from HIDL memories");
-        return {ErrorStatus::GENERAL_FAILURE, {}, kNoTiming};
-    }
-
-    for (size_t i = 0; i < request.inputs.size(); i++) {
-        uint32_t len;
-        auto inIndex = modelInfo->getModelInputIndex(i);
-        void* srcPtr = modelInfo->getBlobFromMemoryPoolIn(request, i, len);
-
-        const std::string& inputNodeName = ngraphNw->getNodeName(inIndex);
-        if (inputNodeName == "") {
-            ALOGD("Ignorning input at index(%d), since it is invalid", inIndex);
-            continue;
-        }
-        ALOGD("Input index: %d layername : %s", inIndex, inputNodeName.c_str());
-        auto destBlob = plugin->getBlob(inputNodeName);
-        if (modelInfo->getOperandType(inIndex) == OperandType::TENSOR_FLOAT16) {
-            float* dest = destBlob->buffer().as<float*>();
-            _Float16* src = (_Float16*)srcPtr;
-
-            for (unsigned int i = 0; i < len / 2; i++) {
-                dest[i] = src[i];
-            }
-        } else {
-            uint8_t* dest = destBlob->buffer().as<uint8_t*>();
-            std::memcpy(dest, (uint8_t*)srcPtr, len);
-        }
-    }
-
-    ALOGD("%s Run", __func__);
-
-    if (measure == MeasureTiming::YES) deviceStart = now();
-    try {
-        plugin->infer();
-    } catch (const std::exception& ex) {
-        ALOGE("%s Exception !!! %s", __func__, ex.what());
-        return {ErrorStatus::GENERAL_FAILURE, {}, kNoTiming};
-    }
-    if (measure == MeasureTiming::YES) deviceEnd = now();
-
-    for (size_t i = 0; i < request.outputs.size(); i++) {
-        auto outIndex = modelInfo->getModelOutputIndex(i);
-        ALOGI("OutputIndex: %d", outIndex);
-        const std::string& outputNodeName = ngraphNw->getNodeName(outIndex);
-        if (outputNodeName == "") {
-            ALOGD("Ignorning output at index(%d), since it is invalid", outIndex);
-            continue;
-        }
-        ALOGD("Output index: %d layername : %s", outIndex, outputNodeName.c_str());
-        auto srcBlob = plugin->getBlob(outputNodeName);
-        auto operandType = modelInfo->getOperandType(outIndex);
-        uint32_t actualLength = srcBlob->byteSize();
-        uint32_t expectedLength = 0;
-        void* destPtr = modelInfo->getBlobFromMemoryPoolOut(request, i, expectedLength);
-        auto outputBlobDims = srcBlob->getTensorDesc().getDims();
-
-        ALOGD("output precision: %d", static_cast<int>(srcBlob->getTensorDesc().getPrecision()));
-
-        switch (operandType) {
-            case OperandType::TENSOR_BOOL8:
-            case OperandType::TENSOR_QUANT8_ASYMM:
-            case OperandType::TENSOR_QUANT8_SYMM:
-            case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL:
-                actualLength /= 4;
-                break;
-            case OperandType::TENSOR_FLOAT16:
-                actualLength /= 2;
-                break;
-            default:
-                ALOGV("Operand type is 4 bytes !!");
-                break;
-        }
-
-        bool outputSizeMismatch = false;
-        if (actualLength != expectedLength) {
-            ALOGE("%s Invalid length at outIndex(%d) Actual:%d Expected:%d", __func__, outIndex,
-                  actualLength, expectedLength);
-            outputSizeMismatch = true;
-        }
-
-        // TODO: bug identified with OV2021.4 where for Pad operation, if the output dimensions is 1
-        // output dimension is coming as 0
-        if ((outputBlobDims.size() == 0) && (actualLength != 0)) {
-            std::vector<size_t> rdims = {1};
-            modelInfo->updateOutputshapes(i, rdims, outputSizeMismatch ? false : true);
-        } else
-            modelInfo->updateOutputshapes(i, outputBlobDims, outputSizeMismatch ? false : true);
-
-        if (outputSizeMismatch) {
-            ALOGE(
-                "Mismatch in actual and exepcted output sizes. Return with "
-                "OUTPUT_INSUFFICIENT_SIZE error");
-            return {ErrorStatus::OUTPUT_INSUFFICIENT_SIZE, modelInfo->getOutputShapes(), kNoTiming};
-        }
-
-        switch (operandType) {
-            case OperandType::TENSOR_INT32:
-            case OperandType::TENSOR_FLOAT32: {
-                std::memcpy((uint8_t*)destPtr, srcBlob->buffer().as<uint8_t*>(),
-                            srcBlob->byteSize());
-                break;
-            }
-            case OperandType::TENSOR_BOOL8: {
-                floatToUint8(srcBlob->buffer().as<float*>(), (uint8_t*)destPtr, srcBlob->size());
-                break;
-            }
-            case OperandType::TENSOR_QUANT8_ASYMM: {
-                floatToUint8(srcBlob->buffer().as<float*>(), (uint8_t*)destPtr, srcBlob->size());
-                break;
-            }
-            case OperandType::TENSOR_QUANT8_SYMM:
-            case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL: {
-                floatToint8(srcBlob->buffer().as<float*>(), (int8_t*)destPtr, srcBlob->size());
-                break;
-            }
-            case OperandType::TENSOR_FLOAT16: {
-                floatToFloat16(srcBlob->buffer().as<float*>(), (_Float16*)destPtr, srcBlob->size());
-                break;
-            }
-            default:
-                std::memcpy((uint8_t*)destPtr, srcBlob->buffer().as<uint8_t*>(),
-                            srcBlob->byteSize());
-                break;
-        }
-    }
-
-    if (!modelInfo->updateRequestPoolInfos()) {
-        ALOGE("Failed to update the request pool infos");
-        return {ErrorStatus::GENERAL_FAILURE, {}, kNoTiming};
-    }
-
-    if (measure == MeasureTiming::YES) {
-        driverEnd = now();
-        Timing timing = {.timeOnDevice = uint64_t(microsecondsDuration(deviceEnd, deviceStart)),
-                         .timeInDriver = uint64_t(microsecondsDuration(driverEnd, driverStart))};
-        return {ErrorStatus::NONE, modelInfo->getOutputShapes(), timing};
-    }
-    return {ErrorStatus::NONE, modelInfo->getOutputShapes(), kNoTiming};
-    ALOGV("Exiting %s", __func__);
-}
-
-Return<void> BasePreparedModel::executeSynchronously(const Request& request, MeasureTiming measure,
-                                                     executeSynchronously_cb cb) {
-    ALOGV("Entering %s", __func__);
-    time_point driverStart;
-    if (measure == MeasureTiming::YES) driverStart = now();
-
-    if (!validateRequest(request, mModelInfo->getModel())) {
-        cb(ErrorStatus::INVALID_ARGUMENT, {}, kNoTiming);
-        return Void();
-    }
-    auto [status, outputShapes, timing] =
-        executeSynchronouslyBase(request, measure, this, driverStart);
-    cb(status, std::move(outputShapes), timing);
-    ALOGV("Exiting %s", __func__);
-    return Void();
-}
-
-Return<void> BasePreparedModel::configureExecutionBurst(
-    const sp<V1_2::IBurstCallback>& callback,
-    const MQDescriptorSync<V1_2::FmqRequestDatum>& requestChannel,
-    const MQDescriptorSync<V1_2::FmqResultDatum>& resultChannel, configureExecutionBurst_cb cb) {
-    ALOGV("Entering %s", __func__);
-    const sp<V1_2::IBurstContext> burst =
-        ExecutionBurstServer::create(callback, requestChannel, resultChannel, this);
-
-    if (burst == nullptr) {
-        cb(ErrorStatus::GENERAL_FAILURE, {});
-        ALOGI("%s GENERAL_FAILURE", __func__);
-    } else {
-        cb(ErrorStatus::NONE, burst);
-        ALOGI("%s burst created", __func__);
-    }
-    return Void();
-}
-
 Return<ErrorStatus> BasePreparedModel::execute(const Request& request,
                                                const sp<V1_0::IExecutionCallback>& callback) {
     ALOGV("Entering %s", __func__);
-    return executeBase(request, MeasureTiming::NO, this, callback);
-}
-
-Return<ErrorStatus> BasePreparedModel::execute_1_2(const Request& request, MeasureTiming measure,
-                                                   const sp<V1_2::IExecutionCallback>& callback) {
-    ALOGV("Entering %s", __func__);
-    return executeBase(request, measure, this, callback);
+    return executeBase(request, this, callback);
 }
 
 }  // namespace nnhal

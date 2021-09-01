@@ -11,18 +11,6 @@ ResizeBilinear::ResizeBilinear(int operationIndex) : OperationsBase(operationInd
 }
 
 bool ResizeBilinear::validate() {
-    // TODO Add FLOAT16 check when VPUX plugin is supported
-    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        ALOGE("%s check for output types failed", __func__);
-        return false;
-    }
-
-    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        return false;
-    }
-
     const auto& inputDimensionsSize = getInputOperandDimensions(0).size();
     if (inputDimensionsSize != 4) {
         ALOGE("%s Invalid dimensions size for input(%lu)", __func__, inputDimensionsSize);
@@ -72,9 +60,8 @@ std::shared_ptr<ngraph::Node> ResizeBilinear::createNode() {
     }
 
     if (!useNchw) inputNode = transpose(NHWC_NCHW, inputNode);
-    // FLOAT16 type check added for future when VPUX plugin support is added
-    if (checkInputOperandType(1, (int32_t)OperandType::FLOAT32) ||
-        checkInputOperandType(1, (int32_t)OperandType::FLOAT16)) {
+
+    if (checkInputOperandType(1, (int32_t)OperandType::FLOAT32)) {
         // In tensorflow lite, resizing by size is supported. Scaling factors are
         // calculated based on output shape.
         attrs.shape_calculation_mode = ngraph::op::v4::Interpolate::ShapeCalcMode::sizes;
@@ -115,10 +102,8 @@ std::shared_ptr<ngraph::Node> ResizeBilinear::createNode() {
 
     std::vector<float> scale_vec = {height_scale, width_scale};
     std::shared_ptr<ngraph::Node> scaleNode;
-    if (checkInputOperandType(1, (int32_t)OperandType::FLOAT16))
-        scaleNode = createConstNode(ngraph::element::f16, {2}, scale_vec);
-    else if (checkInputOperandType(1, (int32_t)OperandType::FLOAT32) ||
-             checkInputOperandType(1, (int32_t)OperandType::INT32)) {
+    if (checkInputOperandType(1, (int32_t)OperandType::FLOAT32) ||
+        checkInputOperandType(1, (int32_t)OperandType::INT32)) {
         scaleNode = createConstNode(ngraph::element::f32, {2}, scale_vec);
     }
 

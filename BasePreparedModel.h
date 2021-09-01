@@ -17,8 +17,8 @@
 #ifndef ANDROID_ML_NN_BASEPREPAREDMODEL_H
 #define ANDROID_ML_NN_BASEPREPAREDMODEL_H
 
-#include <android/hardware/neuralnetworks/1.2/IPreparedModel.h>
-#include <android/hardware/neuralnetworks/1.2/types.h>
+#include <android/hardware/neuralnetworks/1.0/IPreparedModel.h>
+#include <android/hardware/neuralnetworks/1.1/types.h>
 #include <android/hidl/memory/1.0/IMemory.h>
 #include <hidlmemory/mapping.h>
 #include <sys/mman.h>
@@ -48,7 +48,7 @@ template <class T>
 using vec = std::vector<T>;
 typedef uint8_t* memory;
 
-class BasePreparedModel : public V1_2::IPreparedModel {
+class BasePreparedModel : public IPreparedModel {
 public:
     BasePreparedModel(const Model& model) : mTargetDevice(IntelDeviceType::CPU) {
         mModelInfo = std::make_shared<NnapiModelInfo>(model);
@@ -61,15 +61,6 @@ public:
 
     Return<ErrorStatus> execute(const Request& request,
                                 const sp<V1_0::IExecutionCallback>& callback) override;
-    Return<ErrorStatus> execute_1_2(const Request& request, MeasureTiming measure,
-                                    const sp<V1_2::IExecutionCallback>& callback) override;
-    Return<void> executeSynchronously(const Request& request, MeasureTiming measure,
-                                      executeSynchronously_cb cb) override;
-    Return<void> configureExecutionBurst(
-        const sp<V1_2::IBurstCallback>& callback,
-        const MQDescriptorSync<V1_2::FmqRequestDatum>& requestChannel,
-        const MQDescriptorSync<V1_2::FmqResultDatum>& resultChannel,
-        configureExecutionBurst_cb cb) override;
 
     virtual bool initialize();
 
