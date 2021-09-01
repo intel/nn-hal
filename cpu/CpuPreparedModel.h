@@ -17,8 +17,8 @@
 #ifndef ANDROID_ML_NN_CPU_PREPAREDMODEL_H
 #define ANDROID_ML_NN_CPU_PREPAREDMODEL_H
 
-#include <android/hardware/neuralnetworks/1.2/IPreparedModel.h>
-#include <android/hardware/neuralnetworks/1.2/types.h>
+#include <android/hardware/neuralnetworks/1.0/IPreparedModel.h>
+#include <android/hardware/neuralnetworks/1.1/types.h>
 #include <sys/mman.h>
 #include <fstream>
 #include <string>
@@ -38,11 +38,6 @@ public:
     ~CpuPreparedModel() { deinitialize(); }
 
     bool initialize() override;
-    Return<void> configureExecutionBurst(
-        const sp<V1_2::IBurstCallback>& callback,
-        const MQDescriptorSync<V1_2::FmqRequestDatum>& requestChannel,
-        const MQDescriptorSync<V1_2::FmqResultDatum>& resultChannel,
-        configureExecutionBurst_cb cb) override;
 
 protected:
     void deinitialize() override;

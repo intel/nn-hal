@@ -55,29 +55,9 @@ bool NgraphNetworkCreator::createInputParams() {
                         ALOGV("createInputParams created inputIndex %d, type %d", i,
                               nnapiOperand.type);
                         break;
-                    case OperandType::BOOL:
-                    case OperandType::TENSOR_BOOL8:
-                        inputParam = std::make_shared<ngraph::opset3::Parameter>(
-                            ngraph::element::boolean, ngraph::Shape(dims.begin(), dims.end()));
-                        ALOGV("createInputParams created inputIndex %d, type %d", i,
-                              nnapiOperand.type);
-                        break;
                     case OperandType::TENSOR_QUANT8_ASYMM:
                         inputParam = std::make_shared<ngraph::opset3::Parameter>(
                             ngraph::element::u8, ngraph::Shape(dims.begin(), dims.end()));
-                        ALOGV("createInputParams created inputIndex %d, type %d", i,
-                              nnapiOperand.type);
-                        break;
-                    case OperandType::TENSOR_QUANT8_SYMM:
-                    case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL:
-                        inputParam = std::make_shared<ngraph::opset3::Parameter>(
-                            ngraph::element::i8, ngraph::Shape(dims.begin(), dims.end()));
-                        ALOGV("createInputParams created inputIndex %d, type %d", i,
-                              nnapiOperand.type);
-                        break;
-                    case OperandType::TENSOR_FLOAT16:
-                        inputParam = std::make_shared<ngraph::opset3::Parameter>(
-                            ngraph::element::f16, ngraph::Shape(dims.begin(), dims.end()));
                         ALOGV("createInputParams created inputIndex %d, type %d", i,
                               nnapiOperand.type);
                         break;

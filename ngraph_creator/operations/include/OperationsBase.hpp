@@ -24,6 +24,7 @@ protected:
         OHWI_OIHW,
         NHWC_CWHN,
         CWHN_NHWC,
+        BTS_TBS,
         NHC_NCH,
         NCH_NHC,
         CNH_NHC,
@@ -49,6 +50,7 @@ protected:
     bool checkOutputOperandType(uint32_t index, const int32_t expectedOperandType);
     bool checkInputOperandType(uint32_t index, const int32_t expectedOperandType);
     const vec<uint32_t> getInputOperandDimensions(uint32_t inputIndex);
+    const vec<uint32_t> getOutputOperandDimensions(uint32_t outputIndex);
     bool isValidInputTensor(uint32_t inputIndex);
 
     std::shared_ptr<ngraph::Node> getInputNode(uint32_t inputIndex, bool dequantize = true) {
@@ -71,28 +73,9 @@ protected:
                     input = createConstNode(elementType, toNgraphShape(operandDims), operandValues);
                     break;
                 }
-                case OperandType::TENSOR_BOOL8: {
-                    elementType = ngraph::element::boolean;
-                    auto operandValues = sModelInfo->GetConstVecOperand<uint8_t>(operandIndex);
-                    input = createConstNode(elementType, toNgraphShape(operandDims), operandValues);
-                    break;
-                }
                 case OperandType::TENSOR_QUANT8_ASYMM: {
                     elementType = ngraph::element::u8;
                     auto operandValues = sModelInfo->GetConstVecOperand<uint8_t>(operandIndex);
-                    input = createConstNode(elementType, toNgraphShape(operandDims), operandValues);
-                    break;
-                }
-                case OperandType::TENSOR_QUANT8_SYMM:
-                case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL: {
-                    elementType = ngraph::element::i8;
-                    auto operandValues = sModelInfo->GetConstVecOperand<int8_t>(operandIndex);
-                    input = createConstNode(elementType, toNgraphShape(operandDims), operandValues);
-                    break;
-                }
-                case OperandType::TENSOR_FLOAT16: {
-                    elementType = ngraph::element::f16;
-                    auto operandValues = sModelInfo->GetConstVecOperand<_Float16>(operandIndex);
                     input = createConstNode(elementType, toNgraphShape(operandDims), operandValues);
                     break;
                 }
@@ -108,8 +91,7 @@ protected:
         }
 
         if (dequantize) {
-            if (operandType == OperandType::TENSOR_QUANT8_ASYMM ||
-                operandType == OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL) {
+            if (operandType == OperandType::TENSOR_QUANT8_ASYMM) {
                 input = DequantizeNode(input, operandIndex, ngraph::element::f32);
             }
         }

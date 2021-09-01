@@ -21,10 +21,7 @@ std::shared_ptr<ngraph::Node> Dequantize::createNode() {
     input = getInputNode(0, false);
     const auto& inputIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 0);
 
-    if (checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT16))
-        outputNode = DequantizeNode(input, inputIndex, ngraph::element::f16);
-    else
-        outputNode = DequantizeNode(input, inputIndex, ngraph::element::f32);
+    outputNode = DequantizeNode(input, inputIndex, ngraph::element::f32);
 
     return outputNode;
 }

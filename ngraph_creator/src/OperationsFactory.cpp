@@ -17,22 +17,12 @@ OperationsFactory::~OperationsFactory() { ALOGV("%s Destructed", __func__); }
 std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
     int operationIndex, const OperationType& operationType) {
     switch (operationType) {
-        case OperationType::ABS:
-            return std::make_shared<Abs>(operationIndex);
         case OperationType::ADD:
             return std::make_shared<Add>(operationIndex);
-        case OperationType::ARGMAX:
-            return std::make_shared<Argmax>(operationIndex);
-        case OperationType::ARGMIN:
-            return std::make_shared<Argmin>(operationIndex);
         case OperationType::AVERAGE_POOL_2D:
             return std::make_shared<Average_Pool_2D>(operationIndex);
         case OperationType::BATCH_TO_SPACE_ND:
             return std::make_shared<Batch_To_Space>(operationIndex);
-        case OperationType::CAST:
-            return std::make_shared<Cast>(operationIndex);
-        case OperationType::CHANNEL_SHUFFLE:
-            return std::make_shared<Channel_Shuffle>(operationIndex);
         case OperationType::CONCATENATION:
             return std::make_shared<Concat>(operationIndex);
         case OperationType::CONV_2D:
@@ -45,82 +35,26 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<Dequantize>(operationIndex);
         case OperationType::DIV:
             return std::make_shared<Div>(operationIndex);
-        case OperationType::EQUAL:
-            return std::make_shared<Equal>(operationIndex);
-        case OperationType::EXP:
-            return std::make_shared<Exp>(operationIndex);
-        case OperationType::EXPAND_DIMS:
-            return std::make_shared<Expand_Dims>(operationIndex);
         case OperationType::FULLY_CONNECTED:
             return std::make_shared<FullyConnected>(operationIndex);
         case OperationType::FLOOR:
             return std::make_shared<Floor>(operationIndex);
-        case OperationType::GATHER:
-            return std::make_shared<Gather>(operationIndex);
-        case OperationType::GREATER:
-            return std::make_shared<Greater>(operationIndex);
-        case OperationType::GREATER_EQUAL:
-            return std::make_shared<Greater_Equal>(operationIndex);
-        case OperationType::GROUPED_CONV_2D:
-            return std::make_shared<Grouped_Conv_2d>(operationIndex);
-        case OperationType::INSTANCE_NORMALIZATION:
-            return std::make_shared<Instance_Normalization>(operationIndex);
         case OperationType::L2_POOL_2D:
             return std::make_shared<L2Pooling2D>(operationIndex);
         case OperationType::L2_NORMALIZATION:
             return std::make_shared<L2_Normalization>(operationIndex);
         case OperationType::LSTM:
             return std::make_shared<LSTM>(operationIndex);
-        case OperationType::LESS:
-            return std::make_shared<Less>(operationIndex);
-        case OperationType::LESS_EQUAL:
-            return std::make_shared<Less_Equal>(operationIndex);
-        case OperationType::LOG_SOFTMAX:
-            return std::make_shared<Log_Softmax>(operationIndex);
-        case OperationType::LOG:
-            return std::make_shared<Log>(operationIndex);
-        case OperationType::LOGICAL_AND:
-            return std::make_shared<Logical_And>(operationIndex);
-        case OperationType::LOGICAL_NOT:
-            return std::make_shared<Logical_Not>(operationIndex);
-        case OperationType::LOGICAL_OR:
-            return std::make_shared<Logical_Or>(operationIndex);
         case OperationType::LOGISTIC:
             return std::make_shared<Logistic>(operationIndex);
-        case OperationType::MAXIMUM:
-            return std::make_shared<Maximum>(operationIndex);
         case OperationType::MAX_POOL_2D:
             return std::make_shared<Max_Pool_2d>(operationIndex);
         case OperationType::MEAN:
             return std::make_shared<Mean>(operationIndex);
-        case OperationType::MINIMUM:
-            return std::make_shared<Minimum>(operationIndex);
         case OperationType::MUL:
             return std::make_shared<Mul>(operationIndex);
-        case OperationType::NEG:
-            return std::make_shared<Neg>(operationIndex);
-        case OperationType::NOT_EQUAL:
-            return std::make_shared<Not_Equal>(operationIndex);
         case OperationType::PAD:
             return std::make_shared<Pad>(operationIndex);
-        case OperationType::PAD_V2:
-            return std::make_shared<Pad_V2>(operationIndex);
-        case OperationType::POW:
-            return std::make_shared<Pow>(operationIndex);
-        case OperationType::QUANTIZE:
-            return std::make_shared<Quantize>(operationIndex);
-        case OperationType::REDUCE_ALL:
-            return std::make_shared<Reduce_All>(operationIndex);
-        case OperationType::REDUCE_ANY:
-            return std::make_shared<Reduce_Any>(operationIndex);
-        case OperationType::REDUCE_MAX:
-            return std::make_shared<Reduce_Max>(operationIndex);
-        case OperationType::REDUCE_MIN:
-            return std::make_shared<Reduce_Min>(operationIndex);
-        case OperationType::REDUCE_PROD:
-            return std::make_shared<Reduce_Prod>(operationIndex);
-        case OperationType::REDUCE_SUM:
-            return std::make_shared<Reduce_Sum>(operationIndex);
         case OperationType::RELU:
             return std::make_shared<Relu>(operationIndex);
         case OperationType::RELU1:
@@ -131,40 +65,20 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<Reshape>(operationIndex);
         case OperationType::RNN:
             return std::make_shared<RNN>(operationIndex);
-        case OperationType::ROI_ALIGN:
-            return std::make_shared<ROI_Align>(operationIndex);
-        case OperationType::ROI_POOLING:
-            return std::make_shared<ROI_Pooling>(operationIndex);
-        case OperationType::RSQRT:
-            return std::make_shared<RSQRT>(operationIndex);
         case OperationType::RESIZE_BILINEAR:
             return std::make_shared<ResizeBilinear>(operationIndex);
-        case OperationType::RESIZE_NEAREST_NEIGHBOR:
-            return std::make_shared<ResizeNearestNeighbor>(operationIndex);
-        case OperationType::SELECT:
-            return std::make_shared<Select>(operationIndex);
         case OperationType::SOFTMAX:
             return std::make_shared<Softmax>(operationIndex);
         case OperationType::SPACE_TO_BATCH_ND:
             return std::make_shared<Space_To_Batch>(operationIndex);
         case OperationType::SPACE_TO_DEPTH:
             return std::make_shared<Space_To_Depth>(operationIndex);
-        case OperationType::SQRT:
-            return std::make_shared<SQRT>(operationIndex);
-        case OperationType::SIN:
-            return std::make_shared<Sin>(operationIndex);
-        case OperationType::SPLIT:
-            return std::make_shared<Split>(operationIndex);
         case OperationType::SQUEEZE:
             return std::make_shared<Squeeze>(operationIndex);
         case OperationType::SUB:
             return std::make_shared<Sub>(operationIndex);
         case OperationType::TANH:
             return std::make_shared<Tanh>(operationIndex);
-        case OperationType::TOPK_V2:
-            return std::make_shared<Topk_V2>(operationIndex);
-        case OperationType::TRANSPOSE_CONV_2D:
-            return std::make_shared<Transpose_Conv_2D>(operationIndex);
         case OperationType::TRANSPOSE:
             return std::make_shared<Transpose>(operationIndex);
         default:

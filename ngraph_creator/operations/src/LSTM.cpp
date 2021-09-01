@@ -189,15 +189,9 @@ std::shared_ptr<ngraph::Node> LSTM::createNode() {
 
     activationFn = sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 20);
 
-    if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT16)) {
-        cell_state_clipping = sModelInfo->ParseOperationInput<_Float16>(mNnapiOperationIndex, 21);
-        if (isProjectionUsed)
-            proj_clipping = sModelInfo->ParseOperationInput<_Float16>(mNnapiOperationIndex, 22);
-    } else {
-        cell_state_clipping = sModelInfo->ParseOperationInput<float>(mNnapiOperationIndex, 21);
-        if (isProjectionUsed)
-            proj_clipping = sModelInfo->ParseOperationInput<float>(mNnapiOperationIndex, 22);
-    }
+    cell_state_clipping = sModelInfo->ParseOperationInput<float>(mNnapiOperationIndex, 21);
+    if (isProjectionUsed)
+        proj_clipping = sModelInfo->ParseOperationInput<float>(mNnapiOperationIndex, 22);
 
     std::shared_ptr<ngraph::Node> i_t, f_t, c_t, o_t;
     std::shared_ptr<ngraph::Node> scratchBuffer;

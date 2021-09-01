@@ -24,13 +24,9 @@ std::shared_ptr<ngraph::Node> Softmax::createNode() {
 
     std::shared_ptr<ngraph::Node> betaNode;
 
-    if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT16)) {
-        auto beta = sModelInfo->ParseOperationInput<_Float16>(mNnapiOperationIndex, 1);
-        betaNode = createConstNode(ngraph::element::f16, {1}, convertToVector(beta));
-    } else {
-        auto beta = sModelInfo->ParseOperationInput<float>(mNnapiOperationIndex, 1);
-        betaNode = createConstNode(ngraph::element::f32, {1}, convertToVector(beta));
-    }
+    auto beta = sModelInfo->ParseOperationInput<float>(mNnapiOperationIndex, 1);
+    betaNode = createConstNode(ngraph::element::f32, {1}, convertToVector(beta));
+
     int axis = -1;
     const auto& inputsSize = sModelInfo->getOperationInputsSize(mNnapiOperationIndex);
     if (inputsSize == 3) axis = sModelInfo->ParseOperationInput<int>(mNnapiOperationIndex, 2);
