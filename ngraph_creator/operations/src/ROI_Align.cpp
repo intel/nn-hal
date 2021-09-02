@@ -19,25 +19,6 @@ bool ROI_Align::validate() {
         return false;
     }
 
-    // Check Input Type
-#if __ANDROID__
-    // TODO: Issue reported in Android with OV_2021.2 version. Remove this when OV is upgraded
-    const auto& inputDimensions = getInputOperandDimensions(0);
-    auto layout = sModelInfo->ParseOperationInput<uint8_t>(mNnapiOperationIndex, 9);
-    size_t height, width;
-    if (layout) {
-        height = inputDimensions[2];
-        width = inputDimensions[3];
-    } else {
-        height = inputDimensions[1];
-        width = inputDimensions[2];
-    }
-    if (height != width) {
-        ALOGE("%s Not handled with different height and width", __func__);
-        return false;
-    }
-#endif
-
     if (isZeroSizedInput(0) || isZeroSizedInput(1) || isZeroSizedInput(2)) {
         ALOGE("%s Not handling zero sized input for dimension 0", __func__);
         return false;
