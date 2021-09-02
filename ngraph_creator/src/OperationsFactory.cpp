@@ -171,6 +171,8 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<Transpose_Conv_2D>(operationIndex);
         case OperationType::TRANSPOSE:
             return std::make_shared<Transpose>(operationIndex);
+        case OperationType::UNIDIRECTIONAL_SEQUENCE_RNN:
+            return std::make_shared<Unidirectional_Sequence_RNN>(operationIndex);
         default:
             ALOGE("%s Cannot identify OperationType %d", __func__, operationType);
             break;
