@@ -30,6 +30,7 @@ protected:
         NCH_HNC,
         HNC_NCH,
         NHC_CNH,
+        BTS_TBS,
         NHCW_NHWC,
         NC_CN
     };
