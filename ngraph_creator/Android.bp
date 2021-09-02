@@ -24,6 +24,7 @@ cc_library_static {
         "operations/src/Depthwise_Conv_2d.cpp",
         "operations/src/Dequantize.cpp",
         "operations/src/Div.cpp",
+        "operations/src/Embedding_Lookup.cpp",
         "operations/src/Equal.cpp",
         "operations/src/Exp.cpp",
         "operations/src/Expand_Dims.cpp",
