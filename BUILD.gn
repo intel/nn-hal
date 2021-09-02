@@ -85,6 +85,7 @@ shared_library("intel_nnhal") {
     "ngraph_creator/operations/src/Depthwise_Conv_2d.cpp",
     "ngraph_creator/operations/src/Dequantize.cpp",
     "ngraph_creator/operations/src/Div.cpp",
+    "ngraph_creator/operations/src/Embedding_Lookup.cpp",
     "ngraph_creator/operations/src/Equal.cpp",
     "ngraph_creator/operations/src/Exp.cpp",
     "ngraph_creator/operations/src/Expand_Dims.cpp",

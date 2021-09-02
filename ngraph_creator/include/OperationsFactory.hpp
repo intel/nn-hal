@@ -14,6 +14,7 @@
 #include <Depthwise_Conv_2d.hpp>
 #include <Dequantize.hpp>
 #include <Div.hpp>
+#include <Embedding_Lookup.hpp>
 #include <Equal.hpp>
 #include <Exp.hpp>
 #include <Expand_Dims.hpp>
