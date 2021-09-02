@@ -42,6 +42,7 @@
 #include <Mul.hpp>
 #include <Neg.hpp>
 #include <Not_Equal.hpp>
+#include <PRelu.hpp>
 #include <Pad.hpp>
 #include <Pad_V2.hpp>
 #include <Pow.hpp>
