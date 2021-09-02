@@ -77,6 +77,7 @@ shared_library("intel_nnhal") {
     "ngraph_creator/operations/src/Argmin.cpp",
     "ngraph_creator/operations/src/Average_Pool_2D.cpp",
     "ngraph_creator/operations/src/Batch_To_Space.cpp",
+    "ngraph_creator/operations/src/Bidirectional_Sequence_RNN.cpp",
     "ngraph_creator/operations/src/Cast.cpp",
     "ngraph_creator/operations/src/Channel_Shuffle.cpp",
     "ngraph_creator/operations/src/Concat.cpp",
