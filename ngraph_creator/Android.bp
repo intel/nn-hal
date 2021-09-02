@@ -55,6 +55,7 @@ cc_library_static {
         "operations/src/Pad.cpp",
         "operations/src/Pad_V2.cpp",
         "operations/src/Pow.cpp",
+        "operations/src/PRelu.cpp",
         "operations/src/Quantize.cpp",
         "operations/src/Reduce_All.cpp",
         "operations/src/Reduce_Any.cpp",
