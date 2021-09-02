@@ -117,6 +117,7 @@ shared_library("intel_nnhal") {
     "ngraph_creator/operations/src/Pad.cpp",
     "ngraph_creator/operations/src/Pad_V2.cpp",
     "ngraph_creator/operations/src/Pow.cpp",
+    "ngraph_creator/operations/src/PRelu.cpp",
     "ngraph_creator/operations/src/Quantize.cpp",
     "ngraph_creator/operations/src/Reduce_All.cpp",
     "ngraph_creator/operations/src/Reduce_Any.cpp",
