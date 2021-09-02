@@ -11,15 +11,7 @@ Reduce_Sum::Reduce_Sum(int operationIndex) : OperationsBase(operationIndex) {
 }
 
 bool Reduce_Sum::validate() {
-    // TODO: Remove this condition, Issue with "CNNNetworkImpl" in OpenVINO 2021.2, fixed in 2021.4
-    // Issue is with input of shape [1, 1, 1] => Reduce_Sum is converted to Reshape using
-    // ConvertReduce transformation and produces empty constant with [0] to reshape input [1, 1, 1]
-    // to [] shape
-    const auto dims = getInputOperandDimensions(0);
-    if ((unsigned int)(std::count(std::begin(dims), std::end(dims), dims.front())) == dims.size()) {
-        if (dims[0] == 1) return false;
-    }
-
+    ALOGV("%s PASSED", __func__);
     return true;
 }
 
