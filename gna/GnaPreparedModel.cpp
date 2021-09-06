@@ -30,11 +30,11 @@ bool GnaPreparedModel::initialize(const Model& model) {
         ALOGE("Failed to initialize Model runtime parameters!!");
         return false;
     }
-    mNgc = std::make_shared<NgraphNetworkCreator>(mModelInfo, mTargetDevice);
+    mNgraphNetCreator = std::make_shared<NgraphNetworkCreator>(mModelInfo, mTargetDevice);
 
-    if (!mNgc->validateOperations()) return false;
+    if (!mNgraphNetCreator->validateOperations()) return false;
     ALOGI("Generating IR Graph");
-    auto ngraph_function = mNgc->generateGraph();
+    auto ngraph_function = mNgraphNetCreator->generateGraph();
     if (ngraph_function == nullptr) {
         ALOGE("%s ngraph generation failed", __func__);
         return false;

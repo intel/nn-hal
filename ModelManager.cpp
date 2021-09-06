@@ -480,17 +480,47 @@ IRBlob::Ptr NnapiModelInfo::GetConstWeightsOperandAsTensor(uint32_t index) {
     return nullptr;
 }
 
-bool NnapiModelInfo::setRunTimePoolInfosFromHidlMemories(const hidl_vec<hidl_memory>& pools) {
+V1_3::ErrorStatus NnapiModelInfo::setRunTimePoolInfosFromHidlMemories(
+    const hidl_vec<V1_3::Request::MemoryPool>& pools) {
     ALOGD("Number of pools: %zu", pools.size());
+    mRequestPoolInfos.resize(pools.size());
+    for (size_t i = 0; i < pools.size(); i++) {
+        auto& poolInfo = mRequestPoolInfos[i];
+        switch (pools[i].getDiscriminator()) {
+            case V1_3::Request::MemoryPool::hidl_discriminator::hidlMemory:
+                if (!poolInfo.set(pools[i].hidlMemory())) {
+                    ALOGE("Could not map memory pool !!!");
+                    return V1_3::ErrorStatus::GENERAL_FAILURE;
+                }
+                break;
+
+            case V1_3::Request::MemoryPool::hidl_discriminator::token:
+                ALOGE(
+                    "%s NNHAL 1.3 driver does not yet support driver buffer allocation. Returning "
+                    "failure",
+                    __func__);
+                return V1_3::ErrorStatus::INVALID_ARGUMENT;
+                break;
+        }
+    }
+
+    return V1_3::ErrorStatus::NONE;
+}
+
+ErrorStatus NnapiModelInfo::setRunTimePoolInfosFromHidlMemories(
+    const hidl_vec<hidl_memory>& pools) {
+    ALOGD("Number of pools: %d", pools.size());
+
     mRequestPoolInfos.resize(pools.size());
     for (size_t i = 0; i < pools.size(); i++) {
         auto& poolInfo = mRequestPoolInfos[i];
         if (!poolInfo.set(pools[i])) {
             ALOGE("Could not map memory pool !!!");
-            return false;
+            return ErrorStatus::GENERAL_FAILURE;
         }
     }
-    return true;
+
+    return ErrorStatus::NONE;
 }
 
 Blob::Ptr NnapiModelInfo::getBlobFromMemoryPoolIn(const Request& request, uint32_t index) {
