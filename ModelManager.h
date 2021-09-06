@@ -170,7 +170,9 @@ public:
 
     Model getModel() { return mModel; }
 
-    bool setRunTimePoolInfosFromHidlMemories(const hidl_vec<hidl_memory>& pools);
+    ErrorStatus setRunTimePoolInfosFromHidlMemories(const hidl_vec<hidl_memory>& pools);
+    V1_3::ErrorStatus setRunTimePoolInfosFromHidlMemories(
+        const hidl_vec<V1_3::Request::MemoryPool>& pools);
 
     bool updateRequestPoolInfos() {
         for (auto runtimeInfo : mRequestPoolInfos) {

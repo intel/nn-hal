@@ -92,7 +92,7 @@ public:
 
     std::shared_ptr<NnapiModelInfo> getModelInfo() { return mModelInfo; }
 
-    std::shared_ptr<NgraphNetworkCreator> getNgraphNwCreator() { return mNgc; }
+    std::shared_ptr<NgraphNetworkCreator> getNgraphNwCreator() { return mNgraphNetCreator; }
 
     std::shared_ptr<IIENetwork> getPlugin() { return mPlugin; }
 
@@ -101,8 +101,26 @@ protected:
 
     IntelDeviceType mTargetDevice;
     std::shared_ptr<NnapiModelInfo> mModelInfo;
-    std::shared_ptr<NgraphNetworkCreator> mNgc;
+    std::shared_ptr<NgraphNetworkCreator> mNgraphNetCreator;
     std::shared_ptr<IIENetwork> mPlugin;
+};
+
+class BaseFencedExecutionCallback : public V1_3::IFencedExecutionCallback {
+public:
+    BaseFencedExecutionCallback(Timing timingSinceLaunch, Timing timingAfterFence,
+                                V1_3::ErrorStatus error)
+        : kTimingSinceLaunch(timingSinceLaunch),
+          kTimingAfterFence(timingAfterFence),
+          kErrorStatus(error) {}
+    Return<void> getExecutionInfo(getExecutionInfo_cb callback) override {
+        callback(kErrorStatus, kTimingSinceLaunch, kTimingAfterFence);
+        return Void();
+    }
+
+private:
+    const Timing kTimingSinceLaunch;
+    const Timing kTimingAfterFence;
+    const V1_3::ErrorStatus kErrorStatus;
 };
 
 }  // namespace nnhal
