@@ -66,6 +66,10 @@ void OperationsBase::addResultNode(size_t index, std::shared_ptr<ngraph::Node> r
     mNgraphNodes->setResultNode(index, resultNode);
 }
 
+void OperationsBase::addSinkNode(std::shared_ptr<ngraph::op::Sink> sinkNode) {
+    mNgraphNodes->setSinkNode(sinkNode);
+}
+
 OperationsBase::OperationsBase(int operationIndex) : mNnapiOperationIndex(operationIndex) {
     mDefaultOutputIndex = 0;
 }

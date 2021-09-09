@@ -10,6 +10,7 @@ namespace nnhal {
 NgraphNetworkCreator::NgraphNetworkCreator(std::shared_ptr<NnapiModelInfo> modelInfo,
                                            IntelDeviceType deviceType)
     : mModelInfo(modelInfo),
+      mPluginType(deviceType),
       mNgraphNodes(std::make_shared<NgraphNodes>(mModelInfo->getOperandsSize(),
                                                  mModelInfo->getModelOutputsSize())),
       mOpFactoryInstance(deviceType, mModelInfo, mNgraphNodes) {
@@ -49,8 +50,14 @@ bool NgraphNetworkCreator::createInputParams() {
                         break;
                     case OperandType::INT32:
                     case OperandType::TENSOR_INT32:
-                        inputParam = std::make_shared<ngraph::opset3::Parameter>(
-                            ngraph::element::i32, ngraph::Shape(dims.begin(), dims.end()));
+                        if (mPluginType == IntelDeviceType::GNA) {
+                            inputParam = std::make_shared<ngraph::opset3::Parameter>(
+                            ngraph::element::f32, ngraph::Shape(dims.begin(), dims.end()));
+                        }
+                        else {
+                            inputParam = std::make_shared<ngraph::opset3::Parameter>(
+                                ngraph::element::i32, ngraph::Shape(dims.begin(), dims.end()));
+                        }
                         ALOGV("createInputParams created inputIndex %d, type %d", i,
                               nnapiOperand.type);
                         break;
@@ -62,17 +69,42 @@ bool NgraphNetworkCreator::createInputParams() {
                               nnapiOperand.type);
                         break;
                     case OperandType::TENSOR_QUANT8_ASYMM:
-                        inputParam = std::make_shared<ngraph::opset3::Parameter>(
-                            ngraph::element::u8, ngraph::Shape(dims.begin(), dims.end()));
+                        if (mPluginType == IntelDeviceType::GNA) {
+                            inputParam = std::make_shared<ngraph::opset3::Parameter>(
+                            ngraph::element::f32, ngraph::Shape(dims.begin(), dims.end()));
+                        }
+                        else {
+                            inputParam = std::make_shared<ngraph::opset3::Parameter>(
+                                ngraph::element::u8, ngraph::Shape(dims.begin(), dims.end()));
+                        }
                         ALOGV("createInputParams created inputIndex %d, type %d", i,
                               nnapiOperand.type);
                         break;
                     case OperandType::TENSOR_QUANT8_SYMM:
-                    case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL:
-                        inputParam = std::make_shared<ngraph::opset3::Parameter>(
-                            ngraph::element::i8, ngraph::Shape(dims.begin(), dims.end()));
+		    case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL:
+                    case OperandType::TENSOR_QUANT8_ASYMM_SIGNED:
+                        if (mPluginType == IntelDeviceType::GNA) {
+                            inputParam = std::make_shared<ngraph::opset3::Parameter>(
+                            ngraph::element::f32, ngraph::Shape(dims.begin(), dims.end()));
+                        }
+                        else {
+                            inputParam = std::make_shared<ngraph::opset3::Parameter>(
+                                ngraph::element::i8, ngraph::Shape(dims.begin(), dims.end()));
+			}
                         ALOGV("createInputParams created inputIndex %d, type %d", i,
                               nnapiOperand.type);
+                        break;
+                    case OperandType::TENSOR_QUANT16_SYMM:
+                    if (mPluginType == IntelDeviceType::GNA) {
+                            inputParam = std::make_shared<ngraph::opset3::Parameter>(
+                            ngraph::element::f32, ngraph::Shape(dims.begin(), dims.end()));
+                        }
+                        else {
+                            inputParam = std::make_shared<ngraph::opset3::Parameter>(
+                                ngraph::element::i16, ngraph::Shape(dims.begin(), dims.end()));
+                        }
+                        ALOGE("createInputParams created inputIndex %d, type %d", i,
+                            nnapiOperand.type);
                         break;
                     default:
                         ALOGE("createInputParams Failure at inputIndex %d, type %d", i,

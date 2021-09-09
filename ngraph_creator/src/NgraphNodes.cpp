@@ -28,7 +28,11 @@ ngraph::Output<ngraph::Node> NgraphNodes::getOperationOutput(size_t index) {
 
 void NgraphNodes::setResultNode(size_t outputIndex, std::shared_ptr<ngraph::Node> resultNode) {
     ALOGD("setResultNode %zu", outputIndex);
-    mResultNodes.push_back(resultNode);
+    mResultNodes.push_back(std::make_shared<ngraph::op::Result>(resultNode));
+}
+
+void NgraphNodes::setSinkNode(std::shared_ptr<ngraph::op::Sink> sinkNode) {
+    mSinkNodes.push_back(sinkNode);
 }
 
 const std::string& NgraphNodes::getNodeName(size_t index) {
@@ -50,7 +54,8 @@ void NgraphNodes::removeInputParameter(std::string name, size_t index) {
 }
 
 std::shared_ptr<ngraph::Function> NgraphNodes::generateGraph() {
-    return std::make_shared<ngraph::Function>(mResultNodes, mInputParams);
+    ngraph::SinkVector sinks {mSinkNodes};
+    return std::make_shared<ngraph::Function>(mResultNodes, sinks, mInputParams);
 }
 
 void NgraphNodes::setInvalidNode(size_t index) { mNodeNames[index] = ""; }

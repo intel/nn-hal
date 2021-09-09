@@ -37,6 +37,7 @@ protected:
     // override createNodeForPlugin in case sPluginType specific implementation is required
     virtual std::shared_ptr<ngraph::Node> createNodeForPlugin();
     void addResultNode(size_t index, std::shared_ptr<ngraph::Node> resultNode);
+    void addSinkNode(std::shared_ptr<ngraph::op::Sink> sinkNode);
 
     // helper functions
     bool checkOperandType(uint32_t operandIndex, const int32_t expectedOperandType,
@@ -46,12 +47,30 @@ protected:
     const vec<uint32_t> getInputOperandDimensions(uint32_t inputIndex);
     bool isValidInputTensor(uint32_t inputIndex);
 
+    template<typename T>
+    bool deQuantize(const T* inputData, const uint32_t& len, const float scale,
+                const int32_t zeroPoint, float* outputData) {
+        int32_t value;
+        for (int i = 0; i < len; ++i) {
+            value = *(inputData + i);
+            outputData[i] = static_cast<float>(scale * (value - zeroPoint));
+        }
+    return true;
+    }
+
     std::shared_ptr<ngraph::Node> getInputNode(uint32_t inputIndex, bool dequantize = true) {
         std::shared_ptr<ngraph::Node> input;
         auto operandIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, inputIndex);
         auto operandType = sModelInfo->getOperandType(operandIndex);
+        float scale;
+	    int32_t zp;
         if (sModelInfo->isOperandLifeTimeConst(operandIndex)) {
             auto operandDims = getInputOperandDimensions(inputIndex);
+            std::vector<float> f_operandValues;
+
+            if (sPluginType == IntelDeviceType::GNA) {
+                sModelInfo->getOperandScaleZeroPoint(operandIndex, scale, zp);
+            }
             ngraph::element::Type elementType;
             switch (operandType) {
                 case OperandType::TENSOR_FLOAT32: {
@@ -61,9 +80,16 @@ protected:
                     break;
                 }
                 case OperandType::TENSOR_INT32: {
-                    elementType = ngraph::element::i32;
                     auto operandValues = sModelInfo->GetConstVecOperand<int>(operandIndex);
-                    input = createConstNode(elementType, toNgraphShape(operandDims), operandValues);
+                    if (sPluginType == IntelDeviceType::GNA) {
+                        elementType = ngraph::element::f32;
+                        f_operandValues.resize(operandValues.size());
+                        deQuantize(operandValues.data(), operandValues.size(), scale, zp, f_operandValues.data());
+                    }
+                    else {
+                        elementType = ngraph::element::i32;
+                        input = createConstNode(elementType, toNgraphShape(operandDims), operandValues);
+                    }
                     break;
                 }
                 case OperandType::TENSOR_BOOL8: {
@@ -73,16 +99,44 @@ protected:
                     break;
                 }
                 case OperandType::TENSOR_QUANT8_ASYMM: {
-                    elementType = ngraph::element::u8;
                     auto operandValues = sModelInfo->GetConstVecOperand<uint8_t>(operandIndex);
-                    input = createConstNode(elementType, toNgraphShape(operandDims), operandValues);
+                    if (sPluginType == IntelDeviceType::GNA) {
+                        elementType = ngraph::element::f32;
+                        f_operandValues.resize(operandValues.size());
+                        deQuantize(operandValues.data(), operandValues.size(), scale, zp, f_operandValues.data());
+                    }
+                    else {
+                        elementType = ngraph::element::u8;
+                        input = createConstNode(elementType, toNgraphShape(operandDims), operandValues);
+                    }
                     break;
                 }
                 case OperandType::TENSOR_QUANT8_SYMM:
+                case OperandType::TENSOR_QUANT8_ASYMM_SIGNED:
                 case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL: {
-                    elementType = ngraph::element::i8;
                     auto operandValues = sModelInfo->GetConstVecOperand<int8_t>(operandIndex);
-                    input = createConstNode(elementType, toNgraphShape(operandDims), operandValues);
+                    if (sPluginType == IntelDeviceType::GNA) {
+                        elementType = ngraph::element::f32;
+                        f_operandValues.resize(operandValues.size());
+                        deQuantize(operandValues.data(), operandValues.size(), scale, zp, f_operandValues.data());
+                    }
+                    else {
+                        elementType = ngraph::element::i8;
+                        input = createConstNode(elementType, toNgraphShape(operandDims), operandValues);
+                    }
+                    break;
+                }
+                case OperandType::TENSOR_QUANT16_SYMM: {
+                    auto operandValues = sModelInfo->GetConstVecOperand<int16_t>(operandIndex);
+                    if (sPluginType == IntelDeviceType::GNA) {
+                        elementType = ngraph::element::f32;
+                        f_operandValues.resize(operandValues.size());
+                        deQuantize(operandValues.data(), operandValues.size(), scale, zp, f_operandValues.data());
+                    }
+                    else {
+                        elementType = ngraph::element::i16;
+                        input = createConstNode(elementType, toNgraphShape(operandDims), operandValues);
+		    }
                     break;
                 }
                 default: {
@@ -91,12 +145,14 @@ protected:
                     return nullptr;
                 }
             }
-
+            if (sPluginType == IntelDeviceType::GNA && operandType != OperandType::TENSOR_FLOAT32) {
+                input = createConstNode(elementType, toNgraphShape(operandDims), f_operandValues);
+            }
         } else {
             input = mNgraphNodes->getOperationOutput(operandIndex).get_node_shared_ptr();
         }
-
-        if (operandType == OperandType::TENSOR_QUANT8_ASYMM && dequantize) {
+        if (operandType != OperandType::TENSOR_FLOAT32 && dequantize
+                && sPluginType != IntelDeviceType::GNA && !sModelInfo->isOperandLifeTimeTemp(operandIndex)) {
             input = DequantizeNode(input, operandIndex, ngraph::element::f32);
         }
 

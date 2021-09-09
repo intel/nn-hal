@@ -180,6 +180,8 @@ void asyncExecute(const Request& request, MeasureTiming measure, BasePreparedMod
             operandType == OperandType::TENSOR_QUANT8_SYMM ||
             operandType == OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL)
             expectedLength /= 4;  // 8bit expected instead of 32bit
+        else if(operandType == OperandType::TENSOR_QUANT16_SYMM)
+            expectedLength /= 2;  // 16bit expected instead of 32bit
         if (rActualLength != expectedLength) {
             ALOGE("%s Invalid length at outIndex(%d) Actual:%d Expected:%d", __func__, outIndex,
                   rActualLength, expectedLength);
@@ -203,12 +205,26 @@ void asyncExecute(const Request& request, MeasureTiming measure, BasePreparedMod
                 break;
             }
             case OperandType::TENSOR_QUANT8_ASYMM: {
-                floatToUint8(srcBlob->buffer().as<float*>(), (uint8_t*)destPtr, srcBlob->size());
+                modelInfo->getOperandScaleZeroPoint(outIndex, sc, zp);
+                for (int i = 0; i < srcBlob->size() ; i++) {
+                    *((uint8_t*)destPtr + i) = static_cast<uint8_t>(zp + (*(srcBlob->buffer().as<float*>() + i) / sc));
+                }
                 break;
             }
             case OperandType::TENSOR_QUANT8_SYMM:
+            case OperandType::TENSOR_QUANT8_ASYMM_SIGNED:
             case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL: {
-                floatToint8(srcBlob->buffer().as<float*>(), (int8_t*)destPtr, srcBlob->size());
+                modelInfo->getOperandScaleZeroPoint(outIndex, sc, zp);
+                for (int i = 0; i < srcBlob->size() ; i++) {
+                    *((int8_t*)destPtr + i) = static_cast<int8_t>(zp + (*(srcBlob->buffer().as<float*>() + i) / sc));
+                }
+                break;
+            }
+            case OperandType::TENSOR_QUANT16_SYMM: {
+                modelInfo->getOperandScaleZeroPoint(outIndex, sc, zp);
+                for (int i = 0; i < srcBlob->size() ; i++) {
+                    *((int16_t*)destPtr + i) = static_cast<int16_t>(zp + (*(srcBlob->buffer().as<float*>() + i) / sc));
+                }
                 break;
             }
             default:
@@ -295,9 +311,12 @@ static std::tuple<ErrorStatus, hidl_vec<V1_2::OutputShape>, Timing> executeSynch
         auto outDims = srcBlob->getTensorDesc().getDims();
         if (operandType == OperandType::TENSOR_BOOL8 ||
             operandType == OperandType::TENSOR_QUANT8_ASYMM ||
+            operandType == OperandType::TENSOR_QUANT8_ASYMM_SIGNED ||
             operandType == OperandType::TENSOR_QUANT8_SYMM ||
             operandType == OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL)
             expectedLength /= 4;  // 8bit expected instead of 32bit
+        else if(operandType == OperandType::TENSOR_QUANT16_SYMM)
+            expectedLength /= 2;  // 16bit expected instead of 32bit
         if (rActualLength != expectedLength) {
             ALOGE("%s Invalid length(%d) at outIndex(%d)", __func__, rActualLength, outIndex);
             // Notify Insufficient Buffer Length to modelInfo
@@ -305,6 +324,8 @@ static std::tuple<ErrorStatus, hidl_vec<V1_2::OutputShape>, Timing> executeSynch
             return {ErrorStatus::OUTPUT_INSUFFICIENT_SIZE, modelInfo->getOutputShapes(), kNoTiming};
         } else
             modelInfo->updateOutputshapes(i, outDims);
+        float sc;
+        int32_t zp;
         switch (operandType) {
             case OperandType::TENSOR_INT32:
             case OperandType::TENSOR_FLOAT32: {
@@ -317,12 +338,26 @@ static std::tuple<ErrorStatus, hidl_vec<V1_2::OutputShape>, Timing> executeSynch
                 break;
             }
             case OperandType::TENSOR_QUANT8_ASYMM: {
-                floatToUint8(srcBlob->buffer().as<float*>(), (uint8_t*)destPtr, srcBlob->size());
+                modelInfo->getOperandScaleZeroPoint(outIndex, sc, zp);
+                for (int i = 0; i < srcBlob->size() ; i++) {
+                    *((uint8_t*)destPtr + i) = static_cast<uint8_t>(zp + (*(srcBlob->buffer().as<float*>() + i) / sc));
+                }
                 break;
             }
             case OperandType::TENSOR_QUANT8_SYMM:
+            case OperandType::TENSOR_QUANT8_ASYMM_SIGNED:
             case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL: {
-                floatToint8(srcBlob->buffer().as<float*>(), (int8_t*)destPtr, srcBlob->size());
+                modelInfo->getOperandScaleZeroPoint(outIndex, sc, zp);
+                for (int i = 0; i < srcBlob->size() ; i++) {
+                    *((int8_t*)destPtr + i) = static_cast<int8_t>(zp + (*(srcBlob->buffer().as<float*>() + i) / sc));
+                }
+                break;
+            }
+            case OperandType::TENSOR_QUANT16_SYMM: {
+                modelInfo->getOperandScaleZeroPoint(outIndex, sc, zp);
+                for (int i = 0; i < srcBlob->size() ; i++) {
+                    *((int16_t*)destPtr + i) = static_cast<int16_t>(zp + (*(srcBlob->buffer().as<float*>() + i) / sc));
+                }
                 break;
             }
             default:

@@ -46,6 +46,7 @@
 #include <Pad_V2.hpp>
 #include <Pow.hpp>
 #include <Quantize.hpp>
+#include <QuantizedLSTM.hpp>
 #include <RNN.hpp>
 #include <ROI_Align.hpp>
 #include <ROI_Pooling.hpp>
