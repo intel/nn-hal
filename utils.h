@@ -24,6 +24,7 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <fstream>
+#include <iostream>
 #include "Driver.h"
 #include "IENetwork.h"
 // May be move these out of utils??

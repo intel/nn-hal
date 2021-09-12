@@ -66,7 +66,10 @@ bool NnapiModelInfo::initializeRunTimeOperandInfo() {
             case OperandType::TENSOR_QUANT8_ASYMM:
             case OperandType::TENSOR_QUANT8_SYMM:
             case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL:
+            case OperandType::TENSOR_QUANT8_ASYMM_SIGNED:
+            case OperandType::TENSOR_QUANT16_SYMM:
                 to.type = from.type;
+                to.scale = from.scale;
                 break;
             default:
                 ALOGE("wrong operand type %d", from.type);
@@ -284,7 +287,8 @@ Blob::Ptr NnapiModelInfo::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const ui
             return blob;
         }
     } else if (op.type == OperandType::TENSOR_QUANT8_SYMM ||
-               op.type == OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL) {
+               op.type == OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL ||
+               op.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED) {
         ALOGV(
             "check if tensors of type TENSOR_QUANT8_SYMM/TENSOR_QUANT8_SYMM_PER_CHANNEL  "
             "supported");
@@ -299,6 +303,22 @@ Blob::Ptr NnapiModelInfo::GetInOutOperandAsBlob(RunTimeOperandInfo& op, const ui
         } else {
             InferenceEngine::TBlob<int8_t>::Ptr blob =
                 std::make_shared<InferenceEngine::TBlob<int8_t>>(td, (int8_t*)buf, len);
+            return blob;
+        }
+    }
+    else if (op.type == OperandType::TENSOR_QUANT16_SYMM) {
+        ALOGV("check if tensors of type TENSOR_QUANT16_SYMM supported");
+        InferenceEngine::TensorDesc td(InferenceEngine::Precision::I16, toDims(op.dimensions),
+                                       InferenceEngine::Layout::ANY);
+        if (buf == nullptr) {
+            ALOGD("TENSOR_QUANT16_SYMM buf is NULL !!!!!!!!!!!!!!!");
+            InferenceEngine::TBlob<int16_t>::Ptr blob =
+                std::make_shared<InferenceEngine::TBlob<int16_t>>(td);
+            blob->allocate();
+            return blob;
+        } else {
+            InferenceEngine::TBlob<int16_t>::Ptr blob =
+                std::make_shared<InferenceEngine::TBlob<int16_t>>(td, (int16_t*)buf, len);
             return blob;
         }
     }

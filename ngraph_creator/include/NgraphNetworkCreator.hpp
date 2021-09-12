@@ -17,6 +17,7 @@ private:
     std::vector<std::shared_ptr<OperationsBase>> mOperationNodes;
     std::shared_ptr<NgraphNodes> mNgraphNodes;
     OperationsFactory mOpFactoryInstance;
+    const IntelDeviceType mPluginType;
     bool createInputParams();
     bool initializeModel();
 

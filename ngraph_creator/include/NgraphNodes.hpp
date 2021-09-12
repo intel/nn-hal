@@ -17,7 +17,8 @@ private:
     // in the path to current Operand.
     std::vector<bool> mForcedNchw;
     std::vector<std::shared_ptr<ngraph::opset3::Parameter>> mInputParams;
-    std::vector<std::shared_ptr<ngraph::Node>> mResultNodes;
+    std::vector<std::shared_ptr<ngraph::op::Result>> mResultNodes;
+    std::vector<std::shared_ptr<ngraph::op::Sink>> mSinkNodes;
     // mNodeNames are only populated when requested, as only Inputs and Result NodeNames are
     // required.
     std::map<int, std::string> mNodeNames;
@@ -30,6 +31,8 @@ public:
     void setOutputAtOperandIndex(size_t index, ngraph::Output<ngraph::Node> output);
     ngraph::Output<ngraph::Node> getOperationOutput(size_t index);
     void setResultNode(size_t outputIndex, std::shared_ptr<ngraph::Node> resultNode);
+    void setSinkNode(std::shared_ptr<ngraph::op::Sink> sinkNode);
+
 
     const std::string& getNodeName(size_t index);
     void removeInputParameter(std::string name, size_t index);

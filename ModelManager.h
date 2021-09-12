@@ -104,6 +104,13 @@ public:
         return operand.zeroPoint;
     }
 
+    void getOperandScaleZeroPoint(int index, float& scale, int32_t& zp) {
+        auto operand = getOperand(index);
+        scale = operand.scale;
+        zp = operand.zeroPoint;
+        return;
+    }
+
     RunTimeOperandInfo& getRuntimeOperand(uint32_t index) {
         return mOperands[mModel.main.inputIndexes[index]];
     }

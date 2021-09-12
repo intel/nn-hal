@@ -1,0 +1,471 @@
+//#define LOG_NDEBUG 0
+#include <QuantizedLSTM.hpp>
+#define LOG_TAG "Quantized_LSTM"
+
+namespace android {
+namespace hardware {
+namespace neuralnetworks {
+namespace nnhal {
+
+#define ACTIVATION_FUNCTION_NONE 0
+#define ACTIVATION_FUNCTION_RELU 1
+#define ACTIVATION_FUNCTION_RELU6 3
+#define ACTIVATION_FUNCTION_TANH 4
+#define ACTIVATION_FUNCTION_SIGMOID 6
+
+QuantizedLSTM::QuantizedLSTM(int operationIndex) : OperationsBase(operationIndex) {
+    mDefaultOutputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
+}
+
+bool QuantizedLSTM::validate() {
+    // Check all Output types
+    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM_SIGNED)) return false;
+    if (!checkOutputOperandType(1, (int32_t)OperandType::TENSOR_QUANT16_SYMM)) return false;
+    if (!checkOutputOperandType(2, (int32_t)OperandType::TENSOR_QUANT8_ASYMM_SIGNED)) return false;
+
+    const auto& inputsSize = sModelInfo->getOperationInputsSize(mNnapiOperationIndex);
+    const auto& outputsSize = sModelInfo->getOperationOutputsSize(mNnapiOperationIndex);
+
+    if (inputsSize != 32) {
+        return false;
+    }
+
+    if (outputsSize != 3) return false;
+
+    // check 0, 18, 19 input values
+    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM_SIGNED)) return false;
+    if (!checkInputOperandType(18, (int32_t)OperandType::TENSOR_QUANT8_ASYMM_SIGNED)) return false;
+    if (!checkInputOperandType(19, (int32_t)OperandType::TENSOR_QUANT16_SYMM)) return false;
+
+    // check input type for 2 to 4, 6 to 8
+    for (int i = 2; i <= 4; i++) {
+        if (!checkInputOperandType(i, (int32_t)OperandType::TENSOR_QUANT8_SYMM)) return false;
+    }
+    for (int i = 6; i <= 8; i++) {
+        if (!checkInputOperandType(i, (int32_t)OperandType::TENSOR_QUANT8_SYMM)) return false;
+    }
+
+    // check input type for 13,14,15
+    for (int i = 13; i <= 15; i++) {
+        if (!checkInputOperandType(i, (int32_t)OperandType::TENSOR_INT32)) return false;
+    }
+
+    if (!sModelInfo->isOmittedInput(mNnapiOperationIndex, 1) &&
+        !sModelInfo->isOmittedInput(mNnapiOperationIndex, 5) &&
+        !sModelInfo->isOmittedInput(mNnapiOperationIndex, 12)) {
+        // CIFG diabled, check input types
+        if (!checkInputOperandType(1, (int32_t)OperandType::TENSOR_QUANT8_SYMM)) return false;
+        if (!checkInputOperandType(5, (int32_t)OperandType::TENSOR_QUANT8_SYMM)) return false;
+        if (!checkInputOperandType(12, (int32_t)OperandType::TENSOR_INT32)) return false;
+    }
+
+    if (!sModelInfo->isOmittedInput(mNnapiOperationIndex, 9) &&
+        !sModelInfo->isOmittedInput(mNnapiOperationIndex, 10) &&
+        !sModelInfo->isOmittedInput(mNnapiOperationIndex, 11)) {
+        // peephole enabled, check input types
+        if (!checkInputOperandType(9, (int32_t)OperandType::TENSOR_QUANT16_SYMM)) return false;
+        if (!checkInputOperandType(10, (int32_t)OperandType::TENSOR_QUANT16_SYMM)) return false;
+        if (!checkInputOperandType(11, (int32_t)OperandType::TENSOR_QUANT16_SYMM)) return false;
+    }
+
+    if (!sModelInfo->isOmittedInput(mNnapiOperationIndex, 20) &&
+        !sModelInfo->isOmittedInput(mNnapiOperationIndex, 21) &&
+        !sModelInfo->isOmittedInput(mNnapiOperationIndex, 22) &&
+        !sModelInfo->isOmittedInput(mNnapiOperationIndex, 23)) {
+        // Layer Normalization present
+        if (!checkInputOperandType(20, (int32_t)OperandType::TENSOR_QUANT16_SYMM)) return false;
+        if (!checkInputOperandType(21, (int32_t)OperandType::TENSOR_QUANT16_SYMM)) return false;
+        if (!checkInputOperandType(22, (int32_t)OperandType::TENSOR_QUANT16_SYMM)) return false;
+        if (!checkInputOperandType(23, (int32_t)OperandType::TENSOR_QUANT16_SYMM)) return false;
+    }
+
+    ALOGV("%s PASSED", __func__);
+    return true;
+}
+
+void QuantizedLSTM::connectOperationToGraph() { createNode(); }
+
+std::shared_ptr<ngraph::Node> QuantizedLSTM::createNode() {
+
+    const auto& inputsSize = sModelInfo->getOperationInputsSize(mNnapiOperationIndex);
+
+    bool isCIFGenabled = false, isPeepholeUsed = false, isProjectionUsed = false,
+         isLayerNormUsed = false, isCifgDimsEmpty = true;
+
+    // checking if CIFG enabled
+    if (sModelInfo->isOmittedInput(mNnapiOperationIndex, 1) &&
+        sModelInfo->isOmittedInput(mNnapiOperationIndex, 5) &&
+        sModelInfo->isOmittedInput(mNnapiOperationIndex, 12)) {
+        isCIFGenabled = true;
+    } else {
+        if (isValidInputTensor(1) && isValidInputTensor(5) && isValidInputTensor(12))
+            isCIFGenabled = false;
+        else
+            isCIFGenabled = true;
+    }
+
+    // checking if peephole enabled
+    if (sModelInfo->isOmittedInput(mNnapiOperationIndex, 9) &&
+        sModelInfo->isOmittedInput(mNnapiOperationIndex, 10) &&
+        sModelInfo->isOmittedInput(mNnapiOperationIndex, 11)) {
+        isPeepholeUsed = false;
+    } else {
+        if (!isCIFGenabled && !isValidInputTensor(9) && isValidInputTensor(10) &&
+            isValidInputTensor(11)) {
+            isCIFGenabled = true;
+            isCifgDimsEmpty = false;
+        }
+        if (isCIFGenabled) {
+            if (isValidInputTensor(10) && isValidInputTensor(11))
+                isPeepholeUsed = true;
+            else
+                isPeepholeUsed = false;
+        } else {
+            if (isValidInputTensor(9) && isValidInputTensor(10) && isValidInputTensor(11))
+                isPeepholeUsed = true;
+            else
+                isPeepholeUsed = false;
+        }
+    }
+
+    // checking if projection enabled
+    if (sModelInfo->isOmittedInput(mNnapiOperationIndex, 16)) {
+        isProjectionUsed = false;
+    } else {
+        if (isValidInputTensor(16))
+            isProjectionUsed = true;
+        else
+            isProjectionUsed = false;
+    }
+
+    // checking if layer normalization enabled
+    if (sModelInfo->isOmittedInput(mNnapiOperationIndex, 20) &&
+        sModelInfo->isOmittedInput(mNnapiOperationIndex, 21) &&
+        sModelInfo->isOmittedInput(mNnapiOperationIndex, 22) &&
+        sModelInfo->isOmittedInput(mNnapiOperationIndex, 23)) {
+        isLayerNormUsed = false;
+    } else {
+        if (isCIFGenabled) {
+            if (isValidInputTensor(21) && isValidInputTensor(22) && isValidInputTensor(23))
+                isLayerNormUsed = true;
+            else
+                isLayerNormUsed = false;
+        } else {
+            if (isValidInputTensor(20) && isValidInputTensor(21) && isValidInputTensor(22) &&
+                isValidInputTensor(23))
+                isLayerNormUsed = true;
+            else
+                isLayerNormUsed = false;
+        }
+    }
+
+    std::shared_ptr<ngraph::Node> inputNode, input2input_weights, input2forget_weights,
+        input2cell_weights, input2output_weights, recurrent2input_weights, recurrent2forget_weights,
+        recurrent2cell_weights, recurrent2output_weights, cell2input_weights, cell2forget_weights,
+        cell2output_weights, input_gate_bias, forget_gate_bias, cell_bias, output_gate_bias,
+        projection_weights, projection_bias;
+    uint32_t activationFn;
+    float cell_state_clipping, proj_clipping;
+
+    const auto& inputNode_dims = getInputOperandDimensions(0);
+    const auto& initial_hidden_state_dims = getInputOperandDimensions(18);
+    const auto& initial_cell_state_dims = getInputOperandDimensions(19);
+
+    auto batch_size = inputNode_dims[0];
+    auto input_size = inputNode_dims[1];
+    auto num_units = initial_cell_state_dims[1];
+    auto output_size = initial_hidden_state_dims[1];
+
+    // Creating input nodes
+    inputNode = getInputNode(0);
+    const auto& elementType = inputNode->get_element_type();
+    ngraph::element::Type cellElementType = ngraph::element::f32;
+    // W_{xi}, W_{xf}, W_{xc}, W_{xo}
+    if (isCIFGenabled) {
+        if (!isCifgDimsEmpty) removeInputNode(1);
+    } else {
+        input2input_weights = getInputNode(1);
+    }
+    input2forget_weights = getInputNode(2);
+    input2cell_weights = getInputNode(3);
+    input2output_weights = getInputNode(4);
+
+    // W_{hi}, W_{hf}, W_{hc}, W_{ho}
+    if (isCIFGenabled) {
+        if (!isCifgDimsEmpty) removeInputNode(5);
+    } else {
+        recurrent2input_weights = getInputNode(5);
+    }
+    recurrent2forget_weights = getInputNode(6);
+    recurrent2cell_weights = getInputNode(7);
+    recurrent2output_weights = getInputNode(8);
+
+    std::vector<float> init_hidden(output_size, 0.0f);
+    std::vector<float> init_cell(num_units, 0.0f);
+    static int assign_read_count = 0;
+    auto constant_hidden = std::make_shared<ngraph::opset3::Constant>(ngraph::element::f32, ngraph::Shape{1, output_size},
+                                                                        init_hidden);
+    auto constant_cell = std::make_shared<ngraph::opset3::Constant>(ngraph::element::f32, ngraph::Shape{1, num_units},
+                                                                        init_cell);
+
+    auto read_value_hidden = std::make_shared<ngraph::opset3::ReadValue>(constant_hidden, "variable_hidden_" + std::to_string(assign_read_count));
+    auto read_value_cell = std::make_shared<ngraph::opset3::ReadValue>(constant_cell, "variable_cell"+ std::to_string(assign_read_count));
+    assign_read_count++;
+
+    // W_{ci}, W_{cf}, W_{co}
+    if (isPeepholeUsed) {
+        if (isCIFGenabled)
+            cell2input_weights =
+                createConstNode(cellElementType, ngraph::Shape{num_units}, convertToVector(0));
+        else
+            cell2input_weights = getInputNode(9);
+        cell2forget_weights = getInputNode(10);
+        cell2output_weights = getInputNode(11);
+    } else {
+        cell2input_weights =
+            createConstNode(cellElementType, ngraph::Shape{1, num_units}, convertToVector(0));
+        cell2forget_weights =
+            createConstNode(cellElementType, ngraph::Shape{1, num_units}, convertToVector(0));
+        cell2output_weights =
+            createConstNode(cellElementType, ngraph::Shape{1, num_units}, convertToVector(0));
+    }
+
+    // b_i, b_f, b_c, b_o
+    if (isCIFGenabled) {
+        if (!isCifgDimsEmpty) removeInputNode(12);
+    } else {
+        input_gate_bias = getInputNode(12);
+    }
+    forget_gate_bias = getInputNode(13);
+    cell_bias = getInputNode(14);
+    output_gate_bias = getInputNode(15);
+
+    // W_{proj}, b_{proj}
+    if (isProjectionUsed) {
+        projection_weights = getInputNode(16);
+        if (isValidInputTensor(17))
+            projection_bias = getInputNode(17);
+        else
+            projection_bias =
+                createConstNode(elementType, ngraph::Shape{output_size}, convertToVector(0));
+    }
+
+    cell_state_clipping = sModelInfo->ParseOperationInput<float>(mNnapiOperationIndex, 24);
+
+    if (isProjectionUsed)
+        proj_clipping = sModelInfo->ParseOperationInput<float>(mNnapiOperationIndex, 25);
+
+    std::shared_ptr<ngraph::Node> i_t, f_t, c_t, o_t;
+
+    std::shared_ptr<ngraph::Node> input_layer_norm_weights, forget_layer_norm_weights,
+        cell_layer_norm_weights, output_layer_norm_weights;
+    if (isLayerNormUsed) {
+        if (!isCIFGenabled) input_layer_norm_weights = getInputNode(20);
+        forget_layer_norm_weights = getInputNode(21);
+        cell_layer_norm_weights = getInputNode(22);
+        output_layer_norm_weights = getInputNode(23);
+    }
+
+    // i_t = W_{xi}x_t+W_{hi}h_{t-1}+W_{ci}C_{t-1}
+    if (!isCIFGenabled)
+        i_t = add(add(matMul(inputNode, input2input_weights, false, true),
+                      matMul(read_value_hidden, recurrent2input_weights, false, true)),
+                  mul(cell2input_weights, read_value_cell));
+
+    // f_t = W_{xf}x_t+W_{hf}h_{t-1}+W_{cf}C_{t-1}
+    f_t = add(add(matMul(inputNode, input2forget_weights, false, true),
+                  matMul(read_value_hidden, recurrent2forget_weights, false, true)),
+              mul(cell2forget_weights, read_value_cell));
+    // c_t = W_{xc}x_t+W_{hc}h_{t-1}
+    c_t = add(matMul(inputNode, input2cell_weights, false, true),
+              matMul(read_value_hidden, recurrent2cell_weights, false, true));
+    // o_t = W_{xo}x_t+W_{ho}h_{t-1}
+    o_t = add(matMul(inputNode, input2output_weights, false, true),
+              matMul(read_value_hidden, recurrent2output_weights, false, true));
+
+    /* ################# Update Forget Gate ################# */
+    if (isLayerNormUsed) {
+        f_t = LayerNorm(f_t, forget_layer_norm_weights, forget_gate_bias);
+    } else {
+        // W_{xf}x_t + W_{hf}h_{t-1} + W_{cf}C_{t-1} + b_f
+        f_t = add(f_t, forget_gate_bias);
+    }
+    // sigma(W_{xf}x_t + W_{hf}h_{t-1} + W_{cf}C_{t-1} + b_f)
+    f_t = applyActivation(f_t, ACTIVATION_FUNCTION_SIGMOID);
+
+    /* ################# Update Input Gate ################# */
+    if (isCIFGenabled) {
+        auto constNode = createConstNode(elementType, f_t->get_shape(), convertToVector(1.f));
+        // Couple input with forget gate: 1 - i_f
+        i_t = sub(constNode, f_t);
+    } else {
+        if (isLayerNormUsed) {
+            i_t = LayerNorm(i_t, input_layer_norm_weights, input_gate_bias);
+        } else {
+            // W_{xi}x_t + W_{hi}h_{t-1} + W_{ci}C_{t-1} + b_i
+            i_t = add(i_t, input_gate_bias);
+        }
+        // sigma(W_{xi}x_t + W_{hi}h_{t-1} + W_{ci}C_{t-1} + b_i)
+        i_t = applyActivation(i_t, ACTIVATION_FUNCTION_SIGMOID);
+    }
+
+    /* ################# Update Cell Gate ################# */
+
+    if (isLayerNormUsed) {
+        c_t = LayerNorm(c_t, cell_layer_norm_weights, cell_bias);
+    } else {
+        // W_{xc}x_t+W_{hc}h_{t-1}+b_c
+        c_t = add(c_t, cell_bias);
+    }
+    // g(W_{xc}x_t+W_{hc}h_{t-1}+b_c)
+     c_t = applyActivation(c_t, ACTIVATION_FUNCTION_TANH);
+
+    // ft (.) Ct-1 + it (.) ct
+    auto C = add(mul(f_t, read_value_cell), mul(i_t, c_t));
+    // clip(ft (.) Ct-1 + it (.) ct, t_{cell})
+    C = clip(C, cell_state_clipping);
+
+    /* ################# Update Output Gate ################# */
+
+    // W_{xo}x_t+W_{ho}h_{t-1}+W_{co}C_t
+    o_t = add(o_t, mul(cell2output_weights, C));
+    if (isLayerNormUsed) {
+        o_t = LayerNorm(o_t, output_layer_norm_weights, output_gate_bias);
+    } else {
+        // W_{xo}x_t+W_{ho}h_{t-1}+W_{co}C_t+b_o
+        o_t = add(o_t, output_gate_bias);
+    }
+
+    // sigma(W_{xo}x_t+W_{ho}h_{t-1}+W_{co}C_t+b_o)
+    o_t = applyActivation(o_t, ACTIVATION_FUNCTION_SIGMOID);
+
+    std::shared_ptr<ngraph::Node> H;
+    if (isProjectionUsed) {
+        // o_t odot g(C_t)
+        auto dotProd = mul(o_t, applyActivation(C, ACTIVATION_FUNCTION_TANH));
+        // W_{proj}(o_t odot g(C_t))
+        auto projWeightsProduct = matMul(projection_weights, dotProd, false, true);
+        // W_{proj}(o_t odot g(C_t))+b_{proj}
+        auto projBiasAdd = add(transpose(NC_CN, projWeightsProduct), projection_bias);
+        // clip(W_{proj}(o_t odot g(C_t))+b_{proj}, t_{proj})
+        H = clip(projBiasAdd, proj_clipping);
+    } else {
+        // o_t odot g(C_t)
+        H = mul(o_t, applyActivation(C, ACTIVATION_FUNCTION_TANH));
+    }
+
+    std::vector<std::shared_ptr<ngraph::Node>> QLstmOutputs(3, nullptr);
+    QLstmOutputs[0] = H;
+    QLstmOutputs[1] = C;
+    QLstmOutputs[2] = H;
+
+    auto assign_hidden = std::make_shared<ngraph::opset3::Assign>(H, read_value_hidden->get_variable_id());
+    auto assign_cell = std::make_shared<ngraph::opset3::Assign>(C, read_value_cell->get_variable_id());
+    assign_hidden->add_control_dependency(read_value_hidden);
+    assign_cell->add_control_dependency(read_value_cell);
+    addSinkNode(assign_hidden);
+    addSinkNode(assign_cell);
+
+    for (int i = 0; i < 3; i++) {
+        auto outputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, i);
+        mNgraphNodes->setOutputAtOperandIndex(outputIndex, QLstmOutputs[i]);
+
+        const auto op = sModelInfo->getOperand(outputIndex);
+        if (op.lifetime == V1_3::OperandLifeTime::SUBGRAPH_OUTPUT) {
+            addResultNode(outputIndex, QLstmOutputs[i]);
+        }
+    }
+
+    return nullptr;
+}
+
+std::shared_ptr<ngraph::Node> QuantizedLSTM::add(const ngraph::Output<ngraph::Node>& lhs,
+                                        const ngraph::Output<ngraph::Node>& rhs) {
+    return {make_shared<ngraph::opset3::Add>(lhs, rhs, ngraph::op::AutoBroadcastType::NUMPY)};
+}
+
+std::shared_ptr<ngraph::Node> QuantizedLSTM::sub(const ngraph::Output<ngraph::Node>& lhs,
+                                        const ngraph::Output<ngraph::Node>& rhs) {
+    return {make_shared<ngraph::opset3::Subtract>(lhs, rhs, ngraph::op::AutoBroadcastType::NUMPY)};
+}
+
+std::shared_ptr<ngraph::Node> QuantizedLSTM::mul(const ngraph::Output<ngraph::Node>& lhs,
+                                        const ngraph::Output<ngraph::Node>& rhs) {
+    return {make_shared<ngraph::opset3::Multiply>(lhs, rhs, ngraph::op::AutoBroadcastType::NUMPY)};
+}
+
+std::shared_ptr<ngraph::Node> QuantizedLSTM::matMul(const ngraph::Output<ngraph::Node>& lhs,
+                                           const ngraph::Output<ngraph::Node>& rhs,
+                                           bool transpose_lhs, bool transpose_rhs) {
+    return {make_shared<ngraph::opset3::MatMul>(lhs, rhs, transpose_lhs, transpose_rhs)};
+}
+
+std::shared_ptr<ngraph::Node> QuantizedLSTM::clip(const ngraph::Output<ngraph::Node>& data,
+                                         float m_clip) const {
+    if (m_clip == 0.f) {
+        return data.get_node_shared_ptr();
+    }
+    return make_shared<ngraph::opset3::Clamp>(data, -m_clip, m_clip);
+}
+
+std::shared_ptr<ngraph::Node> QuantizedLSTM::applyActivation(const std::shared_ptr<ngraph::Node>& arg,
+                                                    int activationFn) const {
+    switch (activationFn) {
+        case ACTIVATION_FUNCTION_RELU:
+            return std::make_shared<ngraph::opset3::Relu>(arg);
+            break;
+        case ACTIVATION_FUNCTION_RELU6:
+            return std::make_shared<ngraph::opset3::Clamp>(arg, 0, 6);
+            break;
+        case ACTIVATION_FUNCTION_TANH:
+            return std::make_shared<ngraph::opset3::Tanh>(arg);
+            break;
+        case ACTIVATION_FUNCTION_SIGMOID:
+            return std::make_shared<ngraph::opset3::Sigmoid>(arg);
+            break;
+        default:
+            return std::make_shared<ngraph::opset3::Tanh>(arg);
+    }
+}
+
+std::shared_ptr<ngraph::Node> QuantizedLSTM::LayerNorm(
+    const ngraph::Output<ngraph::Node>& input,
+    const std::shared_ptr<ngraph::Node>& normalizationweights,
+    const std::shared_ptr<ngraph::Node>& bias) {
+    // LayerNormalization
+    auto normalizationConstant = createConstNode(ngraph::element::f32, {}, convertToVector(1e-8f));
+    auto axis = ngraph::op::Constant::create(ngraph::element::i32, {}, {-1});
+    auto mean = std::make_shared<ngraph::opset3::ReduceMean>(input, axis, true);
+    // x_i - mean_i
+    auto diff = sub(input, mean);
+    // (x_i - mean_i) ** 2
+    auto multiply = mul(diff, diff);
+    // mean((x_i - mean_i) ** 2)
+    auto var = std::make_shared<ngraph::opset3::ReduceMean>(multiply, axis, true);
+    // var_i + epsilon
+    auto add_var = add(var, normalizationConstant);
+    // sqrt(var_i + epsilon)
+    auto sqrt = std::make_shared<ngraph::opset3::Sqrt>(add_var);
+    // (x_i - mean_i) / sqrt(var_i + epsilon)
+    auto stddev_inv = std::make_shared<ngraph::opset3::Divide>(diff, sqrt);
+    // x_i_normalized * gamma
+    auto mul_norm_weights = mul(stddev_inv, normalizationweights);
+    // x_i_normalized * gamma + beta
+    auto output = add(mul_norm_weights, bias);
+
+    return output;
+}
+
+bool QuantizedLSTM::isValidInputTensor(uint32_t inputIndex) {
+    const auto& dims = getInputOperandDimensions(inputIndex);
+    if (dims.empty()) return false;
+
+    if (dims[0] == 0) return false;
+
+    return true;
+}
+
+}  // namespace nnhal
+}  // namespace neuralnetworks
+}  // namespace hardware
+}  // namespace android

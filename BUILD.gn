@@ -118,6 +118,7 @@ shared_library("intel_nnhal") {
     "ngraph_creator/operations/src/Pad_V2.cpp",
     "ngraph_creator/operations/src/Pow.cpp",
     "ngraph_creator/operations/src/Quantize.cpp",
+    "ngraph_creator/operations/src/QuantizedLSTM.cpp",
     "ngraph_creator/operations/src/Reduce_All.cpp",
     "ngraph_creator/operations/src/Reduce_Any.cpp",
     "ngraph_creator/operations/src/Reduce_Max.cpp",
@@ -194,9 +195,10 @@ shared_library("intel_nnhal") {
     "nnapi-support",
     "ngraph",
     "inference_engine",
-    "nn-common", 
+    "nn-common",
     "ssl",
-    "crypto"
+    "crypto",
+    "MKLDNNPlugin"
   ]
   lib_dirs = [
     "${sysroot}/usr/local/deployment_tools/inference_engine/lib/intel64/",
