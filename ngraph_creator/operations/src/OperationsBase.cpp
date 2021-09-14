@@ -72,7 +72,7 @@ void OperationsBase::connectOperationToGraph() {
     if (op.type == OperandType::TENSOR_QUANT8_ASYMM) {
         outputNode = QuantizeNode(outputNode, mDefaultOutputIndex, ngraph::element::u8);
     }
-    if (op.lifetime == OperandLifeTime::MODEL_OUTPUT) {
+    if (op.lifetime == OperandLifeTime::SUBGRAPH_OUTPUT) {
         addResultNode(mDefaultOutputIndex, outputNode);
     }
     mNgraphNodes->setOutputAtOperandIndex(mDefaultOutputIndex, outputNode->get_default_output());

@@ -53,7 +53,7 @@ std::shared_ptr<ngraph::Node> Cast::createNode() {
 
     mNgraphNodes->setOutputAtOperandIndex(outputIndex, outputNode);
     const auto op = sModelInfo->getOperand(outputIndex);
-    if (op.lifetime == OperandLifeTime::MODEL_OUTPUT) {
+    if (op.lifetime == OperandLifeTime::SUBGRAPH_OUTPUT) {
         addResultNode(mDefaultOutputIndex, outputNode);
     }
 

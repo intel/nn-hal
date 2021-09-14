@@ -330,7 +330,7 @@ std::shared_ptr<ngraph::Node> LSTM::createNode() {
         auto outputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, i);
         mNgraphNodes->setOutputAtOperandIndex(outputIndex, LstmOutputs[i]);
         const auto op = sModelInfo->getOperand(outputIndex);
-        if (op.lifetime == OperandLifeTime::MODEL_OUTPUT) {
+        if (op.lifetime == OperandLifeTime::SUBGRAPH_OUTPUT) {
             addResultNode(outputIndex, LstmOutputs[i]);
         }
     }

@@ -37,7 +37,7 @@ public:
     CpuPreparedModel(const Model& model) : BasePreparedModel(IntelDeviceType::CPU, model) {}
     ~CpuPreparedModel() { deinitialize(); }
 
-    bool initialize() override;
+    bool initialize(const Model& model) override;
     Return<void> configureExecutionBurst(
         const sp<V1_2::IBurstCallback>& callback,
         const MQDescriptorSync<V1_2::FmqRequestDatum>& requestChannel,
