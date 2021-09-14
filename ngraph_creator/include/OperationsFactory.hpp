@@ -73,6 +73,7 @@
 #include <Space_To_Depth.hpp>
 #include <Split.hpp>
 #include <Squeeze.hpp>
+#include <Strided_Slice.hpp>
 #include <Sub.hpp>
 #include <Tanh.hpp>
 #include <Topk_V2.hpp>
