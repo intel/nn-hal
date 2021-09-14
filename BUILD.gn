@@ -145,6 +145,7 @@ shared_library("intel_nnhal") {
     "ngraph_creator/operations/src/Split.cpp",
     "ngraph_creator/operations/src/SQRT.cpp",
     "ngraph_creator/operations/src/Squeeze.cpp",
+    "ngraph_creator/operations/src/Strided_Slice.cpp",
     "ngraph_creator/operations/src/Sub.cpp",
     "ngraph_creator/operations/src/Tanh.cpp",
     "ngraph_creator/operations/src/Topk_V2.cpp",
