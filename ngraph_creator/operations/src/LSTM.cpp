@@ -417,6 +417,27 @@ std::shared_ptr<ngraph::Node> LSTM::clip(const ngraph::Output<ngraph::Node>& dat
     }
     return std::make_shared<ngraph::opset3::Clamp>(data, -m_clip, m_clip);
 }
+
+std::shared_ptr<ngraph::Node> LSTM::reduceMean(const std::shared_ptr<ngraph::Node>& node) {
+    const auto& element_type = node->get_element_type();
+    auto shape = node->get_shape();
+    auto cols = shape[1];
+    float init_value = 1.0 / cols;
+    std::vector<float> transpose_weights(cols, init_value);
+    auto transpose_weights_node = createConstNode(element_type, {cols, 1}, transpose_weights);
+    auto mat_mul = matMul(node, transpose_weights_node, false, false);
+    return mat_mul;
+}
+
+std::shared_ptr<ngraph::Node> LSTM::inverseSqrt(const std::shared_ptr<ngraph::Node>& node) {
+    const auto& element_type = node->get_element_type();
+    auto log = std::make_shared<ngraph::opset3::Log>(node);
+    auto neg_half_constant = createConstNode(element_type, {}, convertToVector(-0.5));
+    auto mul_1 = mul(log, neg_half_constant);
+    auto exp = std::make_shared<ngraph::opset3::Exp>(mul_1);
+    return exp;
+}
+
 std::shared_ptr<ngraph::Node> LSTM::applyActivation(const std::shared_ptr<ngraph::Node>& arg,
                                                     int activationFn) const {
     switch (activationFn) {
@@ -437,28 +458,27 @@ std::shared_ptr<ngraph::Node> LSTM::applyActivation(const std::shared_ptr<ngraph
     }
 }
 
-std::shared_ptr<ngraph::Node> LSTM::LayerNorm(
-    const ngraph::Output<ngraph::Node>& input,
-    const std::shared_ptr<ngraph::Node>& normalizedweights,
-    const std::shared_ptr<ngraph::Node>& bias) {
+std::shared_ptr<ngraph::Node> LSTM::LayerNorm(const ngraph::Output<ngraph::Node>& input,
+                                              const std::shared_ptr<ngraph::Node>& norm_weights,
+                                              const std::shared_ptr<ngraph::Node>& bias) {
     // LayerNormalization
-    auto normalizationConstant = createConstNode(ngraph::element::f32, {}, convertToVector(1e-8f));
+    const auto& element_type = input.get_element_type();
+    auto norm_constant = createConstNode(element_type, {}, convertToVector(1e-8f));
     auto axis = ngraph::op::Constant::create(ngraph::element::i32, {}, {-1});
-    auto mean = std::make_shared<ngraph::opset3::ReduceMean>(input, axis, true);
+    auto reduce_mean_1 = reduceMean(input.get_node_shared_ptr());
     // x_i - mean_i
-    auto diff = sub(input, mean);
+    auto sub_1 = sub(input, reduce_mean_1);
     // (x_i - mean_i) ** 2
-    auto multiply = mul(diff, diff);
+    auto mul_1 = mul(sub_1, sub_1);
     // mean((x_i - mean_i) ** 2)
-    auto var = std::make_shared<ngraph::opset3::ReduceMean>(multiply, axis, true);
+    auto reduce_mean_2 = reduceMean(mul_1);
     // var_i + epsilon
-    auto add_var = add(var, normalizationConstant);
-    // sqrt(var_i + epsilon)
-    auto sqrt = std::make_shared<ngraph::opset3::Sqrt>(add_var);
+    auto add_1 = add(reduce_mean_2, norm_constant);
     // (x_i - mean_i) / sqrt(var_i + epsilon)
-    auto stddev_inv = std::make_shared<ngraph::opset3::Divide>(diff, sqrt);
+    auto inverse_sqrt = inverseSqrt(add_1);
+    auto mul_2 = mul(sub_1, inverse_sqrt);
     // x_i_normalized * gamma
-    auto mul_norm_weights = mul(stddev_inv, normalizedweights);
+    auto mul_norm_weights = mul(mul_2, norm_weights);
     // x_i_normalized * gamma + beta
     auto output = add(mul_norm_weights, bias);
 

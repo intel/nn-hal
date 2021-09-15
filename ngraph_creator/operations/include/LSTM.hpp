@@ -25,6 +25,8 @@ public:
                                          bool transpose_lhs, bool transpose_rhs);
     std::shared_ptr<ngraph::Node> clip(const ngraph::Output<ngraph::Node>& data,
                                        float m_clip) const;
+    std::shared_ptr<ngraph::Node> reduceMean(const std::shared_ptr<ngraph::Node>& node);
+    std::shared_ptr<ngraph::Node> inverseSqrt(const std::shared_ptr<ngraph::Node>& node);
     std::shared_ptr<ngraph::Node> applyActivation(const std::shared_ptr<ngraph::Node>& arg,
                                                   int activationFn) const;
     std::shared_ptr<ngraph::Node> LayerNorm(const ngraph::Output<ngraph::Node>& input,
