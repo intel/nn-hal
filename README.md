@@ -1,3 +1,5 @@
+![CI](https://github.com/reaganlo/nn-hal/actions/workflows/ci.yml/badge.svg)
+
 # Android Neural Networks HAL with OpenVINO supporting hardware accelerators such as /
 Intel® Math Kernel Library for Deep Neural Networks (Intel® MKL-DNN)
 
@@ -38,3 +40,22 @@ Create a pull request on github.com with your patch. Make sure your change is cl
 and passing ULTs.
 
 A maintainer will contact you if there are questions or concerns.
+
+## Continuous Integration
+Before committing any changes, make sure the coding style and testing configs are correct.
+If not, the CI will fail.
+
+### Coding Style
+
+Run the following command to ensure that the proper coding style is being followed:
+```
+    find . -regex '.*\.\(cpp\|hpp\|cc\|cxx\|h\)' -exec clang-format -style=file -i {} \;
+```
+
+### Build and Test
+
+Update the BOARD value in [build-test.sh](ci/build-test.sh) as per your test requirement.
+If your BOARD is not supported, please contact the maintainer to get it added.
+
+Currently, the CI builds the intel-nnhal package and runs the following tests:
+- Functional tests that include ml_cmdline and a subset of cts and vts tests.
