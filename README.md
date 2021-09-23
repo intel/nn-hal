@@ -1,3 +1,5 @@
+[![clang format](https://github.com/intel/nn-hal/actions/workflows/clang_format_check.yml/badge.svg)](https://github.com/intel/actions/workflows/clang_format_check.yml)
+
 # Android Neural Networks HAL with OpenVINO supporting hardware accelerators such as /
 Intel® Math Kernel Library for Deep Neural Networks (Intel® MKL-DNN)
 
@@ -38,3 +40,10 @@ Create a pull request on github.com with your patch. Make sure your change is cl
 and passing ULTs.
 
 A maintainer will contact you if there are questions or concerns.
+
+## Coding Style
+
+Before committing any changes, run the following command to make sure proper coding style is followed:
+```
+    find . -regex '.*\.\(cpp\|hpp\|cc\|cxx\|h\)' -exec clang-format -style=file -i {} \;
+```
