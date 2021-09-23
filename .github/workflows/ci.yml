@@ -1,0 +1,60 @@
+name: CI
+on: [push, pull_request]
+jobs:
+  check-style:
+    runs-on: ubuntu-latest
+    #environment: development
+    steps:
+    - uses: actions/checkout@v2
+    - name: Run clang-format style check.
+      uses: jidicula/clang-format-action@v4.4.1
+      with:
+        clang-format-version: '13'
+        check-path: 'nn-hal'
+  fetch-code:
+    needs: check-style
+    runs-on: self-hosted
+    env:
+      ROOT_DIR: /srv/workspace
+      REPO_NAME: intel-nnhal-dev
+    steps:
+    - name: Clone repo.
+      run: |
+        echo ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
+        cd ${ROOT_DIR}/src/third_party/
+        rm -rf ${REPO_NAME}
+        git clone ${{ github.server_url }}/${{ github.repository }} ${REPO_NAME}
+        cd ${REPO_NAME}
+    - name: Fetch push code.
+      if: github.event_name == 'push'
+      run: |
+        cd ${ROOT_DIR}/src/third_party/${REPO_NAME}/
+        git checkout ${{ github.sha }}
+        cp ci/* ${ROOT_DIR}/src/
+    - name: Fetch pull request code.
+      if: github.event_name == 'pull_request'
+      run: |
+        cd ${ROOT_DIR}/src/third_party/${REPO_NAME}/
+        git fetch origin pull/${{ github.event.number }}/head:${{ github.head_ref }}
+        git checkout ${{ github.head_ref }}
+        cp ci/* ${ROOT_DIR}/src/
+  build-package:
+    needs: fetch-code
+    runs-on: self-hosted
+    env:
+      ROOT_DIR: /srv/workspace
+    steps:
+    - name: Build and deploy nn-hal.
+      run: |
+        cd ${ROOT_DIR}/src/
+        sh build-test.sh "build"
+  test-functional:
+    needs: build-package
+    runs-on: self-hosted
+    env:
+      ROOT_DIR: /srv/workspace
+    steps:
+    - name: Run functional tests for nn-hal.
+      run: |
+        cd ${ROOT_DIR}/src/
+        sh build-test.sh "functional"

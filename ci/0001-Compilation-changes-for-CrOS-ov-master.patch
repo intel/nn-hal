@@ -1,0 +1,328 @@
+From c16c2851bbfd1206d89afec71f972d9bcbafff1b Mon Sep 17 00:00:00 2001
+From: Raviraj Sitaram P <raviraj.p.sitaram@intel.com>
+Date: Mon, 16 Aug 2021 15:12:53 +0530
+Subject: [PATCH] Compilation changes for CrOS ov-master
+
+---
+ cmake/dependencies.cmake                           | 44 +++++++++++-----------
+ cmake/developer_package/linux_name.cmake           | 44 +++++++++++-----------
+ cmake/developer_package/plugins/plugins.cmake      | 10 +++--
+ inference-engine/cmake/vpu_dependencies.cmake      | 19 ++++++----
+ .../src/inference_engine/CMakeLists.txt            | 26 +++++++++----
+ inference-engine/src/legacy_api/CMakeLists.txt     |  8 +++-
+ .../low_precision_transformations/CMakeLists.txt   | 14 +++++--
+ inference-engine/src/preprocessing/CMakeLists.txt  | 10 +++--
+ .../src/transformations/CMakeLists.txt             | 15 ++++++--
+ ngraph/CMakeLists.txt                              | 12 ++++--
+ 10 files changed, 127 insertions(+), 75 deletions(-)
+
+diff --git a/cmake/dependencies.cmake b/cmake/dependencies.cmake
+index 82f98b4c515f..38ffa015d8d5 100644
+--- a/cmake/dependencies.cmake
++++ b/cmake/dependencies.cmake
+@@ -27,28 +27,30 @@ if(COMMAND get_linux_name)
+     get_linux_name(LINUX_OS_NAME)
+ endif()
+ 
+-if(CMAKE_CROSSCOMPILING AND CMAKE_HOST_SYSTEM_NAME MATCHES Linux AND CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "amd64.*|x86_64.*|AMD64.*")
+-    set(protoc_version "3.9.2")
+-
+-    RESOLVE_DEPENDENCY(SYSTEM_PROTOC_ROOT
+-        ARCHIVE_LIN "protoc-${protoc_version}-linux-x86_64.tar.gz"
+-        TARGET_PATH "${TEMP}/protoc-${protoc_version}-linux-x86_64"
+-        SHA256 "1d6da1d97d0cbfcd333558afe24533eb3cb48dc1e0ab5e971aa1e50ede8bcf45"
+-    )
+-    debug_message(STATUS "host protoc-${protoc_version} root path = " ${SYSTEM_PROTOC_ROOT})
+-
+-    reset_deps_cache(SYSTEM_PROTOC)
+-
+-    find_host_program(
+-        SYSTEM_PROTOC
+-        NAMES protoc
+-        PATHS "${SYSTEM_PROTOC_ROOT}/bin"
+-        NO_DEFAULT_PATH)
+-    if(NOT SYSTEM_PROTOC)
+-        message(FATAL_ERROR "[ONNX IMPORTER] Missing host protoc binary")
+-    endif()
++if (NOT ${TARGET_OS} STREQUAL "CHROMEOS")
++    if(CMAKE_CROSSCOMPILING AND CMAKE_HOST_SYSTEM_NAME MATCHES Linux AND CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "amd64.*|x86_64.*|AMD64.*")
++        set(protoc_version "3.9.2")
++
++        RESOLVE_DEPENDENCY(SYSTEM_PROTOC_ROOT
++            ARCHIVE_LIN "protoc-${protoc_version}-linux-x86_64.tar.gz"
++            TARGET_PATH "${TEMP}/protoc-${protoc_version}-linux-x86_64"
++            SHA256 "1d6da1d97d0cbfcd333558afe24533eb3cb48dc1e0ab5e971aa1e50ede8bcf45"
++        )
++        debug_message(STATUS "host protoc-${protoc_version} root path = " ${SYSTEM_PROTOC_ROOT})
++
++        reset_deps_cache(SYSTEM_PROTOC)
++
++        find_host_program(
++            SYSTEM_PROTOC
++            NAMES protoc
++            PATHS "${SYSTEM_PROTOC_ROOT}/bin"
++            NO_DEFAULT_PATH)
++        if(NOT SYSTEM_PROTOC)
++            message(FATAL_ERROR "[ONNX IMPORTER] Missing host protoc binary")
++        endif()
+ 
+-    update_deps_cache(SYSTEM_PROTOC "${SYSTEM_PROTOC}" "Path to host protoc for ONNX Importer")
++        update_deps_cache(SYSTEM_PROTOC "${SYSTEM_PROTOC}" "Path to host protoc for ONNX Importer")
++    endif()
+ endif()
+ 
+ if(ENABLE_MYRIAD)
+diff --git a/cmake/developer_package/linux_name.cmake b/cmake/developer_package/linux_name.cmake
+index 645c71da3568..b93e6c54d36f 100644
+--- a/cmake/developer_package/linux_name.cmake
++++ b/cmake/developer_package/linux_name.cmake
+@@ -6,29 +6,31 @@ include(target_flags)
+ 
+ if (LINUX)
+     function(get_linux_name res_var)
+-        if (NOT EXISTS "/etc/lsb-release")
+-            execute_process(COMMAND find -L /etc/ -maxdepth 1 -type f -name *-release -exec cat {} \;
+-                    OUTPUT_VARIABLE release_data RESULT_VARIABLE result)
+-            string(REPLACE "Red Hat" "CentOS" release_data "${release_data}")
+-            set(name_regex "NAME=\"([^ \"\n]*).*\"\n")
+-            set(version_regex "VERSION=\"([0-9]+(\\.[0-9]+)?)[^\n]*\"")
+-        else ()
+-            # linux version detection using cat /etc/lsb-release
+-            file(READ "/etc/lsb-release" release_data)
+-            set(name_regex "DISTRIB_ID=([^ \n]*)\n")
+-            set(version_regex "DISTRIB_RELEASE=([0-9]+(\\.[0-9]+)?)")
+-        endif ()
++	if (NOT ${TARGET_OS} STREQUAL "CHROMEOS")
++		if (NOT EXISTS "/etc/lsb-release")
++		    execute_process(COMMAND find -L /etc/ -maxdepth 1 -type f -name *-release -exec cat {} \;
++			    OUTPUT_VARIABLE release_data RESULT_VARIABLE result)
++		    string(REPLACE "Red Hat" "CentOS" release_data "${release_data}")
++		    set(name_regex "NAME=\"([^ \"\n]*).*\"\n")
++		    set(version_regex "VERSION=\"([0-9]+(\\.[0-9]+)?)[^\n]*\"")
++		else ()
++		    # linux version detection using cat /etc/lsb-release
++		    file(READ "/etc/lsb-release" release_data)
++		    set(name_regex "DISTRIB_ID=([^ \n]*)\n")
++		    set(version_regex "DISTRIB_RELEASE=([0-9]+(\\.[0-9]+)?)")
++		endif ()
+ 
+-        string(REGEX MATCH ${name_regex} name ${release_data})
+-        set(os_name ${CMAKE_MATCH_1})
++		string(REGEX MATCH ${name_regex} name ${release_data})
++		set(os_name ${CMAKE_MATCH_1})
+ 
+-        string(REGEX MATCH ${version_regex} version ${release_data})
+-        set(os_name "${os_name} ${CMAKE_MATCH_1}")
++		string(REGEX MATCH ${version_regex} version ${release_data})
++		set(os_name "${os_name} ${CMAKE_MATCH_1}")
+ 
+-        if (os_name)
+-            set(${res_var} ${os_name} PARENT_SCOPE)
+-        else ()
+-            set(${res_var} NOTFOUND PARENT_SCOPE)
+-        endif ()
++		if (os_name)
++		    set(${res_var} ${os_name} PARENT_SCOPE)
++		else ()
++		    set(${res_var} NOTFOUND PARENT_SCOPE)
++		endif ()
++	endif()
+     endfunction()
+ endif ()
+diff --git a/cmake/developer_package/plugins/plugins.cmake b/cmake/developer_package/plugins/plugins.cmake
+index 6210ede333ad..1721007b9d2d 100644
+--- a/cmake/developer_package/plugins/plugins.cmake
++++ b/cmake/developer_package/plugins/plugins.cmake
+@@ -121,9 +121,13 @@ function(ie_add_plugin)
+     if(NOT IE_PLUGIN_SKIP_INSTALL)
+         string(TOLOWER "${IE_PLUGIN_DEVICE_NAME}" install_component)
+         ie_cpack_add_component(${install_component} REQUIRED DEPENDS core)
+-
+-        install(TARGETS ${IE_PLUGIN_NAME}
+-                LIBRARY DESTINATION ${IE_CPACK_RUNTIME_PATH} COMPONENT ${install_component})
++        if (${TARGET_OS} STREQUAL "CHROMEOS")
++            install(TARGETS ${IE_PLUGIN_NAME}
++                    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT ${install_component})
++        else()
++            install(TARGETS ${IE_PLUGIN_NAME}
++                    LIBRARY DESTINATION ${IE_CPACK_RUNTIME_PATH} COMPONENT ${install_component})
++        endif()
+     endif()
+ endfunction()
+ 
+diff --git a/inference-engine/cmake/vpu_dependencies.cmake b/inference-engine/cmake/vpu_dependencies.cmake
+index e6ec3799a3cc..e25623ab0c8b 100644
+--- a/inference-engine/cmake/vpu_dependencies.cmake
++++ b/inference-engine/cmake/vpu_dependencies.cmake
+@@ -33,14 +33,17 @@ foreach(idx RANGE 0 ${num_firmwares})
+     endif ()
+ 
+     reset_deps_cache(VPU_FIRMWARE_${firmware_name_upper}_FILE)
+-
+-    RESOLVE_DEPENDENCY(VPU_FIRMWARE_${firmware_name_upper}
+-        ARCHIVE_UNIFIED VPU/${firmware_name}/firmware_${firmware_name}_${FIRMWARE_PACKAGE_VERSION}.zip
+-        TARGET_PATH "${TEMP}/vpu/firmware/${firmware_name}"
+-        ENVIRONMENT "VPU_FIRMWARE_${firmware_name_upper}_FILE"
+-        FOLDER
+-        SHA256 ${hash})
+-    debug_message(STATUS "${firmware_name}=" ${VPU_FIRMWARE_${firmware_name_upper}})
++    if (NOT ${TARGET_OS} STREQUAL "CHROMEOS")
++        RESOLVE_DEPENDENCY(VPU_FIRMWARE_${firmware_name_upper}
++            ARCHIVE_UNIFIED VPU/${firmware_name}/firmware_${firmware_name}_${FIRMWARE_PACKAGE_VERSION}.zip
++            TARGET_PATH "${TEMP}/vpu/firmware/${firmware_name}"
++            ENVIRONMENT "VPU_FIRMWARE_${firmware_name_upper}_FILE"
++            FOLDER
++            SHA256 ${hash})
++        debug_message(STATUS "${firmware_name}=" ${VPU_FIRMWARE_${firmware_name_upper}})
++    else()
++        set(VPU_FIRMWARE_${firmware_name_upper} ${TEMP}/vpu/firmware/${firmware_name})
++    endif()
+ 
+     update_deps_cache(
+         VPU_FIRMWARE_${firmware_name_upper}_FILE
+diff --git a/inference-engine/src/inference_engine/CMakeLists.txt b/inference-engine/src/inference_engine/CMakeLists.txt
+index e79a57093669..039f4f62c5b2 100644
+--- a/inference-engine/src/inference_engine/CMakeLists.txt
++++ b/inference-engine/src/inference_engine/CMakeLists.txt
+@@ -278,14 +278,24 @@ ie_cpack_add_component(core_dev REQUIRED core ngraph_dev)
+ install(DIRECTORY "${PUBLIC_HEADERS_DIR}" DESTINATION ${IE_CPACK_IE_DIR}
+         COMPONENT core_dev)
+ 
+-install(TARGETS ${TARGET_NAME} EXPORT InferenceEngineTargets
+-        RUNTIME DESTINATION ${IE_CPACK_RUNTIME_PATH} COMPONENT core
+-        ARCHIVE DESTINATION ${IE_CPACK_ARCHIVE_PATH} COMPONENT core
+-        LIBRARY DESTINATION ${IE_CPACK_LIBRARY_PATH} COMPONENT core)
+-
+-install(FILES $<TARGET_FILE_DIR:${TARGET_NAME}>/plugins.xml
+-        DESTINATION ${IE_CPACK_RUNTIME_PATH}
+-        COMPONENT core)
++if (${TARGET_OS} STREQUAL "CHROMEOS")
++    install(TARGETS ${TARGET_NAME} EXPORT InferenceEngineTargets
++                RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT core
++                ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT core
++                LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT core)
++    install(FILES $<TARGET_FILE_DIR:${TARGET_NAME}>/plugins.xml
++                DESTINATION ${CMAKE_INSTALL_LIBDIR}
++                COMPONENT core)
++elseif()
++	install(TARGETS ${TARGET_NAME} EXPORT InferenceEngineTargets
++		RUNTIME DESTINATION ${IE_CPACK_RUNTIME_PATH} COMPONENT core
++		ARCHIVE DESTINATION ${IE_CPACK_ARCHIVE_PATH} COMPONENT core
++		LIBRARY DESTINATION ${IE_CPACK_LIBRARY_PATH} COMPONENT core)
++
++	install(FILES $<TARGET_FILE_DIR:${TARGET_NAME}>/plugins.xml
++		DESTINATION ${IE_CPACK_RUNTIME_PATH}
++		COMPONENT core)
++endif()
+ 
+ # for InferenceEngineUnitTest
+ if(WIN32)
+diff --git a/inference-engine/src/legacy_api/CMakeLists.txt b/inference-engine/src/legacy_api/CMakeLists.txt
+index 9de8bf169108..dda156f7296e 100644
+--- a/inference-engine/src/legacy_api/CMakeLists.txt
++++ b/inference-engine/src/legacy_api/CMakeLists.txt
+@@ -78,7 +78,13 @@ set_target_properties(${TARGET_NAME} ${TARGET_NAME}_obj
+ openvino_developer_export_targets(COMPONENT inference_engine TARGETS ${TARGET_NAME})
+ 
+ # install
+-
++if (${TARGET_OS} STREQUAL "CHROMEOS")
++    install(TARGETS ${TARGET_NAME}
++            RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT core
++            ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT core
++            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT core)
++elseif()
+ install(TARGETS ${TARGET_NAME}
+         RUNTIME DESTINATION ${IE_CPACK_RUNTIME_PATH} COMPONENT core
+         LIBRARY DESTINATION ${IE_CPACK_LIBRARY_PATH} COMPONENT core)
++endif()
+\ No newline at end of file
+diff --git a/inference-engine/src/low_precision_transformations/CMakeLists.txt b/inference-engine/src/low_precision_transformations/CMakeLists.txt
+index 7f9d34e7149c..974f50364215 100644
+--- a/inference-engine/src/low_precision_transformations/CMakeLists.txt
++++ b/inference-engine/src/low_precision_transformations/CMakeLists.txt
+@@ -47,6 +47,14 @@ openvino_developer_export_targets(COMPONENT inference_engine TARGETS ${TARGET_NA
+ 
+ # install
+ 
+-install(TARGETS ${TARGET_NAME}
+-        RUNTIME DESTINATION ${IE_CPACK_RUNTIME_PATH} COMPONENT core
+-        LIBRARY DESTINATION ${IE_CPACK_LIBRARY_PATH} COMPONENT core)
++if (${TARGET_OS} STREQUAL "CHROMEOS")
++    install(TARGETS ${TARGET_NAME}
++            RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT core
++            ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT core
++            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT core)
++else()
++    install(TARGETS ${TARGET_NAME}
++            RUNTIME DESTINATION ${IE_CPACK_RUNTIME_PATH} COMPONENT core
++            ARCHIVE DESTINATION ${IE_CPACK_ARCHIVE_PATH} COMPONENT core
++            LIBRARY DESTINATION ${IE_CPACK_LIBRARY_PATH} COMPONENT core)
++endif()
+diff --git a/inference-engine/src/preprocessing/CMakeLists.txt b/inference-engine/src/preprocessing/CMakeLists.txt
+index a118f638c6ad..47179641ec9a 100644
+--- a/inference-engine/src/preprocessing/CMakeLists.txt
++++ b/inference-engine/src/preprocessing/CMakeLists.txt
+@@ -170,6 +170,10 @@ set_target_properties(${TARGET_NAME} ${TARGET_NAME}_obj ${TARGET_NAME}_s
+ openvino_developer_export_targets(COMPONENT inference_engine TARGETS ${TARGET_NAME})
+ 
+ # install
+-
+-install(TARGETS ${TARGET_NAME}
+-        LIBRARY DESTINATION ${IE_CPACK_RUNTIME_PATH} COMPONENT core)
++if (${TARGET_OS} STREQUAL "CHROMEOS")
++    install(TARGETS ${TARGET_NAME}
++            LIBRARY DESTINATION ${IE_CPACK_RUNTIME_PATH} COMPONENT core)
++else()
++    install(TARGETS ${TARGET_NAME}
++            LIBRARY DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT core)
++endif()
+diff --git a/inference-engine/src/transformations/CMakeLists.txt b/inference-engine/src/transformations/CMakeLists.txt
+index bf4a4f31d6ae..2cf70e683777 100644
+--- a/inference-engine/src/transformations/CMakeLists.txt
++++ b/inference-engine/src/transformations/CMakeLists.txt
+@@ -49,7 +49,14 @@ openvino_developer_export_targets(COMPONENT inference_engine TARGETS ${TARGET_NA
+ 
+ # install
+ 
+-install(TARGETS ${TARGET_NAME} EXPORT InferenceEngineTargets
+-        RUNTIME DESTINATION ${IE_CPACK_RUNTIME_PATH} COMPONENT core
+-        ARCHIVE DESTINATION ${IE_CPACK_ARCHIVE_PATH} COMPONENT core
+-        LIBRARY DESTINATION ${IE_CPACK_LIBRARY_PATH} COMPONENT core)
++if (${TARGET_OS} STREQUAL "CHROMEOS")
++    install(TARGETS ${TARGET_NAME} EXPORT InferenceEngineTargets
++            RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT core
++            ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT core
++            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT core)
++else()
++    install(TARGETS ${TARGET_NAME} EXPORT InferenceEngineTargets
++            RUNTIME DESTINATION ${IE_CPACK_RUNTIME_PATH} COMPONENT core
++            ARCHIVE DESTINATION ${IE_CPACK_ARCHIVE_PATH} COMPONENT core
++            LIBRARY DESTINATION ${IE_CPACK_LIBRARY_PATH} COMPONENT core)
++endif()
+diff --git a/ngraph/CMakeLists.txt b/ngraph/CMakeLists.txt
+index 6ef6b3cdeb6b..654e61f079d5 100644
+--- a/ngraph/CMakeLists.txt
++++ b/ngraph/CMakeLists.txt
+@@ -16,9 +16,15 @@ project (ngraph)
+ # Installation logic...
+ #-----------------------------------------------------------------------------------------------
+ 
+-set(NGRAPH_INSTALL_LIB "deployment_tools/ngraph/lib")
+-set(NGRAPH_INSTALL_INCLUDE "deployment_tools/ngraph/include")
+-set(NGRAPH_TARGETS_FILE "${CMAKE_CURRENT_BINARY_DIR}/ngraphTargets.cmake")
++if (${TARGET_OS} STREQUAL "CHROMEOS")
++    set(NGRAPH_INSTALL_LIB "${CMAKE_INSTALL_LIBDIR}")
++    set(NGRAPH_INSTALL_INCLUDE "deployment_tools/ngraph/include")
++    set(NGRAPH_TARGETS_FILE "${CMAKE_CURRENT_BINARY_DIR}/ngraphTargets.cmake")
++else()
++    set(NGRAPH_INSTALL_LIB "deployment_tools/ngraph/lib")
++    set(NGRAPH_INSTALL_INCLUDE "deployment_tools/ngraph/include")
++    set(NGRAPH_TARGETS_FILE "${CMAKE_CURRENT_BINARY_DIR}/ngraphTargets.cmake")
++endif()
+ 
+ add_definitions(-DPROJECT_ROOT_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+ 
+-- 
+2.7.4
+
