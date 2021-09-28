@@ -163,10 +163,6 @@ shared_library("intel_nnhal") {
     "ngraph_creator/operations/include",
     "cpu",
     "gna",
-    "intel_nn_hal",
-    "intel_nn_hal/graphAPI",
-    "intel_nn_hal/graphAPI/builderLayerNorm",
-    "intel_nn_hal/dl",
     "../intel-openvino-dev/inference-engine/src/inference_engine",
     "../intel-openvino-dev/inference-engine/thirdparty/pugixml/src",
     "../intel-openvino-dev/inference-engine/include",
@@ -194,7 +190,7 @@ shared_library("intel_nnhal") {
     "nnapi-support",
     "ngraph",
     "inference_engine",
-    "nn-common", 
+    "nn-common",
     "ssl",
     "crypto"
   ]
