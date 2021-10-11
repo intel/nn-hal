@@ -25,6 +25,7 @@
 #include <Greater.hpp>
 #include <GreaterEqual.hpp>
 #include <GroupedConv2d.hpp>
+#include <HardSwish.hpp>
 #include <InstanceNormalization.hpp>
 #include <L2Normalization.hpp>
 #include <L2Pooling2D.hpp>
