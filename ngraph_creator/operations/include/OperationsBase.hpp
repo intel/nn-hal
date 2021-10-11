@@ -78,6 +78,7 @@ protected:
                     input = createConstNode(elementType, toNgraphShape(operandDims), operandValues);
                     break;
                 }
+                case OperandType::TENSOR_QUANT8_ASYMM_SIGNED:
                 case OperandType::TENSOR_QUANT8_SYMM:
                 case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL: {
                     elementType = ngraph::element::i8;
@@ -96,7 +97,9 @@ protected:
             input = mNgraphNodes->getOperationOutput(operandIndex).get_node_shared_ptr();
         }
 
-        if (operandType == OperandType::TENSOR_QUANT8_ASYMM && dequantize) {
+        if ((operandType == OperandType::TENSOR_QUANT8_ASYMM ||
+             operandType == OperandType::TENSOR_QUANT8_ASYMM_SIGNED) &&
+            dequantize) {
             input = DequantizeNode(input, operandIndex, ngraph::element::f32);
         }
 

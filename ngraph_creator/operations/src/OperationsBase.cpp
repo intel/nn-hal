@@ -55,6 +55,8 @@ void OperationsBase::connectOperationToGraph() {
     const auto op = sModelInfo->getOperand(mDefaultOutputIndex);
     if (op.type == OperandType::TENSOR_QUANT8_ASYMM) {
         outputNode = QuantizeNode(outputNode, mDefaultOutputIndex, ngraph::element::u8);
+    } else if (op.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED) {
+        outputNode = QuantizeNode(outputNode, mDefaultOutputIndex, ngraph::element::i8);
     }
     if (op.lifetime == OperandLifeTime::SUBGRAPH_OUTPUT) {
         addResultNode(mDefaultOutputIndex, outputNode);
@@ -141,7 +143,11 @@ std::shared_ptr<ngraph::Node> OperationsBase::QuantizeNode(std::shared_ptr<ngrap
     auto round = std::make_shared<ngraph::op::v5::Round>(div, mode);
     auto convertRound = std::make_shared<ngraph::opset3::Convert>(round, ngraph::element::i32);
     auto sum = std::make_shared<ngraph::opset3::Add>(convertRound, zeroPoint);
-    auto data = std::make_shared<ngraph::opset3::Clamp>(sum, 0, 255);
+    std::shared_ptr<ngraph::Node> data;
+    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM_SIGNED))
+        data = std::make_shared<ngraph::opset3::Clamp>(sum, 0, 255);
+    else
+        data = std::make_shared<ngraph::opset3::Clamp>(sum, -128, 127);
     std::shared_ptr<ngraph::Node> outputNode;
     if (data->get_element_type() != quantizeType)
         outputNode = std::make_shared<ngraph::opset3::Convert>(data, quantizeType);
