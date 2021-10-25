@@ -1,4 +1,5 @@
 #include <Embedding_Lookup.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Embedding_Lookup"
 
 namespace android {

@@ -1,6 +1,7 @@
 #include <RNN.hpp>
 // Helper funciton
 #include <NgraphHelper.hpp>
+#undef LOG_TAG
 #define LOG_TAG "RNN"
 
 namespace android {

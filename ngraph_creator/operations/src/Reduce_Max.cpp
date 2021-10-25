@@ -1,4 +1,5 @@
 #include <Reduce_Max.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Reduce_Max"
 
 namespace android {

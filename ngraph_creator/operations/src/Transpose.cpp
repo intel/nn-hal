@@ -1,4 +1,5 @@
 #include <Transpose.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Transpose"
 
 namespace android {

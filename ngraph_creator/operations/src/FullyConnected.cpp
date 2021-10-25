@@ -1,4 +1,5 @@
 #include <FullyConnected.hpp>
+#undef LOG_TAG
 #define LOG_TAG "FullyConnected"
 
 namespace android {

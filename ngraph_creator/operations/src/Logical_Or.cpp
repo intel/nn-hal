@@ -1,4 +1,5 @@
 #include <Logical_Or.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Logical_Or"
 
 namespace android {

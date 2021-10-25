@@ -1,4 +1,5 @@
 #include <Log.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Log"
 
 namespace android {

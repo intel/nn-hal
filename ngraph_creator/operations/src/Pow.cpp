@@ -1,4 +1,5 @@
 #include <Pow.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Pow"
 
 namespace android {

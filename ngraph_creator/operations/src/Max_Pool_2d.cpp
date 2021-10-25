@@ -1,4 +1,5 @@
 #include <Max_Pool_2d.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Max_Pool_2d"
 
 namespace android {

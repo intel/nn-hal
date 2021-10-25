@@ -1,4 +1,5 @@
 #include <Relu.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Relu"
 
 namespace android {

@@ -1,5 +1,5 @@
-//#define LOG_NDEBUG 0
 #include <ROI_Pooling.hpp>
+#undef LOG_TAG
 #define LOG_TAG "ROI_Pooling"
 
 namespace android {
@@ -97,6 +97,7 @@ std::shared_ptr<ngraph::Node> ROI_Pooling::createNode() {
 
     return outputNode;
 }
+
 }  // namespace nnhal
 }  // namespace neuralnetworks
 }  // namespace hardware

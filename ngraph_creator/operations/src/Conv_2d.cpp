@@ -1,5 +1,6 @@
 #include <Conv_2d.hpp>
 #include <NgraphHelper.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Conv_2d"
 
 namespace android {

@@ -25,6 +25,7 @@
 #include "ModelManager.h"
 #include "ValidateHal.h"
 
+#undef LOG_TAG
 #define LOG_TAG "Driver"
 
 namespace android {
@@ -85,7 +86,7 @@ static sp<BasePreparedModel> ModelFactory(IntelDeviceType deviceType, const Mode
     return driverPreparedModel;
 }
 // For HAL-1.0 version
-Return<void> Driver::getCapabilities(getCapabilities_cb cb) {
+Return<void> Driver::getCapabilities(getCapabilities_cb) {
     ALOGV("Entering %s", __func__);
     return getCapabilities_1_3(
         [&](V1_3::ErrorStatus error, const V1_3::Capabilities& capabilities) {
@@ -93,7 +94,7 @@ Return<void> Driver::getCapabilities(getCapabilities_cb cb) {
         });
 }
 
-Return<void> Driver::getSupportedOperations(const V1_0_Model& model, getSupportedOperations_cb cb) {
+Return<void> Driver::getSupportedOperations(const V1_0_Model&, getSupportedOperations_cb) {
     ALOGV("Entering %s", __func__);
     if (!validateModel(model)) {
         ALOGE("NNERR: %s failed at line no: %d\n", __func__, __LINE__);
@@ -106,8 +107,8 @@ Return<void> Driver::getSupportedOperations(const V1_0_Model& model, getSupporte
         });
 }
 
-Return<ErrorStatus> Driver::prepareModel(const V1_0_Model& model,
-                                         const sp<V1_0::IPreparedModelCallback>& callback) {
+Return<ErrorStatus> Driver::prepareModel(const V1_0_Model&,
+                                         const sp<V1_0::IPreparedModelCallback>&) {
     ALOGV("Entering %s", __func__);
     if (callback.get() == nullptr) {
         ALOGE("invalid callback passed to prepareModel");
@@ -137,7 +138,7 @@ Return<ErrorStatus> Driver::prepareModel(const V1_0_Model& model,
 }
 
 // For HAL-1.1 version
-Return<void> Driver::getCapabilities_1_1(getCapabilities_1_1_cb cb) {
+Return<void> Driver::getCapabilities_1_1(getCapabilities_1_1_cb) {
     ALOGV("Entering %s", __func__);
     return getCapabilities_1_3(
         [&](V1_3::ErrorStatus error, const V1_3::Capabilities& capabilities) {
@@ -145,8 +146,7 @@ Return<void> Driver::getCapabilities_1_1(getCapabilities_1_1_cb cb) {
         });
 }
 
-Return<void> Driver::getSupportedOperations_1_1(const V1_1_Model& model,
-                                                getSupportedOperations_1_1_cb cb) {
+Return<void> Driver::getSupportedOperations_1_1(const V1_1_Model&, getSupportedOperations_1_1_cb) {
     ALOGV("Entering %s", __func__);
     if (!validateModel(model)) {
         ALOGE("NNERR: %s failed at line no: %d\n", __func__, __LINE__);
@@ -159,9 +159,8 @@ Return<void> Driver::getSupportedOperations_1_1(const V1_1_Model& model,
         });
 }
 
-Return<ErrorStatus> Driver::prepareModel_1_1(const V1_1_Model& model,
-                                             ExecutionPreference preference,
-                                             const sp<V1_0::IPreparedModelCallback>& callback) {
+Return<ErrorStatus> Driver::prepareModel_1_1(const V1_1_Model&, ExecutionPreference,
+                                             const sp<V1_0::IPreparedModelCallback>&) {
     ALOGV("Entering %s", __func__);
 
     if (callback.get() == nullptr) {

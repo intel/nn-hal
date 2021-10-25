@@ -24,6 +24,7 @@
 #include "Utils.h"
 #include "ValidateHal.h"
 
+#undef LOG_TAG
 #define DISABLE_ALL_QUANT
 #define LOG_TAG "BasePreparedModel"
 

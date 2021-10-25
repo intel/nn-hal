@@ -1,4 +1,5 @@
 #include <ResizeBilinear.hpp>
+#undef LOG_TAG
 #define LOG_TAG "ResizeBilinear"
 
 namespace android {

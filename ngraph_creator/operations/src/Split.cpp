@@ -1,4 +1,5 @@
 #include <Split.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Split"
 
 namespace android {

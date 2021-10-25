@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#define LOG_TAG "Utils"
 #include "utils.h"
 
 #include <android-base/logging.h>
@@ -24,6 +23,9 @@
 
 #include <sys/stat.h>
 #include <fstream>
+
+#undef LOG_TAG
+#define LOG_TAG "Utils"
 
 // inline unsigned int debugMask = ((1 << (L1 + 1)) - 1);
 

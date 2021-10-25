@@ -1,4 +1,5 @@
 #include <Expand_Dims.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Expand_Dims"
 
 namespace android {

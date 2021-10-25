@@ -1,5 +1,5 @@
-//#define LOG_NDEBUG 0
 #include <Concat.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Concat"
 
 namespace android {

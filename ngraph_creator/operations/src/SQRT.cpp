@@ -1,4 +1,5 @@
 #include <SQRT.hpp>
+#undef LOG_TAG
 #define LOG_TAG "SQRT"
 
 namespace android {
