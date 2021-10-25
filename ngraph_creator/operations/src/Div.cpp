@@ -1,4 +1,5 @@
 #include <Div.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Div"
 
 namespace android {

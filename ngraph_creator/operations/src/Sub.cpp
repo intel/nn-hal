@@ -1,4 +1,5 @@
 #include <Sub.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Sub"
 
 namespace android {

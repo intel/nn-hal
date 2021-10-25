@@ -1,4 +1,5 @@
 #include <Instance_Normalization.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Instance_Normalization"
 
 namespace android {

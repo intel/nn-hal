@@ -1,4 +1,5 @@
 #include <Squeeze.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Squeeze"
 
 namespace android {

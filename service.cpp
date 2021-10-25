@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-#define LOG_TAG "neuralnetworks-hal-service"
-
 #include <log/log.h>
 #include "Driver.h"
 #define MAX_LENGTH (255)
@@ -23,6 +21,9 @@
 #if __ANDROID__
 #include <hidl/HidlTransportSupport.h>
 #include <hidl/LegacySupport.h>
+
+#undef LOG_TAG
+#define LOG_TAG "neuralnetworks-hal-service"
 
 using android::hardware::configureRpcThreadpool;
 using android::hardware::joinRpcThreadpool;

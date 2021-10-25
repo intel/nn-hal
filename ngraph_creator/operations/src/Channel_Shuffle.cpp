@@ -1,4 +1,5 @@
 #include <Channel_Shuffle.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Channel_Shuffle"
 
 namespace android {

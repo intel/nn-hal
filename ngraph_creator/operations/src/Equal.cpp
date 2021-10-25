@@ -1,4 +1,5 @@
 #include <Equal.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Equal"
 
 namespace android {

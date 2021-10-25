@@ -23,6 +23,7 @@
 #include "ExecutionBurstServer.h"
 #include "ValidateHal.h"
 
+#undef LOG_TAG
 #define DISABLE_ALL_QUANT
 #define LOG_TAG "BasePreparedModel"
 
@@ -474,6 +475,8 @@ Return<ErrorStatus> BasePreparedModel::execute_1_2(const Request& request, Measu
     ALOGV("Entering %s", __func__);
     return executeBase(request, measure, this, callback);
 }
+
+#undef LOG_TAG
 
 }  // namespace nnhal
 }  // namespace neuralnetworks

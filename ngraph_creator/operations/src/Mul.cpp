@@ -1,4 +1,5 @@
 #include <Mul.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Mul"
 
 namespace android {

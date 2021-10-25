@@ -1,4 +1,5 @@
 #include <Depth_To_Space.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Depth_To_Space"
 
 namespace android {

@@ -1,5 +1,5 @@
-//#define LOG_NDEBUG 0
 #include <Space_To_Batch.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Space_To_Batch"
 
 namespace android {
@@ -88,6 +88,7 @@ std::shared_ptr<ngraph::Node> Space_To_Batch::createNode() {
 
     return outputNode;
 }
+
 }  // namespace nnhal
 }  // namespace neuralnetworks
 }  // namespace hardware

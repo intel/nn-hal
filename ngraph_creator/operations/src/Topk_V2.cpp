@@ -1,4 +1,5 @@
 #include <Topk_V2.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Topk_V2"
 
 namespace android {

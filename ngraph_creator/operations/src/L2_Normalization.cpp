@@ -1,4 +1,5 @@
 #include <L2_Normalization.hpp>
+#undef LOG_TAG
 #define LOG_TAG "L2_Normalization"
 
 namespace android {

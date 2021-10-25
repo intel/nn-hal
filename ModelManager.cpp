@@ -1,5 +1,6 @@
 #include "ModelManager.h"
 
+#undef LOG_TAG
 #define LOG_TAG "ModelManager"
 
 namespace android {
@@ -252,6 +253,7 @@ template uint8_t NnapiModelInfo::GetConstFromBuffer<uint8_t>(unsigned char const
 template int8_t NnapiModelInfo::GetConstFromBuffer<int8_t>(unsigned char const*, unsigned int);
 template uint32_t NnapiModelInfo::GetConstFromBuffer<uint32_t>(unsigned char const*, unsigned int);
 template _Float16 NnapiModelInfo::GetConstFromBuffer<_Float16>(unsigned char const*, unsigned int);
+
 }  // namespace nnhal
 }  // namespace neuralnetworks
 }  // namespace hardware

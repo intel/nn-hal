@@ -1,4 +1,5 @@
 #include <Mean.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Mean"
 
 namespace android {

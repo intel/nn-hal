@@ -1,5 +1,5 @@
-//#define LOG_NDEBUG 0
 #include <Average_Pool_2D.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Average_Pool_2D"
 
 namespace android {
@@ -141,6 +141,7 @@ std::shared_ptr<ngraph::Node> Average_Pool_2D::createNode() {
 
     return outputNode;
 }
+
 }  // namespace nnhal
 }  // namespace neuralnetworks
 }  // namespace hardware

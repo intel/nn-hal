@@ -1,4 +1,5 @@
 #include <Neg.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Neg"
 
 namespace android {

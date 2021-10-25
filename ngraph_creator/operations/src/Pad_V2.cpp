@@ -1,4 +1,5 @@
 #include <Pad_V2.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Pad_V2"
 
 namespace android {

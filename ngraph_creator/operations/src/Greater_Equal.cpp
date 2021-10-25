@@ -1,4 +1,5 @@
 #include <Greater_Equal.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Greater_Equal"
 
 namespace android {

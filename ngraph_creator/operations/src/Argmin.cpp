@@ -1,5 +1,5 @@
-//#define LOG_NDEBUG 0
 #include <Argmin.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Argmin"
 
 namespace android {
@@ -36,6 +36,7 @@ std::shared_ptr<ngraph::Node> Argmin::createNode() {
 
     return outputNode;
 }
+
 }  // namespace nnhal
 }  // namespace neuralnetworks
 }  // namespace hardware

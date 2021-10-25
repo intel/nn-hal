@@ -24,6 +24,7 @@
 #include "ModelManager.h"
 #include "ValidateHal.h"
 
+#undef LOG_TAG
 #define LOG_TAG "Driver"
 
 namespace android {
@@ -52,42 +53,40 @@ hidl_vec<Capabilities::OperandPerformance> nonExtensionOperandPerformance(Perfor
 }
 
 // For HAL-1.0 version
-Return<void> Driver::getCapabilities(getCapabilities_cb cb) {
+Return<void> Driver::getCapabilities(getCapabilities_cb) {
     ALOGV("Entering %s", __func__);
 
     return Void();
 }
 
-Return<void> Driver::getSupportedOperations(const V1_0_Model& model, getSupportedOperations_cb cb) {
+Return<void> Driver::getSupportedOperations(const V1_0_Model&, getSupportedOperations_cb) {
     ALOGV("Entering %s", __func__);
 
     return Void();
 }
 
-Return<ErrorStatus> Driver::prepareModel(const V1_0_Model& model,
-                                         const sp<V1_0::IPreparedModelCallback>& callback) {
+Return<ErrorStatus> Driver::prepareModel(const V1_0_Model&,
+                                         const sp<V1_0::IPreparedModelCallback>&) {
     ALOGV("Entering %s", __func__);
 
     return ErrorStatus::NONE;
 }
 
 // For HAL-1.1 version
-Return<void> Driver::getCapabilities_1_1(getCapabilities_1_1_cb cb) {
+Return<void> Driver::getCapabilities_1_1(getCapabilities_1_1_cb) {
     ALOGV("Entering %s", __func__);
 
     return Void();
 }
 
-Return<void> Driver::getSupportedOperations_1_1(const V1_1_Model& model,
-                                                getSupportedOperations_1_1_cb cb) {
+Return<void> Driver::getSupportedOperations_1_1(const V1_1_Model&, getSupportedOperations_1_1_cb) {
     ALOGV("Entering %s", __func__);
 
     return Void();
 }
 
-Return<ErrorStatus> Driver::prepareModel_1_1(const V1_1_Model& model,
-                                             ExecutionPreference preference,
-                                             const sp<V1_0::IPreparedModelCallback>& callback) {
+Return<ErrorStatus> Driver::prepareModel_1_1(const V1_1_Model&, ExecutionPreference,
+                                             const sp<V1_0::IPreparedModelCallback>&) {
     ALOGV("Entering %s", __func__);
 
     return ErrorStatus::NONE;
@@ -197,9 +196,8 @@ static sp<BasePreparedModel> ModelFactory(IntelDeviceType deviceType, const Mode
 }
 
 Return<ErrorStatus> Driver::prepareModel_1_2(const Model& model, ExecutionPreference preference,
-                                             const hidl_vec<hidl_handle>& modelCache,
-                                             const hidl_vec<hidl_handle>& dataCache,
-                                             const HidlToken& token,
+                                             const hidl_vec<hidl_handle>&,
+                                             const hidl_vec<hidl_handle>&, const HidlToken&,
                                              const sp<V1_2::IPreparedModelCallback>& callback) {
     ALOGV("Entering %s", __func__);
 

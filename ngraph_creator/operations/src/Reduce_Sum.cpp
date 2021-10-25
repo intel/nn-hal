@@ -1,4 +1,5 @@
 #include <Reduce_Sum.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Reduce_Sum"
 
 namespace android {

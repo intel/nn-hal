@@ -1,5 +1,5 @@
-//#define LOG_NDEBUG 0
 #include <LSTM.hpp>
+#undef LOG_TAG
 #define LOG_TAG "LSTM"
 
 namespace android {

@@ -1,4 +1,5 @@
 #include <Reduce_Any.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Reduce_Any"
 
 namespace android {

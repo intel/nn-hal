@@ -8,6 +8,7 @@
 #include "ValidateHal.h"
 #include "utils.h"
 
+#undef LOG_TAG
 #define LOG_TAG "CpuPreparedModel"
 
 using namespace android::nn;
@@ -75,6 +76,8 @@ Return<void> CpuPreparedModel::configureExecutionBurst(
     }
     return Void();
 }
+
+#undef LOG_TAG
 
 }  // namespace nnhal
 }  // namespace neuralnetworks

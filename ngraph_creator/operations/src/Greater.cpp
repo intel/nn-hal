@@ -1,4 +1,5 @@
 #include <Greater.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Greater"
 
 namespace android {
