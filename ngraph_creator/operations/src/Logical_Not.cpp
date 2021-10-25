@@ -1,4 +1,5 @@
 #include <Logical_Not.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Logical_Not"
 
 namespace android {

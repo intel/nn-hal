@@ -1,5 +1,6 @@
 #include <Depthwise_Conv_2d.hpp>
 #include <NgraphHelper.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Depthwise_Conv_2d"
 
 namespace android {

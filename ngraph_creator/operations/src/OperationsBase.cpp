@@ -1,4 +1,5 @@
 #include <OperationsBase.hpp>
+#undef LOG_TAG
 #define LOG_TAG "OperationsBase"
 
 namespace android {
@@ -90,12 +91,7 @@ void OperationsBase::setNgraphNodes(std::shared_ptr<NgraphNodes> nodes) { mNgrap
 bool OperationsBase::validate() { return true; }
 
 bool OperationsBase::validateForPlugin() {
-    // Only validates default input(initialized to 0)
-    // All other validations to be done at each operation's validate
-    if (!isValidInputTensor(mDefaultInputIndex)) {
-        ALOGE("%s Invalid dimensions for input", __func__);
-        return false;
-    }
+    // Add any plugin specific validations
     return validate();
 }
 

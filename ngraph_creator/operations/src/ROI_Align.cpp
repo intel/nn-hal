@@ -1,4 +1,5 @@
 #include <ROI_Align.hpp>
+#undef LOG_TAG
 #define LOG_TAG "ROI_Align"
 
 namespace android {
@@ -90,6 +91,7 @@ std::shared_ptr<ngraph::Node> ROI_Align::createNode() {
 
     return outputNode;
 }
+
 }  // namespace nnhal
 }  // namespace neuralnetworks
 }  // namespace hardware

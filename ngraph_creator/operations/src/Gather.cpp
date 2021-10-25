@@ -1,4 +1,5 @@
 #include <Gather.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Gather"
 
 namespace android {

@@ -1,4 +1,5 @@
 #include <OperationsFactory.hpp>
+#undef LOG_TAG
 #define LOG_TAG "OperationsFactory"
 
 namespace android {

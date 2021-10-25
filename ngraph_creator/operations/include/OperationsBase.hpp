@@ -10,6 +10,9 @@
 
 #include "ModelManager.h"
 
+#undef LOG_TAG
+#define LOG_TAG "OperationBase"
+
 namespace android {
 namespace hardware {
 namespace neuralnetworks {

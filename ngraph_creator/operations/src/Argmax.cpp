@@ -1,5 +1,5 @@
-//#define LOG_NDEBUG 0
 #include <Argmax.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Argmax"
 
 namespace android {
@@ -36,6 +36,7 @@ std::shared_ptr<ngraph::Node> Argmax::createNode() {
 
     return outputNode;
 }
+
 }  // namespace nnhal
 }  // namespace neuralnetworks
 }  // namespace hardware

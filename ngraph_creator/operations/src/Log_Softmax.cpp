@@ -1,5 +1,5 @@
-//#define LOG_NDEBUG 0
 #include <Log_Softmax.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Log_Softmax"
 
 namespace android {
@@ -50,6 +50,7 @@ std::shared_ptr<ngraph::Node> Log_Softmax::createNode() {
 
     return outputNode;
 }
+
 }  // namespace nnhal
 }  // namespace neuralnetworks
 }  // namespace hardware

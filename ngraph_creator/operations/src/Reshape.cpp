@@ -1,5 +1,5 @@
-//#define LOG_NDEBUG 0
 #include <Reshape.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Reshape"
 
 namespace android {
@@ -64,6 +64,7 @@ std::shared_ptr<ngraph::Node> Reshape::createNode() {
 
     return outputNode;
 }
+
 }  // namespace nnhal
 }  // namespace neuralnetworks
 }  // namespace hardware

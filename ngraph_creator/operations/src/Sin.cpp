@@ -1,4 +1,5 @@
 #include <Sin.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Sin"
 
 namespace android {

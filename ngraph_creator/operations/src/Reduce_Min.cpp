@@ -1,4 +1,5 @@
 #include <Reduce_Min.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Reduce_Min"
 
 namespace android {

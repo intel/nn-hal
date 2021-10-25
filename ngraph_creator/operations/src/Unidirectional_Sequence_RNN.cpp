@@ -1,6 +1,7 @@
 #include <Unidirectional_Sequence_RNN.hpp>
 // Helper funciton
 #include <NgraphHelper.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Unidirectional_Sequence_RNN"
 
 namespace android {
@@ -52,7 +53,7 @@ std::shared_ptr<ngraph::Node> Unidirectional_Sequence_RNN::createNode() {
 
     std::vector<std::shared_ptr<ngraph::Node>> output_at_each_timestep;
 
-    for (int i = 0; i < maxTime; i++) {
+    for (uint32_t i = 0; i < maxTime; i++) {
         auto dims = createConstNode(ngraph::element::i32, {0}, std::vector<int64_t>{});
         inputSplit[i] = std::make_shared<ngraph::opset3::Squeeze>(inputSplit[i], dims);
         // inputs * input_weights

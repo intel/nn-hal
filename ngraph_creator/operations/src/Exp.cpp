@@ -1,4 +1,5 @@
 #include <Exp.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Exp"
 
 namespace android {

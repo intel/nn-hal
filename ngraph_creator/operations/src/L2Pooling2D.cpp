@@ -1,4 +1,5 @@
 #include <L2Pooling2D.hpp>
+#undef LOG_TAG
 #define LOG_TAG "L2Pooling2D"
 
 namespace android {

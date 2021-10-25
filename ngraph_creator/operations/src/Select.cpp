@@ -1,4 +1,5 @@
 #include <Select.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Select"
 
 namespace android {

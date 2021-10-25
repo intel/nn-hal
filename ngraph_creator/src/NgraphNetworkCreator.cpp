@@ -1,5 +1,5 @@
-//#define LOG_NDEBUG 0
 #include <NgraphNetworkCreator.hpp>
+#undef LOG_TAG
 #define LOG_TAG "NgraphNetworkCreator"
 
 namespace android {

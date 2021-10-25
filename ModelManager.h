@@ -2,11 +2,16 @@
 #define ANDROID_ML_NN_MODELMANAGER_H
 
 #include <android/hidl/memory/1.0/IMemory.h>
+#include <android/log.h>
 #include <hidlmemory/mapping.h>
+#include <log/log.h>
 #include "ie_blob.h"
 
 #include "Driver.h"
 #include "utils.h"
+
+#undef LOG_TAG
+#define LOG_TAG "ModelManager"
 
 namespace android {
 namespace hardware {

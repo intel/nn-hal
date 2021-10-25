@@ -5,6 +5,8 @@
 #include <ngraph/ngraph.hpp>
 #include <ngraph/opsets/opset3.hpp>
 
+#undef LOG_TAG
+
 namespace android {
 namespace hardware {
 namespace neuralnetworks {

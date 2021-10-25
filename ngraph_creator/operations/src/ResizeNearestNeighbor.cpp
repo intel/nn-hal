@@ -1,4 +1,5 @@
 #include <ResizeNearestNeighbor.hpp>
+#undef LOG_TAG
 #define LOG_TAG "ResizeNearestNeighbor"
 
 namespace android {

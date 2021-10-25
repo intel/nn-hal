@@ -1,6 +1,7 @@
 #include <Transpose_Conv_2D.hpp>
 // Helper function
 #include <NgraphHelper.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Transpose_Conv_2D"
 
 namespace android {

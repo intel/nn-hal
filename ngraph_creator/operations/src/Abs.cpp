@@ -1,4 +1,5 @@
 #include <Abs.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Abs"
 
 namespace android {
