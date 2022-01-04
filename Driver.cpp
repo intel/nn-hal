@@ -461,6 +461,7 @@ Return<DeviceStatus> Driver::getStatus() {
 
 Return<void> Driver::getVersionString(getVersionString_cb cb) {
     ALOGV("Entering %s", __func__);
+    ALOGV("NNHAL version: %u.%u", this->cur_version.major, this->cur_version.minor);
     cb(ErrorStatus::NONE, "intel_nn_hal");
     return Void();
 }

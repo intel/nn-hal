@@ -87,9 +87,22 @@ using HidlToken = android::hardware::hidl_array<uint8_t, 32>;
 // Since these drivers simulate hardware, they must run the computations
 // on the CPU.  An actual driver would not do that.
 class Driver : public ::android::hardware::neuralnetworks::V1_3::IDevice {
+private:
+    struct nn_hal_version_t {
+        size_t major;             //!< A major version
+        size_t minor;             //!< A minor version
+    };
+    struct nn_hal_version_t cur_version;
+    Return<void> set_nnhal_version(){
+        cur_version.major = 1;
+        cur_version.minor = 3;
+        return Void();
+    }
 public:
     Driver() {}
-    Driver(IntelDeviceType device) : mDeviceType(device) {}
+    Driver(IntelDeviceType device) : mDeviceType(device) {
+        this->set_nnhal_version();
+    }
 
     ~Driver() override {}
 
