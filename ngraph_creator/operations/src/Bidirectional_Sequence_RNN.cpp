@@ -27,7 +27,7 @@ std::shared_ptr<ngraph::Node> Bidirectional_Sequence_RNN::createNode() {
     std::shared_ptr<ngraph::Node> fwWeights, fwRecurrentWeights, fwBias, fwHiddenState;
     std::shared_ptr<ngraph::Node> bwWeights, bwRecurrentWeights, bwBias, bwHiddenState;
     std::shared_ptr<ngraph::Node> auxInput, fwAuxWeights, bwAuxWeights;
-    bool hasAuxInputs = false;
+    bool hasAuxInputs = false, hasParallelLinking = false;
 
     input = getInputNode(0);
 
@@ -45,7 +45,9 @@ std::shared_ptr<ngraph::Node> Bidirectional_Sequence_RNN::createNode() {
     fwAuxWeights = getInputNode(10);
     bwAuxWeights = getInputNode(11);
 
-    if (!isValidInputTensor(9) || !isValidInputTensor(10) || !isValidInputTensor(11)) {
+    if (isValidInputTensor(9) && !isValidInputTensor(10) && !isValidInputTensor(11)) {
+        hasParallelLinking = true;
+    } else if (!isValidInputTensor(9) || !isValidInputTensor(10) || !isValidInputTensor(11)) {
         removeInputNode(9);
         removeInputNode(10);
         removeInputNode(11);
@@ -68,7 +70,7 @@ std::shared_ptr<ngraph::Node> Bidirectional_Sequence_RNN::createNode() {
 
     if (!isTimeMajor) {
         input = transpose(BTS_TBS, input);
-        if (hasAuxInputs) {
+        if (hasAuxInputs || hasParallelLinking) {
             auxInput = transpose(BTS_TBS, auxInput);
         }
     }
@@ -80,13 +82,14 @@ std::shared_ptr<ngraph::Node> Bidirectional_Sequence_RNN::createNode() {
 
     inputSplit = std::make_shared<ngraph::opset3::Split>(input, axisNode, numSplits)->outputs();
 
-    if (hasAuxInputs) {
+    if (hasAuxInputs || hasParallelLinking) {
         auxInputSplit =
             std::make_shared<ngraph::opset3::Split>(auxInput, axisNode, numSplits)->outputs();
     }
 
     std::vector<std::shared_ptr<ngraph::Node>> fw_output_at_each_timestep(maxTime);
     std::vector<std::shared_ptr<ngraph::Node>> bw_output_at_each_timestep(maxTime);
+    std::shared_ptr<ngraph::Node> fw_op_lastTimestep, bw_op_lastTimestep;
 
     for (uint32_t i = 0; i < maxTime; i++) {
         auto dims = createConstNode(ngraph::element::i32, {0}, std::vector<int64_t>{});
@@ -122,16 +125,22 @@ std::shared_ptr<ngraph::Node> Bidirectional_Sequence_RNN::createNode() {
 
         fwHiddenState = fw_output;
         fw_output_at_each_timestep[i] = fw_output;
+        if (i == maxTime - 1) fw_op_lastTimestep = fw_output;
     }
 
     for (int i = maxTime - 1; i >= 0; --i) {
         auto dims = createConstNode(ngraph::element::i32, {0}, std::vector<int64_t>{});
-        inputSplit[i] = std::make_shared<ngraph::opset3::Squeeze>(inputSplit[i], dims);
+        std::shared_ptr<ngraph::Node> curStepInput;
+        if (hasParallelLinking) {
+            curStepInput = std::make_shared<ngraph::opset3::Squeeze>(auxInputSplit[i], dims);
+        } else {
+            curStepInput = std::make_shared<ngraph::opset3::Squeeze>(inputSplit[i], dims);
+        }
 
         /* ########### Backward direction ########### */
         // inputs * input_weights
         auto bw_input_W =
-            std::make_shared<ngraph::opset3::MatMul>(inputSplit[i], bwWeights, false, true);
+            std::make_shared<ngraph::opset3::MatMul>(curStepInput, bwWeights, false, true);
         // state * recurrent_weights
         auto bw_Ht_R = std::make_shared<ngraph::opset3::MatMul>(bwHiddenState, bwRecurrentWeights,
                                                                 false, true);
@@ -140,7 +149,7 @@ std::shared_ptr<ngraph::Node> Bidirectional_Sequence_RNN::createNode() {
 
         std::shared_ptr<ngraph::Node> bw_i_t;
 
-        if (hasAuxInputs) {
+        if (hasAuxInputs && !hasParallelLinking) {
             auxInputSplit[i] = std::make_shared<ngraph::opset3::Squeeze>(auxInputSplit[i], dims);
             // aux_input * aux_input_weights
             auto aux_mul = std::make_shared<ngraph::opset3::MatMul>(auxInputSplit[i], bwAuxWeights,
@@ -158,6 +167,7 @@ std::shared_ptr<ngraph::Node> Bidirectional_Sequence_RNN::createNode() {
 
         bwHiddenState = bw_output;
         bw_output_at_each_timestep[i] = bw_output;
+        if (i == 0) bw_op_lastTimestep = bw_output;
     }
 
     std::shared_ptr<ngraph::Node> fwOutputNode, bwOutputNode;
@@ -201,6 +211,8 @@ std::shared_ptr<ngraph::Node> Bidirectional_Sequence_RNN::createNode() {
         fwOutputNode = std::make_shared<ngraph::opset3::Concat>(concat_output, 2);
     }
 
+    const auto& outputsSize = sModelInfo->getOperationOutputsSize(mNnapiOperationIndex);
+
     auto fwOutputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
     mNgraphNodes->setOutputAtOperandIndex(fwOutputIndex, fwOutputNode);
     ALOGD("%s Set Output index %d", __func__, fwOutputIndex);
@@ -221,7 +233,51 @@ std::shared_ptr<ngraph::Node> Bidirectional_Sequence_RNN::createNode() {
         }
     }
 
+    if (outputsSize > 2) {
+        int fw_hidden_op_index, bw_hidden_op_index;
+        if (!mergeOutputs) {
+            fw_hidden_op_index = 2;
+            bw_hidden_op_index = 3;
+        } else {
+            fw_hidden_op_index = 1;
+            bw_hidden_op_index = 2;
+        }
+
+        auto forward_hidden_state_output_Index =
+            sModelInfo->getOperationOutput(mNnapiOperationIndex, fw_hidden_op_index);
+        mNgraphNodes->setOutputAtOperandIndex(forward_hidden_state_output_Index,
+                                              fw_op_lastTimestep);
+        ALOGD("%s Set Output index %d", __func__, forward_hidden_state_output_Index);
+        const auto forward_hidden_state_output_Op =
+            sModelInfo->getOperand(forward_hidden_state_output_Index);
+        if (forward_hidden_state_output_Op.lifetime == OperandLifeTime::SUBGRAPH_OUTPUT) {
+            addResultNode(forward_hidden_state_output_Index, fw_op_lastTimestep);
+            ALOGD("%s Add result %d", __func__, forward_hidden_state_output_Index);
+        }
+
+        auto backward_hidden_state_output_Index =
+            sModelInfo->getOperationOutput(mNnapiOperationIndex, bw_hidden_op_index);
+        mNgraphNodes->setOutputAtOperandIndex(backward_hidden_state_output_Index,
+                                              bw_op_lastTimestep);
+        ALOGD("%s Set Output index %d", __func__, backward_hidden_state_output_Index);
+        const auto backward_hidden_state_output_Op =
+            sModelInfo->getOperand(backward_hidden_state_output_Index);
+        if (backward_hidden_state_output_Op.lifetime == OperandLifeTime::SUBGRAPH_OUTPUT) {
+            addResultNode(backward_hidden_state_output_Index, bw_op_lastTimestep);
+            ALOGD("%s Add result %d", __func__, backward_hidden_state_output_Index);
+        }
+    }
+
     return nullptr;
+}
+
+bool Bidirectional_Sequence_RNN::isValidInputTensor(uint32_t inputIndex) {
+    const auto& dims = getInputOperandDimensions(inputIndex);
+    if (dims.empty()) return false;
+
+    if (dims[0] == 0) return false;
+
+    return true;
 }
 
 }  // namespace nnhal
