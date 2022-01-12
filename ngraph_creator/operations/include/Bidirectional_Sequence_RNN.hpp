@@ -13,6 +13,7 @@ public:
     bool validate() override;
     std::shared_ptr<ngraph::Node> createNode() override;
     void connectOperationToGraph() override;
+    bool isValidInputTensor(uint32_t inputIndex);
 };
 
 }  // namespace nnhal
