@@ -19,6 +19,8 @@ bool Unidirectional_Sequence_RNN::validate() {
     return true;
 }
 
+void Unidirectional_Sequence_RNN::connectOperationToGraph() { createNode(); }
+
 std::shared_ptr<ngraph::Node> Unidirectional_Sequence_RNN::createNode() {
     // Creating input nodes
     std::shared_ptr<ngraph::Node> inputNode, W, R, bias, initial_hidden_state, outputNode;
@@ -52,6 +54,7 @@ std::shared_ptr<ngraph::Node> Unidirectional_Sequence_RNN::createNode() {
         std::make_shared<ngraph::opset3::Split>(inputNode, axisNode, numSplits)->outputs();
 
     std::vector<std::shared_ptr<ngraph::Node>> output_at_each_timestep;
+    std::shared_ptr<ngraph::Node> hidden_state_output_last_timestep;
 
     for (uint32_t i = 0; i < maxTime; i++) {
         auto dims = createConstNode(ngraph::element::i32, {0}, std::vector<int64_t>{});
@@ -69,6 +72,7 @@ std::shared_ptr<ngraph::Node> Unidirectional_Sequence_RNN::createNode() {
 
         initial_hidden_state = outNode;
         output_at_each_timestep.push_back(outNode);
+        if (i == maxTime - 1) hidden_state_output_last_timestep = outNode;
     }
 
     outputNode = std::make_shared<ngraph::opset3::Concat>(output_at_each_timestep, 0);
@@ -85,7 +89,29 @@ std::shared_ptr<ngraph::Node> Unidirectional_Sequence_RNN::createNode() {
         outputNode = transpose(BTS_TBS, outputNode);
     }
 
-    return outputNode;
+    const auto& outputsSize = sModelInfo->getOperationOutputsSize(mNnapiOperationIndex);
+
+    auto outputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
+    mNgraphNodes->setOutputAtOperandIndex(outputIndex, outputNode);
+    ALOGD("%s Set Output index %d", __func__, outputIndex);
+    const auto op = sModelInfo->getOperand(outputIndex);
+    if (op.lifetime == OperandLifeTime::SUBGRAPH_OUTPUT) {
+        addResultNode(outputIndex, outputNode);
+        ALOGD("%s Add result %d", __func__, outputIndex);
+    }
+
+    if (outputsSize == 2) {
+        auto hiddenStateIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 1);
+        mNgraphNodes->setOutputAtOperandIndex(hiddenStateIndex, hidden_state_output_last_timestep);
+        ALOGD("%s Set Output index %d", __func__, hiddenStateIndex);
+        const auto hsOp = sModelInfo->getOperand(hiddenStateIndex);
+        if (hsOp.lifetime == OperandLifeTime::SUBGRAPH_OUTPUT) {
+            addResultNode(hiddenStateIndex, hidden_state_output_last_timestep);
+            ALOGD("%s Add result %d", __func__, hiddenStateIndex);
+        }
+    }
+
+    return nullptr;
 }
 
 }  // namespace nnhal
