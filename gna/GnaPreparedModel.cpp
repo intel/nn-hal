@@ -24,7 +24,7 @@ void GnaPreparedModel::deinitialize() {
     ALOGV("Exiting %s", __func__);
 }
 
-bool GnaPreparedModel::initialize(const Model& model) {
+bool GnaPreparedModel::initialize() {
     ALOGV("Entering %s", __func__);
     if (!mModelInfo->initRuntimeInfo()) {
         ALOGE("Failed to initialize Model runtime parameters!!");

@@ -205,7 +205,7 @@ std::shared_ptr<ngraph::Node> Bidirectional_Sequence_RNN::createNode() {
     mNgraphNodes->setOutputAtOperandIndex(fwOutputIndex, fwOutputNode);
     ALOGD("%s Set Output index %d", __func__, fwOutputIndex);
     const auto fwOp = sModelInfo->getOperand(fwOutputIndex);
-    if (fwOp.lifetime == OperandLifeTime::MODEL_OUTPUT) {
+    if (fwOp.lifetime == OperandLifeTime::SUBGRAPH_OUTPUT) {
         addResultNode(fwOutputIndex, fwOutputNode);
         ALOGD("%s Add result %d", __func__, fwOutputIndex);
     }
@@ -215,7 +215,7 @@ std::shared_ptr<ngraph::Node> Bidirectional_Sequence_RNN::createNode() {
         mNgraphNodes->setOutputAtOperandIndex(bwOutputIndex, bwOutputNode);
         ALOGD("%s Set Output index %d", __func__, bwOutputIndex);
         const auto bwOp = sModelInfo->getOperand(bwOutputIndex);
-        if (bwOp.lifetime == OperandLifeTime::MODEL_OUTPUT) {
+        if (bwOp.lifetime == OperandLifeTime::SUBGRAPH_OUTPUT) {
             addResultNode(bwOutputIndex, bwOutputNode);
             ALOGD("%s Add result %d", __func__, bwOutputIndex);
         }

@@ -86,7 +86,7 @@ static sp<BasePreparedModel> ModelFactory(IntelDeviceType deviceType, const Mode
     return driverPreparedModel;
 }
 // For HAL-1.0 version
-Return<void> Driver::getCapabilities(getCapabilities_cb) {
+Return<void> Driver::getCapabilities(getCapabilities_cb cb) {
     ALOGV("Entering %s", __func__);
     return getCapabilities_1_3(
         [&](V1_3::ErrorStatus error, const V1_3::Capabilities& capabilities) {
@@ -94,7 +94,7 @@ Return<void> Driver::getCapabilities(getCapabilities_cb) {
         });
 }
 
-Return<void> Driver::getSupportedOperations(const V1_0_Model&, getSupportedOperations_cb) {
+Return<void> Driver::getSupportedOperations(const V1_0_Model& model, getSupportedOperations_cb cb) {
     ALOGV("Entering %s", __func__);
     if (!validateModel(model)) {
         ALOGE("NNERR: %s failed at line no: %d\n", __func__, __LINE__);
@@ -107,8 +107,8 @@ Return<void> Driver::getSupportedOperations(const V1_0_Model&, getSupportedOpera
         });
 }
 
-Return<ErrorStatus> Driver::prepareModel(const V1_0_Model&,
-                                         const sp<V1_0::IPreparedModelCallback>&) {
+Return<ErrorStatus> Driver::prepareModel(const V1_0_Model& model,
+                                         const sp<V1_0::IPreparedModelCallback>& callback) {
     ALOGV("Entering %s", __func__);
     if (callback.get() == nullptr) {
         ALOGE("invalid callback passed to prepareModel");
@@ -126,7 +126,7 @@ Return<ErrorStatus> Driver::prepareModel(const V1_0_Model&,
     }
     for (auto opn : model.operations) dumpOperation(opn);
 
-    if (!driverPreparedModel->initialize(convertToV1_3(model))) {
+    if (!driverPreparedModel->initialize()) {
         ALOGE("failed to initialize preparedmodel");
         callback->notify(ErrorStatus::INVALID_ARGUMENT, nullptr);
         return ErrorStatus::NONE;
@@ -138,7 +138,7 @@ Return<ErrorStatus> Driver::prepareModel(const V1_0_Model&,
 }
 
 // For HAL-1.1 version
-Return<void> Driver::getCapabilities_1_1(getCapabilities_1_1_cb) {
+Return<void> Driver::getCapabilities_1_1(getCapabilities_1_1_cb cb) {
     ALOGV("Entering %s", __func__);
     return getCapabilities_1_3(
         [&](V1_3::ErrorStatus error, const V1_3::Capabilities& capabilities) {
@@ -146,7 +146,8 @@ Return<void> Driver::getCapabilities_1_1(getCapabilities_1_1_cb) {
         });
 }
 
-Return<void> Driver::getSupportedOperations_1_1(const V1_1_Model&, getSupportedOperations_1_1_cb) {
+Return<void> Driver::getSupportedOperations_1_1(const V1_1_Model& model,
+                                                getSupportedOperations_1_1_cb cb) {
     ALOGV("Entering %s", __func__);
     if (!validateModel(model)) {
         ALOGE("NNERR: %s failed at line no: %d\n", __func__, __LINE__);
@@ -159,8 +160,9 @@ Return<void> Driver::getSupportedOperations_1_1(const V1_1_Model&, getSupportedO
         });
 }
 
-Return<ErrorStatus> Driver::prepareModel_1_1(const V1_1_Model&, ExecutionPreference,
-                                             const sp<V1_0::IPreparedModelCallback>&) {
+Return<ErrorStatus> Driver::prepareModel_1_1(const V1_1_Model& model,
+                                             ExecutionPreference preference,
+                                             const sp<V1_0::IPreparedModelCallback>& callback) {
     ALOGV("Entering %s", __func__);
 
     if (callback.get() == nullptr) {
@@ -179,7 +181,7 @@ Return<ErrorStatus> Driver::prepareModel_1_1(const V1_1_Model&, ExecutionPrefere
     }
     for (auto opn : model.operations) dumpOperation(opn);
 
-    if (!driverPreparedModel->initialize(convertToV1_3(model))) {
+    if (!driverPreparedModel->initialize()) {
         ALOGE("failed to initialize preparedmodel");
         callback->notify(ErrorStatus::INVALID_ARGUMENT, nullptr);
         return ErrorStatus::NONE;
@@ -284,7 +286,7 @@ Return<ErrorStatus> Driver::prepareModel_1_2(const V1_2_Model& model,
     }
     for (auto opn : model.operations) dumpOperation(opn);
 
-    if (!driverPreparedModel->initialize(convertToV1_3(model))) {
+    if (!driverPreparedModel->initialize()) {
         ALOGE("failed to initialize preparedmodel");
         callback->notify(ErrorStatus::INVALID_ARGUMENT, nullptr);
         return ErrorStatus::NONE;
@@ -410,7 +412,7 @@ Return<V1_3::ErrorStatus> Driver::prepareModel_1_3(
 
     // TODO: make asynchronous later
     sp<BasePreparedModel> driverPreparedModel = ModelFactory(mDeviceType, model);
-    if (!driverPreparedModel->initialize(model)) {
+    if (!driverPreparedModel->initialize()) {
         ALOGI("Failed to initialize prepared model");
         cb->notify_1_3(convertToV1_3(ErrorStatus::INVALID_ARGUMENT), nullptr);
         return V1_3::ErrorStatus::NONE;
@@ -422,7 +424,7 @@ Return<V1_3::ErrorStatus> Driver::prepareModel_1_3(
 }
 
 Return<V1_3::ErrorStatus> Driver::prepareModelFromCache_1_3(
-    const V1_3::OptionalTimePoint& timing,
+    const V1_3::OptionalTimePoint&,
     const android::hardware::hidl_vec<android::hardware::hidl_handle>&,
     const android::hardware::hidl_vec<android::hardware::hidl_handle>&, const HidlToken&,
     const sp<V1_3::IPreparedModelCallback>& callback) {
@@ -442,10 +444,8 @@ Return<V1_3::ErrorStatus> Driver::prepareModelFromCache_1_3(
     return V1_3::ErrorStatus::GENERAL_FAILURE;
 }
 
-Return<void> Driver::allocate(const V1_3::BufferDesc& desc,
-                              const hidl_vec<sp<V1_3::IPreparedModel>>& preparedModels,
-                              const hidl_vec<V1_3::BufferRole>& inputRoles,
-                              const hidl_vec<V1_3::BufferRole>& outputRoles,
+Return<void> Driver::allocate(const V1_3::BufferDesc&, const hidl_vec<sp<V1_3::IPreparedModel>>&,
+                              const hidl_vec<V1_3::BufferRole>&, const hidl_vec<V1_3::BufferRole>&,
                               V1_3::IDevice::allocate_cb cb) {
     ALOGV("Entering %s", __func__);
     cb(V1_3::ErrorStatus::GENERAL_FAILURE, nullptr, 0);

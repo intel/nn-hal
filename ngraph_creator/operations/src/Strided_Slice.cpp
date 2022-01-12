@@ -1,4 +1,5 @@
 #include <Strided_Slice.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Strided_Slice"
 
 namespace android {

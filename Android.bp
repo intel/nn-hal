@@ -1,7 +1,7 @@
 //#############################################################
 cc_library_shared {
 
-    name: "android.hardware.neuralnetworks@1.2-generic-impl",
+    name: "android.hardware.neuralnetworks@1.3-generic-impl",
     proprietary: true,
     owner: "intel",
     compile_multilib: "64",
@@ -26,6 +26,7 @@ cc_library_shared {
     include_dirs: [
         "frameworks/ml/nn/common/include",
         "frameworks/ml/nn/runtime/include",
+        "external/mesa3d/include/android_stub"
     ],
 
     header_libs: [
@@ -107,9 +108,9 @@ cc_library_shared {
 
 //##############################################################
 cc_binary {
-    name: "android.hardware.neuralnetworks@1.2-generic-service",
+    name: "android.hardware.neuralnetworks@1.3-generic-service",
     init_rc: [
-        "config/android.hardware.neuralnetworks@1.2-generic-cpu.rc",
+        "config/android.hardware.neuralnetworks@1.3-generic-cpu.rc",
     ],
     relative_install_path: "hw",
     proprietary: true,
@@ -119,6 +120,7 @@ cc_binary {
     include_dirs: [
         "frameworks/ml/nn/common/include",
         "frameworks/ml/nn/runtime/include",
+        "external/mesa3d/include/android_stub"
     ],
 
     cflags: [
@@ -138,8 +140,8 @@ cc_binary {
         "liblog",
         "libcutils",
         "libhardware",
-        "android.hardware.neuralnetworks@1.2",
-        "android.hardware.neuralnetworks@1.2-generic-impl",
+        "android.hardware.neuralnetworks@1.3",
+        "android.hardware.neuralnetworks@1.3-generic-impl",
         "android.hidl.allocator@1.0",
         "android.hidl.memory@1.0",
     ],
