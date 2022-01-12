@@ -44,7 +44,7 @@ int main(int argc, char* argv[]) {
         else
             device = new Driver(android::hardware::neuralnetworks::nnhal::IntelDeviceType::CPU);
 
-        ALOGD("NN-HAL-1.2(%s) is ready.", deviceType);
+        ALOGD("NN-HAL-1.3(%s) is ready.", deviceType);
         configureRpcThreadpool(4, true);
         android::status_t status = device->registerAsService(deviceType);
         LOG_ALWAYS_FATAL_IF(status != android::OK, "Error while registering as service for %s: %d",

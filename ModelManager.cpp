@@ -165,7 +165,8 @@ const uint8_t* NnapiModelInfo::GetOperandMemory(int index, uint32_t& lenOut) {
     return nullptr;
 }
 
-bool NnapiModelInfo::setRunTimePoolInfosFromHidlMemories(const hidl_vec<hidl_memory>& pools) {
+V1_3::ErrorStatus NnapiModelInfo::setRunTimePoolInfosFromHidlMemories(
+    const hidl_vec<V1_3::Request::MemoryPool>& pools) {
     ALOGD("Number of pools: %zu", pools.size());
     mRequestPoolInfos.resize(pools.size());
     for (size_t i = 0; i < pools.size(); i++) {
@@ -193,7 +194,7 @@ bool NnapiModelInfo::setRunTimePoolInfosFromHidlMemories(const hidl_vec<hidl_mem
 
 ErrorStatus NnapiModelInfo::setRunTimePoolInfosFromHidlMemories(
     const hidl_vec<hidl_memory>& pools) {
-    ALOGD("Number of pools: %d", pools.size());
+    ALOGD("Number of pools: %zu", pools.size());
 
     mRequestPoolInfos.resize(pools.size());
     for (size_t i = 0; i < pools.size(); i++) {
@@ -207,7 +208,8 @@ ErrorStatus NnapiModelInfo::setRunTimePoolInfosFromHidlMemories(
     return ErrorStatus::NONE;
 }
 
-Blob::Ptr NnapiModelInfo::getBlobFromMemoryPoolIn(const Request& request, uint32_t index) {
+void* NnapiModelInfo::getBlobFromMemoryPoolIn(const Request& request, uint32_t index,
+                                              uint32_t& rBufferLength) {
     RunTimeOperandInfo& operand = mOperands[mModel.main.inputIndexes[index]];
     const V1_0::RequestArgument& arg = request.inputs[index];
     auto poolIndex = arg.location.poolIndex;

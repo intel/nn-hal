@@ -88,7 +88,7 @@ public:
                                const V1_3::OptionalTimeoutDuration& duration,
                                executeFenced_cb cb) override;
 
-    virtual bool initialize(const Model& model);
+    virtual bool initialize();
 
     std::shared_ptr<NnapiModelInfo> getModelInfo() { return mModelInfo; }
 
