@@ -106,6 +106,7 @@ enum PaddingScheme {
 
 #define WRONG_DIM (-1)
 
+#undef nnAssert
 #define nnAssert(v)                                                                            \
     do {                                                                                       \
         if (!(v)) {                                                                            \

@@ -98,6 +98,9 @@ cc_library_static {
     ],
     include_dirs: [
         "vendor/intel/external/project-celadon/nn-hal",
+        "frameworks/ml/nn/common/include",
+        "frameworks/ml/nn/runtime/include",
+        "external/mesa3d/include/android_stub"
     ],
     local_include_dirs: [
         "include/",

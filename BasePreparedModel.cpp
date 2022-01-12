@@ -51,7 +51,7 @@ T getScalarData(const RunTimeOperandInfo& info) {
     return data[0];
 }
 
-bool BasePreparedModel::initialize(const Model& model) {
+bool BasePreparedModel::initialize() {
     ALOGV("Entering %s", __func__);
     return true;
 }
@@ -454,10 +454,11 @@ Return<void> BasePreparedModel::executeSynchronously(const Request& request, Mea
     return Void();
 }
 
-Return<void> BasePreparedModel::executeSynchronously_1_3(
-    const V1_3::Request& request, V1_2::MeasureTiming measure,
-    const V1_3::OptionalTimePoint& deadline,
-    const V1_3::OptionalTimeoutDuration& loopTimeoutDuration, executeSynchronously_1_3_cb cb) {
+Return<void> BasePreparedModel::executeSynchronously_1_3(const V1_3::Request& request,
+                                                         V1_2::MeasureTiming measure,
+                                                         const V1_3::OptionalTimePoint&,
+                                                         const V1_3::OptionalTimeoutDuration&,
+                                                         executeSynchronously_1_3_cb cb) {
     ALOGV("Entering %s", __func__);
     time_point driverStart;
     if (measure == MeasureTiming::YES) driverStart = now();
@@ -505,19 +506,19 @@ Return<ErrorStatus> BasePreparedModel::execute_1_2(const Request& request, Measu
 }
 
 Return<V1_3::ErrorStatus> BasePreparedModel::execute_1_3(
-    const V1_3::Request& request, V1_2::MeasureTiming measure,
-    const V1_3::OptionalTimePoint& deadline,
-    const V1_3::OptionalTimeoutDuration& loopTimeoutDuration,
-    const sp<V1_3::IExecutionCallback>& callback) {
+    const V1_3::Request& request, V1_2::MeasureTiming measure, const V1_3::OptionalTimePoint&,
+    const V1_3::OptionalTimeoutDuration&, const sp<V1_3::IExecutionCallback>& callback) {
     ALOGV("Entering %s", __func__);
     return convertToV1_3(executeBase(convertToV1_0(request), measure, this, callback));
 }
 
-Return<void> BasePreparedModel::executeFenced(
-    const V1_3::Request& request1_3, const hidl_vec<hidl_handle>& waitFor,
-    V1_2::MeasureTiming measure, const V1_3::OptionalTimePoint& deadline,
-    const V1_3::OptionalTimeoutDuration& loopTimeoutDuration,
-    const V1_3::OptionalTimeoutDuration& duration, executeFenced_cb cb) {
+Return<void> BasePreparedModel::executeFenced(const V1_3::Request& request1_3,
+                                              const hidl_vec<hidl_handle>& waitFor,
+                                              V1_2::MeasureTiming measure,
+                                              const V1_3::OptionalTimePoint& halDeadline,
+                                              const V1_3::OptionalTimeoutDuration&,
+                                              const V1_3::OptionalTimeoutDuration& duration,
+                                              executeFenced_cb cb) {
     ALOGV("Entering %s", __func__);
 
     time_point driverStart, driverEnd;
@@ -528,14 +529,11 @@ Return<void> BasePreparedModel::executeFenced(
         return Void();
     }
 
-    auto errorStatus = mModelInfo->setRunTimePoolInfosFromHidlMemories(request1_3.pools);
-    if (errorStatus != V1_3::ErrorStatus::NONE) {
-        cb(errorStatus, hidl_handle(nullptr), nullptr);
+    const auto deadline = makeDeadline(halDeadline);
+    if (hasDeadlinePassed(deadline)) {
+        cb(V1_3::ErrorStatus::MISSED_DEADLINE_PERSISTENT, hidl_handle(nullptr), nullptr);
         return Void();
     }
-
-    // rest of the interfaces are based on 1.0 request
-    auto request = convertToV1_0(request1_3);
 
     // Wait for the dependent events to signal
     for (const auto& fenceHandle : waitFor) {
@@ -550,12 +548,33 @@ Return<void> BasePreparedModel::executeFenced(
             return Void();
         }
     }
+
+    // Update deadline if the timeout duration is closer than the deadline.
+    auto closestDeadline = deadline;
+    if (duration.getDiscriminator() != OptionalTimeoutDuration::hidl_discriminator::none) {
+        const auto timeoutDurationDeadline = makeDeadline(duration.nanoseconds());
+        if (!closestDeadline.has_value() || *closestDeadline > timeoutDurationDeadline) {
+            closestDeadline = timeoutDurationDeadline;
+        }
+    }
+
+    auto errorStatus = mModelInfo->setRunTimePoolInfosFromHidlMemories(request1_3.pools);
+    if (errorStatus != V1_3::ErrorStatus::NONE) {
+        ALOGE("Failed to set runtime pool info from HIDL memories");
+        cb(errorStatus, hidl_handle(nullptr), nullptr);
+        return Void();
+    }
+
+    // rest of the interfaces are based on 1.0 request
+    auto request = convertToV1_0(request1_3);
+
     time_point driverAfterFence;
     if (measure == MeasureTiming::YES) driverAfterFence = now();
 
     for (size_t i = 0; i < request.inputs.size(); i++) {
+        uint32_t len;
         auto inIndex = mModelInfo->getModelInputIndex(i);
-        auto srcBlob = mModelInfo->getBlobFromMemoryPoolIn(request, i);
+        void* srcPtr = mModelInfo->getBlobFromMemoryPoolIn(request, i, len);
 
         const std::string& inputNodeName = mNgraphNetCreator->getNodeName(inIndex);
         if (inputNodeName == "") {
@@ -564,10 +583,19 @@ Return<void> BasePreparedModel::executeFenced(
         }
         ALOGD("Input index: %d layername : %s", inIndex, inputNodeName.c_str());
         auto destBlob = mPlugin->getBlob(inputNodeName);
-        uint8_t* dest = destBlob->buffer().as<uint8_t*>();
-        uint8_t* src = srcBlob->buffer().as<uint8_t*>();
-        std::memcpy(dest, src, srcBlob->byteSize());
+        if (mModelInfo->getOperandType(inIndex) == OperandType::TENSOR_FLOAT16) {
+            float* dest = destBlob->buffer().as<float*>();
+            _Float16* src = (_Float16*)srcPtr;
+
+            for (unsigned int i = 0; i < len / 2; i++) {
+                dest[i] = src[i];
+            }
+        } else {
+            uint8_t* dest = destBlob->buffer().as<uint8_t*>();
+            std::memcpy(dest, (uint8_t*)srcPtr, len);
+        }
     }
+
     ALOGD("%s Run", __func__);
 
     time_point deviceStart, deviceEnd;
@@ -592,16 +620,27 @@ Return<void> BasePreparedModel::executeFenced(
         ALOGD("Output index: %d layername : %s", outIndex, outputNodeName.c_str());
         auto srcBlob = mPlugin->getBlob(outputNodeName);
         auto operandType = mModelInfo->getOperandType(outIndex);
-        uint32_t expectedLength = srcBlob->byteSize();
-        uint32_t rActualLength = 0;
-        void* destPtr = mModelInfo->getBlobFromMemoryPoolOut(request, i, rActualLength);
+        uint32_t actualLength = srcBlob->byteSize();
+        uint32_t expectedLength = 0;
+        void* destPtr = mModelInfo->getBlobFromMemoryPoolOut(request, i, expectedLength);
         auto outDims = srcBlob->getTensorDesc().getDims();
-        if (operandType == OperandType::TENSOR_BOOL8 ||
-            operandType == OperandType::TENSOR_QUANT8_ASYMM ||
-            operandType == OperandType::TENSOR_QUANT8_SYMM)
-            expectedLength /= 4;  // 8bit expected instead of 32bit
-        if (rActualLength != expectedLength) {
-            ALOGE("%s Invalid length(%d) at outIndex(%d)", __func__, rActualLength, outIndex);
+        switch (operandType) {
+            case OperandType::TENSOR_BOOL8:
+            case OperandType::TENSOR_QUANT8_ASYMM:
+            case OperandType::TENSOR_QUANT8_SYMM:
+            case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL:
+                actualLength /= 4;
+                break;
+            case OperandType::TENSOR_FLOAT16:
+                actualLength /= 2;
+                break;
+            default:
+                ALOGV("Operand type is 4 bytes !!");
+                break;
+        }
+
+        if (actualLength != expectedLength) {
+            ALOGE("%s Invalid length(%d) at outIndex(%d)", __func__, actualLength, outIndex);
             // Notify Insufficient Buffer Length to modelInfo
             mModelInfo->updateOutputshapes(i, outDims, false);
             cb(V1_3::ErrorStatus::OUTPUT_INSUFFICIENT_SIZE, hidl_handle(nullptr), nullptr);
@@ -624,8 +663,13 @@ Return<void> BasePreparedModel::executeFenced(
                 floatToUint8(srcBlob->buffer().as<float*>(), (uint8_t*)destPtr, srcBlob->size());
                 break;
             }
-            case OperandType::TENSOR_QUANT8_SYMM: {
+            case OperandType::TENSOR_QUANT8_SYMM:
+            case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL: {
                 floatToint8(srcBlob->buffer().as<float*>(), (int8_t*)destPtr, srcBlob->size());
+                break;
+            }
+            case OperandType::TENSOR_FLOAT16: {
+                floatToFloat16(srcBlob->buffer().as<float*>(), (_Float16*)destPtr, srcBlob->size());
                 break;
             }
             default:
