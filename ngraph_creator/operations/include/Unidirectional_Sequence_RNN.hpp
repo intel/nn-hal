@@ -11,6 +11,7 @@ class Unidirectional_Sequence_RNN : public OperationsBase {
 public:
     Unidirectional_Sequence_RNN(int operationIndex);
     bool validate() override;
+    void connectOperationToGraph() override;
     std::shared_ptr<ngraph::Node> createNode() override;
 };
 
