@@ -138,6 +138,7 @@ void asyncExecute(const Request& request, MeasureTiming measure, BasePreparedMod
     std::vector<RunTimePoolInfo> requestPoolInfos;
     auto errorStatus = modelInfo->setRunTimePoolInfosFromHidlMemories(request.pools);
     if (errorStatus != ErrorStatus::NONE) {
+        ALOGE("Failed to set runtime pool info from HIDL memories");
         notify(callback, ErrorStatus::GENERAL_FAILURE, {}, kNoTiming);
         return;
     }

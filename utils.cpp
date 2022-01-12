@@ -16,12 +16,13 @@
 #include "utils.h"
 
 #include <android-base/logging.h>
+#include <android/hardware_buffer.h>
 #include <android/log.h>
 #include <hidlmemory/mapping.h>
 #include <log/log.h>
 #include <sys/mman.h>
-
 #include <sys/stat.h>
+#include <vndk/hardware_buffer.h>
 #include <fstream>
 
 #undef LOG_TAG
@@ -345,6 +346,8 @@ size_t sizeOfTensor(const TensorDims& dims) {
 // TODO: long term, implement mmap_fd as a hidl IMemory service.
 bool RunTimePoolInfo::set(const hidl_memory& hidlMemory) {
     this->hidlMemory = hidlMemory;
+    buffer = nullptr;
+    AHardwareBuffer* hardwareBuffer = nullptr;
     auto memType = hidlMemory.name();
     if (memType == "ashmem") {
         memory = mapMemory(hidlMemory);
@@ -370,7 +373,43 @@ bool RunTimePoolInfo::set(const hidl_memory& hidlMemory) {
             return false;
         }
         return true;
-    } else {
+    }
+#if __ANDROID__
+    else if (memType == "hardware_buffer_blob") {
+        auto handle = hidlMemory.handle();
+        auto format = AHARDWAREBUFFER_FORMAT_BLOB;
+        auto usage = AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN | AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN;
+        const uint32_t width = hidlMemory.size();
+        const uint32_t height = 1;  // height is always 1 for BLOB mode AHardwareBuffer.
+        const uint32_t layers = 1;  // layers is always 1 for BLOB mode AHardwareBuffer.
+        const uint32_t stride = hidlMemory.size();
+
+        AHardwareBuffer_Desc desc{
+            .width = width,
+            .format = format,
+            .height = height,
+            .layers = layers,
+            .usage = usage,
+            .stride = stride,
+        };
+        status_t status = AHardwareBuffer_createFromHandle(
+            &desc, handle, AHARDWAREBUFFER_CREATE_FROM_HANDLE_METHOD_CLONE, &hardwareBuffer);
+        if (status != NO_ERROR) {
+            LOG(ERROR) << "RunTimePoolInfo Can't create AHardwareBuffer from handle. Error: "
+                       << status;
+            return false;
+        }
+        void* gBuffer = nullptr;
+        status = AHardwareBuffer_lock(hardwareBuffer, usage, -1, nullptr, &gBuffer);
+        if (status != NO_ERROR) {
+            LOG(ERROR) << "RunTimePoolInfo Can't lock the AHardwareBuffer. Error: " << status;
+            return false;
+        }
+        buffer = static_cast<uint8_t*>(gBuffer);
+        return true;
+    }
+#endif
+    else {
         ALOGE("unsupported hidl_memory type");
         return false;
     }
