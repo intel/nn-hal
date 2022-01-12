@@ -55,7 +55,8 @@ std::shared_ptr<ngraph::Node> FullyConnected::createNode() {
     if (!sModelInfo->isOmittedInput(mNnapiOperationIndex, 2) && biasDims.size() != 0) {
         biasNode = getInputNode(2);
 
-        if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM))
+        if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM) ||
+            checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM_SIGNED))
             biasNode =
                 DequantizeNode(biasNode, sModelInfo->getOperationInput(mNnapiOperationIndex, 2),
                                ngraph::element::f32);

@@ -47,6 +47,22 @@ std::shared_ptr<ngraph::Node> Cast::createNode() {
                 std::make_shared<ngraph::opset3::Convert>(input, ngraph::element::i32);
             input = std::make_shared<ngraph::opset3::Clamp>(convertInput, 0, 255);
             elementType = ngraph::element::u8;
+        } else if (checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM_SIGNED) ||
+                   checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_SYMM)) {
+            auto convertInput =
+                std::make_shared<ngraph::opset3::Convert>(input, ngraph::element::i32);
+            input = std::make_shared<ngraph::opset3::Clamp>(convertInput, -128, 127);
+            elementType = ngraph::element::i8;
+        } else if (checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT16_ASYMM)) {
+            auto convertInput =
+                std::make_shared<ngraph::opset3::Convert>(input, ngraph::element::i32);
+            input = std::make_shared<ngraph::opset3::Clamp>(convertInput, 0, 65535);
+            elementType = ngraph::element::u16;
+        } else if (checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT16_SYMM)) {
+            auto convertInput =
+                std::make_shared<ngraph::opset3::Convert>(input, ngraph::element::i32);
+            input = std::make_shared<ngraph::opset3::Clamp>(convertInput, -32768, 32767);
+            elementType = ngraph::element::i16;
         }
         outputNode = std::make_shared<ngraph::opset3::Convert>(input, elementType);
     }

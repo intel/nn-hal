@@ -61,6 +61,8 @@ bool NnapiModelInfo::initializeRunTimeOperandInfo() {
                 to.type = from.type;
                 break;
             case OperandType::TENSOR_FLOAT16:
+            case OperandType::TENSOR_QUANT16_SYMM:
+            case OperandType::TENSOR_QUANT16_ASYMM:
             case OperandType::FLOAT16:
                 to.type = from.type;
                 break;
@@ -68,6 +70,7 @@ bool NnapiModelInfo::initializeRunTimeOperandInfo() {
                 to.type = from.type;
                 break;
             case OperandType::TENSOR_QUANT8_ASYMM:
+            case OperandType::TENSOR_QUANT8_ASYMM_SIGNED:
             case OperandType::TENSOR_QUANT8_SYMM:
             case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL:
                 to.type = from.type;

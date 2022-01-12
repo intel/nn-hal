@@ -42,7 +42,8 @@ std::shared_ptr<ngraph::Node> Pad_V2::createNode() {
     } else if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT16)) {
         auto pad_scalar_value = sModelInfo->ParseOperationInput<_Float16>(mNnapiOperationIndex, 2);
         pad_value = createConstNode(ngraph::element::f16, {}, convertToVector(pad_scalar_value));
-    } else if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
+    } else if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM) ||
+               checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM_SIGNED)) {
         auto pad_scalar_value = sModelInfo->ParseOperationInput<int>(mNnapiOperationIndex, 2);
         pad_value = createConstNode(ngraph::element::i32, {}, convertToVector(pad_scalar_value));
 

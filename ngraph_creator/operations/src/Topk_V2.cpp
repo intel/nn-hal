@@ -51,6 +51,10 @@ std::shared_ptr<ngraph::Node> Topk_V2::createNode() {
             outNode =
                 std::make_shared<ngraph::opset3::Convert>(outputNode[i], ngraph::element::f32);
             outNode = QuantizeNode(outNode, outputIndex, ngraph::element::u8);
+        } else if (checkOutputOperandType(i, (int32_t)OperandType::TENSOR_QUANT8_ASYMM_SIGNED)) {
+            outNode =
+                std::make_shared<ngraph::opset3::Convert>(outputNode[i], ngraph::element::f32);
+            outNode = QuantizeNode(outNode, outputIndex, ngraph::element::i8);
         }
 
         mNgraphNodes->setOutputAtOperandIndex(outputIndex, outNode);

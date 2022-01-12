@@ -92,6 +92,20 @@ static void floatToFloat16(const float* src, _Float16* dst, size_t size) {
     }
 }
 
+static void floatToInt16(const float* src, int16_t* dst, size_t size) {
+    for (uint32_t i = 0; i < size; ++i) {
+        dst[i] = static_cast<int16_t>(src[i]);
+        ALOGV("%s input: %f output: %hd ", __func__, src[i], dst[i]);
+    }
+}
+
+static void floatToUInt16(const float* src, uint16_t* dst, size_t size) {
+    for (uint32_t i = 0; i < size; ++i) {
+        dst[i] = static_cast<uint16_t>(src[i]);
+        ALOGV("%s input: %f output: %hu ", __func__, src[i], dst[i]);
+    }
+}
+
 namespace {
 using time_point = std::chrono::steady_clock::time_point;
 auto now() { return std::chrono::steady_clock::now(); };
@@ -202,9 +216,12 @@ void asyncExecute(const Request& request, MeasureTiming measure, BasePreparedMod
             case OperandType::TENSOR_QUANT8_ASYMM:
             case OperandType::TENSOR_QUANT8_SYMM:
             case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL:
+            case OperandType::TENSOR_QUANT8_ASYMM_SIGNED:
                 actualLength /= 4;
                 break;
             case OperandType::TENSOR_FLOAT16:
+            case OperandType::TENSOR_QUANT16_SYMM:
+            case OperandType::TENSOR_QUANT16_ASYMM:
                 actualLength /= 2;
                 break;
             default:
@@ -252,12 +269,21 @@ void asyncExecute(const Request& request, MeasureTiming measure, BasePreparedMod
                 break;
             }
             case OperandType::TENSOR_QUANT8_SYMM:
-            case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL: {
+            case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL:
+            case OperandType::TENSOR_QUANT8_ASYMM_SIGNED: {
                 floatToint8(srcBlob->buffer().as<float*>(), (int8_t*)destPtr, srcBlob->size());
                 break;
             }
             case OperandType::TENSOR_FLOAT16: {
                 floatToFloat16(srcBlob->buffer().as<float*>(), (_Float16*)destPtr, srcBlob->size());
+                break;
+            }
+            case OperandType::TENSOR_QUANT16_SYMM: {
+                floatToInt16(srcBlob->buffer().as<float*>(), (int16_t*)destPtr, srcBlob->size());
+                break;
+            }
+            case OperandType::TENSOR_QUANT16_ASYMM: {
+                floatToUInt16(srcBlob->buffer().as<float*>(), (uint16_t*)destPtr, srcBlob->size());
                 break;
             }
             default:
@@ -360,9 +386,12 @@ static std::tuple<ErrorStatus, hidl_vec<V1_2::OutputShape>, Timing> executeSynch
             case OperandType::TENSOR_QUANT8_ASYMM:
             case OperandType::TENSOR_QUANT8_SYMM:
             case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL:
+            case OperandType::TENSOR_QUANT8_ASYMM_SIGNED:
                 actualLength /= 4;
                 break;
             case OperandType::TENSOR_FLOAT16:
+            case OperandType::TENSOR_QUANT16_SYMM:
+            case OperandType::TENSOR_QUANT16_ASYMM:
                 actualLength /= 2;
                 break;
             default:
@@ -408,12 +437,21 @@ static std::tuple<ErrorStatus, hidl_vec<V1_2::OutputShape>, Timing> executeSynch
                 break;
             }
             case OperandType::TENSOR_QUANT8_SYMM:
-            case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL: {
+            case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL:
+            case OperandType::TENSOR_QUANT8_ASYMM_SIGNED: {
                 floatToint8(srcBlob->buffer().as<float*>(), (int8_t*)destPtr, srcBlob->size());
                 break;
             }
             case OperandType::TENSOR_FLOAT16: {
                 floatToFloat16(srcBlob->buffer().as<float*>(), (_Float16*)destPtr, srcBlob->size());
+                break;
+            }
+            case OperandType::TENSOR_QUANT16_SYMM: {
+                floatToInt16(srcBlob->buffer().as<float*>(), (int16_t*)destPtr, srcBlob->size());
+                break;
+            }
+            case OperandType::TENSOR_QUANT16_ASYMM: {
+                floatToUInt16(srcBlob->buffer().as<float*>(), (uint16_t*)destPtr, srcBlob->size());
                 break;
             }
             default:
@@ -630,9 +668,12 @@ Return<void> BasePreparedModel::executeFenced(const V1_3::Request& request1_3,
             case OperandType::TENSOR_QUANT8_ASYMM:
             case OperandType::TENSOR_QUANT8_SYMM:
             case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL:
+            case OperandType::TENSOR_QUANT8_ASYMM_SIGNED:
                 actualLength /= 4;
                 break;
             case OperandType::TENSOR_FLOAT16:
+            case OperandType::TENSOR_QUANT16_SYMM:
+            case OperandType::TENSOR_QUANT16_ASYMM:
                 actualLength /= 2;
                 break;
             default:
@@ -665,12 +706,21 @@ Return<void> BasePreparedModel::executeFenced(const V1_3::Request& request1_3,
                 break;
             }
             case OperandType::TENSOR_QUANT8_SYMM:
-            case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL: {
+            case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL:
+            case OperandType::TENSOR_QUANT8_ASYMM_SIGNED: {
                 floatToint8(srcBlob->buffer().as<float*>(), (int8_t*)destPtr, srcBlob->size());
                 break;
             }
             case OperandType::TENSOR_FLOAT16: {
                 floatToFloat16(srcBlob->buffer().as<float*>(), (_Float16*)destPtr, srcBlob->size());
+                break;
+            }
+            case OperandType::TENSOR_QUANT16_SYMM: {
+                floatToInt16(srcBlob->buffer().as<float*>(), (int16_t*)destPtr, srcBlob->size());
+                break;
+            }
+            case OperandType::TENSOR_QUANT16_ASYMM: {
+                floatToUInt16(srcBlob->buffer().as<float*>(), (uint16_t*)destPtr, srcBlob->size());
                 break;
             }
             default:
