@@ -176,7 +176,8 @@ std::shared_ptr<ngraph::Node> Transpose_Conv_2D::createNode() {
             std::make_shared<ngraph::opset3::Multiply>(filterScalesNode, inputScalesNode);
         biasNode = std::make_shared<ngraph::opset3::Convert>(biasNode, ngraph::element::f32);
         biasNode = std::make_shared<ngraph::opset3::Multiply>(biasNode, biasScalMultiplier);
-    } else if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
+    } else if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM) ||
+               checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM_SIGNED)) {
         // for quant type inputs, bias is of type TENSOR_INT32. For TENSOR_INT32 type,
         // dequantization is not applied during node creation
         biasNode = DequantizeNode(biasNode, biasIndex, ngraph::element::f32);

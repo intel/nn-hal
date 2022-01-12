@@ -72,6 +72,16 @@ void OperationsBase::connectOperationToGraph() {
     if (op.type == OperandType::TENSOR_QUANT8_ASYMM) {
         outputNode = QuantizeNode(outputNode, mDefaultOutputIndex, ngraph::element::u8);
     }
+    if (op.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED ||
+        op.type == OperandType::TENSOR_QUANT8_SYMM) {
+        outputNode = QuantizeNode(outputNode, mDefaultOutputIndex, ngraph::element::i8);
+    }
+    if (op.type == OperandType::TENSOR_QUANT16_ASYMM) {
+        outputNode = QuantizeNode(outputNode, mDefaultOutputIndex, ngraph::element::u16);
+    }
+    if (op.type == OperandType::TENSOR_QUANT16_SYMM) {
+        outputNode = QuantizeNode(outputNode, mDefaultOutputIndex, ngraph::element::i16);
+    }
     if (op.lifetime == OperandLifeTime::SUBGRAPH_OUTPUT) {
         addResultNode(mDefaultOutputIndex, outputNode);
     }
@@ -156,7 +166,8 @@ std::shared_ptr<ngraph::Node> OperationsBase::QuantizeNode(std::shared_ptr<ngrap
     const auto operand = sModelInfo->getOperand(index);
     if (operand.type == OperandType::TENSOR_QUANT8_ASYMM)
         data = std::make_shared<ngraph::opset3::Clamp>(sum, 0, 255);
-    else if (operand.type == OperandType::TENSOR_QUANT8_SYMM)
+    else if (operand.type == OperandType::TENSOR_QUANT8_SYMM ||
+             operand.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED)
         data = std::make_shared<ngraph::opset3::Clamp>(sum, -128, 127);
     else if (operand.type == OperandType::TENSOR_QUANT16_SYMM)
         data = std::make_shared<ngraph::opset3::Clamp>(sum, -32768, 32767);
@@ -198,7 +209,8 @@ std::shared_ptr<ngraph::Node> OperationsBase::DequantizeNode(std::shared_ptr<ngr
             ngraph::element::f32, {}, convertToVector(sModelInfo->getOperandZeroPoint(index)));
 
         if (operand.type == OperandType::TENSOR_QUANT8_ASYMM ||
-            operand.type == OperandType::TENSOR_QUANT16_ASYMM)
+            operand.type == OperandType::TENSOR_QUANT16_ASYMM ||
+            operand.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED)
             input = std::make_shared<ngraph::opset3::Subtract>(input, zeroPointNode);
 
         auto mul = std::make_shared<ngraph::opset3::Multiply>(input, scaleNode);
