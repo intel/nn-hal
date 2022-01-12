@@ -88,7 +88,8 @@ protected:
                     break;
                 }
                 case OperandType::TENSOR_QUANT8_SYMM:
-                case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL: {
+                case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL:
+                case OperandType::TENSOR_QUANT8_ASYMM_SIGNED: {
                     elementType = ngraph::element::i8;
                     auto operandValues = sModelInfo->GetConstVecOperand<int8_t>(operandIndex);
                     input = createConstNode(elementType, toNgraphShape(operandDims), operandValues);
@@ -97,6 +98,18 @@ protected:
                 case OperandType::TENSOR_FLOAT16: {
                     elementType = ngraph::element::f16;
                     auto operandValues = sModelInfo->GetConstVecOperand<_Float16>(operandIndex);
+                    input = createConstNode(elementType, toNgraphShape(operandDims), operandValues);
+                    break;
+                }
+                case OperandType::TENSOR_QUANT16_SYMM: {
+                    elementType = ngraph::element::i16;
+                    auto operandValues = sModelInfo->GetConstVecOperand<int16_t>(operandIndex);
+                    input = createConstNode(elementType, toNgraphShape(operandDims), operandValues);
+                    break;
+                }
+                case OperandType::TENSOR_QUANT16_ASYMM: {
+                    elementType = ngraph::element::u16;
+                    auto operandValues = sModelInfo->GetConstVecOperand<uint16_t>(operandIndex);
                     input = createConstNode(elementType, toNgraphShape(operandDims), operandValues);
                     break;
                 }
@@ -113,7 +126,11 @@ protected:
 
         if (dequantize) {
             if (operandType == OperandType::TENSOR_QUANT8_ASYMM ||
-                operandType == OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL) {
+                operandType == OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL ||
+                operandType == OperandType::TENSOR_QUANT8_ASYMM_SIGNED ||
+                operandType == OperandType::TENSOR_QUANT8_SYMM ||
+                operandType == OperandType::TENSOR_QUANT16_SYMM ||
+                operandType == OperandType::TENSOR_QUANT16_ASYMM) {
                 input = DequantizeNode(input, operandIndex, ngraph::element::f32);
             }
         }

@@ -44,7 +44,8 @@ std::shared_ptr<ngraph::Node> Split::createNode() {
         } else if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_INT32)) {
             outNode =
                 std::make_shared<ngraph::opset3::Convert>(outputNode[i], ngraph::element::i32);
-        } else if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
+        } else if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM) ||
+                   checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM_SIGNED)) {
             outNode = std::make_shared<ngraph::opset3::Convert>(outputNode[i], ngraph::element::u8);
         }
 
