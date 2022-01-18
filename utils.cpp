@@ -348,7 +348,6 @@ size_t sizeOfTensor(const TensorDims& dims) {
 bool RunTimePoolInfo::set(const hidl_memory& hidlMemory) {
     this->hidlMemory = hidlMemory;
     buffer = nullptr;
-    AHardwareBuffer* hardwareBuffer = nullptr;
     auto memType = hidlMemory.name();
     if (memType == "ashmem") {
         memory = mapMemory(hidlMemory);
@@ -377,6 +376,7 @@ bool RunTimePoolInfo::set(const hidl_memory& hidlMemory) {
     }
 #if __ANDROID__
     else if (memType == "hardware_buffer_blob") {
+        AHardwareBuffer* hardwareBuffer = nullptr;
         auto handle = hidlMemory.handle();
         auto format = AHARDWAREBUFFER_FORMAT_BLOB;
         auto usage = AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN | AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN;
