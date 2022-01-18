@@ -13,6 +13,13 @@ Add::Add(int operationIndex) : OperationsBase(operationIndex) {
 
 bool Add::validate() {
     ALOGV("%s PASSED", __func__);
+
+    const auto& activationIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 1);
+    if (!sModelInfo->isOperandLifeTimeConst(activationIndex)) {
+        ALOGE("%s Only Constant supported for specifying Activation", __func__);
+        return false;
+    }
+
     return true;
 }
 

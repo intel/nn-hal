@@ -588,15 +588,6 @@ Return<void> BasePreparedModel::executeFenced(const V1_3::Request& request1_3,
         }
     }
 
-    // Update deadline if the timeout duration is closer than the deadline.
-    auto closestDeadline = deadline;
-    if (duration.getDiscriminator() != OptionalTimeoutDuration::hidl_discriminator::none) {
-        const auto timeoutDurationDeadline = makeDeadline(duration.nanoseconds());
-        if (!closestDeadline.has_value() || *closestDeadline > timeoutDurationDeadline) {
-            closestDeadline = timeoutDurationDeadline;
-        }
-    }
-
     auto errorStatus = mModelInfo->setRunTimePoolInfosFromHidlMemories(request1_3.pools);
     if (errorStatus != V1_3::ErrorStatus::NONE) {
         ALOGE("Failed to set runtime pool info from HIDL memories");
