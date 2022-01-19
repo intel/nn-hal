@@ -11,11 +11,6 @@ Split::Split(int operationIndex) : OperationsBase(operationIndex) {
     mDefaultOutputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
 }
 
-bool Split::validate() {
-    ALOGV("%s PASSED", __func__);
-    return true;
-}
-
 void Split::connectOperationToGraph() { createNode(); }
 
 std::shared_ptr<ngraph::Node> Split::createNode() {

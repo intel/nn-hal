@@ -10,7 +10,6 @@ namespace nnhal {
 class Maximum : public OperationsBase {
 public:
     Maximum(int operationIndex);
-    bool validate() override;
     std::shared_ptr<ngraph::Node> createNode() override;
 };
 

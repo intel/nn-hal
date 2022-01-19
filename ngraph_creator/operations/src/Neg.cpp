@@ -11,11 +11,6 @@ Neg::Neg(int operationIndex) : OperationsBase(operationIndex) {
     mDefaultOutputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
 }
 
-bool Neg::validate() {
-    ALOGV("%s PASSED", __func__);
-    return true;
-}
-
 std::shared_ptr<ngraph::Node> Neg::createNode() {
     // Creating input nodes
     std::shared_ptr<ngraph::Node> input;

@@ -10,7 +10,6 @@ namespace nnhal {
 class Split : public OperationsBase {
 public:
     Split(int operationIndex);
-    bool validate() override;
     std::shared_ptr<ngraph::Node> createNode() override;
     void connectOperationToGraph() override;
 };

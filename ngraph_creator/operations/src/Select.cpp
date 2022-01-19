@@ -11,11 +11,6 @@ Select::Select(int operationIndex) : OperationsBase(operationIndex) {
     mDefaultOutputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
 }
 
-bool Select::validate() {
-    ALOGV("%s PASSED", __func__);
-    return true;
-}
-
 std::shared_ptr<ngraph::Node> Select::createNode() {
     // Creating input nodes
     std::shared_ptr<ngraph::Node> input1, input2, input3;

@@ -10,7 +10,6 @@ namespace nnhal {
 class Minimum : public OperationsBase {
 public:
     Minimum(int operationIndex);
-    bool validate() override;
     std::shared_ptr<ngraph::Node> createNode() override;
 };
 

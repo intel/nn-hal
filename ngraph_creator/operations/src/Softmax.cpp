@@ -11,11 +11,6 @@ Softmax::Softmax(int operationIndex) : OperationsBase(operationIndex) {
     mDefaultOutputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
 }
 
-bool Softmax::validate() {
-    ALOGV("%s PASSED", __func__);
-    return true;
-}
-
 std::shared_ptr<ngraph::Node> Softmax::createNode() {
     // Creating input nodes
     std::shared_ptr<ngraph::Node> input, outputNode;

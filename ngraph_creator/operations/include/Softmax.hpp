@@ -10,7 +10,6 @@ namespace nnhal {
 class Softmax : public OperationsBase {
 public:
     Softmax(int operationIndex);
-    bool validate() override;
     std::shared_ptr<ngraph::Node> createNode() override;
 };
 

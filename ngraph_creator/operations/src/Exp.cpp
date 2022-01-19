@@ -11,11 +11,6 @@ Exp::Exp(int operationIndex) : OperationsBase(operationIndex) {
     mDefaultOutputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
 }
 
-bool Exp::validate() {
-    ALOGV("%s PASSED", __func__);
-    return true;
-}
-
 std::shared_ptr<ngraph::Node> Exp::createNode() {
     // Creating input nodes
     auto input = getInputNode(0);

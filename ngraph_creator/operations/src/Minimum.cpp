@@ -11,11 +11,6 @@ Minimum::Minimum(int operationIndex) : OperationsBase(operationIndex) {
     mDefaultOutputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
 }
 
-bool Minimum::validate() {
-    ALOGV("%s PASSED", __func__);
-    return true;
-}
-
 std::shared_ptr<ngraph::Node> Minimum::createNode() {
     // Creating input nodes
     std::shared_ptr<ngraph::Node> input1, input2;

@@ -10,7 +10,6 @@ namespace nnhal {
 class Abs : public OperationsBase {
 public:
     Abs(int operationIndex);
-    bool validate() override;
     std::shared_ptr<ngraph::Node> createNode() override;
 };
 

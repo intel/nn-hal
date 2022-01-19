@@ -11,11 +11,6 @@ Cast::Cast(int operationIndex) : OperationsBase(operationIndex) {
     mDefaultOutputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
 }
 
-bool Cast::validate() {
-    ALOGV("%s PASSED", __func__);
-    return true;
-}
-
 void Cast::connectOperationToGraph() { createNode(); }
 
 std::shared_ptr<ngraph::Node> Cast::createNode() {

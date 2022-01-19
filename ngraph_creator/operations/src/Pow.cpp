@@ -11,11 +11,6 @@ Pow::Pow(int operationIndex) : OperationsBase(operationIndex) {
     mDefaultOutputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
 }
 
-bool Pow::validate() {
-    ALOGV("%s PASSED", __func__);
-    return true;
-}
-
 std::shared_ptr<ngraph::Node> Pow::createNode() {
     // Creating input nodes
     auto base = getInputNode(0);

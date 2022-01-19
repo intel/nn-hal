@@ -13,11 +13,6 @@ RNN::RNN(int operationIndex) : OperationsBase(operationIndex) {
     mDefaultOutputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
 }
 
-bool RNN::validate() {
-    ALOGV("%s PASSED", __func__);
-    return true;
-}
-
 void RNN::connectOperationToGraph() { createNode(); }
 
 std::shared_ptr<ngraph::Node> RNN::createNode() {
