@@ -10,7 +10,6 @@ namespace nnhal {
 class Gather : public OperationsBase {
 public:
     Gather(int operationIndex);
-    bool validate() override;
     std::shared_ptr<ngraph::Node> createNode() override;
 };
 

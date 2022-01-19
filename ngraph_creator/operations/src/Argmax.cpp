@@ -11,11 +11,6 @@ Argmax::Argmax(int operationIndex) : OperationsBase(operationIndex) {
     mDefaultOutputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
 }
 
-bool Argmax::validate() {
-    ALOGV("%s PASSED", __func__);
-    return true;
-}
-
 std::shared_ptr<ngraph::Node> Argmax::createNode() {
     // Creating input nodes
     std::shared_ptr<ngraph::Node> input;

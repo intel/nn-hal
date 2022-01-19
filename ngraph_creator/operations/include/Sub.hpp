@@ -10,7 +10,6 @@ namespace nnhal {
 class Sub : public OperationsBase {
 public:
     Sub(int operationIndex);
-    bool validate() override;
     std::shared_ptr<ngraph::Node> createNode() override;
 };
 

@@ -11,11 +11,6 @@ Abs::Abs(int operationIndex) : OperationsBase(operationIndex) {
     mDefaultOutputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
 }
 
-bool Abs::validate() {
-    ALOGV("%s PASSED", __func__);
-    return true;
-}
-
 std::shared_ptr<ngraph::Node> Abs::createNode() {
     // Creating input nodes
     auto input = getInputNode(0);

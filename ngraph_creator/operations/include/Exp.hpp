@@ -10,7 +10,6 @@ namespace nnhal {
 class Exp : public OperationsBase {
 public:
     Exp(int operationIndex);
-    bool validate() override;
     std::shared_ptr<ngraph::Node> createNode() override;
 };
 

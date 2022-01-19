@@ -10,7 +10,6 @@ namespace nnhal {
 class Log : public OperationsBase {
 public:
     Log(int operationIndex);
-    bool validate() override;
     std::shared_ptr<ngraph::Node> createNode() override;
 };
 

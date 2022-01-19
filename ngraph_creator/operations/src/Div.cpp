@@ -11,11 +11,6 @@ Div::Div(int operationIndex) : OperationsBase(operationIndex) {
     mDefaultOutputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
 }
 
-bool Div::validate() {
-    ALOGV("%s PASSED", __func__);
-    return true;
-}
-
 std::shared_ptr<ngraph::Node> Div::createNode() {
     // Creating input nodes
     auto input1 = getInputNode(0);

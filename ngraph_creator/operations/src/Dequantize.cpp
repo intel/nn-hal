@@ -11,11 +11,6 @@ Dequantize::Dequantize(int operationIndex) : OperationsBase(operationIndex) {
     mDefaultOutputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
 }
 
-bool Dequantize::validate() {
-    ALOGV("%s PASSED", __func__);
-    return true;
-}
-
 std::shared_ptr<ngraph::Node> Dequantize::createNode() {
     // Creating input nodes
     std::shared_ptr<ngraph::Node> input, outputNode;

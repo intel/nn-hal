@@ -11,11 +11,6 @@ Maximum::Maximum(int operationIndex) : OperationsBase(operationIndex) {
     mDefaultOutputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
 }
 
-bool Maximum::validate() {
-    ALOGV("%s PASSED", __func__);
-    return true;
-}
-
 std::shared_ptr<ngraph::Node> Maximum::createNode() {
     // Creating input nodes
     std::shared_ptr<ngraph::Node> input1, input2;

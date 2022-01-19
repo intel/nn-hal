@@ -11,11 +11,6 @@ Quantize::Quantize(int operationIndex) : OperationsBase(operationIndex) {
     mDefaultOutputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
 }
 
-bool Quantize::validate() {
-    ALOGV("%s PASSED", __func__);
-    return true;
-}
-
 void Quantize::connectOperationToGraph() { createNode(); }
 
 std::shared_ptr<ngraph::Node> Quantize::createNode() {

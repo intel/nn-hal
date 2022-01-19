@@ -10,7 +10,6 @@ namespace nnhal {
 class Div : public OperationsBase {
 public:
     Div(int operationIndex);
-    bool validate() override;
     std::shared_ptr<ngraph::Node> createNode() override;
 };
 

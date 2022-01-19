@@ -10,7 +10,6 @@ namespace nnhal {
 class Neg : public OperationsBase {
 public:
     Neg(int operationIndex);
-    bool validate() override;
     std::shared_ptr<ngraph::Node> createNode() override;
 };
 

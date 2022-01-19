@@ -11,11 +11,6 @@ SQRT::SQRT(int operationIndex) : OperationsBase(operationIndex) {
     mDefaultOutputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
 }
 
-bool SQRT::validate() {
-    ALOGV("%s PASSED", __func__);
-    return true;
-}
-
 std::shared_ptr<ngraph::Node> SQRT::createNode() {
     // Creating input nodes
     auto input = getInputNode(0);

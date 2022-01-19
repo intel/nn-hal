@@ -10,7 +10,6 @@ namespace nnhal {
 class Select : public OperationsBase {
 public:
     Select(int operationIndex);
-    bool validate() override;
     std::shared_ptr<ngraph::Node> createNode() override;
 };
 

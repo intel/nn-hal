@@ -10,7 +10,6 @@ namespace nnhal {
 class Relu6 : public OperationsBase {
 public:
     Relu6(int operationIndex);
-    bool validate() override;
     std::shared_ptr<ngraph::Node> createNode() override;
 };
 

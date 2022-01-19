@@ -10,7 +10,6 @@ namespace nnhal {
 class SQRT : public OperationsBase {
 public:
     SQRT(int operationIndex);
-    bool validate() override;
     std::shared_ptr<ngraph::Node> createNode() override;
 };
 

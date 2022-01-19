@@ -10,7 +10,6 @@ namespace nnhal {
 class Tanh : public OperationsBase {
 public:
     Tanh(int operationIndex);
-    bool validate() override;
     std::shared_ptr<ngraph::Node> createNode() override;
 };
 

@@ -10,7 +10,6 @@ namespace nnhal {
 class Pow : public OperationsBase {
 public:
     Pow(int operationIndex);
-    bool validate() override;
     std::shared_ptr<ngraph::Node> createNode() override;
 };
 
