@@ -24,8 +24,9 @@ cc_library_shared {
     ],
 
     include_dirs: [
-        "frameworks/ml/nn/common/include",
-        "frameworks/ml/nn/runtime/include",
+        "packages/modules/NeuralNetworks/common/include",
+        "packages/modules/NeuralNetworks/common/types/include",
+        "packages/modules/NeuralNetworks/runtime/include",
         "frameworks/native/libs/nativewindow/include",
         "external/mesa3d/include/android_stub"
     ],
@@ -90,6 +91,7 @@ cc_library_shared {
         "libhidlmemory",
         "liblog",
         "libnativewindow",
+        "libtextclassifier_hash",
         "libutils",
         "libinference_engine",
         "libngraph",
@@ -122,8 +124,9 @@ cc_binary {
     srcs: ["service.cpp"],
 
     include_dirs: [
-        "frameworks/ml/nn/common/include",
-        "frameworks/ml/nn/runtime/include",
+        "packages/modules/NeuralNetworks/common/include",
+        "packages/modules/NeuralNetworks/common/types/include",
+        "packages/modules/NeuralNetworks/runtime/include",
         "frameworks/native/libs/nativewindow/include",
         "external/mesa3d/include/android_stub"
     ],
