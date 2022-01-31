@@ -10,7 +10,6 @@ namespace nnhal {
 class Floor : public OperationsBase {
 public:
     Floor(int operationIndex);
-    bool validate() override;
     std::shared_ptr<ngraph::Node> createNode() override;
 };
 

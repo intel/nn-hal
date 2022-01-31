@@ -1,5 +1,5 @@
-//#define LOG_NDEBUG 0
 #include <Softmax.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Softmax"
 
 namespace android {
@@ -11,28 +11,21 @@ Softmax::Softmax(int operationIndex) : OperationsBase(operationIndex) {
     mDefaultOutputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
 }
 
-bool Softmax::validate() {
-    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        return false;
-    }
-    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        return false;
-    }
-
-    ALOGV("%s PASSED", __func__);
-    return true;
-}
-
 std::shared_ptr<ngraph::Node> Softmax::createNode() {
     // Creating input nodes
     std::shared_ptr<ngraph::Node> input, outputNode;
 
     input = getInputNode(0);
 
-    float beta = sModelInfo->ParseOperationInput<float>(mNnapiOperationIndex, 1);
-    auto betaNode = createConstNode(ngraph::element::f32, {}, convertToVector(beta));
+    std::shared_ptr<ngraph::Node> betaNode;
+
+    if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT16)) {
+        auto beta = sModelInfo->ParseOperationInput<_Float16>(mNnapiOperationIndex, 1);
+        betaNode = createConstNode(ngraph::element::f16, {1}, convertToVector(beta));
+    } else {
+        auto beta = sModelInfo->ParseOperationInput<float>(mNnapiOperationIndex, 1);
+        betaNode = createConstNode(ngraph::element::f32, {1}, convertToVector(beta));
+    }
     int axis = -1;
     const auto& inputsSize = sModelInfo->getOperationInputsSize(mNnapiOperationIndex);
     if (inputsSize == 3) axis = sModelInfo->ParseOperationInput<int>(mNnapiOperationIndex, 2);
@@ -55,6 +48,7 @@ std::shared_ptr<ngraph::Node> Softmax::createNode() {
 
     return outputNode;
 }
+
 }  // namespace nnhal
 }  // namespace neuralnetworks
 }  // namespace hardware

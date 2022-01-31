@@ -10,7 +10,6 @@ namespace nnhal {
 class Sin : public OperationsBase {
 public:
     Sin(int operationIndex);
-    bool validate() override;
     std::shared_ptr<ngraph::Node> createNode() override;
 };
 

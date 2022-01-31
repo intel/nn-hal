@@ -25,6 +25,7 @@
 #include "ModelManager.h"
 #include "ValidateHal.h"
 
+#undef LOG_TAG
 #define LOG_TAG "Driver"
 
 namespace android {
@@ -125,7 +126,7 @@ Return<ErrorStatus> Driver::prepareModel(const V1_0_Model& model,
     }
     for (auto opn : model.operations) dumpOperation(opn);
 
-    if (!driverPreparedModel->initialize(convertToV1_3(model))) {
+    if (!driverPreparedModel->initialize()) {
         ALOGE("failed to initialize preparedmodel");
         callback->notify(ErrorStatus::INVALID_ARGUMENT, nullptr);
         return ErrorStatus::NONE;
@@ -180,7 +181,7 @@ Return<ErrorStatus> Driver::prepareModel_1_1(const V1_1_Model& model,
     }
     for (auto opn : model.operations) dumpOperation(opn);
 
-    if (!driverPreparedModel->initialize(convertToV1_3(model))) {
+    if (!driverPreparedModel->initialize()) {
         ALOGE("failed to initialize preparedmodel");
         callback->notify(ErrorStatus::INVALID_ARGUMENT, nullptr);
         return ErrorStatus::NONE;
@@ -285,7 +286,7 @@ Return<ErrorStatus> Driver::prepareModel_1_2(const V1_2_Model& model,
     }
     for (auto opn : model.operations) dumpOperation(opn);
 
-    if (!driverPreparedModel->initialize(convertToV1_3(model))) {
+    if (!driverPreparedModel->initialize()) {
         ALOGE("failed to initialize preparedmodel");
         callback->notify(ErrorStatus::INVALID_ARGUMENT, nullptr);
         return ErrorStatus::NONE;
@@ -411,7 +412,7 @@ Return<V1_3::ErrorStatus> Driver::prepareModel_1_3(
 
     // TODO: make asynchronous later
     sp<BasePreparedModel> driverPreparedModel = ModelFactory(mDeviceType, model);
-    if (!driverPreparedModel->initialize(model)) {
+    if (!driverPreparedModel->initialize()) {
         ALOGI("Failed to initialize prepared model");
         cb->notify_1_3(convertToV1_3(ErrorStatus::INVALID_ARGUMENT), nullptr);
         return V1_3::ErrorStatus::NONE;
@@ -423,7 +424,7 @@ Return<V1_3::ErrorStatus> Driver::prepareModel_1_3(
 }
 
 Return<V1_3::ErrorStatus> Driver::prepareModelFromCache_1_3(
-    const V1_3::OptionalTimePoint& timing,
+    const V1_3::OptionalTimePoint&,
     const android::hardware::hidl_vec<android::hardware::hidl_handle>&,
     const android::hardware::hidl_vec<android::hardware::hidl_handle>&, const HidlToken&,
     const sp<V1_3::IPreparedModelCallback>& callback) {
@@ -443,10 +444,8 @@ Return<V1_3::ErrorStatus> Driver::prepareModelFromCache_1_3(
     return V1_3::ErrorStatus::GENERAL_FAILURE;
 }
 
-Return<void> Driver::allocate(const V1_3::BufferDesc& desc,
-                              const hidl_vec<sp<V1_3::IPreparedModel>>& preparedModels,
-                              const hidl_vec<V1_3::BufferRole>& inputRoles,
-                              const hidl_vec<V1_3::BufferRole>& outputRoles,
+Return<void> Driver::allocate(const V1_3::BufferDesc&, const hidl_vec<sp<V1_3::IPreparedModel>>&,
+                              const hidl_vec<V1_3::BufferRole>&, const hidl_vec<V1_3::BufferRole>&,
                               V1_3::IDevice::allocate_cb cb) {
     ALOGV("Entering %s", __func__);
     cb(V1_3::ErrorStatus::GENERAL_FAILURE, nullptr, 0);

@@ -1,4 +1,5 @@
 #include <Mean.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Mean"
 
 namespace android {
@@ -11,19 +12,6 @@ Mean::Mean(int operationIndex) : OperationsBase(operationIndex) {
 }
 
 bool Mean::validate() {
-    // check output type
-    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        return false;
-    }
-
-    // Check all input types
-    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM))
-        return false;
-
-    if (!checkInputOperandType(1, (int32_t)OperandType::TENSOR_INT32)) return false;
-
     // TODO: Add Support for all_tensors_as_inputs
     const auto& axesOperandIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 1);
 

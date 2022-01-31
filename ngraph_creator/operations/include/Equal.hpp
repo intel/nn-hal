@@ -10,7 +10,6 @@ namespace nnhal {
 class Equal : public OperationsBase {
 public:
     Equal(int operationIndex);
-    bool validate() override;
     std::shared_ptr<ngraph::Node> createNode() override;
 };
 

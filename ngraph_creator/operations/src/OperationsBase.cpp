@@ -1,4 +1,5 @@
 #include <OperationsBase.hpp>
+#undef LOG_TAG
 #define LOG_TAG "OperationsBase"
 
 namespace android {
@@ -37,8 +38,23 @@ std::shared_ptr<ngraph::Node> OperationsBase::transpose(ConversionType type,
         case NCH_NHC:
             order = {0, 1, 2};
             break;
+        case CNH_NHC:
+            order = {1, 2, 0};
+            break;
+        case NHC_CNH:
+            order = {2, 0, 1};
+            break;
+        case BTS_TBS:
+            order = {1, 0, 2};
+            break;
+        case NHCW_NHWC:
+            order = {0, 1, 3, 2};
+            break;
         case NC_CN:
             order = {1, 0};
+            break;
+        default:
+            ALOGE("Invalid transpose operation !!");
             break;
     }
     const auto order_node =
@@ -55,6 +71,16 @@ void OperationsBase::connectOperationToGraph() {
     const auto op = sModelInfo->getOperand(mDefaultOutputIndex);
     if (op.type == OperandType::TENSOR_QUANT8_ASYMM) {
         outputNode = QuantizeNode(outputNode, mDefaultOutputIndex, ngraph::element::u8);
+    }
+    if (op.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED ||
+        op.type == OperandType::TENSOR_QUANT8_SYMM) {
+        outputNode = QuantizeNode(outputNode, mDefaultOutputIndex, ngraph::element::i8);
+    }
+    if (op.type == OperandType::TENSOR_QUANT16_ASYMM) {
+        outputNode = QuantizeNode(outputNode, mDefaultOutputIndex, ngraph::element::u16);
+    }
+    if (op.type == OperandType::TENSOR_QUANT16_SYMM) {
+        outputNode = QuantizeNode(outputNode, mDefaultOutputIndex, ngraph::element::i16);
     }
     if (op.lifetime == OperandLifeTime::SUBGRAPH_OUTPUT) {
         addResultNode(mDefaultOutputIndex, outputNode);
@@ -75,12 +101,7 @@ void OperationsBase::setNgraphNodes(std::shared_ptr<NgraphNodes> nodes) { mNgrap
 bool OperationsBase::validate() { return true; }
 
 bool OperationsBase::validateForPlugin() {
-    // Only validates default input(initialized to 0)
-    // All other validations to be done at each operation's validate
-    if (!isValidInputTensor(mDefaultInputIndex)) {
-        ALOGE("%s Invalid dimensions for input", __func__);
-        return false;
-    }
+    // Add any plugin specific validations
     return validate();
 }
 
@@ -141,7 +162,18 @@ std::shared_ptr<ngraph::Node> OperationsBase::QuantizeNode(std::shared_ptr<ngrap
     auto round = std::make_shared<ngraph::op::v5::Round>(div, mode);
     auto convertRound = std::make_shared<ngraph::opset3::Convert>(round, ngraph::element::i32);
     auto sum = std::make_shared<ngraph::opset3::Add>(convertRound, zeroPoint);
-    auto data = std::make_shared<ngraph::opset3::Clamp>(sum, 0, 255);
+    std::shared_ptr<ngraph::Node> data;
+    const auto operand = sModelInfo->getOperand(index);
+    if (operand.type == OperandType::TENSOR_QUANT8_ASYMM)
+        data = std::make_shared<ngraph::opset3::Clamp>(sum, 0, 255);
+    else if (operand.type == OperandType::TENSOR_QUANT8_SYMM ||
+             operand.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED)
+        data = std::make_shared<ngraph::opset3::Clamp>(sum, -128, 127);
+    else if (operand.type == OperandType::TENSOR_QUANT16_SYMM)
+        data = std::make_shared<ngraph::opset3::Clamp>(sum, -32768, 32767);
+    else if (operand.type == OperandType::TENSOR_QUANT16_ASYMM)
+        data = std::make_shared<ngraph::opset3::Clamp>(sum, 0, 65535);
+
     std::shared_ptr<ngraph::Node> outputNode;
     if (data->get_element_type() != quantizeType)
         outputNode = std::make_shared<ngraph::opset3::Convert>(data, quantizeType);
@@ -152,27 +184,41 @@ std::shared_ptr<ngraph::Node> OperationsBase::QuantizeNode(std::shared_ptr<ngrap
 }
 
 std::shared_ptr<ngraph::Node> OperationsBase::DequantizeNode(std::shared_ptr<ngraph::Node> input,
-                                                             size_t index,
+                                                             uint32_t index,
                                                              ngraph::element::Type dequantizeType) {
-    auto floatElementType = ngraph::element::f32;
-    auto intElementType = ngraph::element::i32;
-
-    float inputScale = sModelInfo->getOperandScale(index);
-    int inputZeroPoint = sModelInfo->getOperandZeroPoint(index);
-
-    auto scale = createConstNode(floatElementType, {}, convertToVector(inputScale));
-    auto zeroPoint = createConstNode(intElementType, {}, convertToVector(inputZeroPoint));
-
-    if (input->get_element_type() != ngraph::element::i32)
-        input = std::make_shared<ngraph::opset3::Convert>(input, intElementType);
-    auto diff = std::make_shared<ngraph::opset3::Subtract>(input, zeroPoint);
-    auto convertDiff = std::make_shared<ngraph::opset3::Convert>(diff, floatElementType);
-    auto mul = std::make_shared<ngraph::opset3::Multiply>(convertDiff, scale);
+    const auto operand = sModelInfo->getOperand(index);
     std::shared_ptr<ngraph::Node> outputNode;
-    if (mul->get_element_type() != dequantizeType)
-        outputNode = std::make_shared<ngraph::opset3::Convert>(mul, dequantizeType);
-    else
+
+    if (input->get_element_type() != ngraph::element::f32)
+        input = std::make_shared<ngraph::opset3::Convert>(input, ngraph::element::f32);
+
+    if (operand.type == OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL) {
+        vec<float> inputScales = operand.extraParams.channelQuant().scales;
+        auto channelDim = operand.extraParams.channelQuant().channelDim;
+        const auto inputRank = getInputOperandDimensions(0).size();
+
+        std::vector<size_t> shape(inputRank - channelDim, 1);
+        shape[0] = inputScales.size();
+
+        auto scaleNode = createConstNode(ngraph::element::f32, ngraph::Shape{shape}, inputScales);
+        outputNode = std::make_shared<ngraph::opset3::Multiply>(input, scaleNode);
+    } else {
+        auto scaleNode = createConstNode(ngraph::element::f32, {},
+                                         convertToVector(sModelInfo->getOperandScale(index)));
+        auto zeroPointNode = createConstNode(
+            ngraph::element::f32, {}, convertToVector(sModelInfo->getOperandZeroPoint(index)));
+
+        if (operand.type == OperandType::TENSOR_QUANT8_ASYMM ||
+            operand.type == OperandType::TENSOR_QUANT16_ASYMM ||
+            operand.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED)
+            input = std::make_shared<ngraph::opset3::Subtract>(input, zeroPointNode);
+
+        auto mul = std::make_shared<ngraph::opset3::Multiply>(input, scaleNode);
         outputNode = mul;
+    }
+
+    if (dequantizeType == ngraph::element::f16)
+        outputNode = std::make_shared<ngraph::opset3::Convert>(outputNode, dequantizeType);
 
     return outputNode;
 }

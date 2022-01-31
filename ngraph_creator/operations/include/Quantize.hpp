@@ -10,7 +10,6 @@ namespace nnhal {
 class Quantize : public OperationsBase {
 public:
     Quantize(int operationIndex);
-    bool validate() override;
     std::shared_ptr<ngraph::Node> createNode() override;
     void connectOperationToGraph() override;
 };

@@ -10,7 +10,6 @@ namespace nnhal {
 class Argmax : public OperationsBase {
 public:
     Argmax(int operationIndex);
-    bool validate() override;
     std::shared_ptr<ngraph::Node> createNode() override;
 };
 

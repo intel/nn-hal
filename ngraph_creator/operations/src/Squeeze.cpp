@@ -1,4 +1,5 @@
 #include <Squeeze.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Squeeze"
 
 namespace android {
@@ -11,16 +12,6 @@ Squeeze::Squeeze(int operationIndex) : OperationsBase(operationIndex) {
 }
 
 bool Squeeze::validate() {
-    // check output type
-    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM))
-        return false;
-
-    // Check all input types
-    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM))
-        return false;
-
     // TODO: Add Support for all_tensors_as_inputs
     const auto& dimsOperandIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 1);
 

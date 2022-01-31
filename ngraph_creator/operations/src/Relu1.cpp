@@ -1,4 +1,5 @@
 #include <Relu1.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Relu1"
 
 namespace android {
@@ -8,22 +9,6 @@ namespace nnhal {
 
 Relu1::Relu1(int operationIndex) : OperationsBase(operationIndex) {
     mDefaultOutputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
-}
-
-bool Relu1::validate() {
-    // check output type
-    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        return false;
-    }
-
-    // Check all input types
-    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        return false;
-    }
-
-    return true;
 }
 
 std::shared_ptr<ngraph::Node> Relu1::createNode() {

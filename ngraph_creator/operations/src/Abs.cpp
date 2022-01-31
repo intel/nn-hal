@@ -1,4 +1,5 @@
 #include <Abs.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Abs"
 
 namespace android {
@@ -8,20 +9,6 @@ namespace nnhal {
 
 Abs::Abs(int operationIndex) : OperationsBase(operationIndex) {
     mDefaultOutputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
-}
-
-bool Abs::validate() {
-    // check output type
-    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) {
-        return false;
-    }
-
-    // Check all input types
-    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) {
-        return false;
-    }
-
-    return true;
 }
 
 std::shared_ptr<ngraph::Node> Abs::createNode() {

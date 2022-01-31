@@ -8,6 +8,7 @@
 #include "ValidateHal.h"
 #include "utils.h"
 
+#undef LOG_TAG
 #define LOG_TAG "CpuPreparedModel"
 
 using namespace android::nn;
@@ -24,30 +25,30 @@ void CpuPreparedModel::deinitialize() {
     ALOGV("Exiting %s", __func__);
 }
 
-bool CpuPreparedModel::initialize(const Model& model) {
+bool CpuPreparedModel::initialize() {
     ALOGV("Entering %s", __func__);
     if (!mModelInfo->initRuntimeInfo()) {
         ALOGE("Failed to initialize Model runtime parameters!!");
         return false;
     }
-    mNgc = std::make_shared<NgraphNetworkCreator>(mModelInfo, mTargetDevice);
+    mNgraphNetCreator = std::make_shared<NgraphNetworkCreator>(mModelInfo, mTargetDevice);
 
-    if (!mNgc->validateOperations()) return false;
+    if (!mNgraphNetCreator->validateOperations()) return false;
     ALOGI("Generating IR Graph");
-    auto ngraph_function = mNgc->generateGraph();
+    auto ngraph_function = mNgraphNetCreator->generateGraph();
     if (ngraph_function == nullptr) {
         ALOGE("%s ngraph generation failed", __func__);
         return false;
     }
     try {
-        auto ngraph_net = std::make_shared<InferenceEngine::CNNNetwork>(ngraph_function);
+        cnnNetworkPtr = std::make_shared<InferenceEngine::CNNNetwork>(ngraph_function);
 #if __ANDROID__
-        ngraph_net->serialize("/data/vendor/neuralnetworks/ngraph_ir.xml",
-                              "/data/vendor/neuralnetworks/ngraph_ir.bin");
+        cnnNetworkPtr->serialize("/data/vendor/neuralnetworks/ngraph_ir.xml",
+                                 "/data/vendor/neuralnetworks/ngraph_ir.bin");
 #else
-        ngraph_net->serialize("/tmp/ngraph_ir.xml", "/tmp/ngraph_ir.bin");
+        cnnNetworkPtr->serialize("/tmp/ngraph_ir.xml", "/tmp/ngraph_ir.bin");
 #endif
-        mPlugin = std::make_shared<IENetwork>(ngraph_net);
+        mPlugin = std::make_shared<IENetwork>(cnnNetworkPtr);
         mPlugin->loadNetwork();
     } catch (const std::exception& ex) {
         ALOGE("%s Exception !!! %s", __func__, ex.what());
@@ -75,6 +76,8 @@ Return<void> CpuPreparedModel::configureExecutionBurst(
     }
     return Void();
 }
+
+#undef LOG_TAG
 
 }  // namespace nnhal
 }  // namespace neuralnetworks

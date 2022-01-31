@@ -1,4 +1,3 @@
-#define LOG_TAG "IENetwork"
 #include "IENetwork.h"
 #include "ie_common.h"
 
@@ -6,6 +5,9 @@
 #include <android/log.h>
 #include <ie_blob.h>
 #include <log/log.h>
+
+#undef LOG_TAG
+#define LOG_TAG "IENetwork"
 
 namespace android {
 namespace hardware {
@@ -30,23 +32,6 @@ bool IENetwork::loadNetwork() {
 
         mInputInfo = mNetwork->getInputsInfo();
         mOutputInfo = mNetwork->getOutputsInfo();
-
-        //#ifdef NN_DEBUG
-        for (auto input : mInputInfo) {
-            auto dims = input.second->getTensorDesc().getDims();
-            for (auto i : dims) {
-                ALOGI(" Dimes : %lu", i);
-            }
-            ALOGI("Name: %s ", input.first.c_str());
-        }
-        for (auto output : mOutputInfo) {
-            auto dims = output.second->getTensorDesc().getDims();
-            for (auto i : dims) {
-                ALOGI(" Dimes : %lu", i);
-            }
-            ALOGI("Name: %s ", output.first.c_str());
-        }
-        //#endif
     } else {
         ALOGE("Invalid Network pointer");
         return false;

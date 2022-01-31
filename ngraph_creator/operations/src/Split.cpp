@@ -1,4 +1,5 @@
 #include <Split.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Split"
 
 namespace android {
@@ -8,24 +9,6 @@ namespace nnhal {
 
 Split::Split(int operationIndex) : OperationsBase(operationIndex) {
     mDefaultOutputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
-}
-
-bool Split::validate() {
-    // check output type
-    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkOutputOperandType(0, (int32_t)OperandType::TENSOR_INT32) &&
-        !checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        return false;
-    }
-
-    // Check all input types
-    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkInputOperandType(0, (int32_t)OperandType::TENSOR_INT32) &&
-        !checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        return false;
-    }
-
-    return true;
 }
 
 void Split::connectOperationToGraph() { createNode(); }
@@ -50,10 +33,14 @@ std::shared_ptr<ngraph::Node> Split::createNode() {
         if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) {
             outNode =
                 std::make_shared<ngraph::opset3::Convert>(outputNode[i], ngraph::element::f32);
+        } else if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT16)) {
+            outNode =
+                std::make_shared<ngraph::opset3::Convert>(outputNode[i], ngraph::element::f16);
         } else if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_INT32)) {
             outNode =
                 std::make_shared<ngraph::opset3::Convert>(outputNode[i], ngraph::element::i32);
-        } else if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
+        } else if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM) ||
+                   checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM_SIGNED)) {
             outNode = std::make_shared<ngraph::opset3::Convert>(outputNode[i], ngraph::element::u8);
         }
 

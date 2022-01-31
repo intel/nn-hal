@@ -1,4 +1,5 @@
 #include <Minimum.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Minimum"
 
 namespace android {
@@ -8,29 +9,6 @@ namespace nnhal {
 
 Minimum::Minimum(int operationIndex) : OperationsBase(operationIndex) {
     mDefaultOutputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
-}
-
-bool Minimum::validate() {
-    // check output type
-    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkOutputOperandType(0, (int32_t)OperandType::TENSOR_INT32) &&
-        !checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        return false;
-    }
-
-    // Check all input types
-    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkInputOperandType(0, (int32_t)OperandType::TENSOR_INT32) &&
-        !checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        return false;
-    }
-    if (!checkInputOperandType(1, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkInputOperandType(1, (int32_t)OperandType::TENSOR_INT32) &&
-        !checkInputOperandType(1, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        return false;
-    }
-
-    return true;
 }
 
 std::shared_ptr<ngraph::Node> Minimum::createNode() {

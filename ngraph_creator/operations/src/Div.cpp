@@ -1,4 +1,5 @@
 #include <Div.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Div"
 
 namespace android {
@@ -8,20 +9,6 @@ namespace nnhal {
 
 Div::Div(int operationIndex) : OperationsBase(operationIndex) {
     mDefaultOutputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
-}
-
-bool Div::validate() {
-    // check output type
-    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) {
-        return false;
-    }
-
-    // Check all input types
-    for (int i = 0; i <= 1; i++) {
-        if (!checkInputOperandType(i, (int32_t)OperandType::TENSOR_FLOAT32)) return false;
-    }
-
-    return true;
 }
 
 std::shared_ptr<ngraph::Node> Div::createNode() {

@@ -30,6 +30,9 @@
 #include "ie_blob.h"
 #include "ie_common.h"
 
+#undef LOG_TAG
+#define LOG_TAG "Utils"
+
 #if __ANDROID__
 #include <hardware/hardware.h>
 #endif
@@ -103,6 +106,7 @@ enum PaddingScheme {
 
 #define WRONG_DIM (-1)
 
+#undef nnAssert
 #define nnAssert(v)                                                                            \
     do {                                                                                       \
         if (!(v)) {                                                                            \
@@ -173,7 +177,7 @@ struct RunTimePoolInfo {
 
 template <typename T>
 struct printHelper {
-    static void print(const T& value, const char* Obj) {}
+    static void print(const T&, const char*) {}
 };
 
 template <>

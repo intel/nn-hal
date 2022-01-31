@@ -1,4 +1,5 @@
 #include <Add.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Add"
 
 namespace android {
@@ -11,18 +12,7 @@ Add::Add(int operationIndex) : OperationsBase(operationIndex) {
 }
 
 bool Add::validate() {
-    // check output type
-    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        return false;
-    }
-
-    // Check all input types
-    for (int i = 0; i <= 1; i++) {
-        if (!checkInputOperandType(i, (int32_t)OperandType::TENSOR_FLOAT32) &&
-            !checkInputOperandType(i, (int32_t)OperandType::TENSOR_QUANT8_ASYMM))
-            return false;
-    }
+    ALOGV("%s PASSED", __func__);
 
     const auto& activationIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 1);
     if (!sModelInfo->isOperandLifeTimeConst(activationIndex)) {

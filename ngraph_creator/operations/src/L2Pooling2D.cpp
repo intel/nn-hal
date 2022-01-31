@@ -1,4 +1,5 @@
 #include <L2Pooling2D.hpp>
+#undef LOG_TAG
 #define LOG_TAG "L2Pooling2D"
 
 namespace android {
@@ -8,17 +9,6 @@ namespace nnhal {
 
 L2Pooling2D::L2Pooling2D(int operationIndex) : OperationsBase(operationIndex) {
     mDefaultOutputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
-}
-
-bool L2Pooling2D::validate() {
-    // check output type
-    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) {
-        ALOGE("L2Pooling2D operation supported only for Float32 inputs");
-        return false;
-    }
-
-    ALOGV("%s PASSED", __func__);
-    return true;
 }
 
 std::shared_ptr<ngraph::Node> L2Pooling2D::createNode() {

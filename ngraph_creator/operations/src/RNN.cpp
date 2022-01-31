@@ -1,6 +1,7 @@
 #include <RNN.hpp>
 // Helper funciton
 #include <NgraphHelper.hpp>
+#undef LOG_TAG
 #define LOG_TAG "RNN"
 
 namespace android {
@@ -10,24 +11,6 @@ namespace nnhal {
 
 RNN::RNN(int operationIndex) : OperationsBase(operationIndex) {
     mDefaultOutputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
-}
-
-bool RNN::validate() {
-    // check output type
-    for (int i = 0; i < 2; i++) {
-        if (!checkOutputOperandType(i, (int32_t)OperandType::TENSOR_FLOAT32)) {
-            return false;
-        }
-    }
-
-    // Check all input types
-    for (int i = 0; i < 5; i++) {
-        if (!checkInputOperandType(i, (int32_t)OperandType::TENSOR_FLOAT32)) {
-            return false;
-        }
-    }
-
-    return true;
 }
 
 void RNN::connectOperationToGraph() { createNode(); }
@@ -61,8 +44,12 @@ std::shared_ptr<ngraph::Node> RNN::createNode() {
         if (i == 1) {
             outNode = outputNode;
         } else {
+            // TODO: Implement properly
+            // Creating a dummy node with same size as outputNode, initialized to 0
+            // and then multiplying with outputNode so that it gets connected to the graph
             outNode = createConstNode(outputNode->get_element_type(), outputNode->get_shape(),
                                       convertToVector(0));
+            outNode = std::make_shared<ngraph::opset3::Multiply>(outNode, outputNode);
         }
 
         mNgraphNodes->setOutputAtOperandIndex(outputIndex, outNode);

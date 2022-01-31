@@ -1,5 +1,5 @@
-//#define LOG_NDEBUG 0
 #include <Argmin.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Argmin"
 
 namespace android {
@@ -9,19 +9,6 @@ namespace nnhal {
 
 Argmin::Argmin(int operationIndex) : OperationsBase(operationIndex) {
     mDefaultOutputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
-}
-
-bool Argmin::validate() {
-    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32) &&
-        !checkInputOperandType(0, (int32_t)OperandType::TENSOR_INT32) &&
-        !checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        return false;
-    }
-    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_INT32)) {
-        return false;
-    }
-    ALOGV("%s PASSED", __func__);
-    return true;
 }
 
 std::shared_ptr<ngraph::Node> Argmin::createNode() {
@@ -44,6 +31,7 @@ std::shared_ptr<ngraph::Node> Argmin::createNode() {
 
     return outputNode;
 }
+
 }  // namespace nnhal
 }  // namespace neuralnetworks
 }  // namespace hardware

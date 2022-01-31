@@ -10,6 +10,9 @@
 
 #include "ModelManager.h"
 
+#undef LOG_TAG
+#define LOG_TAG "OperationBase"
+
 namespace android {
 namespace hardware {
 namespace neuralnetworks {
@@ -26,6 +29,12 @@ protected:
         CWHN_NHWC,
         NHC_NCH,
         NCH_NHC,
+        CNH_NHC,
+        NCH_HNC,
+        HNC_NCH,
+        NHC_CNH,
+        BTS_TBS,
+        NHCW_NHWC,
         NC_CN
     };
     uint32_t mDefaultOutputIndex;
@@ -79,9 +88,28 @@ protected:
                     break;
                 }
                 case OperandType::TENSOR_QUANT8_SYMM:
-                case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL: {
+                case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL:
+                case OperandType::TENSOR_QUANT8_ASYMM_SIGNED: {
                     elementType = ngraph::element::i8;
                     auto operandValues = sModelInfo->GetConstVecOperand<int8_t>(operandIndex);
+                    input = createConstNode(elementType, toNgraphShape(operandDims), operandValues);
+                    break;
+                }
+                case OperandType::TENSOR_FLOAT16: {
+                    elementType = ngraph::element::f16;
+                    auto operandValues = sModelInfo->GetConstVecOperand<_Float16>(operandIndex);
+                    input = createConstNode(elementType, toNgraphShape(operandDims), operandValues);
+                    break;
+                }
+                case OperandType::TENSOR_QUANT16_SYMM: {
+                    elementType = ngraph::element::i16;
+                    auto operandValues = sModelInfo->GetConstVecOperand<int16_t>(operandIndex);
+                    input = createConstNode(elementType, toNgraphShape(operandDims), operandValues);
+                    break;
+                }
+                case OperandType::TENSOR_QUANT16_ASYMM: {
+                    elementType = ngraph::element::u16;
+                    auto operandValues = sModelInfo->GetConstVecOperand<uint16_t>(operandIndex);
                     input = createConstNode(elementType, toNgraphShape(operandDims), operandValues);
                     break;
                 }
@@ -96,8 +124,15 @@ protected:
             input = mNgraphNodes->getOperationOutput(operandIndex).get_node_shared_ptr();
         }
 
-        if (operandType == OperandType::TENSOR_QUANT8_ASYMM && dequantize) {
-            input = DequantizeNode(input, operandIndex, ngraph::element::f32);
+        if (dequantize) {
+            if (operandType == OperandType::TENSOR_QUANT8_ASYMM ||
+                operandType == OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL ||
+                operandType == OperandType::TENSOR_QUANT8_ASYMM_SIGNED ||
+                operandType == OperandType::TENSOR_QUANT8_SYMM ||
+                operandType == OperandType::TENSOR_QUANT16_SYMM ||
+                operandType == OperandType::TENSOR_QUANT16_ASYMM) {
+                input = DequantizeNode(input, operandIndex, ngraph::element::f32);
+            }
         }
 
         return input;
@@ -125,7 +160,8 @@ protected:
 
     std::shared_ptr<ngraph::Node> QuantizeNode(std::shared_ptr<ngraph::Node> input, size_t index,
                                                ngraph::element::Type quantizeType);
-    std::shared_ptr<ngraph::Node> DequantizeNode(std::shared_ptr<ngraph::Node> input, size_t index,
+    std::shared_ptr<ngraph::Node> DequantizeNode(std::shared_ptr<ngraph::Node> input,
+                                                 uint32_t index,
                                                  ngraph::element::Type dequantizeType);
 
     const Operand& getInputOperand(uint32_t index) {

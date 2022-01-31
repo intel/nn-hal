@@ -1,4 +1,5 @@
 #include <Quantize.hpp>
+#undef LOG_TAG
 #define LOG_TAG "Quantize"
 
 namespace android {
@@ -8,20 +9,6 @@ namespace nnhal {
 
 Quantize::Quantize(int operationIndex) : OperationsBase(operationIndex) {
     mDefaultOutputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
-}
-
-bool Quantize::validate() {
-    // check output type
-    if (!checkOutputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-        return false;
-    }
-
-    // Check all input types
-    if (!checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) {
-        return false;
-    }
-
-    return true;
 }
 
 void Quantize::connectOperationToGraph() { createNode(); }

@@ -10,7 +10,6 @@ namespace nnhal {
 class Argmin : public OperationsBase {
 public:
     Argmin(int operationIndex);
-    bool validate() override;
     std::shared_ptr<ngraph::Node> createNode() override;
 };
 

@@ -1,5 +1,5 @@
-//#define LOG_NDEBUG 0
 #include <NgraphNetworkCreator.hpp>
+#undef LOG_TAG
 #define LOG_TAG "NgraphNetworkCreator"
 
 namespace android {
@@ -37,6 +37,7 @@ bool NgraphNetworkCreator::createInputParams() {
         ALOGV("createInputParams operand %d dims.size(%zu)", i, dims.size());
         // keeping this condition to make VTS pass. Operation's optional input lifetime is supposed
         // to be "NO_VALUE"
+        // TODO: Remove these checks to support zero_sized input tensors
         if (dims.size() > 0) {
             if (dims[0] != 0) {
                 switch (nnapiOperand.type) {
@@ -69,8 +70,27 @@ bool NgraphNetworkCreator::createInputParams() {
                         break;
                     case OperandType::TENSOR_QUANT8_SYMM:
                     case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL:
+                    case OperandType::TENSOR_QUANT8_ASYMM_SIGNED:
                         inputParam = std::make_shared<ngraph::opset3::Parameter>(
                             ngraph::element::i8, ngraph::Shape(dims.begin(), dims.end()));
+                        ALOGV("createInputParams created inputIndex %d, type %d", i,
+                              nnapiOperand.type);
+                        break;
+                    case OperandType::TENSOR_FLOAT16:
+                        inputParam = std::make_shared<ngraph::opset3::Parameter>(
+                            ngraph::element::f16, ngraph::Shape(dims.begin(), dims.end()));
+                        ALOGV("createInputParams created inputIndex %d, type %d", i,
+                              nnapiOperand.type);
+                        break;
+                    case OperandType::TENSOR_QUANT16_SYMM:
+                        inputParam = std::make_shared<ngraph::opset3::Parameter>(
+                            ngraph::element::i16, ngraph::Shape(dims.begin(), dims.end()));
+                        ALOGV("createInputParams created inputIndex %d, type %d", i,
+                              nnapiOperand.type);
+                        break;
+                    case OperandType::TENSOR_QUANT16_ASYMM:
+                        inputParam = std::make_shared<ngraph::opset3::Parameter>(
+                            ngraph::element::u16, ngraph::Shape(dims.begin(), dims.end()));
                         ALOGV("createInputParams created inputIndex %d, type %d", i,
                               nnapiOperand.type);
                         break;

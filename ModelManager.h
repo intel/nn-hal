@@ -2,11 +2,16 @@
 #define ANDROID_ML_NN_MODELMANAGER_H
 
 #include <android/hidl/memory/1.0/IMemory.h>
+#include <android/log.h>
 #include <hidlmemory/mapping.h>
+#include <log/log.h>
 #include "ie_blob.h"
 
 #include "Driver.h"
 #include "utils.h"
+
+#undef LOG_TAG
+#define LOG_TAG "ModelManager"
 
 namespace android {
 namespace hardware {
@@ -121,9 +126,6 @@ public:
     }
 
     const uint8_t* GetOperandMemory(int index, uint32_t& lenOut);
-    IRBlob::Ptr GetConstOperandAsTensor(int operand_idx, int operation_idx);
-    Blob::Ptr GetInOutOperandAsBlob(RunTimeOperandInfo& op, const uint8_t* buf, uint32_t& len);
-    IRBlob::Ptr GetConstWeightsOperandAsTensor(uint32_t index);  // Redundant
 
     template <typename T>
     T ParseOperationInput(int operationIndex, uint32_t index) {
@@ -165,12 +167,14 @@ public:
     template <typename T>
     T GetConstFromBuffer(const uint8_t* buf, uint32_t len);
 
-    Blob::Ptr getBlobFromMemoryPoolIn(const Request& request, uint32_t index);
+    void* getBlobFromMemoryPoolIn(const Request& request, uint32_t index, uint32_t& rBufferLength);
     void* getBlobFromMemoryPoolOut(const Request& request, uint32_t index, uint32_t& rBufferLength);
 
     Model getModel() { return mModel; }
 
-    bool setRunTimePoolInfosFromHidlMemories(const hidl_vec<hidl_memory>& pools);
+    ErrorStatus setRunTimePoolInfosFromHidlMemories(const hidl_vec<hidl_memory>& pools);
+    V1_3::ErrorStatus setRunTimePoolInfosFromHidlMemories(
+        const hidl_vec<V1_3::Request::MemoryPool>& pools);
 
     bool updateRequestPoolInfos() {
         for (auto runtimeInfo : mRequestPoolInfos) {
