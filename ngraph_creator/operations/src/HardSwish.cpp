@@ -22,7 +22,6 @@ std::shared_ptr<ngraph::Node> HardSwish::createNode() {
     outputNode = std::make_shared<ngraph::op::v4::HSwish>(inputNode);
 
     return outputNode;
-
 }
 
 }  // namespace nnhal
