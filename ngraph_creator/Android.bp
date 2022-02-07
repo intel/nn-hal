@@ -16,6 +16,7 @@ cc_library_static {
         "operations/src/Argmin.cpp",
         "operations/src/AveragePool2D.cpp",
         "operations/src/BatchToSpace.cpp",
+        "operations/src/BidirectionalSequenceLSTM.cpp",
         "operations/src/BidirectionalSequenceRNN.cpp",
         "operations/src/Cast.cpp",
         "operations/src/ChannelShuffle.cpp",

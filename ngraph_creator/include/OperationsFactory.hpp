@@ -6,6 +6,7 @@
 #include <Argmin.hpp>
 #include <AveragePool2D.hpp>
 #include <BatchToSpace.hpp>
+#include <BidirectionalSequenceLSTM.hpp>
 #include <BidirectionalSequenceRNN.hpp>
 #include <Cast.hpp>
 #include <ChannelShuffle.hpp>

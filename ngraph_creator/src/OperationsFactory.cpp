@@ -30,6 +30,8 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<AveragePool2D>(operationIndex);
         case OperationType::BATCH_TO_SPACE_ND:
             return std::make_shared<BatchToSpace>(operationIndex);
+        case OperationType::BIDIRECTIONAL_SEQUENCE_LSTM:
+            return std::make_shared<BidirectionalSequenceLSTM>(operationIndex);
         case OperationType::BIDIRECTIONAL_SEQUENCE_RNN:
             return std::make_shared<BidirectionalSequenceRNN>(operationIndex);
         case OperationType::CAST:
