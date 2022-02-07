@@ -60,6 +60,7 @@ cc_library_static {
         "operations/src/Pow.cpp",
         "operations/src/PRelu.cpp",
         "operations/src/Quantize.cpp",
+        "operations/src/Quantized16BitLSTM.cpp",
         "operations/src/ReduceAll.cpp",
         "operations/src/ReduceAny.cpp",
         "operations/src/ReduceMax.cpp",

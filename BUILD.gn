@@ -122,6 +122,7 @@ shared_library("intel_nnhal") {
     "ngraph_creator/operations/src/Pow.cpp",
     "ngraph_creator/operations/src/PRelu.cpp",
     "ngraph_creator/operations/src/Quantize.cpp",
+    "ngraph_creator/operations/src/Quantized16BitLSTM.cpp",
     "ngraph_creator/operations/src/ReduceAll.cpp",
     "ngraph_creator/operations/src/ReduceAny.cpp",
     "ngraph_creator/operations/src/ReduceMax.cpp",

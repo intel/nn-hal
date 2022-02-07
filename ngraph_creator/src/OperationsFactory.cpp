@@ -118,6 +118,8 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<PRelu>(operationIndex);
         case OperationType::QUANTIZE:
             return std::make_shared<Quantize>(operationIndex);
+        case OperationType::QUANTIZED_16BIT_LSTM:
+            return std::make_shared<Quantized16BitLSTM>(operationIndex);
         case OperationType::REDUCE_ALL:
             return std::make_shared<ReduceAll>(operationIndex);
         case OperationType::REDUCE_ANY:

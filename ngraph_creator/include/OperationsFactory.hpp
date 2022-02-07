@@ -50,6 +50,7 @@
 #include <PadV2.hpp>
 #include <Pow.hpp>
 #include <Quantize.hpp>
+#include <Quantized16BitLSTM.hpp>
 #include <RNN.hpp>
 #include <ROIAlign.hpp>
 #include <ROIPooling.hpp>
