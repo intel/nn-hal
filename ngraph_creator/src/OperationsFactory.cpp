@@ -180,6 +180,8 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<TransposeConv2D>(operationIndex);
         case OperationType::TRANSPOSE:
             return std::make_shared<Transpose>(operationIndex);
+        case OperationType::UNIDIRECTIONAL_SEQUENCE_LSTM:
+            return std::make_shared<UnidirectionalSequenceLSTM>(operationIndex);
         case OperationType::UNIDIRECTIONAL_SEQUENCE_RNN:
             return std::make_shared<UnidirectionalSequenceRNN>(operationIndex);
         default:

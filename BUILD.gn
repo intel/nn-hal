@@ -153,6 +153,7 @@ shared_library("intel_nnhal") {
     "ngraph_creator/operations/src/TopkV2.cpp",
     "ngraph_creator/operations/src/TransposeConv2D.cpp",
     "ngraph_creator/operations/src/Transpose.cpp",
+    "ngraph_creator/operations/src/UnidirectionalSequenceLSTM.cpp",
     "ngraph_creator/operations/src/UnidirectionalSequenceRNN.cpp",
     "service.cpp",
     "Driver.cpp",

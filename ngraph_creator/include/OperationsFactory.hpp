@@ -81,6 +81,7 @@
 #include <TopkV2.hpp>
 #include <Transpose.hpp>
 #include <TransposeConv2D.hpp>
+#include <UnidirectionalSequenceLSTM.hpp>
 #include <UnidirectionalSequenceRNN.hpp>
 
 namespace android {
