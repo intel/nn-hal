@@ -75,8 +75,12 @@ std::shared_ptr<ngraph::Node> ROIAlign::createNode() {
 
     if (layout) useNchw = true;
 
-    if (!useNchw)  // No conversion needed if useNchw set
-        feat_maps = transpose(NHWC_NCHW, feat_maps);
+    if (!transposed_nchw) {
+        if (!useNchw) {  // No conversion needed if useNchw set
+            feat_maps = transpose(NHWC_NCHW, feat_maps);
+            transposed_nchw = true;
+        }
+    }
 
     float spatial_scale = 1.0 / (height_ratio);
     int sampling_ratio = sampling_pts_h;
@@ -85,7 +89,11 @@ std::shared_ptr<ngraph::Node> ROIAlign::createNode() {
         feat_maps, rois, batch_indices, output_height, output_width, sampling_ratio, spatial_scale,
         "avg");
 
-    if (!useNchw) outputNode = transpose(NCHW_NHWC, outputNode);
+    auto outputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
+    const auto outputOp = sModelInfo->getOperand(outputIndex);
+    if (!useNchw && (outputOp.lifetime == OperandLifeTime::SUBGRAPH_OUTPUT)) {
+        outputNode = transpose(NCHW_NHWC, outputNode);
+    }
 
     ALOGV("%s PASSED", __func__);
 

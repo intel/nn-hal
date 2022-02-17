@@ -54,13 +54,21 @@ std::shared_ptr<ngraph::Node> BatchToSpace::createNode() {
     const auto crop_begin = createConstNode(ngraph::element::i64, {shape.size()}, shape);
     const auto crop_end = createConstNode(ngraph::element::i64, {shape.size()}, shape);
 
-    if (!useNchw)  // No conversion needed if useNchw set
-        inputNode = transpose(NHWC_NCHW, inputNode);
+    if (!transposed_nchw) {
+        if (!useNchw) {  // No conversion needed if useNchw set
+            inputNode = transpose(NHWC_NCHW, inputNode);
+            transposed_nchw = true;
+        }
+    }
 
     std::shared_ptr<ngraph::Node> outputNode = std::make_shared<ngraph::opset3::BatchToSpace>(
         inputNode, block_shape_node, crop_begin, crop_end);
 
-    if (!useNchw) outputNode = transpose(NCHW_NHWC, outputNode);
+    auto outputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
+    const auto outputOp = sModelInfo->getOperand(outputIndex);
+    if (!useNchw && (outputOp.lifetime == OperandLifeTime::SUBGRAPH_OUTPUT)) {
+        outputNode = transpose(NCHW_NHWC, outputNode);
+    }
 
     return outputNode;
 }

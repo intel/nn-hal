@@ -196,6 +196,7 @@ public:
     // override connectOperationToGraph in case Operation has multiple outputs
     virtual void connectOperationToGraph();
     virtual ~OperationsBase() {}
+    bool transposed_nchw = false;
 };
 
 }  // namespace nnhal

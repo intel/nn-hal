@@ -59,8 +59,12 @@ std::shared_ptr<ngraph::Node> ResizeNearestNeighbor::createNode() {
         input_width = inputDimensions[2];
         input_height = inputDimensions[1];
     }
-
-    if (!useNchw) inputNode = transpose(NHWC_NCHW, inputNode);
+    if (!transposed_nchw) {
+        if (!useNchw) {
+            inputNode = transpose(NHWC_NCHW, inputNode);
+            transposed_nchw = true;
+        }
+    }
 
     attrs.shape_calculation_mode = ngraph::op::v4::Interpolate::ShapeCalcMode::sizes;
     // mode is passed as "nearest" for Nearest Neighbor interpolation
@@ -118,7 +122,9 @@ std::shared_ptr<ngraph::Node> ResizeNearestNeighbor::createNode() {
 
     outputNode = std::make_shared<ngraph::op::v4::Interpolate>(inputNode, outputShapeNode,
                                                                scaleNode, axesNode, attrs);
-    if (!useNchw) {
+    auto outputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
+    const auto outputOp = sModelInfo->getOperand(outputIndex);
+    if (!useNchw && (outputOp.lifetime == OperandLifeTime::SUBGRAPH_OUTPUT)) {
         outputNode = transpose(NCHW_NHWC, outputNode);
     }
     return outputNode;

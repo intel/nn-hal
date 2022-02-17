@@ -186,8 +186,11 @@ std::shared_ptr<ngraph::Node> TransposeConv2D::createNode() {
     // OpenVino expects filter in OIHW format
     filterNode = transpose(IHWO_OIHW, filterNode);
 
-    if (!useNchw) {  // No conversion needed if useNchw set
-        inputNode = transpose(NHWC_NCHW, inputNode);
+    if (!transposed_nchw) {
+        if (!useNchw) {  // No conversion needed if useNchw set
+            inputNode = transpose(NHWC_NCHW, inputNode);
+            transposed_nchw = true;
+        }
     }
 
     strides = {(size_t)stride_height, (size_t)stride_width};
@@ -218,7 +221,9 @@ std::shared_ptr<ngraph::Node> TransposeConv2D::createNode() {
         transposeConvNode, biasNode, ngraph::op::AutoBroadcastType::NUMPY);
     outputNode = applyActivation(outputNode, activationFn);
 
-    if (!useNchw) {
+    auto outputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
+    const auto outputOp = sModelInfo->getOperand(outputIndex);
+    if (!useNchw && (outputOp.lifetime == OperandLifeTime::SUBGRAPH_OUTPUT)) {
         outputNode = transpose(NCHW_NHWC, outputNode);
     }
 

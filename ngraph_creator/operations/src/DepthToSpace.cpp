@@ -25,15 +25,23 @@ std::shared_ptr<ngraph::Node> DepthToSpace::createNode() {
     input = getInputNode(0);
     auto block_size = sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 1);
 
-    if (!useNchw)  // No conversion needed if useNchw set
-        input = transpose(NHWC_NCHW, input);
+    if (!transposed_nchw) {
+        if (!useNchw) {  // No conversion needed if useNchw set
+            input = transpose(NHWC_NCHW, input);
+            transposed_nchw = true;
+        }
+    }
 
     std::shared_ptr<ngraph::Node> outputNode;
 
     outputNode = std::make_shared<ngraph::opset3::DepthToSpace>(
         input, ngraph::op::v0::DepthToSpace::DepthToSpaceMode::BLOCKS_FIRST, block_size);
 
-    if (!useNchw) outputNode = transpose(NCHW_NHWC, outputNode);
+    auto outputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
+    const auto outputOp = sModelInfo->getOperand(outputIndex);
+    if (!useNchw && (outputOp.lifetime == OperandLifeTime::SUBGRAPH_OUTPUT)) {
+        outputNode = transpose(NCHW_NHWC, outputNode);
+    }
 
     return outputNode;
 }
