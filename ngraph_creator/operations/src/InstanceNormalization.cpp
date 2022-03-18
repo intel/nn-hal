@@ -50,8 +50,12 @@ std::shared_ptr<ngraph::Node> InstanceNormalization::createNode() {
     auto layout = sModelInfo->ParseOperationInput<uint8_t>(mNnapiOperationIndex, 4);
     if (layout) useNchw = true;
 
-    if (!useNchw)  // No conversion needed if useNchw set
-        inputNode = transpose(NHWC_NCHW, inputNode);
+    if (!transposed_nchw) {
+        if (!useNchw) {  // No conversion needed if useNchw set
+            inputNode = transpose(NHWC_NCHW, inputNode);
+            transposed_nchw = true;
+        }
+    }
 
     // output[b, h, w, c] =   (input[b, h, w, c] - mean[b, c]) * gamma /
     //                                         sqrt(var[b, c] + epsilon) + beta
@@ -71,7 +75,11 @@ std::shared_ptr<ngraph::Node> InstanceNormalization::createNode() {
     std::shared_ptr<ngraph::Node> outputNode =
         std::make_shared<ngraph::opset3::Add>(mulGamma, betaNode);
 
-    if (!useNchw) outputNode = transpose(NCHW_NHWC, outputNode);
+    auto outputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
+    const auto outputOp = sModelInfo->getOperand(outputIndex);
+    if (!useNchw && (outputOp.lifetime == OperandLifeTime::SUBGRAPH_OUTPUT)) {
+        outputNode = transpose(NCHW_NHWC, outputNode);
+    }
     ALOGV("%s PASSED", __func__);
 
     return outputNode;

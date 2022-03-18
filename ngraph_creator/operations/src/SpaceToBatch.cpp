@@ -78,13 +78,21 @@ std::shared_ptr<ngraph::Node> SpaceToBatch::createNode() {
     if (inputsSize == 4) layout = sModelInfo->ParseOperationInput<uint8_t>(mNnapiOperationIndex, 3);
     if (layout) useNchw = true;
 
-    if (!useNchw)  // No conversion needed if useNchw set
-        inputNode = transpose(NHWC_NCHW, inputNode);
+    if (!transposed_nchw) {
+        if (!useNchw) {  // No conversion needed if useNchw set
+            inputNode = transpose(NHWC_NCHW, inputNode);
+            transposed_nchw = true;
+        }
+    }
 
     std::shared_ptr<ngraph::Node> outputNode = std::make_shared<ngraph::opset3::SpaceToBatch>(
         inputNode, block_shape_node, pad_begin, pad_end);
 
-    if (!useNchw) outputNode = transpose(NCHW_NHWC, outputNode);
+    auto outputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
+    const auto outputOp = sModelInfo->getOperand(outputIndex);
+    if (!useNchw && (outputOp.lifetime == OperandLifeTime::SUBGRAPH_OUTPUT)) {
+        outputNode = transpose(NCHW_NHWC, outputNode);
+    }
 
     return outputNode;
 }

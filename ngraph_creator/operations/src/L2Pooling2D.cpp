@@ -114,9 +114,12 @@ std::shared_ptr<ngraph::Node> L2Pooling2D::createNode() {
     inputNode = getInputNode(0);
     inputSquared = std::make_shared<ngraph::op::v1::Multiply>(inputNode, inputNode);
 
-    if (!useNchw) {
-        ALOGD("%s Forced NCHW conversion at operationIndex %d", __func__, mNnapiOperationIndex);
-        inputSquared = transpose(NHWC_NCHW, inputSquared);
+    if (!transposed_nchw) {
+        if (!useNchw) {
+            ALOGD("%s Forced NCHW conversion at operationIndex %d", __func__, mNnapiOperationIndex);
+            inputSquared = transpose(NHWC_NCHW, inputSquared);
+            transposed_nchw = true;
+        }
     }
 
     strides = {(size_t)stride_height, (size_t)stride_width};
@@ -132,7 +135,9 @@ std::shared_ptr<ngraph::Node> L2Pooling2D::createNode() {
 
     auto outputNode = applyActivation(sqrtOutput, activationFn);
 
-    if (!useNchw) {
+    auto outputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
+    const auto outputOp = sModelInfo->getOperand(outputIndex);
+    if (!useNchw && (outputOp.lifetime == OperandLifeTime::SUBGRAPH_OUTPUT)) {
         outputNode = transpose(NCHW_NHWC, outputNode);
     }
 

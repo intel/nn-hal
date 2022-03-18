@@ -115,8 +115,11 @@ std::shared_ptr<ngraph::Node> MaxPool2d::createNode() {
     std::shared_ptr<ngraph::Node> inputNode;
     inputNode = getInputNode(0);
 
-    if (!useNchw) {  // No conversion needed if useNchw set
-        inputNode = transpose(NHWC_NCHW, inputNode);
+    if (!transposed_nchw) {
+        if (!useNchw) {  // No conversion needed if useNchw set
+            inputNode = transpose(NHWC_NCHW, inputNode);
+            transposed_nchw = true;
+        }
     }
 
     strides = {(size_t)stride_height, (size_t)stride_width};
@@ -130,7 +133,9 @@ std::shared_ptr<ngraph::Node> MaxPool2d::createNode() {
 
     auto outputNode = applyActivation(maxpoolNode, activationFn);
 
-    if (!useNchw) {
+    auto outputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
+    const auto outputOp = sModelInfo->getOperand(outputIndex);
+    if (!useNchw && (outputOp.lifetime == OperandLifeTime::SUBGRAPH_OUTPUT)) {
         outputNode = transpose(NCHW_NHWC, outputNode);
     }
 

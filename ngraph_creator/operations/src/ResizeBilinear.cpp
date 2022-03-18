@@ -59,8 +59,12 @@ std::shared_ptr<ngraph::Node> ResizeBilinear::createNode() {
         input_width = inputDimensions[2];
         input_height = inputDimensions[1];
     }
-
-    if (!useNchw) inputNode = transpose(NHWC_NCHW, inputNode);
+    if (!transposed_nchw) {
+        if (!useNchw) {
+            inputNode = transpose(NHWC_NCHW, inputNode);
+            transposed_nchw = true;
+        }
+    }
     // FLOAT16 type check added for future when VPUX plugin support is added
     if (checkInputOperandType(1, (int32_t)OperandType::FLOAT32)) {
         // In tensorflow lite, resizing by size is supported. Scaling factors are
@@ -123,7 +127,9 @@ std::shared_ptr<ngraph::Node> ResizeBilinear::createNode() {
 
     outputNode = std::make_shared<ngraph::op::v4::Interpolate>(inputNode, outputShapeNode,
                                                                scaleNode, axesNode, attrs);
-    if (!useNchw) {
+    auto outputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
+    const auto outputOp = sModelInfo->getOperand(outputIndex);
+    if (!useNchw && (outputOp.lifetime == OperandLifeTime::SUBGRAPH_OUTPUT)) {
         outputNode = transpose(NCHW_NHWC, outputNode);
     }
     return outputNode;

@@ -64,8 +64,12 @@ std::shared_ptr<ngraph::Node> ROIPooling::createNode() {
 
     if (layout) useNchw = true;
 
-    if (!useNchw)  // No conversion needed if useNchw set
-        feat_maps = transpose(NHWC_NCHW, feat_maps);
+    if (!transposed_nchw) {
+        if (!useNchw) {  // No conversion needed if useNchw set
+            feat_maps = transpose(NHWC_NCHW, feat_maps);
+            transposed_nchw = true;
+        }
+    }
 
     auto output_size = ngraph::Shape{(size_t)output_height, (size_t)output_width};
     float spatial_scale = 1.0 / (height_ratio);
@@ -91,7 +95,11 @@ std::shared_ptr<ngraph::Node> ROIPooling::createNode() {
     std::shared_ptr<ngraph::Node> outputNode = std::make_shared<ngraph::opset3::ROIPooling>(
         feat_maps, roiNode, output_size, spatial_scale);
 
-    if (!useNchw) outputNode = transpose(NCHW_NHWC, outputNode);
+    auto outputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
+    const auto outputOp = sModelInfo->getOperand(outputIndex);
+    if (!useNchw && (outputOp.lifetime == OperandLifeTime::SUBGRAPH_OUTPUT)) {
+        outputNode = transpose(NCHW_NHWC, outputNode);
+    }
 
     ALOGV("%s PASSED", __func__);
 
