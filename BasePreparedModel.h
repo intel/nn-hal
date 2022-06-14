@@ -33,6 +33,7 @@
 #include "Driver.h"
 #include "IENetwork.h"
 #include "ModelManager.h"
+#include "DetectionClient.h"
 #include "utils.h"
 
 #if __ANDROID__
@@ -51,7 +52,8 @@ namespace nnhal {
 template <class T>
 using vec = std::vector<T>;
 typedef uint8_t* memory;
-
+extern bool mRemoteCheck;
+extern std::shared_ptr<DetectionClient> mDetectionClient;
 class BasePreparedModel : public V1_3::IPreparedModel {
 public:
     BasePreparedModel(const Model& model) : mTargetDevice(IntelDeviceType::CPU) {
@@ -89,6 +91,8 @@ public:
                                executeFenced_cb cb) override;
 
     virtual bool initialize();
+    virtual bool checkRemoteConnection();
+    virtual bool loadRemoteModel();
 
     std::shared_ptr<NnapiModelInfo> getModelInfo() { return mModelInfo; }
 

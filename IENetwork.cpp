@@ -1,10 +1,6 @@
 #include "IENetwork.h"
 #include "ie_common.h"
-
-#include <android-base/logging.h>
-#include <android/log.h>
 #include <ie_blob.h>
-#include <log/log.h>
 
 #undef LOG_TAG
 #define LOG_TAG "IENetwork"

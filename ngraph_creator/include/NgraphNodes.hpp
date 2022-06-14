@@ -35,6 +35,7 @@ public:
 
     const std::string& getNodeName(size_t index);
     void removeInputParameter(std::string name, size_t index);
+    std::vector<size_t> getOutputShape(size_t index);
 
     std::shared_ptr<ngraph::Function> generateGraph();
     // Setting the node name to empty string "". Caller of getNodeName should validate against "".

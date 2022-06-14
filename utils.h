@@ -252,6 +252,7 @@ T getOperandConstVal(const Model& model, const Operand& operand) {
 
 int sizeOfData(OperandType type, std::vector<uint32_t> dims);
 
+bool getGrpcIpPort(char *ip_port);
 void writeBufferToFile(std::string filename, const float* buf, size_t length);
 template <typename T, typename S>
 std::shared_ptr<T> As(const std::shared_ptr<S>& src) {

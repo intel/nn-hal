@@ -27,6 +27,7 @@ public:
     bool validateOperations();
 
     const std::string& getNodeName(uint32_t index);
+    std::vector<size_t> getOutputShape(uint32_t index);
 
     std::shared_ptr<ngraph::Function> generateGraph();
 };

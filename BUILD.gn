@@ -160,6 +160,7 @@ shared_library("intel_nnhal") {
     "ModelManager.cpp",
     "cpu/CpuPreparedModel.cpp",
     "BasePreparedModel.cpp",
+    "DetectionClient.cpp",
   ]
 
   include_dirs = [

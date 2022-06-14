@@ -9,6 +9,10 @@
 #include <vector>
 
 #include "utils.h"
+#include <android-base/logging.h>
+#include <android/log.h>
+#include <cutils/properties.h>
+#include <log/log.h>
 // #include "ie_blob.h"
 // #include "ie_common.h"
 // #include "ie_core.hpp"
@@ -56,6 +60,8 @@ public:
     InferenceEngine::InferRequest getInferRequest() { return mInferRequest; }
     void queryState() {}
     void infer();
+    bool getGrpcIpPort(char *ip_port);
+
 };
 
 }  // namespace nnhal

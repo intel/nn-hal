@@ -159,6 +159,11 @@ const std::string& NgraphNetworkCreator::getNodeName(uint32_t index) {
     return mNgraphNodes->getNodeName(index);
 }
 
+std::vector<size_t> NgraphNetworkCreator::getOutputShape(uint32_t index) {
+
+    ALOGV("get node %d outputsize ", __func__, index);
+    return mNgraphNodes->getOutputShape(index);
+}
 std::shared_ptr<ngraph::Function> NgraphNetworkCreator::generateGraph() {
     ALOGV("%s Called", __func__);
     std::shared_ptr<ngraph::Function> ret;

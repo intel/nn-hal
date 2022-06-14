@@ -9,6 +9,7 @@ cc_library_shared {
     srcs: [
         "Driver.cpp",
         "BasePreparedModel.cpp",
+        "DetectionClient.cpp",
         "utils.cpp",
         "IENetwork.cpp",
         "ModelManager.cpp",
@@ -28,7 +29,17 @@ cc_library_shared {
         "packages/modules/NeuralNetworks/common/types/include",
         "packages/modules/NeuralNetworks/runtime/include",
         "frameworks/native/libs/nativewindow/include",
-        "external/mesa3d/include/android_stub"
+        "external/mesa3d/include/android_stub",
+        "external/grpc-grpc",
+        "external/grpc-grpc/include",
+        "external/grpc-grpc/third_party/cares",
+        "external/grpc-grpc/third_party/cares/config_android",
+        "external/grpc-grpc/src/core/ext/filters/client_channel",
+        "external/grpc-grpc/third_party/nanopb",
+        "external/protobuf",
+        "external/protobuf/src",
+        "external/protobuf/config",
+        "external/protobuf/android"
     ],
 
     header_libs: [
@@ -95,7 +106,9 @@ cc_library_shared {
         "libutils",
         "libinference_engine",
         "libngraph",
-        "libMKLDNNPlugin"
+        "libMKLDNNPlugin",
+        "libgrpc++",
+        "libprotobuf-cpp-full"
     ],
 
     static_libs: [
@@ -104,12 +117,51 @@ cc_library_shared {
         "libngraph_creator",
     ],
 
+    generated_headers: [
+        "ObjectDetectionProtoStub_h",
+    ],
+    generated_sources: [
+        "ObjectDetectionProtoStub_cc",
+    ],
+
     defaults: [
         "neuralnetworks_defaults"
     ],
 
     vintf_fragments: ["android.hardware.neuralnetworks@1.3.xml"]
 
+}
+
+genrule {
+    name: "ObjectDetectionProtoStub_h",
+    tools: [
+        "aprotoc",
+        "protoc-gen-grpc-cpp-plugin",
+    ],
+    cmd: "$(location aprotoc) -I$$(dirname $(in)) -Iexternal/protobuf/src --plugin=protoc-gen-grpc=$(location protoc-gen-grpc-cpp-plugin) $(in) --grpc_out=$(genDir) --cpp_out=$(genDir)",
+    srcs: [
+        "proto/nnhal_object_detection.proto",
+    ],
+    out: [
+        "nnhal_object_detection.pb.h",
+        "nnhal_object_detection.grpc.pb.h",
+    ],
+}
+
+genrule {
+    name: "ObjectDetectionProtoStub_cc",
+    tools: [
+        "aprotoc",
+        "protoc-gen-grpc-cpp-plugin",
+    ],
+    cmd: "$(location aprotoc) -I$$(dirname $(in)) -Iexternal/protobuf/src --plugin=protoc-gen-grpc=$(location protoc-gen-grpc-cpp-plugin) $(in) --grpc_out=$(genDir) --cpp_out=$(genDir)",
+    srcs: [
+        "proto/nnhal_object_detection.proto",
+    ],
+    out: [
+        "nnhal_object_detection.pb.cc",
+        "nnhal_object_detection.grpc.pb.cc",
+    ],
 }
 
 //##############################################################

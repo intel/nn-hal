@@ -31,6 +31,7 @@ bool CpuPreparedModel::initialize() {
         ALOGE("Failed to initialize Model runtime parameters!!");
         return false;
     }
+    BasePreparedModel::checkRemoteConnection();
     mNgraphNetCreator = std::make_shared<NgraphNetworkCreator>(mModelInfo, mTargetDevice);
 
     if (!mNgraphNetCreator->validateOperations()) return false;
@@ -50,6 +51,12 @@ bool CpuPreparedModel::initialize() {
 #endif
         mPlugin = std::make_shared<IENetwork>(cnnNetworkPtr);
         mPlugin->loadNetwork();
+        if(mRemoteCheck) {
+            auto resp = loadRemoteModel();
+            ALOGD("%s Load Remote Model returns %d", __func__, resp);
+        } else {
+            ALOGI("%s Remote connection unavailable", __func__);
+        }
     } catch (const std::exception& ex) {
         ALOGE("%s Exception !!! %s", __func__, ex.what());
         return false;

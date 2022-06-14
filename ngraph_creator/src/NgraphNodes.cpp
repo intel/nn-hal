@@ -39,6 +39,13 @@ const std::string& NgraphNodes::getNodeName(size_t index) {
     ALOGV("%s index %zu, name %s", __func__, index, mNodeNames[index].c_str());
     return mNodeNames[index];
 }
+
+std::vector<size_t> NgraphNodes::getOutputShape(size_t index) {
+
+    ALOGD("outputshape of node %d index ", __func__, index);
+    return mOutputAtOperandIndex[index].get_node_shared_ptr()->get_output_shape(0);
+}
+
 // remove null input node parameter
 void NgraphNodes::removeInputParameter(std::string name, size_t index) {
     for (size_t i = 0; i < mInputParams.size(); i++) {
