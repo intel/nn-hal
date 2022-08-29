@@ -10,6 +10,7 @@ namespace nnhal {
 class ReduceMin : public OperationsBase {
 public:
     ReduceMin(int operationIndex);
+    bool validate() override;
     std::shared_ptr<ngraph::Node> createNode() override;
 };
 

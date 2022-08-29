@@ -10,6 +10,7 @@ namespace nnhal {
 class Logistic : public OperationsBase {
 public:
     Logistic(int operationIndex);
+    bool validate() override;
     std::shared_ptr<ngraph::Node> createNode() override;
 };
 

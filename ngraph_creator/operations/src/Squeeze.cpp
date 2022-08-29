@@ -12,16 +12,31 @@ Squeeze::Squeeze(int operationIndex) : OperationsBase(operationIndex) {
 }
 
 bool Squeeze::validate() {
-    // TODO: Add Support for all_tensors_as_inputs
-    const auto& dimsOperandIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 1);
+    const auto inputRank = getInputOperandDimensions(0).size();
+    if (inputRank > 4) return false;
 
-    // TODO: Support OmittedInput.
-    // The empty 2nd argument in Squeeze op causes dynamic output
-    // To add support, the dims will have to be calculated statically
-    if (sModelInfo->isOmittedInput(mNnapiOperationIndex, 1) ||
-        !sModelInfo->isOperandLifeTimeConst(dimsOperandIndex)) {
+    if ( !isValidInputTensor(0)) {
+         ALOGE("%s Empty  or Invalid dimensions size for input", __func__);
+         return false;
+    }
+    // TODO: Add Support for all_tensors_as_inputs
+    const auto& dimsOperandIndex1 = sModelInfo->getOperationInput(mNnapiOperationIndex, 0);
+
+    if (!sModelInfo->isOperandLifeTimeConst(dimsOperandIndex1)) {
         ALOGE("%s Only Constant dimensions supported now", __func__);
         return false;
+    }
+    const auto& inputsSize = sModelInfo->getOperationInputsSize(mNnapiOperationIndex);
+    if (inputsSize == 2) {
+        const auto& dimsOperandIndex2 = sModelInfo->getOperationInput(mNnapiOperationIndex, 1);
+        // TODO: Support OmittedInput.
+        // The empty 2nd argument in Squeeze op causes dynamic output
+        // To add support, the dims will have to be calculated statically
+        if (!isValidInputTensor(1) || !sModelInfo->isOperandLifeTimeConst(dimsOperandIndex2) ||
+        sModelInfo->isOmittedInput(mNnapiOperationIndex, 1) ) {
+            ALOGE("%s Invalid operand type or operand lifetime", __func__);
+            return false;
+        }
     }
 
     return true;

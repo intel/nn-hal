@@ -11,6 +11,22 @@ Relu::Relu(int operationIndex) : OperationsBase(operationIndex) {
     mDefaultOutputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
 }
 
+bool Relu::validate() {
+    if ( !isValidInputTensor(0)) {
+         ALOGE("%s Empty  or Invalid dimensions size for input", __func__);
+         return false;
+    }
+    //check operand lifetime
+    const auto& dimsOperandIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 0);
+    if(!sModelInfo->isOperandLifeTimeConst(dimsOperandIndex)) {
+        ALOGE("%s Only Const lifetime is supported", __func__);
+        return false;
+    }
+
+    ALOGV("%s PASSED", __func__);
+    return true;
+}
+
 std::shared_ptr<ngraph::Node> Relu::createNode() {
     // Creating input nodes
     std::shared_ptr<ngraph::Node> input;

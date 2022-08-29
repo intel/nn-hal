@@ -10,6 +10,7 @@ namespace nnhal {
 class Less : public OperationsBase {
 public:
     Less(int operationIndex);
+    bool validate() override;
     std::shared_ptr<ngraph::Node> createNode() override;
 };
 

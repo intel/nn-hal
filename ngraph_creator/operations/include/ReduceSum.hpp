@@ -10,6 +10,7 @@ namespace nnhal {
 class ReduceSum : public OperationsBase {
 public:
     ReduceSum(int operationIndex);
+    bool validate() override;
     std::shared_ptr<ngraph::Node> createNode() override;
 };
 

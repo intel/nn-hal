@@ -11,6 +11,7 @@ class Quantize : public OperationsBase {
 public:
     Quantize(int operationIndex);
     std::shared_ptr<ngraph::Node> createNode() override;
+    bool validate() override;
     void connectOperationToGraph() override;
 };
 

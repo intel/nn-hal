@@ -10,6 +10,7 @@ namespace nnhal {
 class L2Pooling2D : public OperationsBase {
 public:
     L2Pooling2D(int operationIndex);
+     bool validate() override;
     std::shared_ptr<ngraph::Node> createNode() override;
 };
 

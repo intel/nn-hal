@@ -22,7 +22,7 @@ bool TransposeConv2D::validate() {
               inputDimensionsSize, filterDimensionsSize);
         return false;
     }
-    if (!isValidInputTensor(0) || !isValidInputTensor(1)) {
+    if (!isValidInputTensor(0) || !isValidInputTensor(1) || !isValidInputTensor(2)) {
         ALOGE("%s Invalid dimensions for input or filter", __func__);
         return false;
     }
@@ -38,8 +38,16 @@ bool TransposeConv2D::validate() {
     // TODO: Issue from OV 2021.4, remove this check once CVS-61723 is resolved
     // Workaround to ignore VTS large input error test cases
     const auto& inputDimensions = getInputOperandDimensions(0);
+    const auto& filterDimensions = getInputOperandDimensions(1);
+    const auto& biasDimensions = getInputOperandDimensions(2);
 
-    if (inputDimensions[1] == 1 && inputDimensions[2] == 1 && inputDimensions[3] == 1) return false;
+    if (inputDimensions[1] == 1 && inputDimensions[2] == 1 && inputDimensions[3] == 1) {
+        return false;
+    }
+    //check if the bias dimension ==  filter depth_out && filter depth_in == input depth_in
+    if(filterDimensions[0] != biasDimensions[0] && biasDimensions[3] != inputDimensions[3]) {
+        return false;
+    }
 
     ALOGV("%s PASSED", __func__);
     return true;

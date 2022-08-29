@@ -18,6 +18,11 @@ bool AveragePool2D::validate() {
         ALOGE("%s Invalid dimensions size for input(%lu)", __func__, inputDimensionsSize);
         return false;
     }
+    //check Input are of valid dimension or not
+    if ( !isValidInputTensor(0)) {
+         ALOGE("%s Empty  or Invalid dimensions size for input", __func__);
+         return false;
+    }
 
     ALOGV("%s PASSED", __func__);
     return true;
