@@ -1,6 +1,4 @@
-#define LOG_TAG "GnaPreparedModel"
-
-#include "GnaPreparedModel.h"
+#include "VpuPreparedModel.h"
 #include <android-base/logging.h>
 #include <android/log.h>
 #include <log/log.h>
@@ -10,6 +8,9 @@
 #include "ValidateHal.h"
 #include "utils.h"
 
+#undef LOG_TAG
+#define LOG_TAG "VpuPreparedModel"
+
 using namespace android::nn;
 
 namespace android {
@@ -17,14 +18,14 @@ namespace hardware {
 namespace neuralnetworks {
 namespace nnhal {
 
-void GnaPreparedModel::deinitialize() {
+void VpuPreparedModel::deinitialize() {
     ALOGV("Entering %s", __func__);
     mModelInfo->unmapRuntimeMemPools();
 
     ALOGV("Exiting %s", __func__);
 }
 
-bool GnaPreparedModel::initialize() {
+bool VpuPreparedModel::initialize() {
     ALOGV("Entering %s", __func__);
     if (!mModelInfo->initRuntimeInfo()) {
         ALOGE("Failed to initialize Model runtime parameters!!");
@@ -53,7 +54,7 @@ bool GnaPreparedModel::initialize() {
     return true;
 }
 
-Return<void> GnaPreparedModel::configureExecutionBurst(
+Return<void> VpuPreparedModel::configureExecutionBurst(
     const sp<V1_2::IBurstCallback>& callback,
     const MQDescriptorSync<V1_2::FmqRequestDatum>& requestChannel,
     const MQDescriptorSync<V1_2::FmqResultDatum>& resultChannel, configureExecutionBurst_cb cb) {

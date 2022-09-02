@@ -43,10 +43,7 @@ using ::android::hardware::MQDescriptorSync;
 using ::android::hidl::memory::V1_0::IMemory;
 using namespace InferenceEngine;
 
-namespace android {
-namespace hardware {
-namespace neuralnetworks {
-namespace nnhal {
+namespace android::hardware::neuralnetworks::nnhal {
 
 template <class T>
 using vec = std::vector<T>;
@@ -54,9 +51,6 @@ typedef uint8_t* memory;
 
 class BasePreparedModel : public V1_3::IPreparedModel {
 public:
-    BasePreparedModel(const Model& model) : mTargetDevice(IntelDeviceType::CPU) {
-        mModelInfo = std::make_shared<NnapiModelInfo>(model);
-    }
     BasePreparedModel(const IntelDeviceType device, const Model& model) : mTargetDevice(device) {
         mModelInfo = std::make_shared<NnapiModelInfo>(model);
     }
@@ -125,9 +119,6 @@ private:
     const V1_3::ErrorStatus kErrorStatus;
 };
 
-}  // namespace nnhal
-}  // namespace neuralnetworks
-}  // namespace hardware
-}  // namespace android
+}  // namespace android::hardware::neuralnetworks::nnhal
 
 #endif  // ANDROID_ML_NN_PREPAREDMODEL_H

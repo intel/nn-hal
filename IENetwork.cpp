@@ -9,10 +9,7 @@
 #undef LOG_TAG
 #define LOG_TAG "IENetwork"
 
-namespace android {
-namespace hardware {
-namespace neuralnetworks {
-namespace nnhal {
+namespace android::hardware::neuralnetworks::nnhal {
 
 bool IENetwork::loadNetwork() {
     ALOGD("%s", __func__);
@@ -23,9 +20,23 @@ bool IENetwork::loadNetwork() {
     InferenceEngine::Core ie(std::string("/usr/local/lib64/plugins.xml"));
 #endif
     std::map<std::string, std::string> config;
+    std::string deviceStr;
+    switch (mTargetDevice) {
+        case IntelDeviceType::GNA:
+            deviceStr = "GNA";
+            break;
+        case IntelDeviceType::VPU:
+            deviceStr = "VPUX";
+            break;
+        case IntelDeviceType::CPU:
+        default:
+            deviceStr = "CPU";
+            break;
+    }
 
+    ALOGD("Creating infer request for Intel Device Type : %s", deviceStr.c_str());
     if (mNetwork) {
-        mExecutableNw = ie.LoadNetwork(*mNetwork, "CPU");
+        mExecutableNw = ie.LoadNetwork(*mNetwork, deviceStr);
         ALOGD("LoadNetwork is done....");
         mInferRequest = mExecutableNw.CreateInferRequest();
         ALOGD("CreateInfereRequest is done....");
@@ -75,7 +86,4 @@ void IENetwork::infer() {
     ALOGI("infer request completed");
 }
 
-}  // namespace nnhal
-}  // namespace neuralnetworks
-}  // namespace hardware
-}  // namespace android
+}  // namespace android::hardware::neuralnetworks::nnhal

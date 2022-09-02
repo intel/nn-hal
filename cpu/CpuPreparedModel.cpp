@@ -48,7 +48,7 @@ bool CpuPreparedModel::initialize() {
 #else
         cnnNetworkPtr->serialize("/tmp/ngraph_ir.xml", "/tmp/ngraph_ir.bin");
 #endif
-        mPlugin = std::make_shared<IENetwork>(cnnNetworkPtr);
+        mPlugin = std::make_shared<IENetwork>(mTargetDevice, cnnNetworkPtr);
         mPlugin->loadNetwork();
     } catch (const std::exception& ex) {
         ALOGE("%s Exception !!! %s", __func__, ex.what());

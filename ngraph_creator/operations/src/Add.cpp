@@ -42,6 +42,7 @@ std::shared_ptr<ngraph::Node> Add::createNode() {
 }
 
 std::shared_ptr<ngraph::Node> Add::createNodeForPlugin() {
+#if 0
     if (sPluginType == IntelDeviceType::VPU) {
         auto input = mNgraphNodes->getOperationOutput(
             sModelInfo->getOperationInput(mNnapiOperationIndex, 0));
@@ -53,6 +54,8 @@ std::shared_ptr<ngraph::Node> Add::createNodeForPlugin() {
     } else {
         return createNode();
     }
+#endif
+    return createNode();
 }
 
 }  // namespace nnhal

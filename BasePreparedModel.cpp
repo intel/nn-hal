@@ -15,23 +15,20 @@
  */
 #include "BasePreparedModel.h"
 
+#include <LegacyHalUtils.h>
 #include <android-base/logging.h>
 #include <android/log.h>
 #include <cutils/properties.h>
 #include <log/log.h>
 #include <thread>
 #include "ExecutionBurstServer.h"
-#include "Utils.h"
 #include "ValidateHal.h"
 
 #undef LOG_TAG
 #define DISABLE_ALL_QUANT
 #define LOG_TAG "BasePreparedModel"
 
-namespace android {
-namespace hardware {
-namespace neuralnetworks {
-namespace nnhal {
+namespace android::hardware::neuralnetworks::nnhal {
 
 using namespace android::nn;
 
@@ -745,7 +742,4 @@ Return<void> BasePreparedModel::executeFenced(const V1_3::Request& request1_3,
     return Void();
 }
 
-}  // namespace nnhal
-}  // namespace neuralnetworks
-}  // namespace hardware
-}  // namespace android
+}  // namespace android::hardware::neuralnetworks::nnhal
