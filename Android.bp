@@ -104,7 +104,9 @@ cc_library_shared {
 
     defaults: [
         "neuralnetworks_defaults"
-    ]
+    ],
+
+    vintf_fragments: ["android.hardware.neuralnetworks@1.3.xml"]
 
 }
 
