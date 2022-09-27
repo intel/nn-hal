@@ -11,6 +11,30 @@ DepthToSpace::DepthToSpace(int operationIndex) : OperationsBase(operationIndex) 
     mDefaultOutputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
 }
 
+bool DepthToSpace::validate() {
+    // Check input rank
+    const auto inputRank = getInputOperandDimensions(0).size();
+
+    if (inputRank != 4) {
+        ALOGE("%s Invalid dimension of rank %d", __func__, inputRank);
+        return false;
+    }
+
+    if ( !isValidInputTensor(0)) {
+         ALOGE("%s Empty  or Invalid dimensions size for input", __func__);
+         return false;
+    }
+
+    auto block_size = sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 1);
+    if(block_size < 1) {
+        ALOGE("%s Invalid block size %d", __func__, block_size);
+        return false;
+    }
+
+    ALOGV("%s PASSED", __func__);
+    return true;
+}
+
 std::shared_ptr<ngraph::Node> DepthToSpace::createNode() {
     // Creating input nodes
     std::shared_ptr<ngraph::Node> input;

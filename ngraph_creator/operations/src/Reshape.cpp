@@ -12,12 +12,17 @@ Reshape::Reshape(int operationIndex) : OperationsBase(operationIndex) {
 }
 
 bool Reshape::validate() {
-    const auto& dimsOperandIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 1);
-    if (!sModelInfo->isOperandLifeTimeConst(dimsOperandIndex) || !isValidInputTensor(1)) {
-        // TODO: Support CPU_reshape_all_tensors_as_inputs
-        ALOGE("%s Only Constant non-zero dimensions supported now", __func__);
+    const auto inputRank = getInputOperandDimensions(0).size();
+    if (!isValidInputTensor(0)) {
+        ALOGE("%s Empty  or Invalid dimensions size for input", __func__);
         return false;
     }
+
+    if (inputRank > 4) {
+         ALOGE("%s Invalid dimensions size for input", __func__);
+         return false;
+    }
+
     ALOGV("%s PASSED", __func__);
     return true;
 }

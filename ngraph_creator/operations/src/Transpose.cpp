@@ -20,11 +20,6 @@ bool Transpose::validate() {
          return false;
     }
 
-    if(!sModelInfo->isOperandLifeTimeConst(dimsOperandIndex1)) {
-        ALOGE("%s Only Const lifetime is supported", __func__);
-        return false;
-    }
-
     const auto& inputsSize = sModelInfo->getOperationInputsSize(mNnapiOperationIndex);
     if (inputsSize == 2) {
         const auto& dimsOperandIndex2 = sModelInfo->getOperationInput(mNnapiOperationIndex, 1);

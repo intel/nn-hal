@@ -38,12 +38,12 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<ChannelShuffle>(operationIndex);
         case OperationType::CONCATENATION:
             return std::make_shared<Concat>(operationIndex);
-        // case OperationType::CONV_2D:
-        //     return std::make_shared<Conv2d>(operationIndex);
+        case OperationType::CONV_2D:
+            return std::make_shared<Conv2d>(operationIndex);
         case OperationType::DEPTH_TO_SPACE:
             return std::make_shared<DepthToSpace>(operationIndex);
-        // case OperationType::DEPTHWISE_CONV_2D:
-        //     return std::make_shared<DepthwiseConv2d>(operationIndex);
+        case OperationType::DEPTHWISE_CONV_2D:
+            return std::make_shared<DepthwiseConv2d>(operationIndex);
         case OperationType::DEQUANTIZE:
             return std::make_shared<Dequantize>(operationIndex);
         case OperationType::DIV:
@@ -94,8 +94,8 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<Logistic>(operationIndex);
         case OperationType::MAXIMUM:
             return std::make_shared<Maximum>(operationIndex);
-        // case OperationType::MAX_POOL_2D:
-        //     return std::make_shared<MaxPool2d>(operationIndex);
+        case OperationType::MAX_POOL_2D:
+            return std::make_shared<MaxPool2d>(operationIndex);
         case OperationType::MEAN:
             return std::make_shared<Mean>(operationIndex);
         case OperationType::MINIMUM:

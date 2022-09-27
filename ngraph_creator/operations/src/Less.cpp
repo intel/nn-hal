@@ -20,12 +20,6 @@ bool Less::validate() {
          ALOGE("%s Empty  or Invalid dimensions size for input", __func__);
          return false;
     }
-    //check operand lifetime
-    if(!sModelInfo->isOperandLifeTimeConst(operandIndex1) ||
-        !sModelInfo->isOperandLifeTimeConst(operandIndex2)) {
-        ALOGE("%s Only Const lifetime is supported", __func__);
-        return false;
-    }
 
     // check if both tensors are of same type
     if(elementType1 != elementType2 ) {

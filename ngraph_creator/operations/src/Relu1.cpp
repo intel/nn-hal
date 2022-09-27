@@ -16,12 +16,6 @@ bool Relu1::validate() {
          ALOGE("%s Empty  or Invalid dimensions size for input", __func__);
          return false;
     }
-    //check operand lifetime
-    const auto& dimsOperandIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 0);
-    if(!sModelInfo->isOperandLifeTimeConst(dimsOperandIndex)) {
-        ALOGE("%s Only Const lifetime is supported", __func__);
-        return false;
-    }
 
     ALOGV("%s PASSED", __func__);
     return true;

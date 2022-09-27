@@ -12,8 +12,6 @@ Mul::Mul(int operationIndex) : OperationsBase(operationIndex) {
 }
 
 bool Mul::validate() {
-    const auto inputRank1 = getInputOperandDimensions(0).size();
-    const auto inputRank2 = getInputOperandDimensions(1).size();
     auto operandIndex1 = sModelInfo->getOperationInput(mNnapiOperationIndex, 0);
     auto operandIndex2 = sModelInfo->getOperationInput(mNnapiOperationIndex, 1);
     const auto& elementType1 = sModelInfo->getOperandType(operandIndex1);
@@ -22,15 +20,6 @@ bool Mul::validate() {
     if ( !isValidInputTensor(0) || !isValidInputTensor(1) ) {
          ALOGE("%s Empty  or Invalid dimensions size for input", __func__);
          return false;
-    }
-
-    //check operand lifetime
-    const auto& operandIndex3 = sModelInfo->getOperationInput(mNnapiOperationIndex, 2);
-    if(!sModelInfo->isOperandLifeTimeConst(operandIndex1) ||
-        !sModelInfo->isOperandLifeTimeConst(operandIndex2) ||
-        !sModelInfo->isOperandLifeTimeConst(operandIndex3)) {
-        ALOGE("%s Only Const lifetime is supported", __func__);
-        return false;
     }
 
     if(elementType1 != elementType2 ) {

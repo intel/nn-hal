@@ -10,6 +10,7 @@ namespace nnhal {
 class DepthToSpace : public OperationsBase {
 public:
     DepthToSpace(int operationIndex);
+    bool validate() override;
     std::shared_ptr<ngraph::Node> createNode() override;
 };
 

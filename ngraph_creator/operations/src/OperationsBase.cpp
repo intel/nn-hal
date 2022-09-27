@@ -109,7 +109,7 @@ bool OperationsBase::checkOperandType(uint32_t operandIndex, const int32_t expec
                                       const std::string& strLogInfo) {
     const auto operandType = (int32_t)sModelInfo->getOperandType(operandIndex);
     if (operandType != expectedOperandType) {
-        ALOGE("OperationIndex %d %s Index %d type %d invalid", mNnapiOperationIndex,
+        ALOGV("OperationIndex %d %s Index %d type %d invalid", mNnapiOperationIndex,
               strLogInfo.c_str(), operandIndex, operandType);
         return false;
     }
