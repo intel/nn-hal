@@ -11,14 +11,14 @@ Logistic::Logistic(int operationIndex) : OperationsBase(operationIndex) {
     mDefaultOutputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
 }
 
-std::shared_ptr<ngraph::Node> Logistic::createNode() {
+std::shared_ptr<ov::Node> Logistic::createNode() {
     // Creating input nodes
-    std::shared_ptr<ngraph::Node> input;
+    std::shared_ptr<ov::Node> input;
 
     input = getInputNode(0);
 
-    std::shared_ptr<ngraph::Node> outputNode;
-    outputNode = std::make_shared<ngraph::opset3::Sigmoid>(input);
+    std::shared_ptr<ov::Node> outputNode;
+    outputNode = std::make_shared<ov::opset3::Sigmoid>(input);
 
     return outputNode;
 }

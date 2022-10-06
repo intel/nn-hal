@@ -10,7 +10,7 @@ namespace nnhal {
 class Less : public OperationsBase {
 public:
     Less(int operationIndex);
-    std::shared_ptr<ngraph::Node> createNode() override;
+    std::shared_ptr<ov::Node> createNode() override;
 };
 
 }  // namespace nnhal

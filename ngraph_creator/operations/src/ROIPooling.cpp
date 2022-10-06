@@ -46,7 +46,7 @@ bool ROIPooling::validate() {
     return true;
 }
 
-std::shared_ptr<ngraph::Node> ROIPooling::createNode() {
+std::shared_ptr<ov::Node> ROIPooling::createNode() {
     ALOGV("%s Entering", __func__);
 
     bool useNchw = false;
@@ -67,29 +67,28 @@ std::shared_ptr<ngraph::Node> ROIPooling::createNode() {
     if (!useNchw)  // No conversion needed if useNchw set
         feat_maps = transpose(NHWC_NCHW, feat_maps);
 
-    auto output_size = ngraph::Shape{(size_t)output_height, (size_t)output_width};
+    auto output_size = ov::Shape{(size_t)output_height, (size_t)output_width};
     float spatial_scale = 1.0 / (height_ratio);
 
     // Concat batch index of shape[num_rois] and rois shape[num_rois, 4]
     // to create 2-D Tensor of shape[num_rois, 5] => bi,x1,y1,x2,y2
-    std::vector<ngraph::Output<ngraph::Node>> inputs;
+    std::vector<ov::Output<ov::Node>> inputs;
     auto axis = 1;
     // add bi node to inputs for concat
     const auto& biOperandIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 2);
     auto bi_vec = sModelInfo->GetConstVecOperand<int32_t>(biOperandIndex);
-    const auto bi_node =
-        createConstNode(ngraph::element::f32, ngraph::Shape{bi_vec.size(), 1}, bi_vec);
+    const auto bi_node = createConstNode(ov::element::f32, ov::Shape{bi_vec.size(), 1}, bi_vec);
     inputs.push_back(bi_node);
     // add rois node to inputs for concat
     auto inputIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 1);
     auto inputOp = mNgraphNodes->getOperationOutput(inputIndex);
     inputs.push_back(inputOp);
 
-    std::shared_ptr<ngraph::Node> roiNode = std::make_shared<ngraph::opset3::Concat>(inputs, axis);
+    std::shared_ptr<ov::Node> roiNode = std::make_shared<ov::opset3::Concat>(inputs, axis);
     ALOGI("%s Concatinated roi_node created", __func__);
 
-    std::shared_ptr<ngraph::Node> outputNode = std::make_shared<ngraph::opset3::ROIPooling>(
-        feat_maps, roiNode, output_size, spatial_scale);
+    std::shared_ptr<ov::Node> outputNode =
+        std::make_shared<ov::opset3::ROIPooling>(feat_maps, roiNode, output_size, spatial_scale);
 
     if (!useNchw) outputNode = transpose(NCHW_NHWC, outputNode);
 

@@ -11,7 +11,7 @@ MaxPool2d::MaxPool2d(int operationIndex) : OperationsBase(operationIndex) {
     mDefaultOutputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
 }
 
-std::shared_ptr<ngraph::Node> MaxPool2d::createNode() {
+std::shared_ptr<ov::Node> MaxPool2d::createNode() {
     const auto& inputsSize = sModelInfo->getOperationInputsSize(mNnapiOperationIndex);
     ALOGD("%s inputsSize %lu", __func__, inputsSize);
 
@@ -36,7 +36,7 @@ std::shared_ptr<ngraph::Node> MaxPool2d::createNode() {
     std::vector<size_t> pads_begin;
     std::vector<size_t> pads_end;
     std::vector<size_t> kernel;
-    ngraph::op::PadType auto_pad;
+    ov::op::PadType auto_pad;
 
     const auto& inputDimensions = getInputOperandDimensions(0);
 
@@ -60,7 +60,7 @@ std::shared_ptr<ngraph::Node> MaxPool2d::createNode() {
 
         if (layout) useNchw = true;
 
-        auto_pad = ngraph::op::PadType::EXPLICIT;
+        auto_pad = ov::op::PadType::EXPLICIT;
         if (useNchw) {
             input_width = inputDimensions[3];
             input_height = inputDimensions[2];
@@ -102,9 +102,9 @@ std::shared_ptr<ngraph::Node> MaxPool2d::createNode() {
                                      &padding_right);
             calculateExplicitPadding(input_height, stride_height, filter_height, 1, &padding_top,
                                      &padding_bottom);
-            auto_pad = ngraph::op::PadType::SAME_UPPER;
+            auto_pad = ov::op::PadType::SAME_UPPER;
         } else {
-            auto_pad = ngraph::op::PadType::VALID;
+            auto_pad = ov::op::PadType::VALID;
             padding_left = 0;
             padding_right = 0;
             padding_top = 0;
@@ -112,7 +112,7 @@ std::shared_ptr<ngraph::Node> MaxPool2d::createNode() {
         }
     }
 
-    std::shared_ptr<ngraph::Node> inputNode;
+    std::shared_ptr<ov::Node> inputNode;
     inputNode = getInputNode(0);
 
     if (!useNchw) {  // No conversion needed if useNchw set
@@ -124,9 +124,9 @@ std::shared_ptr<ngraph::Node> MaxPool2d::createNode() {
     pads_begin = {(size_t)padding_top, (size_t)padding_left};
     pads_end = {(size_t)padding_bottom, (size_t)padding_right};
 
-    auto maxpoolNode = std::make_shared<ngraph::opset3::MaxPool>(
-        inputNode, ngraph::Strides(strides), ngraph::Shape(pads_begin), ngraph::Shape(pads_end),
-        ngraph::Shape(kernel), ngraph::op::RoundingType::FLOOR, auto_pad);
+    auto maxpoolNode = std::make_shared<ov::opset3::MaxPool>(
+        inputNode, ov::Strides(strides), ov::Shape(pads_begin), ov::Shape(pads_end),
+        ov::Shape(kernel), ov::op::RoundingType::FLOOR, auto_pad);
 
     auto outputNode = applyActivation(maxpoolNode, activationFn);
 

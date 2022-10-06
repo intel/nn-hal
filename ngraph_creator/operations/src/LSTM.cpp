@@ -33,7 +33,7 @@ bool LSTM::validate() {
 
 void LSTM::connectOperationToGraph() { createNode(); }
 
-std::shared_ptr<ngraph::Node> LSTM::createNode() {
+std::shared_ptr<ov::Node> LSTM::createNode() {
     const auto& inputsSize = sModelInfo->getOperationInputsSize(mNnapiOperationIndex);
 
     bool isCIFGenabled = false, isPeepholeUsed = false, isProjectionUsed = false,
@@ -109,7 +109,7 @@ std::shared_ptr<ngraph::Node> LSTM::createNode() {
         }
     }
 
-    std::shared_ptr<ngraph::Node> inputNode, input2input_weights, input2forget_weights,
+    std::shared_ptr<ov::Node> inputNode, input2input_weights, input2forget_weights,
         input2cell_weights, input2output_weights, recurrent2input_weights, recurrent2forget_weights,
         recurrent2cell_weights, recurrent2output_weights, cell2input_weights, cell2forget_weights,
         cell2output_weights, input_gate_bias, forget_gate_bias, cell_bias, output_gate_bias,
@@ -150,18 +150,17 @@ std::shared_ptr<ngraph::Node> LSTM::createNode() {
     if (isPeepholeUsed) {
         if (isCIFGenabled)
             cell2input_weights =
-                createConstNode(elementType, ngraph::Shape{num_units}, convertToVector(0));
+                createConstNode(elementType, ov::Shape{num_units}, convertToVector(0));
         else
             cell2input_weights = getInputNode(9);
         cell2forget_weights = getInputNode(10);
         cell2output_weights = getInputNode(11);
     } else {
-        cell2input_weights =
-            createConstNode(elementType, ngraph::Shape{num_units}, convertToVector(0));
+        cell2input_weights = createConstNode(elementType, ov::Shape{num_units}, convertToVector(0));
         cell2forget_weights =
-            createConstNode(elementType, ngraph::Shape{num_units}, convertToVector(0));
+            createConstNode(elementType, ov::Shape{num_units}, convertToVector(0));
         cell2output_weights =
-            createConstNode(elementType, ngraph::Shape{num_units}, convertToVector(0));
+            createConstNode(elementType, ov::Shape{num_units}, convertToVector(0));
     }
 
     // b_i, b_f, b_c, b_o
@@ -181,7 +180,7 @@ std::shared_ptr<ngraph::Node> LSTM::createNode() {
             projection_bias = getInputNode(17);
         else
             projection_bias =
-                createConstNode(elementType, ngraph::Shape{output_size}, convertToVector(0));
+                createConstNode(elementType, ov::Shape{output_size}, convertToVector(0));
     }
 
     initial_hidden_state = getInputNode(18);  // h_{t-1}
@@ -199,10 +198,10 @@ std::shared_ptr<ngraph::Node> LSTM::createNode() {
             proj_clipping = sModelInfo->ParseOperationInput<float>(mNnapiOperationIndex, 22);
     }
 
-    std::shared_ptr<ngraph::Node> i_t, f_t, c_t, o_t;
-    std::shared_ptr<ngraph::Node> scratchBuffer;
+    std::shared_ptr<ov::Node> i_t, f_t, c_t, o_t;
+    std::shared_ptr<ov::Node> scratchBuffer;
 
-    std::shared_ptr<ngraph::Node> input_layer_norm_weights, forget_layer_norm_weights,
+    std::shared_ptr<ov::Node> input_layer_norm_weights, forget_layer_norm_weights,
         cell_layer_norm_weights, output_layer_norm_weights;
 
     if (isLayerNormUsed) {
@@ -249,10 +248,10 @@ std::shared_ptr<ngraph::Node> LSTM::createNode() {
         // and then multiplying with i_t so that it gets connected to the graph
         // Then it's concat'ed on axis 1 to make that dim 3x
         scratchBuffer = createConstNode(elementType, i_t->get_shape(), convertToVector(0.f));
-        scratchBuffer = std::make_shared<ngraph::opset3::Multiply>(scratchBuffer, i_t);
-        std::vector<ngraph::Output<ngraph::Node>> inputs;
+        scratchBuffer = std::make_shared<ov::opset3::Multiply>(scratchBuffer, i_t);
+        std::vector<ov::Output<ov::Node>> inputs;
         for (int i = 0; i < 3; i++) inputs.push_back(scratchBuffer);
-        scratchBuffer = std::make_shared<ngraph::opset3::Concat>(inputs, 1);
+        scratchBuffer = std::make_shared<ov::opset3::Concat>(inputs, 1);
     } else {
         if (isLayerNormUsed) {
             i_t = LayerNorm(i_t, input_layer_norm_weights, input_gate_bias);
@@ -268,10 +267,10 @@ std::shared_ptr<ngraph::Node> LSTM::createNode() {
         // and then multiplying with i_t so that it gets connected to the graph
         // Then it's concat'ed on axis 1 to make that dim 4x
         scratchBuffer = createConstNode(elementType, i_t->get_shape(), convertToVector(0.f));
-        scratchBuffer = std::make_shared<ngraph::opset3::Multiply>(scratchBuffer, i_t);
-        std::vector<ngraph::Output<ngraph::Node>> inputs;
+        scratchBuffer = std::make_shared<ov::opset3::Multiply>(scratchBuffer, i_t);
+        std::vector<ov::Output<ov::Node>> inputs;
         for (int i = 0; i < 4; i++) inputs.push_back(scratchBuffer);
-        scratchBuffer = std::make_shared<ngraph::opset3::Concat>(inputs, 1);
+        scratchBuffer = std::make_shared<ov::opset3::Concat>(inputs, 1);
     }
 
     /* ################# Update Cell Gate ################# */
@@ -305,7 +304,7 @@ std::shared_ptr<ngraph::Node> LSTM::createNode() {
     // sigma(W_{xo}x_t+W_{ho}h_{t-1}+W_{co}C_t+b_o)
     o_t = applyActivation(o_t, ACTIVATION_FUNCTION_SIGMOID);
 
-    std::shared_ptr<ngraph::Node> H;
+    std::shared_ptr<ov::Node> H;
     if (isProjectionUsed) {
         // o_t odot g(C_t)
         auto dotProd = mul(o_t, applyActivation(C, activationFn));
@@ -320,7 +319,7 @@ std::shared_ptr<ngraph::Node> LSTM::createNode() {
         H = mul(o_t, applyActivation(C, activationFn));
     }
 
-    std::vector<std::shared_ptr<ngraph::Node>> LstmOutputs(4, nullptr);
+    std::vector<std::shared_ptr<ov::Node>> LstmOutputs(4, nullptr);
     LstmOutputs[0] = scratchBuffer;
     LstmOutputs[1] = H;
     LstmOutputs[2] = C;
@@ -337,76 +336,73 @@ std::shared_ptr<ngraph::Node> LSTM::createNode() {
     return nullptr;
 }
 
-std::shared_ptr<ngraph::Node> LSTM::add(const ngraph::Output<ngraph::Node>& lhs,
-                                        const ngraph::Output<ngraph::Node>& rhs) {
-    return {std::make_shared<ngraph::opset3::Add>(lhs, rhs, ngraph::op::AutoBroadcastType::NUMPY)};
+std::shared_ptr<ov::Node> LSTM::add(const ov::Output<ov::Node>& lhs,
+                                    const ov::Output<ov::Node>& rhs) {
+    return {std::make_shared<ov::opset3::Add>(lhs, rhs, ov::op::AutoBroadcastType::NUMPY)};
 }
 
-std::shared_ptr<ngraph::Node> LSTM::sub(const ngraph::Output<ngraph::Node>& lhs,
-                                        const ngraph::Output<ngraph::Node>& rhs) {
-    return {
-        std::make_shared<ngraph::opset3::Subtract>(lhs, rhs, ngraph::op::AutoBroadcastType::NUMPY)};
+std::shared_ptr<ov::Node> LSTM::sub(const ov::Output<ov::Node>& lhs,
+                                    const ov::Output<ov::Node>& rhs) {
+    return {std::make_shared<ov::opset3::Subtract>(lhs, rhs, ov::op::AutoBroadcastType::NUMPY)};
 }
 
-std::shared_ptr<ngraph::Node> LSTM::mul(const ngraph::Output<ngraph::Node>& lhs,
-                                        const ngraph::Output<ngraph::Node>& rhs) {
-    return {
-        std::make_shared<ngraph::opset3::Multiply>(lhs, rhs, ngraph::op::AutoBroadcastType::NUMPY)};
+std::shared_ptr<ov::Node> LSTM::mul(const ov::Output<ov::Node>& lhs,
+                                    const ov::Output<ov::Node>& rhs) {
+    return {std::make_shared<ov::opset3::Multiply>(lhs, rhs, ov::op::AutoBroadcastType::NUMPY)};
 }
 
-std::shared_ptr<ngraph::Node> LSTM::matMul(const ngraph::Output<ngraph::Node>& lhs,
-                                           const ngraph::Output<ngraph::Node>& rhs,
-                                           bool transpose_lhs, bool transpose_rhs) {
-    return {std::make_shared<ngraph::opset3::MatMul>(lhs, rhs, transpose_lhs, transpose_rhs)};
+std::shared_ptr<ov::Node> LSTM::matMul(const ov::Output<ov::Node>& lhs,
+                                       const ov::Output<ov::Node>& rhs, bool transpose_lhs,
+                                       bool transpose_rhs) {
+    return {std::make_shared<ov::opset3::MatMul>(lhs, rhs, transpose_lhs, transpose_rhs)};
 }
 
-std::shared_ptr<ngraph::Node> LSTM::clip(const ngraph::Output<ngraph::Node>& data,
-                                         float m_clip) const {
+std::shared_ptr<ov::Node> LSTM::clip(const ov::Output<ov::Node>& data, float m_clip) const {
     if (m_clip == 0.f) {
         return data.get_node_shared_ptr();
     }
-    return std::make_shared<ngraph::opset3::Clamp>(data, -m_clip, m_clip);
+    return std::make_shared<ov::opset3::Clamp>(data, -m_clip, m_clip);
 }
-std::shared_ptr<ngraph::Node> LSTM::applyActivation(const std::shared_ptr<ngraph::Node>& arg,
-                                                    int activationFn) const {
+std::shared_ptr<ov::Node> LSTM::applyActivation(const std::shared_ptr<ov::Node>& arg,
+                                                int activationFn) const {
     switch (activationFn) {
         case ACTIVATION_FUNCTION_RELU:
-            return std::make_shared<ngraph::opset3::Relu>(arg);
+            return std::make_shared<ov::opset3::Relu>(arg);
             break;
         case ACTIVATION_FUNCTION_RELU6:
-            return std::make_shared<ngraph::opset3::Clamp>(arg, 0, 6);
+            return std::make_shared<ov::opset3::Clamp>(arg, 0, 6);
             break;
         case ACTIVATION_FUNCTION_TANH:
-            return std::make_shared<ngraph::opset3::Tanh>(arg);
+            return std::make_shared<ov::opset3::Tanh>(arg);
             break;
         case ACTIVATION_FUNCTION_SIGMOID:
-            return std::make_shared<ngraph::opset3::Sigmoid>(arg);
+            return std::make_shared<ov::opset3::Sigmoid>(arg);
             break;
         default:
-            return std::make_shared<ngraph::opset3::Tanh>(arg);
+            return std::make_shared<ov::opset3::Tanh>(arg);
     }
 }
 
-std::shared_ptr<ngraph::Node> LSTM::LayerNorm(
-    const ngraph::Output<ngraph::Node>& input,
-    const std::shared_ptr<ngraph::Node>& normalizedweights,
-    const std::shared_ptr<ngraph::Node>& bias) {
+std::shared_ptr<ov::Node> LSTM::LayerNorm(const ov::Output<ov::Node>& input,
+                                          const std::shared_ptr<ov::Node>& normalizedweights,
+                                          const std::shared_ptr<ov::Node>& bias) {
     // LayerNormalization
-    auto normalizationConstant = createConstNode(ngraph::element::f32, {}, convertToVector(1e-8f));
-    auto axis = ngraph::op::Constant::create(ngraph::element::i32, {}, {-1});
-    auto mean = std::make_shared<ngraph::opset3::ReduceMean>(input, axis, true);
+    auto normalizationConstant = createConstNode(ov::element::f32, {}, convertToVector(1e-8f));
+    // auto axis = std::make_shared<ov::opset3::Constant>(ov::element::i32, {}, {-1});
+    auto axis = createConstNode(ov::element::i32, {}, convertToVector(-1));
+    auto mean = std::make_shared<ov::opset3::ReduceMean>(input, axis, true);
     // x_i - mean_i
     auto diff = sub(input, mean);
     // (x_i - mean_i) ** 2
     auto multiply = mul(diff, diff);
     // mean((x_i - mean_i) ** 2)
-    auto var = std::make_shared<ngraph::opset3::ReduceMean>(multiply, axis, true);
+    auto var = std::make_shared<ov::opset3::ReduceMean>(multiply, axis, true);
     // var_i + epsilon
     auto add_var = add(var, normalizationConstant);
     // sqrt(var_i + epsilon)
-    auto sqrt = std::make_shared<ngraph::opset3::Sqrt>(add_var);
+    auto sqrt = std::make_shared<ov::opset3::Sqrt>(add_var);
     // (x_i - mean_i) / sqrt(var_i + epsilon)
-    auto stddev_inv = std::make_shared<ngraph::opset3::Divide>(diff, sqrt);
+    auto stddev_inv = std::make_shared<ov::opset3::Divide>(diff, sqrt);
     // x_i_normalized * gamma
     auto mul_norm_weights = mul(stddev_inv, normalizedweights);
     // x_i_normalized * gamma + beta

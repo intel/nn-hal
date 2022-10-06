@@ -23,24 +23,24 @@ bool Transpose::validate() {
     return true;
 }
 
-std::shared_ptr<ngraph::Node> Transpose::createNode() {
+std::shared_ptr<ov::Node> Transpose::createNode() {
     // Creating input nodes
-    std::shared_ptr<ngraph::Node> input;
+    std::shared_ptr<ov::Node> input;
 
     input = getInputNode(0);
 
-    std::shared_ptr<ngraph::Node> order;
+    std::shared_ptr<ov::Node> order;
 
     const auto& dims = getInputOperandDimensions(1);
     if (!dims.empty() && dims[0] != 0) {
         order = getInputNode(1);
     } else {
-        order = createConstNode(ngraph::element::i32, {0}, convertToVector(0));
+        order = createConstNode(ov::element::i32, {0}, convertToVector(0));
     }
 
-    std::shared_ptr<ngraph::Node> outputNode;
+    std::shared_ptr<ov::Node> outputNode;
 
-    outputNode = std::make_shared<ngraph::opset3::Transpose>(input, order);
+    outputNode = std::make_shared<ov::opset3::Transpose>(input, order);
 
     return outputNode;
 }

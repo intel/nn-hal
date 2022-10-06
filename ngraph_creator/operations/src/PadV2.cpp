@@ -30,26 +30,26 @@ bool PadV2::validate() {
     return true;
 }
 
-std::shared_ptr<ngraph::Node> PadV2::createNode() {
+std::shared_ptr<ov::Node> PadV2::createNode() {
     // Creating input nodes
     auto inputNode = getInputNode(0);
-    std::shared_ptr<ngraph::Node> pad_value;
+    std::shared_ptr<ov::Node> pad_value;
     auto inputIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 0);
 
     if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT32)) {
         auto pad_scalar_value = sModelInfo->ParseOperationInput<float>(mNnapiOperationIndex, 2);
-        pad_value = createConstNode(ngraph::element::f32, {}, convertToVector(pad_scalar_value));
+        pad_value = createConstNode(ov::element::f32, {}, convertToVector(pad_scalar_value));
     } else if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_FLOAT16)) {
         auto pad_scalar_value = sModelInfo->ParseOperationInput<_Float16>(mNnapiOperationIndex, 2);
-        pad_value = createConstNode(ngraph::element::f16, {}, convertToVector(pad_scalar_value));
+        pad_value = createConstNode(ov::element::f16, {}, convertToVector(pad_scalar_value));
     } else if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM) ||
                checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM_SIGNED)) {
         auto pad_scalar_value = sModelInfo->ParseOperationInput<int>(mNnapiOperationIndex, 2);
-        pad_value = createConstNode(ngraph::element::i32, {}, convertToVector(pad_scalar_value));
+        pad_value = createConstNode(ov::element::i32, {}, convertToVector(pad_scalar_value));
 
         // scale and zeropoint of pad value has to be same as in inputNode. so inputIndex is passed
         // as second parameter to DequantizeNode
-        pad_value = DequantizeNode(pad_value, inputIndex, ngraph::element::f32);
+        pad_value = DequantizeNode(pad_value, inputIndex, ov::element::f32);
     }
 
     const auto& paddingsOperandIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 1);
@@ -62,11 +62,11 @@ std::shared_ptr<ngraph::Node> PadV2::createNode() {
         paddings_0[i] = paddings_2d[2 * i];
         paddings_1[i] = paddings_2d[2 * i + 1];
     }
-    const auto pads_begin = createConstNode(ngraph::element::i32, {half_size}, paddings_0);
-    const auto pads_end = createConstNode(ngraph::element::i32, {half_size}, paddings_1);
+    const auto pads_begin = createConstNode(ov::element::i32, {half_size}, paddings_0);
+    const auto pads_end = createConstNode(ov::element::i32, {half_size}, paddings_1);
 
-    auto outputNode = std::make_shared<ngraph::opset3::Pad>(
-        inputNode, pads_begin, pads_end, pad_value, ngraph::op::PadMode::CONSTANT);
+    auto outputNode = std::make_shared<ov::opset3::Pad>(inputNode, pads_begin, pads_end, pad_value,
+                                                        ov::op::PadMode::CONSTANT);
 
     return outputNode;
 }

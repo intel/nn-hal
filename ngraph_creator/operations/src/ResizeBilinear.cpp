@@ -21,10 +21,10 @@ bool ResizeBilinear::validate() {
     return true;
 }
 
-std::shared_ptr<ngraph::Node> ResizeBilinear::createNode() {
+std::shared_ptr<ov::Node> ResizeBilinear::createNode() {
     const auto& inputsSize = sModelInfo->getOperationInputsSize(mNnapiOperationIndex);
 
-    std::shared_ptr<ngraph::Node> outputNode;
+    std::shared_ptr<ov::Node> outputNode;
     int32_t input_width = 0, input_height = 0;
     bool useNchw = false;
     int32_t layout = 0;
@@ -33,8 +33,8 @@ std::shared_ptr<ngraph::Node> ResizeBilinear::createNode() {
     const auto& inputDimensions = getInputOperandDimensions(0);
     int32_t out_width = 0, out_height = 0;
 
-    std::shared_ptr<ngraph::Node> inputNode;
-    struct ngraph::op::v4::Interpolate::InterpolateAttrs attrs;
+    std::shared_ptr<ov::Node> inputNode;
+    struct ov::op::v4::Interpolate::InterpolateAttrs attrs;
 
     inputNode = getInputNode(0);
     switch (inputsSize) {
@@ -65,7 +65,7 @@ std::shared_ptr<ngraph::Node> ResizeBilinear::createNode() {
     if (checkInputOperandType(1, (int32_t)OperandType::FLOAT32)) {
         // In tensorflow lite, resizing by size is supported. Scaling factors are
         // calculated based on output shape.
-        attrs.shape_calculation_mode = ngraph::op::v4::Interpolate::ShapeCalcMode::sizes;
+        attrs.shape_calculation_mode = ov::op::v4::Interpolate::ShapeCalcMode::sizes;
         width_scale = sModelInfo->ParseOperationInput<float>(mNnapiOperationIndex, 1);
         height_scale = sModelInfo->ParseOperationInput<float>(mNnapiOperationIndex, 2);
         out_width = (int)(input_width * width_scale);
@@ -75,7 +75,7 @@ std::shared_ptr<ngraph::Node> ResizeBilinear::createNode() {
         width_scale = (float)out_width / (float)input_width;
         height_scale = (float)out_height / (float)input_height;
     } else if (checkInputOperandType(1, (int32_t)OperandType::FLOAT16)) {
-        attrs.shape_calculation_mode = ngraph::op::v4::Interpolate::ShapeCalcMode::sizes;
+        attrs.shape_calculation_mode = ov::op::v4::Interpolate::ShapeCalcMode::sizes;
         width_scale = sModelInfo->ParseOperationInput<_Float16>(mNnapiOperationIndex, 1);
         height_scale = sModelInfo->ParseOperationInput<_Float16>(mNnapiOperationIndex, 2);
         out_width = (int)(input_width * width_scale);
@@ -83,7 +83,7 @@ std::shared_ptr<ngraph::Node> ResizeBilinear::createNode() {
         width_scale = (float)out_width / (float)input_width;
         height_scale = (float)out_height / (float)input_height;
     } else if (checkInputOperandType(1, (int32_t)OperandType::INT32)) {
-        attrs.shape_calculation_mode = ngraph::op::v4::Interpolate::ShapeCalcMode::sizes;
+        attrs.shape_calculation_mode = ov::op::v4::Interpolate::ShapeCalcMode::sizes;
         out_width = sModelInfo->ParseOperationInput<int>(mNnapiOperationIndex, 1);
         out_height = sModelInfo->ParseOperationInput<int>(mNnapiOperationIndex, 2);
         width_scale = (float)out_width / (float)input_width;
@@ -92,37 +92,37 @@ std::shared_ptr<ngraph::Node> ResizeBilinear::createNode() {
 
     if (align_corners == true) {
         attrs.coordinate_transformation_mode =
-            ngraph::op::v4::Interpolate::CoordinateTransformMode::align_corners;
+            ov::op::v4::Interpolate::CoordinateTransformMode::align_corners;
     } else if (half_pixel == true) {
         attrs.coordinate_transformation_mode =
-            ngraph::op::v4::Interpolate::CoordinateTransformMode::half_pixel;
+            ov::op::v4::Interpolate::CoordinateTransformMode::half_pixel;
     } else {
         // If none of the align_corners and half_pixel are false, transformation
         // mode is set to asymmetric
         attrs.coordinate_transformation_mode =
-            ngraph::op::v4::Interpolate::CoordinateTransformMode::asymmetric;
+            ov::op::v4::Interpolate::CoordinateTransformMode::asymmetric;
     }
 
     // mode is passed as "linear" for bilinear interpolation
-    attrs.mode = ngraph::op::v4::Interpolate::InterpolateMode::linear;
+    attrs.mode = ov::op::v4::Interpolate::InterpolateMode::linear;
 
     std::vector<int32_t> output_shape = {out_height, out_width};
-    auto outputShapeNode = createConstNode(ngraph::element::i32, {2}, output_shape);
+    auto outputShapeNode = createConstNode(ov::element::i32, {2}, output_shape);
 
     std::vector<float> scale_vec = {height_scale, width_scale};
-    std::shared_ptr<ngraph::Node> scaleNode;
+    std::shared_ptr<ov::Node> scaleNode;
     if (checkInputOperandType(1, (int32_t)OperandType::FLOAT16))
-        scaleNode = createConstNode(ngraph::element::f16, {2}, scale_vec);
+        scaleNode = createConstNode(ov::element::f16, {2}, scale_vec);
     else if (checkInputOperandType(1, (int32_t)OperandType::FLOAT32) ||
              checkInputOperandType(1, (int32_t)OperandType::INT32)) {
-        scaleNode = createConstNode(ngraph::element::f32, {2}, scale_vec);
+        scaleNode = createConstNode(ov::element::f32, {2}, scale_vec);
     }
 
     std::vector<int32_t> axes_vec = {2, 3};
-    auto axesNode = createConstNode(ngraph::element::i32, {2}, axes_vec);
+    auto axesNode = createConstNode(ov::element::i32, {2}, axes_vec);
 
-    outputNode = std::make_shared<ngraph::op::v4::Interpolate>(inputNode, outputShapeNode,
-                                                               scaleNode, axesNode, attrs);
+    outputNode = std::make_shared<ov::op::v4::Interpolate>(inputNode, outputShapeNode, scaleNode,
+                                                           axesNode, attrs);
     if (!useNchw) {
         outputNode = transpose(NCHW_NHWC, outputNode);
     }

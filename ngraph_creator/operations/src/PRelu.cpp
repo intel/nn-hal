@@ -32,12 +32,12 @@ bool PRelu::validate() {
     return true;
 }
 
-std::shared_ptr<ngraph::Node> PRelu::createNode() {
+std::shared_ptr<ov::Node> PRelu::createNode() {
     // Creating input nodes
     auto base = getInputNode(0);
     auto alpha = getInputNode(1);
 
-    auto outputNode = std::make_shared<ngraph::opset3::PRelu>(base, alpha);
+    auto outputNode = std::make_shared<ov::opset3::PRelu>(base, alpha);
 
     return outputNode;
 }

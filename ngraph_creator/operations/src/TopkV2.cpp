@@ -13,43 +13,37 @@ TopkV2::TopkV2(int operationIndex) : OperationsBase(operationIndex) {
 
 void TopkV2::connectOperationToGraph() { createNode(); }
 
-std::shared_ptr<ngraph::Node> TopkV2::createNode() {
+std::shared_ptr<ov::Node> TopkV2::createNode() {
     // Creating input nodes
-    std::shared_ptr<ngraph::Node> input;
+    std::shared_ptr<ov::Node> input;
 
     input = getInputNode(0);
 
     auto k = sModelInfo->ParseOperationInput<int>(mNnapiOperationIndex, 1);
     int axis = -1;  // to find largest entries for the last dimension.
 
-    auto k_node = createConstNode(ngraph::element::i32, {}, convertToVector(k));
-    const auto topk =
-        std::make_shared<ngraph::opset3::TopK>(input, k_node, axis, ngraph::opset3::TopK::Mode::MAX,
-                                               ngraph::opset3::TopK::SortType::SORT_VALUES);
+    auto k_node = createConstNode(ov::element::i32, {}, convertToVector(k));
+    const auto topk = std::make_shared<ov::opset3::TopK>(
+        input, k_node, axis, ov::opset3::TopK::Mode::MAX, ov::opset3::TopK::SortType::SORT_VALUES);
 
     auto outputNode = topk->outputs();
 
     for (int i = 0; i < 2; i++) {
         auto outputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, i);
         // TODO: remove this dummy convert
-        std::shared_ptr<ngraph::Node> outNode;
+        std::shared_ptr<ov::Node> outNode;
         if (checkOutputOperandType(i, (int32_t)OperandType::TENSOR_FLOAT32)) {
-            outNode =
-                std::make_shared<ngraph::opset3::Convert>(outputNode[i], ngraph::element::f32);
+            outNode = std::make_shared<ov::opset3::Convert>(outputNode[i], ov::element::f32);
         } else if (checkOutputOperandType(i, (int32_t)OperandType::TENSOR_FLOAT16)) {
-            outNode =
-                std::make_shared<ngraph::opset3::Convert>(outputNode[i], ngraph::element::f16);
+            outNode = std::make_shared<ov::opset3::Convert>(outputNode[i], ov::element::f16);
         } else if (checkOutputOperandType(i, (int32_t)OperandType::TENSOR_INT32)) {
-            outNode =
-                std::make_shared<ngraph::opset3::Convert>(outputNode[i], ngraph::element::i32);
+            outNode = std::make_shared<ov::opset3::Convert>(outputNode[i], ov::element::i32);
         } else if (checkOutputOperandType(i, (int32_t)OperandType::TENSOR_QUANT8_ASYMM)) {
-            outNode =
-                std::make_shared<ngraph::opset3::Convert>(outputNode[i], ngraph::element::f32);
-            outNode = QuantizeNode(outNode, outputIndex, ngraph::element::u8);
+            outNode = std::make_shared<ov::opset3::Convert>(outputNode[i], ov::element::f32);
+            outNode = QuantizeNode(outNode, outputIndex, ov::element::u8);
         } else if (checkOutputOperandType(i, (int32_t)OperandType::TENSOR_QUANT8_ASYMM_SIGNED)) {
-            outNode =
-                std::make_shared<ngraph::opset3::Convert>(outputNode[i], ngraph::element::f32);
-            outNode = QuantizeNode(outNode, outputIndex, ngraph::element::i8);
+            outNode = std::make_shared<ov::opset3::Convert>(outputNode[i], ov::element::f32);
+            outNode = QuantizeNode(outNode, outputIndex, ov::element::i8);
         }
 
         mNgraphNodes->setOutputAtOperandIndex(outputIndex, outNode);

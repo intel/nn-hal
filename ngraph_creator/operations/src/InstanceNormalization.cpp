@@ -34,10 +34,10 @@ bool InstanceNormalization::validate() {
     return true;
 }
 
-std::shared_ptr<ngraph::Node> InstanceNormalization::createNode() {
+std::shared_ptr<ov::Node> InstanceNormalization::createNode() {
     ALOGV("%s Entering", __func__);
 
-    std::shared_ptr<ngraph::Node> inputNode;
+    std::shared_ptr<ov::Node> inputNode;
     bool useNchw = false;
     const auto& inputsSize = sModelInfo->getOperationInputsSize(mNnapiOperationIndex);
     ALOGD("%s inputsSize %lu", __func__, inputsSize);
@@ -57,19 +57,18 @@ std::shared_ptr<ngraph::Node> InstanceNormalization::createNode() {
     //                                         sqrt(var[b, c] + epsilon) + beta
     // Instance Normalizatiom = MVN * gamma + beta
     bool normalize_variance = true;
-    auto gammaNode = createConstNode(ngraph::element::f32, {1}, convertToVector(gamma));
-    auto betaNode = createConstNode(ngraph::element::f32, {1}, convertToVector(beta));
+    auto gammaNode = createConstNode(ov::element::f32, {1}, convertToVector(gamma));
+    auto betaNode = createConstNode(ov::element::f32, {1}, convertToVector(beta));
 
     // Axis along which mean and variance is calculated
     std::vector<int32_t> axes{2, 3};
-    std::shared_ptr<ngraph::Node> inputAxesNode = createConstNode(ngraph::element::i32, {2}, axes);
-    std::shared_ptr<ngraph::Node> mvnNode = std::make_shared<ngraph::op::v6::MVN>(
-        inputNode, inputAxesNode, normalize_variance, epsilon, ngraph::op::MVNEpsMode::INSIDE_SQRT);
+    std::shared_ptr<ov::Node> inputAxesNode = createConstNode(ov::element::i32, {2}, axes);
+    std::shared_ptr<ov::Node> mvnNode = std::make_shared<ov::op::v6::MVN>(
+        inputNode, inputAxesNode, normalize_variance, epsilon, ov::op::MVNEpsMode::INSIDE_SQRT);
 
-    auto mulGamma = std::make_shared<ngraph::opset3::Multiply>(
-        mvnNode, gammaNode, ngraph::op::AutoBroadcastType::NUMPY);
-    std::shared_ptr<ngraph::Node> outputNode =
-        std::make_shared<ngraph::opset3::Add>(mulGamma, betaNode);
+    auto mulGamma = std::make_shared<ov::opset3::Multiply>(mvnNode, gammaNode,
+                                                           ov::op::AutoBroadcastType::NUMPY);
+    std::shared_ptr<ov::Node> outputNode = std::make_shared<ov::opset3::Add>(mulGamma, betaNode);
 
     if (!useNchw) outputNode = transpose(NCHW_NHWC, outputNode);
     ALOGV("%s PASSED", __func__);

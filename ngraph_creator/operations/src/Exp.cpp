@@ -11,11 +11,11 @@ Exp::Exp(int operationIndex) : OperationsBase(operationIndex) {
     mDefaultOutputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
 }
 
-std::shared_ptr<ngraph::Node> Exp::createNode() {
+std::shared_ptr<ov::Node> Exp::createNode() {
     // Creating input nodes
     auto input = getInputNode(0);
 
-    auto outputNode = std::make_shared<ngraph::opset3::Exp>(input);
+    auto outputNode = std::make_shared<ov::opset3::Exp>(input);
 
     return outputNode;
 }

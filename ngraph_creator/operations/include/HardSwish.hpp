@@ -11,7 +11,7 @@ class HardSwish : public OperationsBase {
 public:
     HardSwish(int operationIndex);
     bool validate() override;
-    std::shared_ptr<ngraph::Node> createNode() override;
+    std::shared_ptr<ov::Node> createNode() override;
 };
 
 }  // namespace nnhal

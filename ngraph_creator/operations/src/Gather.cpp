@@ -11,20 +11,20 @@ Gather::Gather(int operationIndex) : OperationsBase(operationIndex) {
     mDefaultOutputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
 }
 
-std::shared_ptr<ngraph::Node> Gather::createNode() {
+std::shared_ptr<ov::Node> Gather::createNode() {
     // Creating input nodes
-    std::shared_ptr<ngraph::Node> gatherVals;
+    std::shared_ptr<ov::Node> gatherVals;
 
     gatherVals = getInputNode(0);
 
     // axis range [-n, n]
     auto axis = sModelInfo->ParseOperationInput<int>(mNnapiOperationIndex, 1);
-    auto axisNode = createConstNode(ngraph::element::i32, {}, convertToVector(axis));
+    auto axisNode = createConstNode(ov::element::i32, {}, convertToVector(axis));
 
     auto indices = getInputNode(2);
 
-    std::shared_ptr<ngraph::Node> outputNode;
-    outputNode = std::make_shared<ngraph::opset3::Gather>(gatherVals, indices, axisNode);
+    std::shared_ptr<ov::Node> outputNode;
+    outputNode = std::make_shared<ov::opset3::Gather>(gatherVals, indices, axisNode);
 
     return outputNode;
 }

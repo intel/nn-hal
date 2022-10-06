@@ -35,20 +35,20 @@ bool CpuPreparedModel::initialize() {
 
     if (!mNgraphNetCreator->validateOperations()) return false;
     ALOGI("Generating IR Graph");
-    auto ngraph_function = mNgraphNetCreator->generateGraph();
-    if (ngraph_function == nullptr) {
-        ALOGE("%s ngraph generation failed", __func__);
+    auto model = mNgraphNetCreator->generateGraph();
+    if (model == nullptr) {
+        ALOGE("%s model generation failed", __func__);
         return false;
     }
     try {
-        cnnNetworkPtr = std::make_shared<InferenceEngine::CNNNetwork>(ngraph_function);
+        cnnNetworkPtr = std::make_shared<ov::Model>(model);
 #if __ANDROID__
         cnnNetworkPtr->serialize("/data/vendor/neuralnetworks/ngraph_ir.xml",
                                  "/data/vendor/neuralnetworks/ngraph_ir.bin");
 #else
         cnnNetworkPtr->serialize("/tmp/ngraph_ir.xml", "/tmp/ngraph_ir.bin");
 #endif
-        mPlugin = std::make_shared<IENetwork>(cnnNetworkPtr);
+        mPlugin = std::make_shared<IENetwork>(mTargetDevice, cnnNetworkPtr);
         mPlugin->loadNetwork();
     } catch (const std::exception& ex) {
         ALOGE("%s Exception !!! %s", __func__, ex.what());

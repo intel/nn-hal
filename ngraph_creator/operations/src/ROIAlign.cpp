@@ -50,7 +50,7 @@ bool ROIAlign::validate() {
     return true;
 }
 
-std::shared_ptr<ngraph::Node> ROIAlign::createNode() {
+std::shared_ptr<ov::Node> ROIAlign::createNode() {
     ALOGV("%s Entering", __func__);
 
     bool useNchw = false;
@@ -81,9 +81,9 @@ std::shared_ptr<ngraph::Node> ROIAlign::createNode() {
     float spatial_scale = 1.0 / (height_ratio);
     int sampling_ratio = sampling_pts_h;
 
-    std::shared_ptr<ngraph::Node> outputNode = std::make_shared<ngraph::opset3::ROIAlign>(
-        feat_maps, rois, batch_indices, output_height, output_width, sampling_ratio, spatial_scale,
-        "avg");
+    std::shared_ptr<ov::Node> outputNode =
+        std::make_shared<ov::opset3::ROIAlign>(feat_maps, rois, batch_indices, output_height,
+                                               output_width, sampling_ratio, spatial_scale, "avg");
 
     if (!useNchw) outputNode = transpose(NCHW_NHWC, outputNode);
 

@@ -43,6 +43,16 @@ config("target_defaults") {
         "${sysroot}/usr/include/aosp/frameworks/ml/nn/common/include",
         "${sysroot}/usr/include/aosp/frameworks/ml/nn/runtime/include",
         "${sysroot}/usr/include/aosp/frameworks/ml/nn/driver/cache",
+        "${sysroot}/usr/include/aosp/frameworks/ml/nn/common/types/include",
+        "${sysroot}/usr/include/aosp/hardware/interfaces/neuralnetworks/1.0/utils/include",
+        "${sysroot}/usr/include/aosp/hardware/interfaces/neuralnetworks/1.3/utils/include/",
+        "${sysroot}/usr/include/aosp/hardware/interfaces/neuralnetworks/utils/common/include",
+        "${sysroot}/usr/local/include/ie",
+        "${sysroot}/usr/local/include/ie/cpp",
+        "${sysroot}/usr/local/include/openvino",
+        "${sysroot}/usr/local/runtime/include/ie",
+        "${sysroot}/usr/local/runtime/include/ie/cpp",
+        "${sysroot}/usr/local/runtime/include/"
     ]
 }
 
@@ -155,11 +165,9 @@ shared_library("intel_nnhal") {
     "ngraph_creator/operations/src/UnidirectionalSequenceRNN.cpp",
     "service.cpp",
     "Driver.cpp",
-    "gna/GnaPreparedModel.cpp",
     "utils.cpp",
     "IENetwork.cpp",
     "ModelManager.cpp",
-    "cpu/CpuPreparedModel.cpp",
     "BasePreparedModel.cpp",
   ]
 
@@ -173,37 +181,16 @@ shared_library("intel_nnhal") {
     "intel_nn_hal/graphAPI",
     "intel_nn_hal/graphAPI/builderLayerNorm",
     "intel_nn_hal/dl",
-    "../intel-openvino-dev/inference-engine/include",
-    "../intel-openvino-dev/inference-engine/include/cldnn",
-    "../intel-openvino-dev/inference-engine/include/cpp",
-    "../intel-openvino-dev/inference-engine/include/details",
-    "../intel-openvino-dev/inference-engine/include/details/os",
-    "../intel-openvino-dev/inference-engine/include/gna",
-    "../intel-openvino-dev/inference-engine/include/hetero",
-    "../intel-openvino-dev/inference-engine/include/mkldnn",
-    "../intel-openvino-dev/inference-engine/include/openvx",
-    "../intel-openvino-dev/inference-engine/include/vpu",
-    "../intel-openvino-dev/inference-engine/src/dumper",
-    "../intel-openvino-dev/inference-engine/src/inference_engine",
-    "../intel-openvino-dev/inference-engine/src/inference_engine/cpp_interfaces",
-    "../intel-openvino-dev/inference-engine/src/inference_engine/cpp_interfaces/base",
-    "../intel-openvino-dev/inference-engine/src/inference_engine/cpp_interfaces/impl",
-    "../intel-openvino-dev/inference-engine/src/inference_engine/cpp_interfaces/interface",
-    "../intel-openvino-dev/inference-engine/src/inference_engine/include/ie",
-    "../intel-openvino-dev/inference-engine/src/inference_engine/include/ie/cpp",
-    "../intel-openvino-dev/thirdparty/pugixml/src/",
-    "../intel-openvino-dev/ngraph/core/include",
   ]
   libs = [
+    "crypto",
+    "openvino",
+    "openvino_intel_cpu_plugin",
     "pthread",
     "rt",
     "nnapi-support",
-    "ngraph",
-    "inference_engine",
     "nn-common",
     "ssl",
-    "crypto",
-    "MKLDNNPlugin"
   ]
   lib_dirs = [
     "${sysroot}/usr/local/deployment_tools/inference_engine/lib/intel64/",

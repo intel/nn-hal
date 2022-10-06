@@ -5,33 +5,57 @@
 #include <android/log.h>
 #include <ie_blob.h>
 #include <log/log.h>
+#include <openvino/pass/manager.hpp>
+#include <openvino/pass/serialize.hpp>
 
 #undef LOG_TAG
 #define LOG_TAG "IENetwork"
 
-namespace android {
-namespace hardware {
-namespace neuralnetworks {
-namespace nnhal {
+namespace android::hardware::neuralnetworks::nnhal {
 
 bool IENetwork::loadNetwork() {
     ALOGD("%s", __func__);
 
 #if __ANDROID__
-    InferenceEngine::Core ie(std::string("/vendor/etc/openvino/plugins.xml"));
+    ov::Core ie(std::string("/vendor/etc/openvino/plugins.xml"));
 #else
-    InferenceEngine::Core ie(std::string("/usr/local/lib64/plugins.xml"));
+    ov::Core ie(std::string("/usr/local/lib64/plugins.xml"));
 #endif
     std::map<std::string, std::string> config;
+    std::string deviceStr;
+    switch (mTargetDevice) {
+        case IntelDeviceType::GNA:
+            deviceStr = "GNA";
+            break;
+        case IntelDeviceType::VPU:
+            deviceStr = "VPUX";
+            break;
+        case IntelDeviceType::CPU:
+        default:
+            deviceStr = "CPU";
+            break;
+    }
 
+    ALOGD("Creating infer request for Intel Device Type : %s", deviceStr.c_str());
     if (mNetwork) {
-        mExecutableNw = ie.LoadNetwork(*mNetwork, "CPU");
+        compiled_model = ie.compile_model(mNetwork, deviceStr);
         ALOGD("LoadNetwork is done....");
-        mInferRequest = mExecutableNw.CreateInferRequest();
+
+#if __ANDROID__
+        ov::pass::Serialize serializer("/data/vendor/neuralnetworks/ngraph_ir.xml",
+                                       "/data/vendor/neuralnetworks/ngraph_ir.bin");
+        serializer.run_on_model(
+            std::const_pointer_cast<ov::Model>(compiled_model.get_runtime_model()));
+#else
+        ov::pass::Manager manager;
+        manager.register_pass<ov::pass::Serialize>("/tmp/model.xml", "/tmp/model.bin");
+        manager.run_passes(mNetwork);
+#endif
+
+        std::vector<ov::Output<ov::Node>> modelInput = mNetwork->inputs();
+        mInferRequest = compiled_model.create_infer_request();
         ALOGD("CreateInfereRequest is done....");
 
-        mInputInfo = mNetwork->getInputsInfo();
-        mOutputInfo = mNetwork->getOutputsInfo();
     } else {
         ALOGE("Invalid Network pointer");
         return false;
@@ -42,40 +66,22 @@ bool IENetwork::loadNetwork() {
 
 // Need to be called before loadnetwork.. But not sure whether need to be called for
 // all the inputs in case multiple input / output
-void IENetwork::prepareInput(InferenceEngine::Precision precision, InferenceEngine::Layout layout) {
-    ALOGE("%s", __func__);
 
-    auto inputInfoItem = *mInputInfo.begin();
-    inputInfoItem.second->setPrecision(precision);
-    inputInfoItem.second->setLayout(layout);
+ov::Tensor IENetwork::getBlob(const std::string& outName) {
+    return mInferRequest.get_tensor(outName);
 }
 
-void IENetwork::prepareOutput(InferenceEngine::Precision precision,
-                              InferenceEngine::Layout layout) {
-    InferenceEngine::DataPtr& output = mOutputInfo.begin()->second;
-    output->setPrecision(precision);
-    output->setLayout(layout);
+ov::Tensor IENetwork::getInputBlob(const std::size_t index) {
+    return mInferRequest.get_input_tensor(index);
 }
-
-void IENetwork::setBlob(const std::string& inName, const InferenceEngine::Blob::Ptr& inputBlob) {
-    ALOGI("setBlob input or output blob name : %s", inName.c_str());
-    mInferRequest.SetBlob(inName, inputBlob);
+ov::Tensor IENetwork::getOutputBlob(const std::size_t index) {
+    return mInferRequest.get_output_tensor(index);
 }
-
-InferenceEngine::TBlob<float>::Ptr IENetwork::getBlob(const std::string& outName) {
-    InferenceEngine::Blob::Ptr outputBlob;
-    outputBlob = mInferRequest.GetBlob(outName);
-    return android::hardware::neuralnetworks::nnhal::As<InferenceEngine::TBlob<float>>(outputBlob);
-}
-
 void IENetwork::infer() {
     ALOGI("Infer Network\n");
-    mInferRequest.StartAsync();
-    mInferRequest.Wait(10000);
+    mInferRequest.start_async();
+    mInferRequest.wait_for(std::chrono::milliseconds(10000));
     ALOGI("infer request completed");
 }
 
-}  // namespace nnhal
-}  // namespace neuralnetworks
-}  // namespace hardware
-}  // namespace android
+}  // namespace android::hardware::neuralnetworks::nnhal

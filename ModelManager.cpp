@@ -3,10 +3,7 @@
 #undef LOG_TAG
 #define LOG_TAG "ModelManager"
 
-namespace android {
-namespace hardware {
-namespace neuralnetworks {
-namespace nnhal {
+namespace android::hardware::neuralnetworks::nnhal {
 
 bool NnapiModelInfo::updateOutputshapes(size_t outputIndex, std::vector<size_t>& outputDims,
                                         bool isLengthSufficient) {
@@ -287,7 +284,4 @@ template int8_t NnapiModelInfo::GetConstFromBuffer<int8_t>(unsigned char const*,
 template uint32_t NnapiModelInfo::GetConstFromBuffer<uint32_t>(unsigned char const*, unsigned int);
 template _Float16 NnapiModelInfo::GetConstFromBuffer<_Float16>(unsigned char const*, unsigned int);
 
-}  // namespace nnhal
-}  // namespace neuralnetworks
-}  // namespace hardware
-}  // namespace android
+}  // namespace android::hardware::neuralnetworks::nnhal
