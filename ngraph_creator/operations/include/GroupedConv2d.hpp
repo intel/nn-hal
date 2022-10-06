@@ -11,7 +11,7 @@ class GroupedConv2d : public OperationsBase {
 public:
     GroupedConv2d(int operationIndex);
     bool validate() override;
-    std::shared_ptr<ngraph::Node> createNode() override;
+    std::shared_ptr<ov::Node> createNode() override;
 };
 
 }  // namespace nnhal

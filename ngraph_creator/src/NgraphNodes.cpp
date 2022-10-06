@@ -15,18 +15,18 @@ NgraphNodes::NgraphNodes(size_t operandsSize, size_t resultsSize) {
 
 NgraphNodes::~NgraphNodes() { ALOGV("%s Destructed", __func__); }
 
-void NgraphNodes::addInputParam(std::shared_ptr<ngraph::opset3::Parameter> inParam) {
+void NgraphNodes::addInputParam(std::shared_ptr<ov::opset3::Parameter> inParam) {
     mInputParams.push_back(inParam);
 }
-void NgraphNodes::setOutputAtOperandIndex(size_t index, ngraph::Output<ngraph::Node> output) {
+void NgraphNodes::setOutputAtOperandIndex(size_t index, ov::Output<ov::Node> output) {
     ALOGV("%s index %zu", __func__, index);
     mOutputAtOperandIndex[index] = output;
 }
-ngraph::Output<ngraph::Node> NgraphNodes::getOperationOutput(size_t index) {
+ov::Output<ov::Node> NgraphNodes::getOperationOutput(size_t index) {
     return mOutputAtOperandIndex[index];
 }
 
-void NgraphNodes::setResultNode(size_t outputIndex, std::shared_ptr<ngraph::Node> resultNode) {
+void NgraphNodes::setResultNode(size_t outputIndex, std::shared_ptr<ov::Node> resultNode) {
     ALOGD("setResultNode %zu", outputIndex);
     mResultNodes.push_back(resultNode);
 }
@@ -49,8 +49,8 @@ void NgraphNodes::removeInputParameter(std::string name, size_t index) {
     }
 }
 
-std::shared_ptr<ngraph::Function> NgraphNodes::generateGraph() {
-    return std::make_shared<ngraph::Function>(mResultNodes, mInputParams);
+std::shared_ptr<ov::Model> NgraphNodes::generateGraph() {
+    return std::make_shared<ov::Model>(mResultNodes, mInputParams);
 }
 
 void NgraphNodes::setInvalidNode(size_t index) { mNodeNames[index] = ""; }

@@ -11,11 +11,11 @@ Floor::Floor(int operationIndex) : OperationsBase(operationIndex) {
     mDefaultOutputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
 }
 
-std::shared_ptr<ngraph::Node> Floor::createNode() {
+std::shared_ptr<ov::Node> Floor::createNode() {
     // Creating input nodes
     auto input = getInputNode(0);
 
-    auto outputNode = std::make_shared<ngraph::opset3::Floor>(input);
+    auto outputNode = std::make_shared<ov::opset3::Floor>(input);
 
     return outputNode;
 }

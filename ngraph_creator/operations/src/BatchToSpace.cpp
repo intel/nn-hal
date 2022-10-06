@@ -29,7 +29,7 @@ bool BatchToSpace::validate() {
     return true;
 }
 
-std::shared_ptr<ngraph::Node> BatchToSpace::createNode() {
+std::shared_ptr<ov::Node> BatchToSpace::createNode() {
     int32_t layout = 0;
     bool useNchw = false;
     const auto& inputsSize = sModelInfo->getOperationInputsSize(mNnapiOperationIndex);
@@ -49,15 +49,14 @@ std::shared_ptr<ngraph::Node> BatchToSpace::createNode() {
 
     std::vector<uint32_t> shape(inDims.size(), 0);
 
-    const auto block_shape_node =
-        createConstNode(ngraph::element::i64, {inDims.size()}, block_shape);
-    const auto crop_begin = createConstNode(ngraph::element::i64, {shape.size()}, shape);
-    const auto crop_end = createConstNode(ngraph::element::i64, {shape.size()}, shape);
+    const auto block_shape_node = createConstNode(ov::element::i64, {inDims.size()}, block_shape);
+    const auto crop_begin = createConstNode(ov::element::i64, {shape.size()}, shape);
+    const auto crop_end = createConstNode(ov::element::i64, {shape.size()}, shape);
 
     if (!useNchw)  // No conversion needed if useNchw set
         inputNode = transpose(NHWC_NCHW, inputNode);
 
-    std::shared_ptr<ngraph::Node> outputNode = std::make_shared<ngraph::opset3::BatchToSpace>(
+    std::shared_ptr<ov::Node> outputNode = std::make_shared<ov::opset3::BatchToSpace>(
         inputNode, block_shape_node, crop_begin, crop_end);
 
     if (!useNchw) outputNode = transpose(NCHW_NHWC, outputNode);

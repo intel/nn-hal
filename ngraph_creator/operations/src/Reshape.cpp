@@ -22,11 +22,11 @@ bool Reshape::validate() {
     return true;
 }
 
-std::shared_ptr<ngraph::Node> Reshape::createNode() {
+std::shared_ptr<ov::Node> Reshape::createNode() {
     const auto& dimsOperandIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 1);
     auto outDims = sModelInfo->GetConstVecOperand<int32_t>(dimsOperandIndex);
     VLOGDIMS(L3, outDims, "Reshape::createNode dims");
-    std::shared_ptr<ngraph::Node> inputOp;
+    std::shared_ptr<ov::Node> inputOp;
     inputOp = getInputNode(0);
 
     const auto& inDims = getInputOperandDimensions(0);
@@ -56,11 +56,11 @@ std::shared_ptr<ngraph::Node> Reshape::createNode() {
               numOutputElements);
     }
 
-    auto shapeNode = std::make_shared<ngraph::opset3::Constant>(
-        ngraph::element::i32, ngraph::Shape{outDims.size()}, outDims.data());
+    auto shapeNode = std::make_shared<ov::opset3::Constant>(
+        ov::element::i32, ov::Shape{outDims.size()}, outDims.data());
 
-    std::shared_ptr<ngraph::Node> outputNode =
-        std::make_shared<ngraph::opset3::Reshape>(inputOp, shapeNode, true);
+    std::shared_ptr<ov::Node> outputNode =
+        std::make_shared<ov::opset3::Reshape>(inputOp, shapeNode, true);
 
     return outputNode;
 }

@@ -19,13 +19,13 @@ bool EmbeddingLookup::validate() {
     return true;
 }
 
-std::shared_ptr<ngraph::Node> EmbeddingLookup::createNode() {
+std::shared_ptr<ov::Node> EmbeddingLookup::createNode() {
     // Creating input nodes
     auto indices = getInputNode(0);
     auto input = getInputNode(1);
 
-    auto axis = createConstNode(ngraph::element::i32, {}, std::vector<int64_t>{0});
-    auto outputNode = std::make_shared<ngraph::opset3::Gather>(input, indices, axis);
+    auto axis = createConstNode(ov::element::i32, {}, std::vector<int64_t>{0});
+    auto outputNode = std::make_shared<ov::opset3::Gather>(input, indices, axis);
 
     return outputNode;
 }

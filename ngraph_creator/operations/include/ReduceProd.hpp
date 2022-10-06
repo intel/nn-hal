@@ -10,7 +10,7 @@ namespace nnhal {
 class ReduceProd : public OperationsBase {
 public:
     ReduceProd(int operationIndex);
-    std::shared_ptr<ngraph::Node> createNode() override;
+    std::shared_ptr<ov::Node> createNode() override;
 };
 
 }  // namespace nnhal

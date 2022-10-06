@@ -15,11 +15,11 @@ bool HardSwish::validate() {
     return true;
 }
 
-std::shared_ptr<ngraph::Node> HardSwish::createNode() {
-    std::shared_ptr<ngraph::Node> outputNode, inputNode;
+std::shared_ptr<ov::Node> HardSwish::createNode() {
+    std::shared_ptr<ov::Node> outputNode, inputNode;
     inputNode = getInputNode(0);
 
-    outputNode = std::make_shared<ngraph::op::v4::HSwish>(inputNode);
+    outputNode = std::make_shared<ov::op::v4::HSwish>(inputNode);
 
     return outputNode;
 }

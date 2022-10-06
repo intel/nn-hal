@@ -11,13 +11,13 @@ ReduceSum::ReduceSum(int operationIndex) : OperationsBase(operationIndex) {
     mDefaultOutputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
 }
 
-std::shared_ptr<ngraph::Node> ReduceSum::createNode() {
+std::shared_ptr<ov::Node> ReduceSum::createNode() {
     // Creating input nodes
     auto input = getInputNode(0);
     auto reduction_axes = getInputNode(1);
     auto keep_dims = sModelInfo->ParseOperationInput<uint8_t>(mNnapiOperationIndex, 2);
 
-    auto outputNode = std::make_shared<ngraph::opset3::ReduceSum>(input, reduction_axes, keep_dims);
+    auto outputNode = std::make_shared<ov::opset3::ReduceSum>(input, reduction_axes, keep_dims);
 
     return outputNode;
 }

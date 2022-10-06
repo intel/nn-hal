@@ -13,10 +13,7 @@
 #undef LOG_TAG
 #define LOG_TAG "ModelManager"
 
-namespace android {
-namespace hardware {
-namespace neuralnetworks {
-namespace nnhal {
+namespace android::hardware::neuralnetworks::nnhal {
 
 using ::android::hidl::memory::V1_0::IMemory;
 
@@ -206,9 +203,6 @@ private:
     std::vector<V1_2::OutputShape> mOutputShapes;
 };
 
-}  // namespace nnhal
-}  // namespace neuralnetworks
-}  // namespace hardware
-}  // namespace android
+}  // namespace android::hardware::neuralnetworks::nnhal
 
 #endif

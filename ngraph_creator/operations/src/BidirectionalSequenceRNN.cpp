@@ -16,12 +16,12 @@ BidirectionalSequenceRNN::BidirectionalSequenceRNN(int operationIndex)
 
 void BidirectionalSequenceRNN::connectOperationToGraph() { createNode(); }
 
-std::shared_ptr<ngraph::Node> BidirectionalSequenceRNN::createNode() {
+std::shared_ptr<ov::Node> BidirectionalSequenceRNN::createNode() {
     // Creating input nodes
-    std::shared_ptr<ngraph::Node> input;
-    std::shared_ptr<ngraph::Node> fwWeights, fwRecurrentWeights, fwBias, fwHiddenState;
-    std::shared_ptr<ngraph::Node> bwWeights, bwRecurrentWeights, bwBias, bwHiddenState;
-    std::shared_ptr<ngraph::Node> auxInput, fwAuxWeights, bwAuxWeights;
+    std::shared_ptr<ov::Node> input;
+    std::shared_ptr<ov::Node> fwWeights, fwRecurrentWeights, fwBias, fwHiddenState;
+    std::shared_ptr<ov::Node> bwWeights, bwRecurrentWeights, bwBias, bwHiddenState;
+    std::shared_ptr<ov::Node> auxInput, fwAuxWeights, bwAuxWeights;
     bool hasAuxInputs = false, hasParallelLinking = false;
 
     input = getInputNode(0);
@@ -70,50 +70,50 @@ std::shared_ptr<ngraph::Node> BidirectionalSequenceRNN::createNode() {
         }
     }
 
-    auto axisNode = createConstNode(ngraph::element::i32, {}, convertToVector(0));
+    auto axisNode = createConstNode(ov::element::i32, {}, convertToVector(0));
     auto numSplits = maxTime;
 
-    std::vector<ngraph::Output<ngraph::Node>> inputSplit, auxInputSplit;
+    std::vector<ov::Output<ov::Node>> inputSplit, auxInputSplit;
 
-    inputSplit = std::make_shared<ngraph::opset3::Split>(input, axisNode, numSplits)->outputs();
+    inputSplit = std::make_shared<ov::opset3::Split>(input, axisNode, numSplits)->outputs();
 
     if (hasAuxInputs || hasParallelLinking) {
         auxInputSplit =
-            std::make_shared<ngraph::opset3::Split>(auxInput, axisNode, numSplits)->outputs();
+            std::make_shared<ov::opset3::Split>(auxInput, axisNode, numSplits)->outputs();
     }
 
-    std::vector<std::shared_ptr<ngraph::Node>> fw_output_at_each_timestep(maxTime);
-    std::vector<std::shared_ptr<ngraph::Node>> bw_output_at_each_timestep(maxTime);
-    std::shared_ptr<ngraph::Node> fw_op_lastTimestep, bw_op_lastTimestep;
+    std::vector<std::shared_ptr<ov::Node>> fw_output_at_each_timestep(maxTime);
+    std::vector<std::shared_ptr<ov::Node>> bw_output_at_each_timestep(maxTime);
+    std::shared_ptr<ov::Node> fw_op_lastTimestep, bw_op_lastTimestep;
 
     for (uint32_t i = 0; i < maxTime; i++) {
-        auto dims = createConstNode(ngraph::element::i32, {0}, std::vector<int64_t>{});
-        inputSplit[i] = std::make_shared<ngraph::opset3::Squeeze>(inputSplit[i], dims);
+        auto dims = createConstNode(ov::element::i32, {0}, std::vector<int64_t>{});
+        inputSplit[i] = std::make_shared<ov::opset3::Squeeze>(inputSplit[i], dims);
 
         /* ########### Forward direction ########### */
         // inputs * input_weights
         auto fw_input_W =
-            std::make_shared<ngraph::opset3::MatMul>(inputSplit[i], fwWeights, false, true);
+            std::make_shared<ov::opset3::MatMul>(inputSplit[i], fwWeights, false, true);
         // state * recurrent_weights
-        auto fw_Ht_R = std::make_shared<ngraph::opset3::MatMul>(fwHiddenState, fwRecurrentWeights,
-                                                                false, true);
+        auto fw_Ht_R =
+            std::make_shared<ov::opset3::MatMul>(fwHiddenState, fwRecurrentWeights, false, true);
         // (state * recurrent_weights) + bias
-        auto fw_add = std::make_shared<ngraph::opset3::Add>(fw_Ht_R, fwBias);
+        auto fw_add = std::make_shared<ov::opset3::Add>(fw_Ht_R, fwBias);
 
-        std::shared_ptr<ngraph::Node> fw_i_t;
+        std::shared_ptr<ov::Node> fw_i_t;
 
         if (hasAuxInputs) {
-            auxInputSplit[i] = std::make_shared<ngraph::opset3::Squeeze>(auxInputSplit[i], dims);
+            auxInputSplit[i] = std::make_shared<ov::opset3::Squeeze>(auxInputSplit[i], dims);
             // aux_input * aux_input_weights
-            auto aux_mul = std::make_shared<ngraph::opset3::MatMul>(auxInputSplit[i], fwAuxWeights,
-                                                                    false, true);
-            auto fw_aux_add = std::make_shared<ngraph::opset3::Add>(aux_mul, fw_add);
+            auto aux_mul =
+                std::make_shared<ov::opset3::MatMul>(auxInputSplit[i], fwAuxWeights, false, true);
+            auto fw_aux_add = std::make_shared<ov::opset3::Add>(aux_mul, fw_add);
             // (inputs * input_weights) + (state * recurrent_weights) + (aux_input *
             // aux_input_weights) + bias
-            fw_i_t = std::make_shared<ngraph::opset3::Add>(fw_input_W, fw_aux_add);
+            fw_i_t = std::make_shared<ov::opset3::Add>(fw_input_W, fw_aux_add);
         } else {
             // (inputs * input_weights) + (state * recurrent_weights) + bias
-            fw_i_t = std::make_shared<ngraph::opset3::Add>(fw_input_W, fw_add);
+            fw_i_t = std::make_shared<ov::opset3::Add>(fw_input_W, fw_add);
         }
 
         auto fw_output = applyActivation(fw_i_t, activationFn);
@@ -124,38 +124,38 @@ std::shared_ptr<ngraph::Node> BidirectionalSequenceRNN::createNode() {
     }
 
     for (int i = maxTime - 1; i >= 0; --i) {
-        auto dims = createConstNode(ngraph::element::i32, {0}, std::vector<int64_t>{});
-        std::shared_ptr<ngraph::Node> curStepInput;
+        auto dims = createConstNode(ov::element::i32, {0}, std::vector<int64_t>{});
+        std::shared_ptr<ov::Node> curStepInput;
         if (hasParallelLinking) {
-            curStepInput = std::make_shared<ngraph::opset3::Squeeze>(auxInputSplit[i], dims);
+            curStepInput = std::make_shared<ov::opset3::Squeeze>(auxInputSplit[i], dims);
         } else {
-            curStepInput = std::make_shared<ngraph::opset3::Squeeze>(inputSplit[i], dims);
+            curStepInput = std::make_shared<ov::opset3::Squeeze>(inputSplit[i], dims);
         }
 
         /* ########### Backward direction ########### */
         // inputs * input_weights
         auto bw_input_W =
-            std::make_shared<ngraph::opset3::MatMul>(curStepInput, bwWeights, false, true);
+            std::make_shared<ov::opset3::MatMul>(curStepInput, bwWeights, false, true);
         // state * recurrent_weights
-        auto bw_Ht_R = std::make_shared<ngraph::opset3::MatMul>(bwHiddenState, bwRecurrentWeights,
-                                                                false, true);
+        auto bw_Ht_R =
+            std::make_shared<ov::opset3::MatMul>(bwHiddenState, bwRecurrentWeights, false, true);
         // (state * recurrent_weights) + bias
-        auto bw_add = std::make_shared<ngraph::opset3::Add>(bw_Ht_R, bwBias);
+        auto bw_add = std::make_shared<ov::opset3::Add>(bw_Ht_R, bwBias);
 
-        std::shared_ptr<ngraph::Node> bw_i_t;
+        std::shared_ptr<ov::Node> bw_i_t;
 
         if (hasAuxInputs && !hasParallelLinking) {
-            auxInputSplit[i] = std::make_shared<ngraph::opset3::Squeeze>(auxInputSplit[i], dims);
+            auxInputSplit[i] = std::make_shared<ov::opset3::Squeeze>(auxInputSplit[i], dims);
             // aux_input * aux_input_weights
-            auto aux_mul = std::make_shared<ngraph::opset3::MatMul>(auxInputSplit[i], bwAuxWeights,
-                                                                    false, true);
-            auto bw_aux_add = std::make_shared<ngraph::opset3::Add>(aux_mul, bw_add);
+            auto aux_mul =
+                std::make_shared<ov::opset3::MatMul>(auxInputSplit[i], bwAuxWeights, false, true);
+            auto bw_aux_add = std::make_shared<ov::opset3::Add>(aux_mul, bw_add);
             // (inputs * input_weights) + (state * recurrent_weights) + (aux_input *
             // aux_input_weights) + bias
-            bw_i_t = std::make_shared<ngraph::opset3::Add>(bw_input_W, bw_aux_add);
+            bw_i_t = std::make_shared<ov::opset3::Add>(bw_input_W, bw_aux_add);
         } else {
             // (inputs * input_weights) + (state * recurrent_weights) + bias
-            bw_i_t = std::make_shared<ngraph::opset3::Add>(bw_input_W, bw_add);
+            bw_i_t = std::make_shared<ov::opset3::Add>(bw_input_W, bw_add);
         }
 
         auto bw_output = applyActivation(bw_i_t, activationFn);
@@ -165,11 +165,11 @@ std::shared_ptr<ngraph::Node> BidirectionalSequenceRNN::createNode() {
         if (i == 0) bw_op_lastTimestep = bw_output;
     }
 
-    std::shared_ptr<ngraph::Node> fwOutputNode, bwOutputNode;
+    std::shared_ptr<ov::Node> fwOutputNode, bwOutputNode;
     std::vector<uint32_t> fwShape, bwShape;
 
     /* ########### Forward direction ########### */
-    fwOutputNode = std::make_shared<ngraph::opset3::Concat>(fw_output_at_each_timestep, 0);
+    fwOutputNode = std::make_shared<ov::opset3::Concat>(fw_output_at_each_timestep, 0);
 
     auto fwOutput_batch = fwOutputNode->get_shape()[0] / maxTime;
     fwShape.push_back(maxTime);
@@ -177,12 +177,12 @@ std::shared_ptr<ngraph::Node> BidirectionalSequenceRNN::createNode() {
     fwShape.push_back(fwOutputNode->get_shape()[1]);
 
     auto fwShapeNode =
-        createConstNode(ngraph::element::i32, ngraph::Shape{input->get_shape().size()}, fwShape);
+        createConstNode(ov::element::i32, ov::Shape{input->get_shape().size()}, fwShape);
 
-    fwOutputNode = std::make_shared<ngraph::opset3::Reshape>(fwOutputNode, fwShapeNode, false);
+    fwOutputNode = std::make_shared<ov::opset3::Reshape>(fwOutputNode, fwShapeNode, false);
 
     /* ########### Backward direction ########### */
-    bwOutputNode = std::make_shared<ngraph::opset3::Concat>(bw_output_at_each_timestep, 0);
+    bwOutputNode = std::make_shared<ov::opset3::Concat>(bw_output_at_each_timestep, 0);
 
     auto bwOutput_batch = bwOutputNode->get_shape()[0] / maxTime;
     bwShape.push_back(maxTime);
@@ -190,9 +190,9 @@ std::shared_ptr<ngraph::Node> BidirectionalSequenceRNN::createNode() {
     bwShape.push_back(bwOutputNode->get_shape()[1]);
 
     auto bwShapeNode =
-        createConstNode(ngraph::element::i32, ngraph::Shape{input->get_shape().size()}, bwShape);
+        createConstNode(ov::element::i32, ov::Shape{input->get_shape().size()}, bwShape);
 
-    bwOutputNode = std::make_shared<ngraph::opset3::Reshape>(bwOutputNode, bwShapeNode, false);
+    bwOutputNode = std::make_shared<ov::opset3::Reshape>(bwOutputNode, bwShapeNode, false);
 
     if (!isTimeMajor) {
         fwOutputNode = transpose(BTS_TBS, fwOutputNode);
@@ -200,10 +200,10 @@ std::shared_ptr<ngraph::Node> BidirectionalSequenceRNN::createNode() {
     }
 
     if (mergeOutputs) {
-        std::vector<std::shared_ptr<ngraph::Node>> concat_output;
+        std::vector<std::shared_ptr<ov::Node>> concat_output;
         concat_output.push_back(fwOutputNode);
         concat_output.push_back(bwOutputNode);
-        fwOutputNode = std::make_shared<ngraph::opset3::Concat>(concat_output, 2);
+        fwOutputNode = std::make_shared<ov::opset3::Concat>(concat_output, 2);
     }
 
     const auto& outputsSize = sModelInfo->getOperationOutputsSize(mNnapiOperationIndex);

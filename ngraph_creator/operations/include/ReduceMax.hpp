@@ -10,7 +10,7 @@ namespace nnhal {
 class ReduceMax : public OperationsBase {
 public:
     ReduceMax(int operationIndex);
-    std::shared_ptr<ngraph::Node> createNode() override;
+    std::shared_ptr<ov::Node> createNode() override;
 };
 
 }  // namespace nnhal

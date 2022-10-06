@@ -15,23 +15,20 @@
  */
 #include "BasePreparedModel.h"
 
+#include <LegacyHalUtils.h>
 #include <android-base/logging.h>
 #include <android/log.h>
 #include <cutils/properties.h>
 #include <log/log.h>
 #include <thread>
 #include "ExecutionBurstServer.h"
-#include "Utils.h"
 #include "ValidateHal.h"
 
 #undef LOG_TAG
 #define DISABLE_ALL_QUANT
 #define LOG_TAG "BasePreparedModel"
 
-namespace android {
-namespace hardware {
-namespace neuralnetworks {
-namespace nnhal {
+namespace android::hardware::neuralnetworks::nnhal {
 
 using namespace android::nn;
 
@@ -53,6 +50,24 @@ T getScalarData(const RunTimeOperandInfo& info) {
 
 bool BasePreparedModel::initialize() {
     ALOGV("Entering %s", __func__);
+    if (!mModelInfo->initRuntimeInfo()) {
+        ALOGE("Failed to initialize Model runtime parameters!!");
+        return false;
+    }
+    mNgraphNetCreator = std::make_shared<NgraphNetworkCreator>(mModelInfo, mTargetDevice);
+
+    if (!mNgraphNetCreator->validateOperations()) return false;
+    ALOGI("Generating IR Graph");
+    auto ov_model = mNgraphNetCreator->generateGraph();
+    if (ov_model == nullptr) {
+        ALOGE("%s Openvino model generation failed", __func__);
+        return false;
+    }
+
+    mPlugin = std::make_unique<IENetwork>(mTargetDevice, ov_model);
+    mPlugin->loadNetwork();
+
+    ALOGV("Exiting %s", __func__);
     return true;
 }
 
@@ -69,41 +84,6 @@ static Return<void> notify(const sp<V1_2::IExecutionCallback>& callback, const E
 static Return<void> notify(const sp<V1_3::IExecutionCallback>& callback, const ErrorStatus& status,
                            const hidl_vec<OutputShape>& outputShapes, Timing timing) {
     return callback->notify_1_3(convertToV1_3(status), outputShapes, timing);
-}
-
-static void floatToUint8(const float* src, uint8_t* dst, size_t size) {
-    for (uint32_t i = 0; i < size; ++i) {
-        dst[i] = static_cast<uint8_t>(src[i]);
-        ALOGV("%s input: %f output: %d ", __func__, src[i], dst[i]);
-    }
-}
-
-static void floatToint8(const float* src, int8_t* dst, size_t size) {
-    for (uint32_t i = 0; i < size; ++i) {
-        dst[i] = static_cast<int8_t>(src[i]);
-        ALOGV("%s input: %f output: %d ", __func__, src[i], dst[i]);
-    }
-}
-
-static void floatToFloat16(const float* src, _Float16* dst, size_t size) {
-    for (uint32_t i = 0; i < size; ++i) {
-        dst[i] = src[i];
-        ALOGV("%s input: %f output: %f ", __func__, src[i], dst[i]);
-    }
-}
-
-static void floatToInt16(const float* src, int16_t* dst, size_t size) {
-    for (uint32_t i = 0; i < size; ++i) {
-        dst[i] = static_cast<int16_t>(src[i]);
-        ALOGV("%s input: %f output: %hd ", __func__, src[i], dst[i]);
-    }
-}
-
-static void floatToUInt16(const float* src, uint16_t* dst, size_t size) {
-    for (uint32_t i = 0; i < size; ++i) {
-        dst[i] = static_cast<uint16_t>(src[i]);
-        ALOGV("%s input: %f output: %hu ", __func__, src[i], dst[i]);
-    }
 }
 
 namespace {
@@ -168,17 +148,55 @@ void asyncExecute(const Request& request, MeasureTiming measure, BasePreparedMod
             continue;
         }
         ALOGD("Input index: %d layername : %s", inIndex, inputNodeName.c_str());
-        auto destBlob = plugin->getBlob(inputNodeName);
-        if (modelInfo->getOperandType(inIndex) == OperandType::TENSOR_FLOAT16) {
-            float* dest = destBlob->buffer().as<float*>();
-            _Float16* src = (_Float16*)srcPtr;
-
-            for (unsigned int i = 0; i < len / 2; i++) {
-                dest[i] = src[i];
+        auto destBlob = plugin->getInputBlob(i);
+        auto inOperandType = modelInfo->getOperandType(inIndex);
+        switch (inOperandType) {
+            case OperandType::TENSOR_INT32: {
+                int32_t* dest = destBlob.data<int32_t>();
+                std::memcpy((uint8_t*)dest, (uint8_t*)srcPtr, len);
+                break;
             }
-        } else {
-            uint8_t* dest = destBlob->buffer().as<uint8_t*>();
-            std::memcpy(dest, (uint8_t*)srcPtr, len);
+            case OperandType::TENSOR_FLOAT16: {
+                ov::float16* dest = destBlob.data<ov::float16>();
+                std::memcpy((uint8_t*)dest, (uint8_t*)srcPtr, len);
+                break;
+            }
+            case OperandType::TENSOR_FLOAT32: {
+                uint8_t* dest = (uint8_t*)destBlob.data<float>();
+                std::memcpy((uint8_t*)dest, (uint8_t*)srcPtr, len);
+                break;
+            }
+            case OperandType::TENSOR_BOOL8: {
+                uint8_t* dest = (uint8_t*)destBlob.data<bool>();
+                std::memcpy((uint8_t*)dest, (uint8_t*)srcPtr, len);
+                break;
+            }
+            case OperandType::TENSOR_QUANT8_ASYMM: {
+                uint8_t* dest = (uint8_t*)destBlob.data<uint8_t>();
+                std::memcpy((uint8_t*)dest, (uint8_t*)srcPtr, len);
+                break;
+            }
+            case OperandType::TENSOR_QUANT8_SYMM:
+            case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL:
+            case OperandType::TENSOR_QUANT8_ASYMM_SIGNED: {
+                int8_t* dest = (int8_t*)destBlob.data<int8_t>();
+                std::memcpy((int8_t*)dest, (int8_t*)srcPtr, len);
+                break;
+            }
+            case OperandType::TENSOR_QUANT16_SYMM: {
+                uint8_t* dest = (uint8_t*)destBlob.data<int16_t>();
+                std::memcpy((uint8_t*)dest, (uint8_t*)srcPtr, len);
+                break;
+            }
+            case OperandType::TENSOR_QUANT16_ASYMM: {
+                uint8_t* dest = (uint8_t*)destBlob.data<uint16_t>();
+                std::memcpy((uint8_t*)dest, (uint8_t*)srcPtr, len);
+                break;
+            }
+            default:
+                uint8_t* dest = (uint8_t*)destBlob.data<uint8_t>();
+                std::memcpy((uint8_t*)dest, (uint8_t*)srcPtr, len);
+                break;
         }
     }
     ALOGD("%s Run", __func__);
@@ -202,32 +220,12 @@ void asyncExecute(const Request& request, MeasureTiming measure, BasePreparedMod
             continue;
         }
         ALOGD("Output index: %d layername : %s", outIndex, outputNodeName.c_str());
-        auto srcBlob = plugin->getBlob(outputNodeName);
+        auto srcBlob = plugin->getOutputBlob(i);
         auto operandType = modelInfo->getOperandType(outIndex);
-        uint32_t actualLength = srcBlob->byteSize();
+        uint32_t actualLength = srcBlob.get_byte_size();
         uint32_t expectedLength = 0;
         void* destPtr = modelInfo->getBlobFromMemoryPoolOut(request, i, expectedLength);
-        auto outputBlobDims = srcBlob->getTensorDesc().getDims();
-
-        ALOGD("output precision: %d", static_cast<int>(srcBlob->getTensorDesc().getPrecision()));
-
-        switch (operandType) {
-            case OperandType::TENSOR_BOOL8:
-            case OperandType::TENSOR_QUANT8_ASYMM:
-            case OperandType::TENSOR_QUANT8_SYMM:
-            case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL:
-            case OperandType::TENSOR_QUANT8_ASYMM_SIGNED:
-                actualLength /= 4;
-                break;
-            case OperandType::TENSOR_FLOAT16:
-            case OperandType::TENSOR_QUANT16_SYMM:
-            case OperandType::TENSOR_QUANT16_ASYMM:
-                actualLength /= 2;
-                break;
-            default:
-                ALOGV("Operand type is 4 bytes !!");
-                break;
-        }
+        auto outputBlobDims = srcBlob.get_shape();
 
         bool outputSizeMismatch = false;
         if (actualLength != expectedLength) {
@@ -254,41 +252,49 @@ void asyncExecute(const Request& request, MeasureTiming measure, BasePreparedMod
         }
 
         switch (operandType) {
-            case OperandType::TENSOR_INT32:
+            case OperandType::TENSOR_INT32: {
+                std::memcpy((uint8_t*)destPtr, (uint8_t*)srcBlob.data<int32_t>(),
+                            srcBlob.get_byte_size());
+                break;
+            }
             case OperandType::TENSOR_FLOAT32: {
-                std::memcpy((uint8_t*)destPtr, srcBlob->buffer().as<uint8_t*>(),
-                            srcBlob->byteSize());
+                std::memcpy((uint8_t*)destPtr, srcBlob.data<uint8_t>(), srcBlob.get_byte_size());
                 break;
             }
             case OperandType::TENSOR_BOOL8: {
-                floatToUint8(srcBlob->buffer().as<float*>(), (uint8_t*)destPtr, srcBlob->size());
+                std::memcpy((uint8_t*)destPtr, (uint8_t*)srcBlob.data<bool>(),
+                            srcBlob.get_byte_size());
                 break;
             }
             case OperandType::TENSOR_QUANT8_ASYMM: {
-                floatToUint8(srcBlob->buffer().as<float*>(), (uint8_t*)destPtr, srcBlob->size());
+                std::memcpy((uint8_t*)destPtr, (uint8_t*)srcBlob.data<uint8_t>(),
+                            srcBlob.get_byte_size());
                 break;
             }
             case OperandType::TENSOR_QUANT8_SYMM:
             case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL:
             case OperandType::TENSOR_QUANT8_ASYMM_SIGNED: {
-                floatToint8(srcBlob->buffer().as<float*>(), (int8_t*)destPtr, srcBlob->size());
+                std::memcpy((int8_t*)destPtr, (int8_t*)srcBlob.data<int8_t>(),
+                            srcBlob.get_byte_size());
                 break;
             }
             case OperandType::TENSOR_FLOAT16: {
-                floatToFloat16(srcBlob->buffer().as<float*>(), (_Float16*)destPtr, srcBlob->size());
+                std::memcpy((uint8_t*)destPtr, (uint8_t*)srcBlob.data<ov::float16>(),
+                            srcBlob.get_byte_size());
                 break;
             }
             case OperandType::TENSOR_QUANT16_SYMM: {
-                floatToInt16(srcBlob->buffer().as<float*>(), (int16_t*)destPtr, srcBlob->size());
+                std::memcpy((uint8_t*)destPtr, (uint8_t*)srcBlob.data<int16_t>(),
+                            srcBlob.get_byte_size());
                 break;
             }
             case OperandType::TENSOR_QUANT16_ASYMM: {
-                floatToUInt16(srcBlob->buffer().as<float*>(), (uint16_t*)destPtr, srcBlob->size());
+                std::memcpy((uint8_t*)destPtr, (uint8_t*)srcBlob.data<uint16_t>(),
+                            srcBlob.get_byte_size());
                 break;
             }
             default:
-                std::memcpy((uint8_t*)destPtr, srcBlob->buffer().as<uint8_t*>(),
-                            srcBlob->byteSize());
+                std::memcpy((uint8_t*)destPtr, srcBlob.data<uint8_t>(), srcBlob.get_byte_size());
                 break;
         }
     }
@@ -338,17 +344,55 @@ static std::tuple<ErrorStatus, hidl_vec<V1_2::OutputShape>, Timing> executeSynch
             continue;
         }
         ALOGD("Input index: %d layername : %s", inIndex, inputNodeName.c_str());
-        auto destBlob = plugin->getBlob(inputNodeName);
-        if (modelInfo->getOperandType(inIndex) == OperandType::TENSOR_FLOAT16) {
-            float* dest = destBlob->buffer().as<float*>();
-            _Float16* src = (_Float16*)srcPtr;
-
-            for (unsigned int i = 0; i < len / 2; i++) {
-                dest[i] = src[i];
+        auto destBlob = plugin->getInputBlob(i);
+        auto inOperandType = modelInfo->getOperandType(inIndex);
+        switch (inOperandType) {
+            case OperandType::TENSOR_INT32: {
+                int32_t* dest = destBlob.data<int32_t>();
+                std::memcpy((uint8_t*)dest, (uint8_t*)srcPtr, len);
+                break;
             }
-        } else {
-            uint8_t* dest = destBlob->buffer().as<uint8_t*>();
-            std::memcpy(dest, (uint8_t*)srcPtr, len);
+            case OperandType::TENSOR_FLOAT16: {
+                ov::float16* dest = destBlob.data<ov::float16>();
+                std::memcpy((uint8_t*)dest, (uint8_t*)srcPtr, len);
+                break;
+            }
+            case OperandType::TENSOR_FLOAT32: {
+                uint8_t* dest = (uint8_t*)destBlob.data<float>();
+                std::memcpy((uint8_t*)dest, (uint8_t*)srcPtr, len);
+                break;
+            }
+            case OperandType::TENSOR_BOOL8: {
+                uint8_t* dest = (uint8_t*)destBlob.data<bool>();
+                std::memcpy((uint8_t*)dest, (uint8_t*)srcPtr, len);
+                break;
+            }
+            case OperandType::TENSOR_QUANT8_ASYMM: {
+                uint8_t* dest = (uint8_t*)destBlob.data<uint8_t>();
+                std::memcpy((uint8_t*)dest, (uint8_t*)srcPtr, len);
+                break;
+            }
+            case OperandType::TENSOR_QUANT8_SYMM:
+            case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL:
+            case OperandType::TENSOR_QUANT8_ASYMM_SIGNED: {
+                int8_t* dest = (int8_t*)destBlob.data<int8_t>();
+                std::memcpy((int8_t*)dest, (int8_t*)srcPtr, len);
+                break;
+            }
+            case OperandType::TENSOR_QUANT16_SYMM: {
+                uint8_t* dest = (uint8_t*)destBlob.data<int16_t>();
+                std::memcpy((uint8_t*)dest, (uint8_t*)srcPtr, len);
+                break;
+            }
+            case OperandType::TENSOR_QUANT16_ASYMM: {
+                uint8_t* dest = (uint8_t*)destBlob.data<uint16_t>();
+                std::memcpy((uint8_t*)dest, (uint8_t*)srcPtr, len);
+                break;
+            }
+            default:
+                uint8_t* dest = (uint8_t*)destBlob.data<uint8_t>();
+                std::memcpy((uint8_t*)dest, (uint8_t*)srcPtr, len);
+                break;
         }
     }
 
@@ -372,32 +416,12 @@ static std::tuple<ErrorStatus, hidl_vec<V1_2::OutputShape>, Timing> executeSynch
             continue;
         }
         ALOGD("Output index: %d layername : %s", outIndex, outputNodeName.c_str());
-        auto srcBlob = plugin->getBlob(outputNodeName);
+        auto srcBlob = plugin->getOutputBlob(i);
         auto operandType = modelInfo->getOperandType(outIndex);
-        uint32_t actualLength = srcBlob->byteSize();
+        uint32_t actualLength = srcBlob.get_byte_size();
         uint32_t expectedLength = 0;
         void* destPtr = modelInfo->getBlobFromMemoryPoolOut(request, i, expectedLength);
-        auto outputBlobDims = srcBlob->getTensorDesc().getDims();
-
-        ALOGD("output precision: %d", static_cast<int>(srcBlob->getTensorDesc().getPrecision()));
-
-        switch (operandType) {
-            case OperandType::TENSOR_BOOL8:
-            case OperandType::TENSOR_QUANT8_ASYMM:
-            case OperandType::TENSOR_QUANT8_SYMM:
-            case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL:
-            case OperandType::TENSOR_QUANT8_ASYMM_SIGNED:
-                actualLength /= 4;
-                break;
-            case OperandType::TENSOR_FLOAT16:
-            case OperandType::TENSOR_QUANT16_SYMM:
-            case OperandType::TENSOR_QUANT16_ASYMM:
-                actualLength /= 2;
-                break;
-            default:
-                ALOGV("Operand type is 4 bytes !!");
-                break;
-        }
+        auto outputBlobDims = srcBlob.get_shape();
 
         bool outputSizeMismatch = false;
         if (actualLength != expectedLength) {
@@ -423,40 +447,48 @@ static std::tuple<ErrorStatus, hidl_vec<V1_2::OutputShape>, Timing> executeSynch
 
         switch (operandType) {
             case OperandType::TENSOR_INT32:
+                std::memcpy((uint8_t*)destPtr, (uint8_t*)srcBlob.data<int32_t>(),
+                            srcBlob.get_byte_size());
+                break;
             case OperandType::TENSOR_FLOAT32: {
-                std::memcpy((uint8_t*)destPtr, srcBlob->buffer().as<uint8_t*>(),
-                            srcBlob->byteSize());
+                std::memcpy((uint8_t*)destPtr, (uint8_t*)srcBlob.data<float>(),
+                            srcBlob.get_byte_size());
                 break;
             }
             case OperandType::TENSOR_BOOL8: {
-                floatToUint8(srcBlob->buffer().as<float*>(), (uint8_t*)destPtr, srcBlob->size());
+                std::memcpy((uint8_t*)destPtr, (uint8_t*)srcBlob.data<bool>(),
+                            srcBlob.get_byte_size());
                 break;
             }
             case OperandType::TENSOR_QUANT8_ASYMM: {
-                floatToUint8(srcBlob->buffer().as<float*>(), (uint8_t*)destPtr, srcBlob->size());
+                std::memcpy((uint8_t*)destPtr, (uint8_t*)srcBlob.data<uint8_t>(),
+                            srcBlob.get_byte_size());
                 break;
             }
             case OperandType::TENSOR_QUANT8_SYMM:
             case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL:
             case OperandType::TENSOR_QUANT8_ASYMM_SIGNED: {
-                floatToint8(srcBlob->buffer().as<float*>(), (int8_t*)destPtr, srcBlob->size());
+                std::memcpy((int8_t*)destPtr, (int8_t*)srcBlob.data<int8_t>(),
+                            srcBlob.get_byte_size());
                 break;
             }
             case OperandType::TENSOR_FLOAT16: {
-                floatToFloat16(srcBlob->buffer().as<float*>(), (_Float16*)destPtr, srcBlob->size());
+                std::memcpy((uint8_t*)destPtr, (uint8_t*)srcBlob.data<ov::float16>(),
+                            srcBlob.get_byte_size());
                 break;
             }
             case OperandType::TENSOR_QUANT16_SYMM: {
-                floatToInt16(srcBlob->buffer().as<float*>(), (int16_t*)destPtr, srcBlob->size());
+                std::memcpy((uint8_t*)destPtr, (uint8_t*)srcBlob.data<int16_t>(),
+                            srcBlob.get_byte_size());
                 break;
             }
             case OperandType::TENSOR_QUANT16_ASYMM: {
-                floatToUInt16(srcBlob->buffer().as<float*>(), (uint16_t*)destPtr, srcBlob->size());
+                std::memcpy((uint8_t*)destPtr, (uint8_t*)srcBlob.data<uint16_t>(),
+                            srcBlob.get_byte_size());
                 break;
             }
             default:
-                std::memcpy((uint8_t*)destPtr, srcBlob->buffer().as<uint8_t*>(),
-                            srcBlob->byteSize());
+                std::memcpy((uint8_t*)destPtr, srcBlob.data<uint8_t>(), srcBlob.get_byte_size());
                 break;
         }
     }
@@ -612,17 +644,55 @@ Return<void> BasePreparedModel::executeFenced(const V1_3::Request& request1_3,
             continue;
         }
         ALOGD("Input index: %d layername : %s", inIndex, inputNodeName.c_str());
-        auto destBlob = mPlugin->getBlob(inputNodeName);
-        if (mModelInfo->getOperandType(inIndex) == OperandType::TENSOR_FLOAT16) {
-            float* dest = destBlob->buffer().as<float*>();
-            _Float16* src = (_Float16*)srcPtr;
-
-            for (unsigned int i = 0; i < len / 2; i++) {
-                dest[i] = src[i];
+        auto destBlob = mPlugin->getInputBlob(i);
+        auto inOperandType = mModelInfo->getOperandType(inIndex);
+        switch (inOperandType) {
+            case OperandType::TENSOR_INT32: {
+                int32_t* dest = destBlob.data<int32_t>();
+                std::memcpy((uint8_t*)dest, (uint8_t*)srcPtr, len);
+                break;
             }
-        } else {
-            uint8_t* dest = destBlob->buffer().as<uint8_t*>();
-            std::memcpy(dest, (uint8_t*)srcPtr, len);
+            case OperandType::TENSOR_FLOAT16: {
+                ov::float16* dest = destBlob.data<ov::float16>();
+                std::memcpy((uint8_t*)dest, (uint8_t*)srcPtr, len);
+                break;
+            }
+            case OperandType::TENSOR_FLOAT32: {
+                uint8_t* dest = (uint8_t*)destBlob.data<float>();
+                std::memcpy((uint8_t*)dest, (uint8_t*)srcPtr, len);
+                break;
+            }
+            case OperandType::TENSOR_BOOL8: {
+                uint8_t* dest = (uint8_t*)destBlob.data<bool>();
+                std::memcpy((uint8_t*)dest, (uint8_t*)srcPtr, len);
+                break;
+            }
+            case OperandType::TENSOR_QUANT8_ASYMM: {
+                uint8_t* dest = (uint8_t*)destBlob.data<uint8_t>();
+                std::memcpy((uint8_t*)dest, (uint8_t*)srcPtr, len);
+                break;
+            }
+            case OperandType::TENSOR_QUANT8_SYMM:
+            case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL:
+            case OperandType::TENSOR_QUANT8_ASYMM_SIGNED: {
+                int8_t* dest = (int8_t*)destBlob.data<int8_t>();
+                std::memcpy((int8_t*)dest, (int8_t*)srcPtr, len);
+                break;
+            }
+            case OperandType::TENSOR_QUANT16_SYMM: {
+                uint8_t* dest = (uint8_t*)destBlob.data<int16_t>();
+                std::memcpy((uint8_t*)dest, (uint8_t*)srcPtr, len);
+                break;
+            }
+            case OperandType::TENSOR_QUANT16_ASYMM: {
+                uint8_t* dest = (uint8_t*)destBlob.data<uint16_t>();
+                std::memcpy((uint8_t*)dest, (uint8_t*)srcPtr, len);
+                break;
+            }
+            default:
+                uint8_t* dest = (uint8_t*)destBlob.data<uint8_t>();
+                std::memcpy((uint8_t*)dest, (uint8_t*)srcPtr, len);
+                break;
         }
     }
 
@@ -648,29 +718,12 @@ Return<void> BasePreparedModel::executeFenced(const V1_3::Request& request1_3,
             continue;
         }
         ALOGD("Output index: %d layername : %s", outIndex, outputNodeName.c_str());
-        auto srcBlob = mPlugin->getBlob(outputNodeName);
+        auto srcBlob = mPlugin->getOutputBlob(i);
         auto operandType = mModelInfo->getOperandType(outIndex);
-        uint32_t actualLength = srcBlob->byteSize();
+        uint32_t actualLength = srcBlob.get_byte_size();
         uint32_t expectedLength = 0;
         void* destPtr = mModelInfo->getBlobFromMemoryPoolOut(request, i, expectedLength);
-        auto outDims = srcBlob->getTensorDesc().getDims();
-        switch (operandType) {
-            case OperandType::TENSOR_BOOL8:
-            case OperandType::TENSOR_QUANT8_ASYMM:
-            case OperandType::TENSOR_QUANT8_SYMM:
-            case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL:
-            case OperandType::TENSOR_QUANT8_ASYMM_SIGNED:
-                actualLength /= 4;
-                break;
-            case OperandType::TENSOR_FLOAT16:
-            case OperandType::TENSOR_QUANT16_SYMM:
-            case OperandType::TENSOR_QUANT16_ASYMM:
-                actualLength /= 2;
-                break;
-            default:
-                ALOGV("Operand type is 4 bytes !!");
-                break;
-        }
+        auto outDims = srcBlob.get_shape();
 
         if (actualLength != expectedLength) {
             ALOGE("%s Invalid length(%d) at outIndex(%d)", __func__, actualLength, outIndex);
@@ -682,41 +735,50 @@ Return<void> BasePreparedModel::executeFenced(const V1_3::Request& request1_3,
             mModelInfo->updateOutputshapes(i, outDims);
         }
         switch (operandType) {
-            case OperandType::TENSOR_INT32:
+            case OperandType::TENSOR_INT32: {
+                std::memcpy((uint8_t*)destPtr, (uint8_t*)srcBlob.data<int32_t>(),
+                            srcBlob.get_byte_size());
+                break;
+            }
             case OperandType::TENSOR_FLOAT32: {
-                std::memcpy((uint8_t*)destPtr, srcBlob->buffer().as<uint8_t*>(),
-                            srcBlob->byteSize());
+                std::memcpy((uint8_t*)destPtr, (uint8_t*)srcBlob.data<float>(),
+                            srcBlob.get_byte_size());
                 break;
             }
             case OperandType::TENSOR_BOOL8: {
-                floatToUint8(srcBlob->buffer().as<float*>(), (uint8_t*)destPtr, srcBlob->size());
+                std::memcpy((uint8_t*)destPtr, (uint8_t*)srcBlob.data<bool>(),
+                            srcBlob.get_byte_size());
                 break;
             }
             case OperandType::TENSOR_QUANT8_ASYMM: {
-                floatToUint8(srcBlob->buffer().as<float*>(), (uint8_t*)destPtr, srcBlob->size());
+                std::memcpy((uint8_t*)destPtr, (uint8_t*)srcBlob.data<uint8_t>(),
+                            srcBlob.get_byte_size());
                 break;
             }
             case OperandType::TENSOR_QUANT8_SYMM:
             case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL:
             case OperandType::TENSOR_QUANT8_ASYMM_SIGNED: {
-                floatToint8(srcBlob->buffer().as<float*>(), (int8_t*)destPtr, srcBlob->size());
+                std::memcpy((int8_t*)destPtr, (int8_t*)srcBlob.data<int8_t>(),
+                            srcBlob.get_byte_size());
                 break;
             }
             case OperandType::TENSOR_FLOAT16: {
-                floatToFloat16(srcBlob->buffer().as<float*>(), (_Float16*)destPtr, srcBlob->size());
+                std::memcpy((uint8_t*)destPtr, (uint8_t*)srcBlob.data<ov::float16>(),
+                            srcBlob.get_byte_size());
                 break;
             }
             case OperandType::TENSOR_QUANT16_SYMM: {
-                floatToInt16(srcBlob->buffer().as<float*>(), (int16_t*)destPtr, srcBlob->size());
+                std::memcpy((uint8_t*)destPtr, (uint8_t*)srcBlob.data<int16_t>(),
+                            srcBlob.get_byte_size());
                 break;
             }
             case OperandType::TENSOR_QUANT16_ASYMM: {
-                floatToUInt16(srcBlob->buffer().as<float*>(), (uint16_t*)destPtr, srcBlob->size());
+                std::memcpy((uint8_t*)destPtr, (uint8_t*)srcBlob.data<uint16_t>(),
+                            srcBlob.get_byte_size());
                 break;
             }
             default:
-                std::memcpy((uint8_t*)destPtr, srcBlob->buffer().as<uint8_t*>(),
-                            srcBlob->byteSize());
+                std::memcpy((uint8_t*)destPtr, srcBlob.data<uint8_t>(), srcBlob.get_byte_size());
                 break;
         }
     }
@@ -745,7 +807,4 @@ Return<void> BasePreparedModel::executeFenced(const V1_3::Request& request1_3,
     return Void();
 }
 
-}  // namespace nnhal
-}  // namespace neuralnetworks
-}  // namespace hardware
-}  // namespace android
+}  // namespace android::hardware::neuralnetworks::nnhal

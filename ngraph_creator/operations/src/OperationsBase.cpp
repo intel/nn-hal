@@ -10,9 +10,9 @@ namespace nnhal {
 IntelDeviceType OperationsBase::sPluginType;
 std::shared_ptr<NnapiModelInfo> OperationsBase::sModelInfo;
 
-std::shared_ptr<ngraph::Node> OperationsBase::transpose(ConversionType type,
-                                                        ngraph::Output<ngraph::Node> input) {
-    ngraph::AxisVector order;
+std::shared_ptr<ov::Node> OperationsBase::transpose(ConversionType type,
+                                                    ov::Output<ov::Node> input) {
+    ov::AxisVector order;
     switch (type) {
         case NHWC_NCHW:
             order = {0, 3, 1, 2};
@@ -58,12 +58,12 @@ std::shared_ptr<ngraph::Node> OperationsBase::transpose(ConversionType type,
             break;
     }
     const auto order_node =
-        ngraph::opset3::Constant::create(ngraph::element::i64, ngraph::Shape{order.size()}, order);
-    return std::make_shared<ngraph::opset3::Transpose>(input, order_node);
+        ov::opset3::Constant::create(ov::element::i64, ov::Shape{order.size()}, order);
+    return std::make_shared<ov::opset3::Transpose>(input, order_node);
 }
 
 // override createNodeForPlugin in case sPluginType specific implementation is required
-std::shared_ptr<ngraph::Node> OperationsBase::createNodeForPlugin() { return createNode(); }
+std::shared_ptr<ov::Node> OperationsBase::createNodeForPlugin() { return createNode(); }
 
 // override connectOperationToGraph in case Operation has multiple outputs
 void OperationsBase::connectOperationToGraph() {
@@ -88,7 +88,7 @@ void OperationsBase::connectOperationToGraph() {
     mNgraphNodes->setOutputAtOperandIndex(mDefaultOutputIndex, outputNode->get_default_output());
 }
 
-void OperationsBase::addResultNode(size_t index, std::shared_ptr<ngraph::Node> resultNode) {
+void OperationsBase::addResultNode(size_t index, std::shared_ptr<ov::Node> resultNode) {
     mNgraphNodes->setResultNode(index, resultNode);
 }
 
@@ -143,11 +143,11 @@ bool OperationsBase::isValidInputTensor(uint32_t inputIndex) {
     return true;
 }
 
-std::shared_ptr<ngraph::Node> OperationsBase::QuantizeNode(std::shared_ptr<ngraph::Node> input,
-                                                           size_t index,
-                                                           ngraph::element::Type quantizeType) {
-    auto floatElementType = ngraph::element::f32;
-    auto intElementType = ngraph::element::i32;
+std::shared_ptr<ov::Node> OperationsBase::QuantizeNode(std::shared_ptr<ov::Node> input,
+                                                       size_t index,
+                                                       ov::element::Type quantizeType) {
+    auto floatElementType = ov::element::f32;
+    auto intElementType = ov::element::i32;
 
     float inputScale = sModelInfo->getOperandScale(index);
     int inputZeroPoint = sModelInfo->getOperandZeroPoint(index);
@@ -155,42 +155,42 @@ std::shared_ptr<ngraph::Node> OperationsBase::QuantizeNode(std::shared_ptr<ngrap
     auto scale = createConstNode(floatElementType, {}, convertToVector(inputScale));
     auto zeroPoint = createConstNode(intElementType, {}, convertToVector(inputZeroPoint));
 
-    if (input->get_element_type() != ngraph::element::f32)
-        input = std::make_shared<ngraph::opset3::Convert>(input, floatElementType);
-    auto div = std::make_shared<ngraph::opset3::Divide>(input, scale);
-    ngraph::op::v5::Round::RoundMode mode = ngraph::op::v5::Round::RoundMode::HALF_TO_EVEN;
-    auto round = std::make_shared<ngraph::op::v5::Round>(div, mode);
-    auto convertRound = std::make_shared<ngraph::opset3::Convert>(round, ngraph::element::i32);
-    auto sum = std::make_shared<ngraph::opset3::Add>(convertRound, zeroPoint);
-    std::shared_ptr<ngraph::Node> data;
+    if (input->get_element_type() != ov::element::f32)
+        input = std::make_shared<ov::opset3::Convert>(input, floatElementType);
+    auto div = std::make_shared<ov::opset3::Divide>(input, scale);
+    ov::op::v5::Round::RoundMode mode = ov::op::v5::Round::RoundMode::HALF_TO_EVEN;
+    auto round = std::make_shared<ov::op::v5::Round>(div, mode);
+    auto convertRound = std::make_shared<ov::opset3::Convert>(round, ov::element::i32);
+    auto sum = std::make_shared<ov::opset3::Add>(convertRound, zeroPoint);
+    std::shared_ptr<ov::Node> data;
     const auto operand = sModelInfo->getOperand(index);
     if (operand.type == OperandType::TENSOR_QUANT8_ASYMM)
-        data = std::make_shared<ngraph::opset3::Clamp>(sum, 0, 255);
+        data = std::make_shared<ov::opset3::Clamp>(sum, 0, 255);
     else if (operand.type == OperandType::TENSOR_QUANT8_SYMM ||
              operand.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED)
-        data = std::make_shared<ngraph::opset3::Clamp>(sum, -128, 127);
+        data = std::make_shared<ov::opset3::Clamp>(sum, -128, 127);
     else if (operand.type == OperandType::TENSOR_QUANT16_SYMM)
-        data = std::make_shared<ngraph::opset3::Clamp>(sum, -32768, 32767);
+        data = std::make_shared<ov::opset3::Clamp>(sum, -32768, 32767);
     else if (operand.type == OperandType::TENSOR_QUANT16_ASYMM)
-        data = std::make_shared<ngraph::opset3::Clamp>(sum, 0, 65535);
+        data = std::make_shared<ov::opset3::Clamp>(sum, 0, 65535);
 
-    std::shared_ptr<ngraph::Node> outputNode;
+    std::shared_ptr<ov::Node> outputNode;
     if (data->get_element_type() != quantizeType)
-        outputNode = std::make_shared<ngraph::opset3::Convert>(data, quantizeType);
+        outputNode = std::make_shared<ov::opset3::Convert>(data, quantizeType);
     else
         outputNode = data;
 
     return outputNode;
 }
 
-std::shared_ptr<ngraph::Node> OperationsBase::DequantizeNode(std::shared_ptr<ngraph::Node> input,
-                                                             uint32_t index,
-                                                             ngraph::element::Type dequantizeType) {
+std::shared_ptr<ov::Node> OperationsBase::DequantizeNode(std::shared_ptr<ov::Node> input,
+                                                         uint32_t index,
+                                                         ov::element::Type dequantizeType) {
     const auto operand = sModelInfo->getOperand(index);
-    std::shared_ptr<ngraph::Node> outputNode;
+    std::shared_ptr<ov::Node> outputNode;
 
-    if (input->get_element_type() != ngraph::element::f32)
-        input = std::make_shared<ngraph::opset3::Convert>(input, ngraph::element::f32);
+    if (input->get_element_type() != ov::element::f32)
+        input = std::make_shared<ov::opset3::Convert>(input, ov::element::f32);
 
     if (operand.type == OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL) {
         vec<float> inputScales = operand.extraParams.channelQuant().scales;
@@ -200,10 +200,10 @@ std::shared_ptr<ngraph::Node> OperationsBase::DequantizeNode(std::shared_ptr<ngr
         std::vector<size_t> shape(inputRank - channelDim, 1);
         shape[0] = inputScales.size();
 
-        auto scaleNode = createConstNode(ngraph::element::f32, ngraph::Shape{shape}, inputScales);
-        outputNode = std::make_shared<ngraph::opset3::Multiply>(input, scaleNode);
+        auto scaleNode = createConstNode(ov::element::f32, ov::Shape{shape}, inputScales);
+        outputNode = std::make_shared<ov::opset3::Multiply>(input, scaleNode);
     } else {
-        auto scaleNode = createConstNode(ngraph::element::f32, {},
+        auto scaleNode = createConstNode(ov::element::f32, {},
                                          convertToVector(sModelInfo->getOperandScale(index)));
         auto zeroPointNode = createConstNode(
             ngraph::element::f32, {}, convertToVector(sModelInfo->getOperandZeroPoint(index)));
@@ -211,14 +211,14 @@ std::shared_ptr<ngraph::Node> OperationsBase::DequantizeNode(std::shared_ptr<ngr
         if (operand.type == OperandType::TENSOR_QUANT8_ASYMM ||
             operand.type == OperandType::TENSOR_QUANT16_ASYMM ||
             operand.type == OperandType::TENSOR_QUANT8_ASYMM_SIGNED)
-            input = std::make_shared<ngraph::opset3::Subtract>(input, zeroPointNode);
+            input = std::make_shared<ov::opset3::Subtract>(input, zeroPointNode);
 
-        auto mul = std::make_shared<ngraph::opset3::Multiply>(input, scaleNode);
+        auto mul = std::make_shared<ov::opset3::Multiply>(input, scaleNode);
         outputNode = mul;
     }
 
-    if (dequantizeType == ngraph::element::f16)
-        outputNode = std::make_shared<ngraph::opset3::Convert>(outputNode, dequantizeType);
+    if (dequantizeType == ov::element::f16)
+        outputNode = std::make_shared<ov::opset3::Convert>(outputNode, dequantizeType);
 
     return outputNode;
 }

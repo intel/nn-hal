@@ -10,7 +10,7 @@ namespace nnhal {
 class NotEqual : public OperationsBase {
 public:
     NotEqual(int operationIndex);
-    std::shared_ptr<ngraph::Node> createNode() override;
+    std::shared_ptr<ov::Node> createNode() override;
 };
 
 }  // namespace nnhal

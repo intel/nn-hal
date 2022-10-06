@@ -11,11 +11,11 @@ SQRT::SQRT(int operationIndex) : OperationsBase(operationIndex) {
     mDefaultOutputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
 }
 
-std::shared_ptr<ngraph::Node> SQRT::createNode() {
+std::shared_ptr<ov::Node> SQRT::createNode() {
     // Creating input nodes
     auto input = getInputNode(0);
 
-    auto outputNode = std::make_shared<ngraph::opset3::Sqrt>(input);
+    auto outputNode = std::make_shared<ov::opset3::Sqrt>(input);
 
     return outputNode;
 }

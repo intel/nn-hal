@@ -11,13 +11,13 @@ Pow::Pow(int operationIndex) : OperationsBase(operationIndex) {
     mDefaultOutputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
 }
 
-std::shared_ptr<ngraph::Node> Pow::createNode() {
+std::shared_ptr<ov::Node> Pow::createNode() {
     // Creating input nodes
     auto base = getInputNode(0);
     auto exponent = getInputNode(1);
 
-    auto outputNode = std::make_shared<ngraph::opset3::Power>(base, exponent,
-                                                              ngraph::op::AutoBroadcastType::NUMPY);
+    auto outputNode =
+        std::make_shared<ov::opset3::Power>(base, exponent, ov::op::AutoBroadcastType::NUMPY);
 
     return outputNode;
 }

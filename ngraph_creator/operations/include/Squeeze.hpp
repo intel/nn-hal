@@ -11,7 +11,7 @@ class Squeeze : public OperationsBase {
 public:
     Squeeze(int operationIndex);
     bool validate() override;
-    std::shared_ptr<ngraph::Node> createNode() override;
+    std::shared_ptr<ov::Node> createNode() override;
 };
 
 }  // namespace nnhal

@@ -15,9 +15,9 @@ RNN::RNN(int operationIndex) : OperationsBase(operationIndex) {
 
 void RNN::connectOperationToGraph() { createNode(); }
 
-std::shared_ptr<ngraph::Node> RNN::createNode() {
+std::shared_ptr<ov::Node> RNN::createNode() {
     // Creating input nodes
-    std::shared_ptr<ngraph::Node> input, W, R, bias, initial_hidden_state;
+    std::shared_ptr<ov::Node> input, W, R, bias, initial_hidden_state;
 
     input = getInputNode(0);
     W = getInputNode(1);
@@ -28,19 +28,19 @@ std::shared_ptr<ngraph::Node> RNN::createNode() {
     auto activationFn = sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 5);
 
     // inputs * input_weights
-    auto input_W = std::make_shared<ngraph::opset3::MatMul>(input, W, false, true);
+    auto input_W = std::make_shared<ov::opset3::MatMul>(input, W, false, true);
     // state * recurrent_weights
-    auto Ht_R = std::make_shared<ngraph::opset3::MatMul>(initial_hidden_state, R, false, true);
+    auto Ht_R = std::make_shared<ov::opset3::MatMul>(initial_hidden_state, R, false, true);
     // (state * recurrent_weights) + bias
-    auto add = std::make_shared<ngraph::opset3::Add>(Ht_R, bias);
+    auto add = std::make_shared<ov::opset3::Add>(Ht_R, bias);
     // (inputs * input_weights) + (state * recurrent_weights) + bias
-    auto i_t = std::make_shared<ngraph::opset3::Add>(input_W, add);
+    auto i_t = std::make_shared<ov::opset3::Add>(input_W, add);
 
     auto outputNode = applyActivation(i_t, activationFn);
 
     for (int i = 0; i < 2; i++) {
         auto outputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, i);
-        std::shared_ptr<ngraph::Node> outNode;
+        std::shared_ptr<ov::Node> outNode;
         if (i == 1) {
             outNode = outputNode;
         } else {
@@ -49,7 +49,7 @@ std::shared_ptr<ngraph::Node> RNN::createNode() {
             // and then multiplying with outputNode so that it gets connected to the graph
             outNode = createConstNode(outputNode->get_element_type(), outputNode->get_shape(),
                                       convertToVector(0));
-            outNode = std::make_shared<ngraph::opset3::Multiply>(outNode, outputNode);
+            outNode = std::make_shared<ov::opset3::Multiply>(outNode, outputNode);
         }
 
         mNgraphNodes->setOutputAtOperandIndex(outputIndex, outNode);

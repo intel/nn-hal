@@ -45,7 +45,7 @@ bool TransposeConv2D::validate() {
     return true;
 }
 
-std::shared_ptr<ngraph::Node> TransposeConv2D::createNode() {
+std::shared_ptr<ov::Node> TransposeConv2D::createNode() {
     const auto& inputsSize = sModelInfo->getOperationInputsSize(mNnapiOperationIndex);
     ALOGD("%s inputsSize %lu", __func__, inputsSize);
 
@@ -71,9 +71,9 @@ std::shared_ptr<ngraph::Node> TransposeConv2D::createNode() {
     std::vector<std::ptrdiff_t> pads_begin;
     std::vector<std::ptrdiff_t> pads_end;
     std::vector<size_t> dilations;
-    ngraph::op::PadType auto_pad;
+    ov::op::PadType auto_pad;
 
-    std::shared_ptr<ngraph::Node> outputShapeNode = nullptr;
+    std::shared_ptr<ov::Node> outputShapeNode = nullptr;
 
     const auto& inputDimensions = getInputOperandDimensions(0);
 
@@ -97,7 +97,7 @@ std::shared_ptr<ngraph::Node> TransposeConv2D::createNode() {
 
         if (layout) useNchw = true;
 
-        auto_pad = ngraph::op::PadType::EXPLICIT;
+        auto_pad = ov::op::PadType::EXPLICIT;
         {
             if (useNchw) {
                 input_width = inputDimensions[3];
@@ -138,13 +138,13 @@ std::shared_ptr<ngraph::Node> TransposeConv2D::createNode() {
         }
 
         if (padding_scheme == 1) {
-            auto_pad = ngraph::op::PadType::SAME_UPPER;
+            auto_pad = ov::op::PadType::SAME_UPPER;
         } else {
-            auto_pad = ngraph::op::PadType::VALID;
+            auto_pad = ov::op::PadType::VALID;
         }
 
         outputShapeNode =
-            createConstNode(ngraph::element::i32, {spatial_dimensions_size}, spatial_dimensions);
+            createConstNode(ov::element::i32, {spatial_dimensions_size}, spatial_dimensions);
 
         padding_left = 0;
         padding_right = 0;
@@ -152,7 +152,7 @@ std::shared_ptr<ngraph::Node> TransposeConv2D::createNode() {
         padding_bottom = 0;
     }
 
-    std::shared_ptr<ngraph::Node> inputNode, filterNode, biasNode;
+    std::shared_ptr<ov::Node> inputNode, filterNode, biasNode;
     const auto& biasIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 2);
 
     inputNode = getInputNode(0);
@@ -165,22 +165,22 @@ std::shared_ptr<ngraph::Node> TransposeConv2D::createNode() {
         vec<float> filterScales = filterOperand.extraParams.channelQuant().scales;
         float inputScale = sModelInfo->getOperandScale(0);
         auto filterScalesNode =
-            createConstNode(ngraph::element::f32, ngraph::Shape{filterScales.size()}, filterScales);
+            createConstNode(ov::element::f32, ov::Shape{filterScales.size()}, filterScales);
         auto inputScalesNode =
-            createConstNode(ngraph::element::f32, ngraph::Shape{1}, convertToVector(inputScale));
+            createConstNode(ov::element::f32, ov::Shape{1}, convertToVector(inputScale));
 
         // for quant symm per channel type inputs, bias is of type TENSOR_INT32. For TENSOR_INT32
         // type, dequantization is not applied during node creation
         // bias_scale[i] = input_scale * filter_scale[i]
         auto biasScalMultiplier =
-            std::make_shared<ngraph::opset3::Multiply>(filterScalesNode, inputScalesNode);
-        biasNode = std::make_shared<ngraph::opset3::Convert>(biasNode, ngraph::element::f32);
-        biasNode = std::make_shared<ngraph::opset3::Multiply>(biasNode, biasScalMultiplier);
+            std::make_shared<ov::opset3::Multiply>(filterScalesNode, inputScalesNode);
+        biasNode = std::make_shared<ov::opset3::Convert>(biasNode, ov::element::f32);
+        biasNode = std::make_shared<ov::opset3::Multiply>(biasNode, biasScalMultiplier);
     } else if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM) ||
                checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM_SIGNED)) {
         // for quant type inputs, bias is of type TENSOR_INT32. For TENSOR_INT32 type,
         // dequantization is not applied during node creation
-        biasNode = DequantizeNode(biasNode, biasIndex, ngraph::element::f32);
+        biasNode = DequantizeNode(biasNode, biasIndex, ov::element::f32);
     }
 
     // OpenVino expects filter in OIHW format
@@ -195,27 +195,27 @@ std::shared_ptr<ngraph::Node> TransposeConv2D::createNode() {
     pads_end = {padding_bottom, padding_right};
     dilations = {(size_t)dilation_height_factor, (size_t)dilation_width_factor};
 
-    std::shared_ptr<ngraph::Node> transposeConvNode;
+    std::shared_ptr<ov::Node> transposeConvNode;
 
     if (outputShapeNode == nullptr)
-        transposeConvNode = std::make_shared<ngraph::opset3::ConvolutionBackpropData>(
-            inputNode, filterNode, ngraph::Strides(strides), ngraph::CoordinateDiff(pads_begin),
-            ngraph::CoordinateDiff(pads_end), ngraph::Strides(dilations));
+        transposeConvNode = std::make_shared<ov::opset3::ConvolutionBackpropData>(
+            inputNode, filterNode, ov::Strides(strides), ov::CoordinateDiff(pads_begin),
+            ov::CoordinateDiff(pads_end), ov::Strides(dilations));
     else
-        transposeConvNode = std::make_shared<ngraph::opset3::ConvolutionBackpropData>(
-            inputNode, filterNode, outputShapeNode, ngraph::Strides(strides),
-            ngraph::CoordinateDiff(pads_begin), ngraph::CoordinateDiff(pads_end),
-            ngraph::Strides(dilations), auto_pad);
+        transposeConvNode = std::make_shared<ov::opset3::ConvolutionBackpropData>(
+            inputNode, filterNode, outputShapeNode, ov::Strides(strides),
+            ov::CoordinateDiff(pads_begin), ov::CoordinateDiff(pads_end), ov::Strides(dilations),
+            auto_pad);
 
     auto biasDimensions = getInputOperandDimensions(2);
     std::vector<uint32_t> shape(transposeConvNode->get_shape().size(), 1);
     shape[1] = biasDimensions[0];
-    auto shapeNode = createConstNode(ngraph::element::i32, ngraph::Shape{shape.size()}, shape);
+    auto shapeNode = createConstNode(ov::element::i32, ov::Shape{shape.size()}, shape);
 
-    biasNode = std::make_shared<ngraph::opset3::Reshape>(biasNode, shapeNode, true);
+    biasNode = std::make_shared<ov::opset3::Reshape>(biasNode, shapeNode, true);
 
-    std::shared_ptr<ngraph::Node> outputNode = std::make_shared<ngraph::opset3::Add>(
-        transposeConvNode, biasNode, ngraph::op::AutoBroadcastType::NUMPY);
+    std::shared_ptr<ov::Node> outputNode = std::make_shared<ov::opset3::Add>(
+        transposeConvNode, biasNode, ov::op::AutoBroadcastType::NUMPY);
     outputNode = applyActivation(outputNode, activationFn);
 
     if (!useNchw) {

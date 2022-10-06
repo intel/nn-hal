@@ -65,12 +65,12 @@ bool StridedSlice::validate() {
     return true;
 }
 
-std::shared_ptr<ngraph::Node> StridedSlice::createNode() {
+std::shared_ptr<ov::Node> StridedSlice::createNode() {
     // Creating input nodes
-    std::shared_ptr<ngraph::Node> data = getInputNode(0);
-    std::shared_ptr<ngraph::Node> begin = getInputNode(1);
-    std::shared_ptr<ngraph::Node> end = getInputNode(2);
-    std::shared_ptr<ngraph::Node> strides = getInputNode(3);
+    std::shared_ptr<ov::Node> data = getInputNode(0);
+    std::shared_ptr<ov::Node> begin = getInputNode(1);
+    std::shared_ptr<ov::Node> end = getInputNode(2);
+    std::shared_ptr<ov::Node> strides = getInputNode(3);
 
     auto begin_mask = sModelInfo->ParseOperationInput<int32_t>(mNnapiOperationIndex, 4);
     auto end_mask = sModelInfo->ParseOperationInput<int32_t>(mNnapiOperationIndex, 5);
@@ -85,7 +85,7 @@ std::shared_ptr<ngraph::Node> StridedSlice::createNode() {
     const std::vector<int64_t> new_axis_mask = std::vector<int64_t>{};
     const std::vector<int64_t> ellipsis_mask = std::vector<int64_t>{};
 
-    std::shared_ptr<ngraph::Node> outputNode = std::make_shared<ngraph::opset3::StridedSlice>(
+    std::shared_ptr<ov::Node> outputNode = std::make_shared<ov::opset3::StridedSlice>(
         data, begin, end, strides, begin_mask_bits, end_mask_bits, new_axis_mask,
         shrink_axis_mask_bits, ellipsis_mask);
 

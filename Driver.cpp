@@ -17,6 +17,7 @@
 #include "Driver.h"
 #include <string>
 
+#include <LegacyHalUtils.h>
 #include <android-base/logging.h>
 #include <thread>
 #include "BasePreparedModel.h"
@@ -28,10 +29,7 @@
 #undef LOG_TAG
 #define LOG_TAG "Driver"
 
-namespace android {
-namespace hardware {
-namespace neuralnetworks {
-namespace nnhal {
+namespace android::hardware::neuralnetworks::nnhal {
 
 using namespace android::nn;
 
@@ -77,12 +75,7 @@ hidl_vec<Capabilities::OperandPerformance> nonExtensionOperandPerformance(
 }
 
 static sp<BasePreparedModel> ModelFactory(IntelDeviceType deviceType, const Model& model) {
-    sp<BasePreparedModel> driverPreparedModel = NULL;
-
-    if (deviceType == IntelDeviceType::CPU)
-        driverPreparedModel = new CpuPreparedModel(model);
-    else if (deviceType == IntelDeviceType::GNA)
-        driverPreparedModel = new GnaPreparedModel(model);
+    sp<BasePreparedModel> driverPreparedModel = new BasePreparedModel(deviceType, model);
     return driverPreparedModel;
 }
 // For HAL-1.0 version
@@ -226,11 +219,11 @@ Return<void> Driver::getCapabilities_1_2(getCapabilities_1_2_cb cb) {
     } else if (mDeviceType == IntelDeviceType::VPU) {
         ALOGI("Myriad driver getCapabilities()");
         V1_2::Capabilities capabilities = {
-            .relaxedFloat32toFloat16PerformanceScalar = {.execTime = 1.1f, .powerUsage = 1.1f},
-            .relaxedFloat32toFloat16PerformanceTensor = {.execTime = 1.1f, .powerUsage = 1.1f},
-            .operandPerformance = nonExtensionOperandPerformanceV1_2({1.1f, 1.1f})};
+            .relaxedFloat32toFloat16PerformanceScalar = {.execTime = 0.8f, .powerUsage = 0.8f},
+            .relaxedFloat32toFloat16PerformanceTensor = {.execTime = 0.8f, .powerUsage = 0.8f},
+            .operandPerformance = nonExtensionOperandPerformanceV1_2({0.8f, 0.8f})};
 
-        ALOGI("Driver Capabilities .execTime = 1.1f, .powerUsage = 1.1f");
+        ALOGI("Driver Capabilities .execTime = 0.8f, .powerUsage = 0.8f");
         cb(ErrorStatus::NONE, capabilities);
     } else {
         V1_2::Capabilities capabilities;
@@ -352,13 +345,13 @@ Return<void> Driver::getCapabilities_1_3(getCapabilities_1_3_cb cb) {
     } else if (mDeviceType == IntelDeviceType::VPU) {
         ALOGI("Driver getCapabilities()");
         Capabilities capabilities = {
-            .relaxedFloat32toFloat16PerformanceScalar = {.execTime = 1.1f, .powerUsage = 1.1f},
-            .relaxedFloat32toFloat16PerformanceTensor = {.execTime = 1.1f, .powerUsage = 1.1f},
-            .operandPerformance = nonExtensionOperandPerformance({1.1f, 1.1f}),
-            .ifPerformance = {.execTime = 1.1f, .powerUsage = 1.1f},
-            .whilePerformance = {.execTime = 1.1f, .powerUsage = 1.1f}};
+            .relaxedFloat32toFloat16PerformanceScalar = {.execTime = 0.8f, .powerUsage = 0.8f},
+            .relaxedFloat32toFloat16PerformanceTensor = {.execTime = 0.8f, .powerUsage = 0.8f},
+            .operandPerformance = nonExtensionOperandPerformance({0.8f, 0.8f}),
+            .ifPerformance = {.execTime = 0.8f, .powerUsage = 0.8f},
+            .whilePerformance = {.execTime = 0.8f, .powerUsage = 0.8f}};
 
-        ALOGI("Driver Capabilities .execTime = 1.1f, .powerUsage = 1.1f");
+        ALOGI("Driver Capabilities .execTime = 0.8f, .powerUsage = 0.8f");
         cb(V1_3::ErrorStatus::NONE, capabilities);
     } else {
         Capabilities capabilities;
@@ -476,7 +469,4 @@ Return<void> Driver::getSupportedExtensions(getSupportedExtensions_cb cb) {
     return Void();
 }
 
-}  // namespace nnhal
-}  // namespace neuralnetworks
-}  // namespace hardware
-}  // namespace android
+}  // namespace android::hardware::neuralnetworks::nnhal

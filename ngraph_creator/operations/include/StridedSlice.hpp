@@ -11,7 +11,7 @@ class StridedSlice : public OperationsBase {
 public:
     StridedSlice(int operationIndex);
     bool validate() override;
-    std::shared_ptr<ngraph::Node> createNode() override;
+    std::shared_ptr<ov::Node> createNode() override;
     std::vector<int64_t> getMaskBits(int32_t maskValue, size_t vec_size);
 };
 

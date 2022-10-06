@@ -11,7 +11,7 @@ class UnidirectionalSequenceRNN : public OperationsBase {
 public:
     UnidirectionalSequenceRNN(int operationIndex);
     void connectOperationToGraph() override;
-    std::shared_ptr<ngraph::Node> createNode() override;
+    std::shared_ptr<ov::Node> createNode() override;
 };
 
 }  // namespace nnhal

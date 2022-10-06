@@ -23,9 +23,9 @@ bool Mean::validate() {
     return true;
 }
 
-std::shared_ptr<ngraph::Node> Mean::createNode() {
+std::shared_ptr<ov::Node> Mean::createNode() {
     // Creating input nodes
-    std::shared_ptr<ngraph::Node> input;
+    std::shared_ptr<ov::Node> input;
 
     input = getInputNode(0);
 
@@ -33,8 +33,8 @@ std::shared_ptr<ngraph::Node> Mean::createNode() {
     auto reduce_dims = sModelInfo->ParseOperationInput<int>(mNnapiOperationIndex, 2);
     bool keep_dims = (reduce_dims > 0) ? true : false;
 
-    std::shared_ptr<ngraph::Node> outputNode;
-    outputNode = std::make_shared<ngraph::opset3::ReduceMean>(input, reduction_axes, keep_dims);
+    std::shared_ptr<ov::Node> outputNode;
+    outputNode = std::make_shared<ov::opset3::ReduceMean>(input, reduction_axes, keep_dims);
 
     return outputNode;
 }
