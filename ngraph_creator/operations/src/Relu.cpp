@@ -11,15 +11,15 @@ Relu::Relu(int operationIndex) : OperationsBase(operationIndex) {
     mDefaultOutputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
 }
 
-std::shared_ptr<ngraph::Node> Relu::createNode() {
+std::shared_ptr<ov::Node> Relu::createNode() {
     // Creating input nodes
-    std::shared_ptr<ngraph::Node> input;
+    std::shared_ptr<ov::Node> input;
 
     input = getInputNode(0);
 
-    std::shared_ptr<ngraph::Node> outputNode;
+    std::shared_ptr<ov::Node> outputNode;
 
-    outputNode = std::make_shared<ngraph::opset3::Relu>(input);
+    outputNode = std::make_shared<ov::opset3::Relu>(input);
 
     return outputNode;
 }

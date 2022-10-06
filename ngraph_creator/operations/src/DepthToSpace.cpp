@@ -11,9 +11,9 @@ DepthToSpace::DepthToSpace(int operationIndex) : OperationsBase(operationIndex) 
     mDefaultOutputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
 }
 
-std::shared_ptr<ngraph::Node> DepthToSpace::createNode() {
+std::shared_ptr<ov::Node> DepthToSpace::createNode() {
     // Creating input nodes
-    std::shared_ptr<ngraph::Node> input;
+    std::shared_ptr<ov::Node> input;
     bool useNchw = false;
     const auto& inputsSize = sModelInfo->getOperationInputsSize(mNnapiOperationIndex);
 
@@ -28,10 +28,10 @@ std::shared_ptr<ngraph::Node> DepthToSpace::createNode() {
     if (!useNchw)  // No conversion needed if useNchw set
         input = transpose(NHWC_NCHW, input);
 
-    std::shared_ptr<ngraph::Node> outputNode;
+    std::shared_ptr<ov::Node> outputNode;
 
-    outputNode = std::make_shared<ngraph::opset3::DepthToSpace>(
-        input, ngraph::op::v0::DepthToSpace::DepthToSpaceMode::BLOCKS_FIRST, block_size);
+    outputNode = std::make_shared<ov::opset3::DepthToSpace>(
+        input, ov::op::v0::DepthToSpace::DepthToSpaceMode::BLOCKS_FIRST, block_size);
 
     if (!useNchw) outputNode = transpose(NCHW_NHWC, outputNode);
 

@@ -38,7 +38,7 @@ bool Conv2d::validate() {
     return true;
 }
 
-std::shared_ptr<ngraph::Node> Conv2d::createNode() {
+std::shared_ptr<ov::Node> Conv2d::createNode() {
     const auto& inputsSize = sModelInfo->getOperationInputsSize(mNnapiOperationIndex);
     ALOGD("%s inputsSize %lu", __func__, inputsSize);
 
@@ -65,7 +65,7 @@ std::shared_ptr<ngraph::Node> Conv2d::createNode() {
     std::vector<std::ptrdiff_t> pads_begin;
     std::vector<std::ptrdiff_t> pads_end;
     std::vector<size_t> dilations;
-    ngraph::op::PadType auto_pad;
+    ov::op::PadType auto_pad;
 
     const auto& inputDimensions = getInputOperandDimensions(0);
 
@@ -107,7 +107,7 @@ std::shared_ptr<ngraph::Node> Conv2d::createNode() {
 
         if (layout) useNchw = true;
 
-        auto_pad = ngraph::op::PadType::EXPLICIT;
+        auto_pad = ov::op::PadType::EXPLICIT;
         {
             if (useNchw) {
                 input_width = inputDimensions[3];
@@ -162,9 +162,9 @@ std::shared_ptr<ngraph::Node> Conv2d::createNode() {
                                      &padding_right);
             calculateExplicitPadding(input_height, stride_height, filter_height, 1, &padding_top,
                                      &padding_bottom);
-            auto_pad = ngraph::op::PadType::SAME_UPPER;
+            auto_pad = ov::op::PadType::SAME_UPPER;
         } else {
-            auto_pad = ngraph::op::PadType::VALID;
+            auto_pad = ov::op::PadType::VALID;
             padding_left = 0;
             padding_right = 0;
             padding_top = 0;
@@ -172,7 +172,7 @@ std::shared_ptr<ngraph::Node> Conv2d::createNode() {
         }
     }
 
-    std::shared_ptr<ngraph::Node> inputNode, filterNode, biasNode;
+    std::shared_ptr<ov::Node> inputNode, filterNode, biasNode;
     const auto& biasIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 2);
 
     inputNode = getInputNode(0);
@@ -185,22 +185,22 @@ std::shared_ptr<ngraph::Node> Conv2d::createNode() {
         vec<float> filterScales = filterOperand.extraParams.channelQuant().scales;
         float inputScale = sModelInfo->getOperandScale(0);
         auto filterScalesNode =
-            createConstNode(ngraph::element::f32, ngraph::Shape{filterScales.size()}, filterScales);
+            createConstNode(ov::element::f32, ov::Shape{filterScales.size()}, filterScales);
         auto inputScalesNode =
-            createConstNode(ngraph::element::f32, ngraph::Shape{1}, convertToVector(inputScale));
+            createConstNode(ov::element::f32, ov::Shape{1}, convertToVector(inputScale));
 
         // for quant symm per channel type inputs, bias is of type TENSOR_INT32. For TENSOR_INT32
         // type, dequantization is not applied during node creation
         // bias_scale[i] = input_scale * filter_scale[i]
         auto biasScalMultiplier =
-            std::make_shared<ngraph::opset3::Multiply>(filterScalesNode, inputScalesNode);
-        biasNode = std::make_shared<ngraph::opset3::Convert>(biasNode, ngraph::element::f32);
-        biasNode = std::make_shared<ngraph::opset3::Multiply>(biasNode, biasScalMultiplier);
+            std::make_shared<ov::opset3::Multiply>(filterScalesNode, inputScalesNode);
+        biasNode = std::make_shared<ov::opset3::Convert>(biasNode, ov::element::f32);
+        biasNode = std::make_shared<ov::opset3::Multiply>(biasNode, biasScalMultiplier);
     } else if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM) ||
                checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM_SIGNED)) {
         // for quant type inputs, bias is of type TENSOR_INT32. For TENSOR_INT32 type,
         // dequantization is not applied during node creation
-        biasNode = DequantizeNode(biasNode, biasIndex, ngraph::element::f32);
+        biasNode = DequantizeNode(biasNode, biasIndex, ov::element::f32);
     }
 
     // OpenVino expects filter in OIHW format
@@ -214,19 +214,19 @@ std::shared_ptr<ngraph::Node> Conv2d::createNode() {
     pads_end = {padding_bottom, padding_right};
     dilations = {(size_t)dilation_height_factor, (size_t)dilation_width_factor};
 
-    auto convNode = std::make_shared<ngraph::opset3::Convolution>(
-        inputNode, filterNode, ngraph::Strides(strides), ngraph::CoordinateDiff(pads_begin),
-        ngraph::CoordinateDiff(pads_end), ngraph::Strides(dilations), auto_pad);
+    auto convNode = std::make_shared<ov::opset3::Convolution>(
+        inputNode, filterNode, ov::Strides(strides), ov::CoordinateDiff(pads_begin),
+        ov::CoordinateDiff(pads_end), ov::Strides(dilations), auto_pad);
 
     auto biasDimensions = getInputOperandDimensions(2);
     std::vector<uint32_t> shape(convNode->get_shape().size(), 1);
     shape[1] = biasDimensions[0];
-    auto shapeNode = createConstNode(ngraph::element::i32, ngraph::Shape{shape.size()}, shape);
+    auto shapeNode = createConstNode(ov::element::i32, ov::Shape{shape.size()}, shape);
 
-    biasNode = std::make_shared<ngraph::opset3::Reshape>(biasNode, shapeNode, true);
+    biasNode = std::make_shared<ov::opset3::Reshape>(biasNode, shapeNode, true);
 
-    std::shared_ptr<ngraph::Node> outputNode = std::make_shared<ngraph::opset3::Add>(
-        convNode, biasNode, ngraph::op::AutoBroadcastType::NUMPY);
+    std::shared_ptr<ov::Node> outputNode =
+        std::make_shared<ov::opset3::Add>(convNode, biasNode, ov::op::AutoBroadcastType::NUMPY);
     outputNode = applyActivation(outputNode, activationFn);
 
     if (!useNchw) {

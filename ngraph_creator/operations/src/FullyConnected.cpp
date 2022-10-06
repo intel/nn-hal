@@ -30,10 +30,10 @@ bool FullyConnected::validate() {
     return true;
 }
 
-std::shared_ptr<ngraph::Node> FullyConnected::createNode() {
-    std::shared_ptr<ngraph::Node> inputNode = getInputNode(0);
-    std::shared_ptr<ngraph::Node> weightsNode = getInputNode(1);
-    std::shared_ptr<ngraph::Node> biasNode, multiplyNode, addNode, activationNode;
+std::shared_ptr<ov::Node> FullyConnected::createNode() {
+    std::shared_ptr<ov::Node> inputNode = getInputNode(0);
+    std::shared_ptr<ov::Node> weightsNode = getInputNode(1);
+    std::shared_ptr<ov::Node> biasNode, multiplyNode, addNode, activationNode;
 
     auto inputDims = getInputOperand(0).dimensions;
     auto weightDims = getInputOperand(1).dimensions;
@@ -42,14 +42,11 @@ std::shared_ptr<ngraph::Node> FullyConnected::createNode() {
     if ((inputDims.size() > 2) || (inputDims[1] != weightDims[1])) {
         std::vector<size_t> newShape = {getNumberOfElements(inputDims) / weightDims[1],
                                         weightDims[1]};
-        auto reshapeConstant = createConstNode(ngraph::element::i32, {2}, newShape);
-        auto reshapeNode =
-            std::make_shared<ngraph::op::v1::Reshape>(inputNode, reshapeConstant, false);
-        multiplyNode =
-            std::make_shared<ngraph::opset3::MatMul>(reshapeNode, weightsNode, false, true);
+        auto reshapeConstant = createConstNode(ov::element::i32, {2}, newShape);
+        auto reshapeNode = std::make_shared<ov::op::v1::Reshape>(inputNode, reshapeConstant, false);
+        multiplyNode = std::make_shared<ov::opset3::MatMul>(reshapeNode, weightsNode, false, true);
     } else {
-        multiplyNode =
-            std::make_shared<ngraph::opset3::MatMul>(inputNode, weightsNode, false, true);
+        multiplyNode = std::make_shared<ov::opset3::MatMul>(inputNode, weightsNode, false, true);
     }
 
     if (!sModelInfo->isOmittedInput(mNnapiOperationIndex, 2) && biasDims.size() != 0) {
@@ -57,12 +54,11 @@ std::shared_ptr<ngraph::Node> FullyConnected::createNode() {
 
         if (checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM) ||
             checkInputOperandType(0, (int32_t)OperandType::TENSOR_QUANT8_ASYMM_SIGNED))
-            biasNode =
-                DequantizeNode(biasNode, sModelInfo->getOperationInput(mNnapiOperationIndex, 2),
-                               ngraph::element::f32);
+            biasNode = DequantizeNode(
+                biasNode, sModelInfo->getOperationInput(mNnapiOperationIndex, 2), ov::element::f32);
 
-        addNode = std::make_shared<ngraph::opset3::Add>(multiplyNode, biasNode,
-                                                        ngraph::op::AutoBroadcastType::NUMPY);
+        addNode = std::make_shared<ov::opset3::Add>(multiplyNode, biasNode,
+                                                    ov::op::AutoBroadcastType::NUMPY);
     } else {
         ALOGD("FullyConnected: Bias not provided !!!");
         addNode = multiplyNode;

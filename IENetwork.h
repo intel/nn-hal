@@ -6,6 +6,9 @@
 #include <ie_executable_network.hpp>
 #include <ie_infer_request.hpp>
 #include <ie_input_info.hpp>
+#include <openvino/runtime/compiled_model.hpp>
+#include <openvino/runtime/core.hpp>
+#include <openvino/runtime/infer_request.hpp>
 #include <vector>
 
 #include "utils.h"
@@ -13,53 +16,41 @@
 // #include "ie_common.h"
 // #include "ie_core.hpp"
 // #include "inference_engine.hpp"
-
-namespace android {
-namespace hardware {
-namespace neuralnetworks {
-namespace nnhal {
+namespace android::hardware::neuralnetworks::nnhal {
 
 class IIENetwork {
 public:
     virtual ~IIENetwork() {}
     virtual bool loadNetwork() = 0;
-    virtual InferenceEngine::InferRequest getInferRequest() = 0;
+    virtual ov::InferRequest getInferRequest() = 0;
     virtual void infer() = 0;
     virtual void queryState() = 0;
-    virtual InferenceEngine::TBlob<float>::Ptr getBlob(const std::string& outName) = 0;
-    virtual void prepareInput(InferenceEngine::Precision precision,
-                              InferenceEngine::Layout layout) = 0;
-    virtual void prepareOutput(InferenceEngine::Precision precision,
-                               InferenceEngine::Layout layout) = 0;
-    virtual void setBlob(const std::string& inName,
-                         const InferenceEngine::Blob::Ptr& inputBlob) = 0;
+    virtual ov::Tensor getBlob(const std::string& outName) = 0;
+    virtual ov::Tensor getInputBlob(const std::size_t index) = 0;
+    virtual ov::Tensor getOutputBlob(const std::size_t index) = 0;
 };
 
 // Abstract this class for all accelerators
 class IENetwork : public IIENetwork {
 private:
-    std::shared_ptr<InferenceEngine::CNNNetwork> mNetwork;
-    InferenceEngine::ExecutableNetwork mExecutableNw;
-    InferenceEngine::InferRequest mInferRequest;
-    InferenceEngine::InputsDataMap mInputInfo;
-    InferenceEngine::OutputsDataMap mOutputInfo;
+    IntelDeviceType mTargetDevice;
+    std::shared_ptr<ov::Model> mNetwork;
+    ov::CompiledModel compiled_model;
+    ov::InferRequest mInferRequest;
 
 public:
-    IENetwork() : IENetwork(nullptr) {}
-    IENetwork(std::shared_ptr<InferenceEngine::CNNNetwork> network) : mNetwork(network) {}
+    IENetwork(IntelDeviceType device, std::shared_ptr<ov::Model> network)
+        : mTargetDevice(device), mNetwork(network) {}
 
     virtual bool loadNetwork();
-    void prepareInput(InferenceEngine::Precision precision, InferenceEngine::Layout layout);
-    void prepareOutput(InferenceEngine::Precision precision, InferenceEngine::Layout layout);
-    void setBlob(const std::string& inName, const InferenceEngine::Blob::Ptr& inputBlob);
-    InferenceEngine::TBlob<float>::Ptr getBlob(const std::string& outName);
-    InferenceEngine::InferRequest getInferRequest() { return mInferRequest; }
+    ov::Tensor getBlob(const std::string& outName);
+    ov::Tensor getInputBlob(const std::size_t index);
+    ov::Tensor getOutputBlob(const std::size_t index);
+    ov::InferRequest getInferRequest() { return mInferRequest; }
     void queryState() {}
     void infer();
 };
 
-}  // namespace nnhal
-}  // namespace neuralnetworks
-}  // namespace hardware
-}  // namespace android
+}  // namespace android::hardware::neuralnetworks::nnhal
+
 #endif

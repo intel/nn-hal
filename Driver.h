@@ -36,12 +36,8 @@
 #include <android/hardware/neuralnetworks/1.3/types.h>
 
 #include <string>
-#include "Utils.h"
 
-namespace android {
-namespace hardware {
-namespace neuralnetworks {
-namespace nnhal {
+namespace android::hardware::neuralnetworks::nnhal {
 
 enum class IntelDeviceType { CPU, GPU, GNA, VPU, OTHER };
 
@@ -150,9 +146,6 @@ protected:
     IntelDeviceType mDeviceType;
 };
 
-}  // namespace nnhal
-}  // namespace neuralnetworks
-}  // namespace hardware
-}  // namespace android
+}  // namespace android::hardware::neuralnetworks::nnhal
 
 #endif  // ANDROID_ML_NN_DRIVER_H

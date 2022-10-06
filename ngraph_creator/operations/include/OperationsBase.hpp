@@ -5,8 +5,9 @@
 #include <log/log.h>
 #include <NgraphHelper.hpp>
 #include <NgraphNodes.hpp>
-#include <ngraph/ngraph.hpp>
-#include <ngraph/opsets/opset3.hpp>
+#include <openvino/openvino.hpp>
+#include <openvino/opsets/opset3.hpp>
+#include <openvino/opsets/opset8.hpp>
 
 #include "ModelManager.h"
 
@@ -40,12 +41,11 @@ protected:
     uint32_t mDefaultOutputIndex;
     uint32_t mDefaultInputIndex = 0;
     int mNnapiOperationIndex;
-    std::shared_ptr<ngraph::Node> transpose(ConversionType type,
-                                            ngraph::Output<ngraph::Node> input);
-    virtual std::shared_ptr<ngraph::Node> createNode() = 0;
+    std::shared_ptr<ov::Node> transpose(ConversionType type, ov::Output<ov::Node> input);
+    virtual std::shared_ptr<ov::Node> createNode() = 0;
     // override createNodeForPlugin in case sPluginType specific implementation is required
-    virtual std::shared_ptr<ngraph::Node> createNodeForPlugin();
-    void addResultNode(size_t index, std::shared_ptr<ngraph::Node> resultNode);
+    virtual std::shared_ptr<ov::Node> createNodeForPlugin();
+    void addResultNode(size_t index, std::shared_ptr<ov::Node> resultNode);
 
     // helper functions
     bool checkOperandType(uint32_t operandIndex, const int32_t expectedOperandType,
@@ -55,34 +55,34 @@ protected:
     const vec<uint32_t> getInputOperandDimensions(uint32_t inputIndex);
     bool isValidInputTensor(uint32_t inputIndex);
 
-    std::shared_ptr<ngraph::Node> getInputNode(uint32_t inputIndex, bool dequantize = true) {
-        std::shared_ptr<ngraph::Node> input;
+    std::shared_ptr<ov::Node> getInputNode(uint32_t inputIndex, bool dequantize = true) {
+        std::shared_ptr<ov::Node> input;
         auto operandIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, inputIndex);
         auto operandType = sModelInfo->getOperandType(operandIndex);
         if (sModelInfo->isOperandLifeTimeConst(operandIndex)) {
             auto operandDims = getInputOperandDimensions(inputIndex);
-            ngraph::element::Type elementType;
+            ov::element::Type elementType;
             switch (operandType) {
                 case OperandType::TENSOR_FLOAT32: {
-                    elementType = ngraph::element::f32;
+                    elementType = ov::element::f32;
                     auto operandValues = sModelInfo->GetConstVecOperand<float>(operandIndex);
                     input = createConstNode(elementType, toNgraphShape(operandDims), operandValues);
                     break;
                 }
                 case OperandType::TENSOR_INT32: {
-                    elementType = ngraph::element::i32;
+                    elementType = ov::element::i32;
                     auto operandValues = sModelInfo->GetConstVecOperand<int>(operandIndex);
                     input = createConstNode(elementType, toNgraphShape(operandDims), operandValues);
                     break;
                 }
                 case OperandType::TENSOR_BOOL8: {
-                    elementType = ngraph::element::boolean;
+                    elementType = ov::element::boolean;
                     auto operandValues = sModelInfo->GetConstVecOperand<uint8_t>(operandIndex);
                     input = createConstNode(elementType, toNgraphShape(operandDims), operandValues);
                     break;
                 }
                 case OperandType::TENSOR_QUANT8_ASYMM: {
-                    elementType = ngraph::element::u8;
+                    elementType = ov::element::u8;
                     auto operandValues = sModelInfo->GetConstVecOperand<uint8_t>(operandIndex);
                     input = createConstNode(elementType, toNgraphShape(operandDims), operandValues);
                     break;
@@ -90,25 +90,25 @@ protected:
                 case OperandType::TENSOR_QUANT8_SYMM:
                 case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL:
                 case OperandType::TENSOR_QUANT8_ASYMM_SIGNED: {
-                    elementType = ngraph::element::i8;
+                    elementType = ov::element::i8;
                     auto operandValues = sModelInfo->GetConstVecOperand<int8_t>(operandIndex);
                     input = createConstNode(elementType, toNgraphShape(operandDims), operandValues);
                     break;
                 }
                 case OperandType::TENSOR_FLOAT16: {
-                    elementType = ngraph::element::f16;
+                    elementType = ov::element::f16;
                     auto operandValues = sModelInfo->GetConstVecOperand<_Float16>(operandIndex);
                     input = createConstNode(elementType, toNgraphShape(operandDims), operandValues);
                     break;
                 }
                 case OperandType::TENSOR_QUANT16_SYMM: {
-                    elementType = ngraph::element::i16;
+                    elementType = ov::element::i16;
                     auto operandValues = sModelInfo->GetConstVecOperand<int16_t>(operandIndex);
                     input = createConstNode(elementType, toNgraphShape(operandDims), operandValues);
                     break;
                 }
                 case OperandType::TENSOR_QUANT16_ASYMM: {
-                    elementType = ngraph::element::u16;
+                    elementType = ov::element::u16;
                     auto operandValues = sModelInfo->GetConstVecOperand<uint16_t>(operandIndex);
                     input = createConstNode(elementType, toNgraphShape(operandDims), operandValues);
                     break;
@@ -131,7 +131,7 @@ protected:
                 operandType == OperandType::TENSOR_QUANT8_SYMM ||
                 operandType == OperandType::TENSOR_QUANT16_SYMM ||
                 operandType == OperandType::TENSOR_QUANT16_ASYMM) {
-                input = DequantizeNode(input, operandIndex, ngraph::element::f32);
+                input = DequantizeNode(input, operandIndex, ov::element::f32);
             }
         }
 
@@ -145,9 +145,9 @@ protected:
     }
 
     template <typename T>
-    std::shared_ptr<ngraph::Node> createConstNode(ngraph::element::Type elementType,
-                                                  ngraph::Shape shape, std::vector<T> vals) {
-        return ngraph::op::Constant::create(elementType, shape, vals);
+    std::shared_ptr<ov::Node> createConstNode(ov::element::Type elementType, ov::Shape shape,
+                                              std::vector<T> vals) {
+        return std::make_shared<ov::opset8::Constant>(elementType, shape, vals);
     }
 
     template <typename T>
@@ -158,11 +158,12 @@ protected:
         return vec;
     }
 
-    std::shared_ptr<ngraph::Node> QuantizeNode(std::shared_ptr<ngraph::Node> input, size_t index,
-                                               ngraph::element::Type quantizeType);
-    std::shared_ptr<ngraph::Node> DequantizeNode(std::shared_ptr<ngraph::Node> input,
-                                                 uint32_t index,
-                                                 ngraph::element::Type dequantizeType);
+    std::shared_ptr<ov::Node> addFakeQuantizeNode(std::shared_ptr<ov::Node> inputNode,
+                                                  uint32_t index);
+    std::shared_ptr<ov::Node> QuantizeNode(std::shared_ptr<ov::Node> input, size_t index,
+                                           ov::element::Type quantizeType);
+    std::shared_ptr<ov::Node> DequantizeNode(std::shared_ptr<ov::Node> input, uint32_t index,
+                                             ov::element::Type dequantizeType);
 
     const Operand& getInputOperand(uint32_t index) {
         auto inputIdx = sModelInfo->getOperationInput(mNnapiOperationIndex, index);
@@ -190,6 +191,7 @@ public:
     std::shared_ptr<NgraphNodes> mNgraphNodes;
     OperationsBase(int operationIndex);
     void setNgraphNodes(std::shared_ptr<NgraphNodes> nodes);
+    bool transposed = false;
     virtual bool validate();
     // override validateForPlugin in case sPluginType specific implementation is required
     virtual bool validateForPlugin();

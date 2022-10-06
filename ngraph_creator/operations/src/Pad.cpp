@@ -30,7 +30,7 @@ bool Pad::validate() {
     return true;
 }
 
-std::shared_ptr<ngraph::Node> Pad::createNode() {
+std::shared_ptr<ov::Node> Pad::createNode() {
     // Creating input nodes
     auto inputNode = getInputNode(0);
 
@@ -44,11 +44,11 @@ std::shared_ptr<ngraph::Node> Pad::createNode() {
         paddings_0[i] = paddings_2d[2 * i];
         paddings_1[i] = paddings_2d[2 * i + 1];
     }
-    const auto pads_begin = createConstNode(ngraph::element::i32, {half_size}, paddings_0);
-    const auto pads_end = createConstNode(ngraph::element::i32, {half_size}, paddings_1);
+    const auto pads_begin = createConstNode(ov::element::i32, {half_size}, paddings_0);
+    const auto pads_end = createConstNode(ov::element::i32, {half_size}, paddings_1);
 
-    auto outputNode = std::make_shared<ngraph::opset3::Pad>(inputNode, pads_begin, pads_end,
-                                                            ngraph::op::PadMode::CONSTANT);
+    auto outputNode = std::make_shared<ov::opset3::Pad>(inputNode, pads_begin, pads_end,
+                                                        ov::op::PadMode::CONSTANT);
     ALOGV("outputNode Shape Size : %lu", outputNode->get_shape().size());
 
     return outputNode;

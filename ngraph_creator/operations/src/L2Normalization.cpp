@@ -22,8 +22,8 @@ bool L2Normalization::validate() {
     return true;
 }
 
-std::shared_ptr<ngraph::Node> L2Normalization::createNode() {
-    std::shared_ptr<ngraph::Node> inputNode;
+std::shared_ptr<ov::Node> L2Normalization::createNode() {
+    std::shared_ptr<ov::Node> inputNode;
 
     int32_t inputAxes = -1;
     const auto& inputsSize = sModelInfo->getOperationInputsSize(mNnapiOperationIndex);
@@ -33,7 +33,7 @@ std::shared_ptr<ngraph::Node> L2Normalization::createNode() {
     if (inputsSize == 2) {
         inputAxes = sModelInfo->ParseOperationInput<int32_t>(mNnapiOperationIndex, 1);
     }
-    auto inputAxesNode = createConstNode(ngraph::element::i32, {1}, convertToVector(inputAxes));
+    auto inputAxesNode = createConstNode(ov::element::i32, {1}, convertToVector(inputAxes));
     // TODO: Add support for NNAPI feature level 4, if the elements along an axis are all zeros, the
     // result is undefined. Since NNAPI feature level 4, if the elements along an axis are all
     // zeros, the result is logical zero.
@@ -43,10 +43,10 @@ std::shared_ptr<ngraph::Node> L2Normalization::createNode() {
      *         input[batch, row, col, channel] /
      *         sqrt(sum_{c} pow(input[batch, row, col, c], 2))
      */
-    auto mul = std::make_shared<ngraph::opset3::Multiply>(inputNode, inputNode);
-    auto sum = std::make_shared<ngraph::opset3::ReduceSum>(mul, inputAxesNode, true);
-    auto sqrt = std::make_shared<ngraph::opset3::Sqrt>(sum);
-    auto outputNode = std::make_shared<ngraph::opset3::Divide>(inputNode, sqrt);
+    auto mul = std::make_shared<ov::opset3::Multiply>(inputNode, inputNode);
+    auto sum = std::make_shared<ov::opset3::ReduceSum>(mul, inputAxesNode, true);
+    auto sqrt = std::make_shared<ov::opset3::Sqrt>(sum);
+    auto outputNode = std::make_shared<ov::opset3::Divide>(inputNode, sqrt);
 
     return outputNode;
 }

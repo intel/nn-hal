@@ -23,8 +23,8 @@ bool AveragePool2D::validate() {
     return true;
 }
 
-std::shared_ptr<ngraph::Node> AveragePool2D::createNode() {
-    std::shared_ptr<ngraph::Node> inputNode;
+std::shared_ptr<ov::Node> AveragePool2D::createNode() {
+    std::shared_ptr<ov::Node> inputNode;
     const auto& inDims = getInputOperandDimensions(0);
     const auto& inputsSize = sModelInfo->getOperationInputsSize(mNnapiOperationIndex);
 
@@ -47,7 +47,7 @@ std::shared_ptr<ngraph::Node> AveragePool2D::createNode() {
     int32_t filter_width, filter_height;
     int32_t input_width, input_height;
     int32_t activationFn;
-    ngraph::op::PadType auto_pad;
+    ov::op::PadType auto_pad;
 
     if (inputsSize >= 10 && inputsSize <= 11) {
         isExplicit = true;
@@ -75,7 +75,7 @@ std::shared_ptr<ngraph::Node> AveragePool2D::createNode() {
 
         if (layout) useNchw = true;
 
-        auto_pad = ngraph::op::PadType::EXPLICIT;
+        auto_pad = ov::op::PadType::EXPLICIT;
     }
 
     if (isImplicit) {
@@ -109,14 +109,14 @@ std::shared_ptr<ngraph::Node> AveragePool2D::createNode() {
             calculateExplicitPadding(input_height, stride_height, filter_height, 1, &padding_top,
                                      &padding_bottom);
 
-            auto_pad = ngraph::op::PadType::SAME_UPPER;
+            auto_pad = ov::op::PadType::SAME_UPPER;
 
         } else {
             padding_left = 0;
             padding_right = 0;
             padding_top = 0;
             padding_bottom = 0;
-            auto_pad = ngraph::op::PadType::VALID;
+            auto_pad = ov::op::PadType::VALID;
         }
     }
 
@@ -129,9 +129,9 @@ std::shared_ptr<ngraph::Node> AveragePool2D::createNode() {
     pad_end = {(size_t)padding_bottom, (size_t)padding_right};
     kernel = {(size_t)filter_height, (size_t)filter_width};
 
-    std::shared_ptr<ngraph::Node> outputNode = std::make_shared<ngraph::opset3::AvgPool>(
-        inputNode, ngraph::Strides(strides), ngraph::Shape(pad_begin), ngraph::Shape(pad_end),
-        ngraph::Shape(kernel), true, ngraph::op::RoundingType::FLOOR, auto_pad);
+    std::shared_ptr<ov::Node> outputNode = std::make_shared<ov::opset3::AvgPool>(
+        inputNode, ov::Strides(strides), ov::Shape(pad_begin), ov::Shape(pad_end),
+        ov::Shape(kernel), true, ov::op::RoundingType::FLOOR, auto_pad);
 
     outputNode = applyActivation(outputNode, activationFn);
 

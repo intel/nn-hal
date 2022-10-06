@@ -11,11 +11,11 @@ Log::Log(int operationIndex) : OperationsBase(operationIndex) {
     mDefaultOutputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
 }
 
-std::shared_ptr<ngraph::Node> Log::createNode() {
+std::shared_ptr<ov::Node> Log::createNode() {
     // Creating input nodes
     auto input = getInputNode(0);
 
-    auto outputNode = std::make_shared<ngraph::opset3::Log>(input);
+    auto outputNode = std::make_shared<ov::opset3::Log>(input);
 
     return outputNode;
 }

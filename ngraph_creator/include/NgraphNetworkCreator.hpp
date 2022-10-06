@@ -2,7 +2,7 @@
 
 #include <NgraphNodes.hpp>
 #include <OperationsFactory.hpp>
-#include <ngraph/node.hpp>
+#include <openvino/core/node.hpp>
 #include "ModelManager.h"
 #include "OperationsBase.hpp"
 
@@ -28,7 +28,7 @@ public:
 
     const std::string& getNodeName(uint32_t index);
 
-    std::shared_ptr<ngraph::Function> generateGraph();
+    std::shared_ptr<ov::Model> generateGraph();
 };
 
 }  // namespace nnhal

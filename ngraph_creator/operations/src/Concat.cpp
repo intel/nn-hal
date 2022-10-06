@@ -25,12 +25,12 @@ bool Concat::validate() {
     return true;
 }
 
-std::shared_ptr<ngraph::Node> Concat::createNode() {
+std::shared_ptr<ov::Node> Concat::createNode() {
     auto n = sModelInfo->getOperationInputsSize(mNnapiOperationIndex) -
              1;  // 0 ~ n-1: The list of n input tensors
     auto axis = sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex,
                                                           n);  // n: concatenation axis
-    std::vector<ngraph::Output<ngraph::Node>> inputs;
+    std::vector<ov::Output<ov::Node>> inputs;
     ALOGD("createNode n %lu, axis %d", n, axis);
     for (size_t i = 0; i < n; i++) {
         auto inputIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, i);
@@ -40,8 +40,7 @@ std::shared_ptr<ngraph::Node> Concat::createNode() {
         inputs.push_back(inputOp);
     }
 
-    std::shared_ptr<ngraph::Node> outputNode =
-        std::make_shared<ngraph::opset3::Concat>(inputs, axis);
+    std::shared_ptr<ov::Node> outputNode = std::make_shared<ov::opset3::Concat>(inputs, axis);
 
     return outputNode;
 }

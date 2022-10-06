@@ -13,11 +13,11 @@ Quantize::Quantize(int operationIndex) : OperationsBase(operationIndex) {
 
 void Quantize::connectOperationToGraph() { createNode(); }
 
-std::shared_ptr<ngraph::Node> Quantize::createNode() {
+std::shared_ptr<ov::Node> Quantize::createNode() {
     // Creating input nodes
     auto input = getInputNode(0);
     const auto& outputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
-    auto outputNode = QuantizeNode(input, outputIndex, ngraph::element::u8);
+    auto outputNode = QuantizeNode(input, outputIndex, ov::element::u8);
 
     mNgraphNodes->setOutputAtOperandIndex(outputIndex, outputNode);
     const auto op = sModelInfo->getOperand(outputIndex);

@@ -19,14 +19,14 @@ bool ExpandDims::validate() {
     return true;
 }
 
-std::shared_ptr<ngraph::Node> ExpandDims::createNode() {
+std::shared_ptr<ov::Node> ExpandDims::createNode() {
     // Creating input nodes
     auto input = getInputNode(0);
     auto index = sModelInfo->ParseOperationInput<int>(mNnapiOperationIndex, 1);
 
-    auto axes = createConstNode(ngraph::element::i32, {}, convertToVector(index));
+    auto axes = createConstNode(ov::element::i32, {}, convertToVector(index));
 
-    auto outputNode = std::make_shared<ngraph::opset3::Unsqueeze>(input, axes);
+    auto outputNode = std::make_shared<ov::opset3::Unsqueeze>(input, axes);
 
     return outputNode;
 }

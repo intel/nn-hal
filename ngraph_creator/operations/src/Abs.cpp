@@ -11,11 +11,11 @@ Abs::Abs(int operationIndex) : OperationsBase(operationIndex) {
     mDefaultOutputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
 }
 
-std::shared_ptr<ngraph::Node> Abs::createNode() {
+std::shared_ptr<ov::Node> Abs::createNode() {
     // Creating input nodes
     auto input = getInputNode(0);
 
-    auto outputNode = std::make_shared<ngraph::opset3::Abs>(input);
+    auto outputNode = std::make_shared<ov::opset3::Abs>(input);
 
     return outputNode;
 }
