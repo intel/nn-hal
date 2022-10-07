@@ -30,14 +30,14 @@ jobs:
       run: |
         cd ${ROOT_DIR}/src/third_party/${REPO_NAME}/
         git checkout ${{ github.sha }}
-        cp ci/* ${ROOT_DIR}/src/
+        cp -r ci/* ${ROOT_DIR}/src/
     - name: Fetch pull request code.
       if: github.event_name == 'pull_request'
       run: |
         cd ${ROOT_DIR}/src/third_party/${REPO_NAME}/
         git fetch origin pull/${{ github.event.number }}/head:${{ github.head_ref }}
         git checkout ${{ github.head_ref }}
-        cp ci/* ${ROOT_DIR}/src/
+        cp -r ci/* ${ROOT_DIR}/src/
   build-package:
     needs: fetch-code
     runs-on: self-hosted

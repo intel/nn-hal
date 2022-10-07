@@ -21,7 +21,7 @@ SLOT="0/0"
 
 RDEPEND="
 	chromeos-base/aosp-frameworks-ml-nn
-	chromeos-base/intel-openvino
+	chromeos-base/intel-openvino-dev
 "
 
 DEPEND="
