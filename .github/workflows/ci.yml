@@ -58,3 +58,13 @@ jobs:
       run: |
         cd ${ROOT_DIR}/src/
         sh build-test.sh "functional"
+  test-regression:
+    needs: build-package
+    runs-on: self-hosted
+    env:
+      ROOT_DIR: /srv/workspace
+    steps:
+    - name: Run regression tests for nn-hal.
+      run: |
+        cd ${ROOT_DIR}/src/
+        sh build-test.sh "regression"        
