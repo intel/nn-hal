@@ -64,7 +64,7 @@ namespace nn {
 
 GeneralResult<SharedDevice> getService(const std::string& serviceName) {
     auto driver = new android::hardware::neuralnetworks::nnhal::Driver(
-        android::hardware::neuralnetworks::nnhal::IntelDeviceType::CPU);
+        android::hardware::neuralnetworks::nnhal::IntelDeviceType::VPU);
     return V1_3::utils::Device::create(serviceName, std::move(driver));
 }
 
