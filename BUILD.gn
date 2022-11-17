@@ -183,14 +183,12 @@ shared_library("intel_nnhal") {
     "intel_nn_hal/dl",
   ]
   libs = [
-    "crypto",
     "openvino",
     "openvino_intel_cpu_plugin",
     "pthread",
     "rt",
     "nnapi-support",
     "nn-common",
-    "ssl",
   ]
   lib_dirs = [
     "${sysroot}/usr/local/deployment_tools/inference_engine/lib/intel64/",
