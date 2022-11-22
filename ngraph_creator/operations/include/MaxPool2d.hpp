@@ -10,7 +10,6 @@ namespace nnhal {
 class MaxPool2d : public OperationsBase {
 public:
     MaxPool2d(int operationIndex);
-    bool validate() override;
     std::shared_ptr<ngraph::Node> createNode() override;
 };
 

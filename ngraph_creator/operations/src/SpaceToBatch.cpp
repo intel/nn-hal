@@ -16,21 +16,17 @@ bool SpaceToBatch::validate() {
     const auto inputRank = getInputOperandDimensions(0).size();
 
     if (inputRank != 4) return false;
-    if ( !isValidInputTensor(0) || !isValidInputTensor(1) || !isValidInputTensor(2) ) {
-         ALOGE("%s Empty  or Invalid dimensions size for input", __func__);
-         return false;
+
+    auto& block_shape_OperandIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 1);
+    // TODO: Add Support for all_tensors_as_inputs
+    if (!sModelInfo->isOperandLifeTimeConst(block_shape_OperandIndex)) {
+        ALOGE("%s Only Constant dimensions supported now", __func__);
+        return false;
     }
 
-
-    auto& input_OperandIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 0);
-    auto& block_shape_OperandIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 1);
-    auto& pad_OperandIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 2);
-
-    //check operand lifetime is const or not as for now only const operand lifetime is supported
+    auto pad_OperandIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 2);
     // TODO: Add Support for all_tensors_as_inputs
-    if (!sModelInfo->isOperandLifeTimeConst(input_OperandIndex) ||
-        !sModelInfo->isOperandLifeTimeConst(block_shape_OperandIndex) ||
-        !sModelInfo->isOperandLifeTimeConst(pad_OperandIndex)) {
+    if (!sModelInfo->isOperandLifeTimeConst(pad_OperandIndex)) {
         ALOGE("%s Only Constant dimensions supported now", __func__);
         return false;
     }

@@ -11,16 +11,6 @@ Relu6::Relu6(int operationIndex) : OperationsBase(operationIndex) {
     mDefaultOutputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
 }
 
-bool Relu6::validate() {
-    if ( !isValidInputTensor(0)) {
-         ALOGE("%s Empty  or Invalid dimensions size for input", __func__);
-         return false;
-    }
-
-    ALOGV("%s PASSED", __func__);
-    return true;
-}
-
 std::shared_ptr<ngraph::Node> Relu6::createNode() {
     // Creating input nodes
     std::shared_ptr<ngraph::Node> input;

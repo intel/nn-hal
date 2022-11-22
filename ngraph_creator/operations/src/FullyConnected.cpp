@@ -25,18 +25,6 @@ bool FullyConnected::validate() {
         ALOGE("%s Invalid input parameter dimensions!!!", __func__);
         return false;
     }
-    //check operand lifetime
-    const auto& dimsOperandIndex1 = sModelInfo->getOperationInput(mNnapiOperationIndex, 0);
-    const auto& dimsOperandIndex2 = sModelInfo->getOperationInput(mNnapiOperationIndex, 1);
-    const auto& dimsOperandIndex3 = sModelInfo->getOperationInput(mNnapiOperationIndex, 2);
-    const auto& dimsOperandIndex4 = sModelInfo->getOperationInput(mNnapiOperationIndex, 3);
-    if(!sModelInfo->isOperandLifeTimeConst(dimsOperandIndex1) ||
-        !sModelInfo->isOperandLifeTimeConst(dimsOperandIndex2) ||
-        !sModelInfo->isOperandLifeTimeConst(dimsOperandIndex3) ||
-        !sModelInfo->isOperandLifeTimeConst(dimsOperandIndex4)) {
-        ALOGE("%s Only Const lifetime is supported", __func__);
-        return false;
-    }
 
     ALOGD("%s succeeded", __func__);
     return true;

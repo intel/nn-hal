@@ -11,25 +11,6 @@ ReduceMin::ReduceMin(int operationIndex) : OperationsBase(operationIndex) {
     mDefaultOutputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
 }
 
-bool ReduceMin::validate() {
-    // Check input rank
-    const auto inputRank = getInputOperandDimensions(0).size();
-
-    if (inputRank > 4) 
-        return false;
-
-    if ( !isValidInputTensor(0) || !isValidInputTensor(1)) {
-         ALOGE("%s Empty  or Invalid dimensions size for input", __func__);
-         return false;
-    }
-
-    auto& input_OperandIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 0);
-    auto& dim_reduce_OperandIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 1);
-
-    ALOGV("%s PASSED", __func__);
-    return true;
-}
-
 std::shared_ptr<ngraph::Node> ReduceMin::createNode() {
     // Creating input nodes
     std::shared_ptr<ngraph::Node> input;

@@ -11,16 +11,6 @@ Quantize::Quantize(int operationIndex) : OperationsBase(operationIndex) {
     mDefaultOutputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
 }
 
-bool Quantize::validate() {
-    if ( !isValidInputTensor(0)) {
-         ALOGE("%s Empty  or Invalid dimensions size for input", __func__);
-         return false;
-    }
-
-    ALOGV("%s PASSED", __func__);
-    return true;
-}
-
 void Quantize::connectOperationToGraph() { createNode(); }
 
 std::shared_ptr<ngraph::Node> Quantize::createNode() {

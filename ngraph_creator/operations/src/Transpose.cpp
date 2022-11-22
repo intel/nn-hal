@@ -13,23 +13,13 @@ Transpose::Transpose(int operationIndex) : OperationsBase(operationIndex) {
 
 bool Transpose::validate() {
     // TODO: Add Support for all_tensors_as_inputs
-    const auto& dimsOperandIndex1 = sModelInfo->getOperationInput(mNnapiOperationIndex, 0);
-    const auto inputRank = getInputOperandDimensions(0).size();
-    if ( !isValidInputTensor(0) || inputRank > 4) {
-         ALOGE("%s Empty  or Invalid dimensions size for input", __func__);
-         return false;
+    const auto& dimsOperandIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 1);
+    const auto& dims = getInputOperandDimensions(1);
+    if (!dims.empty() && dims[0] != 0 && !sModelInfo->isOperandLifeTimeConst(dimsOperandIndex)) {
+        ALOGE("%s Only Constant dimensions supported now", __func__);
+        return false;
     }
 
-    const auto& inputsSize = sModelInfo->getOperationInputsSize(mNnapiOperationIndex);
-    if (inputsSize == 2) {
-        const auto& dimsOperandIndex2 = sModelInfo->getOperationInput(mNnapiOperationIndex, 1);
-        if (!isValidInputTensor(1) || !sModelInfo->isOperandLifeTimeConst(dimsOperandIndex2)) {
-            ALOGE("%s Invalid operand type or operand lifetime", __func__);
-            return false;
-        }
-    }
-
-    ALOGV("%s PASSED", __func__);
     return true;
 }
 
@@ -40,12 +30,14 @@ std::shared_ptr<ngraph::Node> Transpose::createNode() {
     input = getInputNode(0);
 
     std::shared_ptr<ngraph::Node> order;
-    order = createConstNode(ngraph::element::i32, {0}, convertToVector(0));
 
-    const auto& inputsSize = sModelInfo->getOperationInputsSize(mNnapiOperationIndex);
-    if (inputsSize == 2) {
+    const auto& dims = getInputOperandDimensions(1);
+    if (!dims.empty() && dims[0] != 0) {
         order = getInputNode(1);
+    } else {
+        order = createConstNode(ngraph::element::i32, {0}, convertToVector(0));
     }
+
     std::shared_ptr<ngraph::Node> outputNode;
 
     outputNode = std::make_shared<ngraph::opset3::Transpose>(input, order);

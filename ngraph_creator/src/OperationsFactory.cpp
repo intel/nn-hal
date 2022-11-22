@@ -26,8 +26,8 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<Argmax>(operationIndex);
         case OperationType::ARGMIN:
             return std::make_shared<Argmin>(operationIndex);
-        // case OperationType::AVERAGE_POOL_2D:
-        //     return std::make_shared<AveragePool2D>(operationIndex);
+        case OperationType::AVERAGE_POOL_2D:
+            return std::make_shared<AveragePool2D>(operationIndex);
         case OperationType::BATCH_TO_SPACE_ND:
             return std::make_shared<BatchToSpace>(operationIndex);
         case OperationType::BIDIRECTIONAL_SEQUENCE_RNN:
@@ -70,10 +70,10 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<GroupedConv2d>(operationIndex);
         case OperationType::INSTANCE_NORMALIZATION:
             return std::make_shared<InstanceNormalization>(operationIndex);
-        // case OperationType::L2_POOL_2D:
-        //     return std::make_shared<L2Pooling2D>(operationIndex);
-        // case OperationType::L2_NORMALIZATION:
-        //     return std::make_shared<L2Normalization>(operationIndex);
+        case OperationType::L2_POOL_2D:
+            return std::make_shared<L2Pooling2D>(operationIndex);
+        case OperationType::L2_NORMALIZATION:
+            return std::make_shared<L2Normalization>(operationIndex);
         case OperationType::LSTM:
             return std::make_shared<LSTM>(operationIndex);
         case OperationType::LESS:
@@ -144,10 +144,10 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<ROIPooling>(operationIndex);
         case OperationType::RSQRT:
             return std::make_shared<RSQRT>(operationIndex);
-        // case OperationType::RESIZE_BILINEAR:
-        //     return std::make_shared<ResizeBilinear>(operationIndex);
-        // case OperationType::RESIZE_NEAREST_NEIGHBOR:
-        //     return std::make_shared<ResizeNearestNeighbor>(operationIndex);
+        case OperationType::RESIZE_BILINEAR:
+            return std::make_shared<ResizeBilinear>(operationIndex);
+        case OperationType::RESIZE_NEAREST_NEIGHBOR:
+            return std::make_shared<ResizeNearestNeighbor>(operationIndex);
         case OperationType::SELECT:
             return std::make_shared<Select>(operationIndex);
         case OperationType::SOFTMAX:
