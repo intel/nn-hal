@@ -186,7 +186,10 @@ std::shared_ptr<ov::Node> TransposeConv2D::createNode() {
     // OpenVino expects filter in OIHW format
     filterNode = transpose(IHWO_OIHW, filterNode);
 
-    if (!useNchw) {  // No conversion needed if useNchw set
+    const auto& inputIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 0);
+    const auto inputOp = sModelInfo->getOperand(inputIndex);
+    if (!useNchw && inputOp.lifetime ==
+                        OperandLifeTime::SUBGRAPH_INPUT) {  // No conversion needed if useNchw set
         inputNode = transpose(NHWC_NCHW, inputNode);
     }
 
@@ -218,7 +221,9 @@ std::shared_ptr<ov::Node> TransposeConv2D::createNode() {
         transposeConvNode, biasNode, ov::op::AutoBroadcastType::NUMPY);
     outputNode = applyActivation(outputNode, activationFn);
 
-    if (!useNchw) {
+    auto outputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
+    const auto op = sModelInfo->getOperand(outputIndex);
+    if (!useNchw && (op.lifetime == OperandLifeTime::SUBGRAPH_OUTPUT)) {
         outputNode = transpose(NCHW_NHWC, outputNode);
     }
 

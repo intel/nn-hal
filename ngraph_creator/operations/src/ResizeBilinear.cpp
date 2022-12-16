@@ -60,7 +60,13 @@ std::shared_ptr<ov::Node> ResizeBilinear::createNode() {
         input_height = inputDimensions[1];
     }
 
-    if (!useNchw) inputNode = transpose(NHWC_NCHW, inputNode);
+    const auto& inputIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 0);
+    const auto inputOp = sModelInfo->getOperand(inputIndex);
+    if (!useNchw && (inputOp.lifetime ==
+                     OperandLifeTime::SUBGRAPH_INPUT)) {  // No conversion needed if useNchw set
+        inputNode = transpose(NHWC_NCHW, inputNode);
+    }
+
     // FLOAT16 type check added for future when VPUX plugin support is added
     if (checkInputOperandType(1, (int32_t)OperandType::FLOAT32)) {
         // In tensorflow lite, resizing by size is supported. Scaling factors are
@@ -123,7 +129,9 @@ std::shared_ptr<ov::Node> ResizeBilinear::createNode() {
 
     outputNode = std::make_shared<ov::op::v4::Interpolate>(inputNode, outputShapeNode, scaleNode,
                                                            axesNode, attrs);
-    if (!useNchw) {
+    auto outputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
+    const auto op = sModelInfo->getOperand(outputIndex);
+    if (!useNchw && (op.lifetime == OperandLifeTime::SUBGRAPH_OUTPUT)) {
         outputNode = transpose(NCHW_NHWC, outputNode);
     }
     return outputNode;
