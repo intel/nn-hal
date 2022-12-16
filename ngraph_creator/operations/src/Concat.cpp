@@ -30,6 +30,10 @@ std::shared_ptr<ov::Node> Concat::createNode() {
              1;  // 0 ~ n-1: The list of n input tensors
     auto axis = sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex,
                                                           n);  // n: concatenation axis
+    // TODO: Axis is 3 since data is in NHWC but due to optimization
+    // data is in NCHW format
+    // WA to fix Axis to 1
+    axis = 1;
     std::vector<ov::Output<ov::Node>> inputs;
     ALOGD("createNode n %lu, axis %d", n, axis);
     for (size_t i = 0; i < n; i++) {
