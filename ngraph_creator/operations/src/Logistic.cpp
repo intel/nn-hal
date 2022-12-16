@@ -20,6 +20,13 @@ std::shared_ptr<ov::Node> Logistic::createNode() {
     std::shared_ptr<ov::Node> outputNode;
     outputNode = std::make_shared<ov::opset3::Sigmoid>(input);
 
+    // TODO : This is a WA for selfie_segmentation model
+    auto outputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
+    const auto op = sModelInfo->getOperand(outputIndex);
+    if (op.lifetime == OperandLifeTime::SUBGRAPH_OUTPUT) {
+        outputNode = transpose(NCHW_NHWC, outputNode);
+    }
+
     return outputNode;
 }
 
