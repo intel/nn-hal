@@ -120,7 +120,10 @@ std::shared_ptr<ov::Node> AveragePool2D::createNode() {
         }
     }
 
-    if (!useNchw) {  // No conversion needed if useNchw set
+    const auto& inputIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 0);
+    const auto inputOp = sModelInfo->getOperand(inputIndex);
+    if (!useNchw && (inputOp.lifetime ==
+                     OperandLifeTime::SUBGRAPH_INPUT)) {  // No conversion needed if useNchw set
         inputNode = transpose(NHWC_NCHW, inputNode);
     }
 
@@ -134,8 +137,9 @@ std::shared_ptr<ov::Node> AveragePool2D::createNode() {
         ov::Shape(kernel), true, ov::op::RoundingType::FLOOR, auto_pad);
 
     outputNode = applyActivation(outputNode, activationFn);
-
-    if (!useNchw) {
+    auto outputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
+    const auto op = sModelInfo->getOperand(outputIndex);
+    if (!useNchw && (op.lifetime == OperandLifeTime::SUBGRAPH_OUTPUT)) {
         outputNode = transpose(NCHW_NHWC, outputNode);
     }
 
