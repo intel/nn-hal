@@ -2,8 +2,8 @@
 
 ## Update the BOARD based on the testing requirement. ##
 ## Currently the following boards are supported:      ##
-## - volteer                                          ##
-BOARD=volteer
+## - rex                                              ##
+BOARD=rex
 ACTION=$1
 
 red=`tput setaf 1`
@@ -28,7 +28,7 @@ runCmd() {
 # This function is required because, by default, ml_cmdline
 # always returns status 0 irrespective of whether it failed or not.
 mlCmdline() {
-	sub_cmd="ssh root@${IPADDRESS} ml_cmdline --nnapi"
+	sub_cmd="ssh root@${DUT} ml_cmdline --nnapi"
 	if ! ${sub_cmd} | grep "Status: OK" ; then
 		return 1
 	else
@@ -38,15 +38,13 @@ mlCmdline() {
 
 # Function to get DUT IP address from config file based on BOARD.
 getBoardAddr() {
-	IPADDRESS=$(awk -v key=${BOARD} -F "=" 'BEGIN{/key/} {print $2}' boards.ini | tr -d ' ' | sed -r '/^\s*$/d')
-	echo ${IPADDRESS}
-	if [ -z "${IPADDRESS}" ]; then
-		echo "${red}ERROR: Unsupported BOARD=${BOARD}.${reset}"
+	DUT=$(awk -v key=${BOARD} -F "=" 'BEGIN{/key/} {print $2}' boards.ini | tr -d ' ' | sed -r '/^\s*$/d')
+	echo ${DUT}
+	if [ -z "${DUT}" ]; then
+		echo "${red}ERROR: Invalid BOARD \"${BOARD}\" and/or DUT \"${DUT}\".${reset}"
 		exit 1
 	fi
 }
-
-getBoardAddr
 
 echo ${ACTION}
 if [ "${ACTION}" = "build" ]; then
@@ -63,8 +61,11 @@ if [ "${ACTION}" = "build" ]; then
 	cmd="cros_sdk -- cros_workon_make --board=${BOARD} --install intel-nnhal"
 	runCmd
 
-	cmd="cros_sdk -- cros deploy ssh://${IPADDRESS} intel-nnhal"
-	runCmd
+elif [ "${ACTION}" = "deploy" ]; then
+        getBoardAddr # Get DUT IP address
+
+        cmd="cros_sdk -- cros deploy ${DUT} intel-nnhal"
+        runCmd
 
 elif [ "${ACTION}" = "functional" ]; then
 
@@ -73,56 +74,56 @@ elif [ "${ACTION}" = "functional" ]; then
 	runCmd
 
 	# Run required cts tests
-	cmd="ssh root@${IPADDRESS} export ANDROID_LOG_TAGS=\"*:f\" && cros_nnapi_cts --gtest_filter=-Validation*:TestGenerated*:TestRandom*:Generated*:UnknownCombinations*"
+	cmd="ssh root@${DUT} export ANDROID_LOG_TAGS=\"*:f\" && cros_nnapi_cts --gtest_filter=-Validation*:TestGenerated*:TestRandom*:Generated*:UnknownCombinations*"
 	runCmd
 
         # Run subset of nnapi vts 1_0 tests
-        cmd="ssh root@${IPADDRESS} export ANDROID_LOG_TAGS=\"*:f\" && cros_nnapi_vts_1_0 --gtest_filter=-Validation*:TestGenerated*:TestRandom*:Generated*:UnknownCombinations*"
+        cmd="ssh root@${DUT} export ANDROID_LOG_TAGS=\"*:f\" && cros_nnapi_vts_1_0 --gtest_filter=-Validation*:TestGenerated*:TestRandom*:Generated*:UnknownCombinations*"
 	runCmd
 
         # Run subset of nnapi vts 1_1 tests
-        cmd="ssh root@${IPADDRESS} export ANDROID_LOG_TAGS=\"*:f\" && cros_nnapi_vts_1_1 --gtest_filter=-Validation*:TestGenerated*:TestRandom*:Generated*:UnknownCombinations*"
+        cmd="ssh root@${DUT} export ANDROID_LOG_TAGS=\"*:f\" && cros_nnapi_vts_1_1 --gtest_filter=-Validation*:TestGenerated*:TestRandom*:Generated*:UnknownCombinations*"
 	runCmd
 
         # Run subset of nnapi vts 1_2 tests
-        cmd="ssh root@${IPADDRESS} export ANDROID_LOG_TAGS=\"*:f\" && cros_nnapi_vts_1_2 --gtest_filter=-Validation*:TestGenerated*:TestRandom*:Generated*:UnknownCombinations*"
+        cmd="ssh root@${DUT} export ANDROID_LOG_TAGS=\"*:f\" && cros_nnapi_vts_1_2 --gtest_filter=-Validation*:TestGenerated*:TestRandom*:Generated*:UnknownCombinations*"
 	runCmd
 
         # Run subset of  nnapi vts 1_3 tests
-	cmd="ssh root@${IPADDRESS} export ANDROID_LOG_TAGS=\"*:f\" && cros_nnapi_vts_1_3 --gtest_filter=-Validation*:TestGenerated*:TestRandom*:Generated*:UnknownCombinations*"
+	cmd="ssh root@${DUT} export ANDROID_LOG_TAGS=\"*:f\" && cros_nnapi_vts_1_3 --gtest_filter=-Validation*:TestGenerated*:TestRandom*:Generated*:UnknownCombinations*"
 	runCmd
 
 elif [ "${ACTION}" = "regression" ]; then
 	# Copy test script to DUT
-	scp cts-vts.py root@${IPADDRESS}:~/
+	scp cts-vts.py root@${DUT}:~/
 
 	# Run nnapi cts tests
-	cmd="ssh root@${IPADDRESS} export ANDROID_LOG_TAGS=\"*:f\" && python cts-vts.py --cts"
+	cmd="ssh root@${DUT} export ANDROID_LOG_TAGS=\"*:f\" && python cts-vts.py --cts"
 	runCmd
-	scp root@${IPADDRESS}:~/cts_*.csv . # Copy test result to host server
-	ssh root@${IPADDRESS} rm -f cts_*.csv # Delete test result to save space in DUT
+	scp root@${DUT}:~/cts_*.csv . # Copy test result to host server
+	ssh root@${DUT} rm -f cts_*.csv # Delete test result to save space in DUT
 
 	# Run nnapi vts_1_0 tests
-	cmd="ssh root@${IPADDRESS} python cts-vts.py --vts10"
+	cmd="ssh root@${DUT} python cts-vts.py --vts10"
 	runCmd
-        scp root@${IPADDRESS}:~/vts10_*.csv . # Copy test result to host server
-        ssh root@${IPADDRESS} rm -f vts10_*.csv # Delete test result to save space in DUT
+        scp root@${DUT}:~/vts10_*.csv . # Copy test result to host server
+        ssh root@${DUT} rm -f vts10_*.csv # Delete test result to save space in DUT
 
         # Run nnapi vts_1_1 tests
-        cmd="ssh root@${IPADDRESS} python cts-vts.py --vts11"
+        cmd="ssh root@${DUT} python cts-vts.py --vts11"
         runCmd
-        scp root@${IPADDRESS}:~/vts11_*.csv . # Copy test result to host server
-        ssh root@${IPADDRESS} rm -f vts11_*.csv # Delete test result to save space in DUT
+        scp root@${DUT}:~/vts11_*.csv . # Copy test result to host server
+        ssh root@${DUT} rm -f vts11_*.csv # Delete test result to save space in DUT
 
         # Run nnapi vts_1_2 tests
-        cmd="ssh root@${IPADDRESS} python cts-vts.py --vts12"
+        cmd="ssh root@${DUT} python cts-vts.py --vts12"
         runCmd
-        scp root@${IPADDRESS}:~/vts12_*.csv . # Copy test result to host server
-        ssh root@${IPADDRESS} rm -f vts12_*.csv # Delete test result to save space in DUT
+        scp root@${DUT}:~/vts12_*.csv . # Copy test result to host server
+        ssh root@${DUT} rm -f vts12_*.csv # Delete test result to save space in DUT
 
         # Run nnapi vts_1_3 tests
-        cmd="ssh root@${IPADDRESS} python cts-vts.py --vts13"
+        cmd="ssh root@${DUT} python cts-vts.py --vts13"
         runCmd
-        scp root@${IPADDRESS}:~/vts13_*.csv . # Copy test result to host server
-        ssh root@${IPADDRESS} rm -f vts13_*.csv # Delete test result to save space in DUT
+        scp root@${DUT}:~/vts13_*.csv . # Copy test result to host server
+        ssh root@${DUT} rm -f vts13_*.csv # Delete test result to save space in DUT
 fi
