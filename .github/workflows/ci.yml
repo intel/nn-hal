@@ -44,12 +44,22 @@ jobs:
     env:
       ROOT_DIR: /srv/workspace
     steps:
-    - name: Build and deploy nn-hal.
+    - name: Build nn-hal.
       run: |
         cd ${ROOT_DIR}/src/
         sh build-test.sh "build"
-  test-functional:
+  deploy-package:
     needs: build-package
+    runs-on: self-hosted
+    env:
+      ROOT_DIR: /srv/workspace
+    steps:
+    - name: Deploy nn-hal.
+      run: |
+        cd ${ROOT_DIR}/src/
+        sh build-test.sh "deploy"
+  test-functional:
+    needs: deploy-package
     runs-on: self-hosted
     env:
       ROOT_DIR: /srv/workspace
