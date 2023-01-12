@@ -1,8 +1,4 @@
-![CI](https://github.com/reaganlo/nn-hal/actions/workflows/ci.yml/badge.svg)
-
-# ChromeOS Neural Networks HAL with OpenVINO supporting hardware accelerators such as /
-Intel® Math Kernel Library for Deep Neural Networks (Intel® MKL-DNN)
-Intel® Movidius™ Vision Processing Units (VPUs)
+# ChromeOS Neural Networks HAL with OpenVINO
 
 ## Introduction
 The ChromeOS Neural Network Hardware Abstraction Layer(NN HAL) provides the hardware acceleration
@@ -16,22 +12,22 @@ This version of the HAL works with OpenVINO 2022.1.1 branch: https://github.com/
 ## Supported Operations
 Following operations are currently supported by Android Neural Networks HAL for Intel MKL-DNN.
 
-ADD
-AVERAGE_POOL_2D
-CONCATENATION
-CONV_2D
-Convolution2DTransposeBias*
-DEPTHWISE_CONV_2D
-DEQUANTIZE
-FULLY_CONNECTED
-LOGISTIC
-MAX_POOL_2D
-MUL
-PAD
-RELU
-RELU6
-RESHAPE
-RESIZE_BILINEAR
+- ADD
+- AVERAGE_POOL_2D
+- CONCATENATION
+- CONV_2D
+- Convolution2DTransposeBias*
+- DEPTHWISE_CONV_2D
+- DEQUANTIZE
+- FULLY_CONNECTED
+- LOGISTIC
+- MAX_POOL_2D
+- MUL
+- PAD
+- RELU
+- RELU6
+- RESHAPE
+- RESIZE_BILINEAR
 
 ## License
 ChromeOS Neural Networks HAL is distributed under the Apache License, Version 2.0
