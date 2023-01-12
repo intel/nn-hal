@@ -1,33 +1,41 @@
 ![CI](https://github.com/reaganlo/nn-hal/actions/workflows/ci.yml/badge.svg)
 
-# Android Neural Networks HAL with OpenVINO supporting hardware accelerators such as /
+# ChromeOS Neural Networks HAL with OpenVINO supporting hardware accelerators such as /
 Intel® Math Kernel Library for Deep Neural Networks (Intel® MKL-DNN)
+Intel® Movidius™ Vision Processing Units (VPUs)
 
 ## Introduction
-The Android Neural Network Hardware Abstraction Layer(NN HAL) provides the hardware accelration
-for Android Neural Networks (NN) API. Intel NN-HAL takes the advantage of the Intel MKLD-DNN,
-enables high performance and low power implementation of Neural Networks API.
-Intel MKL-DNN https://github.com/intel/mkl-dnn &  https://01.org/mkl-dnn
-Android NN API is on [Neural Networks API]
-(https://developer.android.com/ndk/guides/neuralnetworks/index.html).
-OpenVINO deep learning framework https://github.com/opencv/dldt & https://01.org/openvinotoolkit
+The ChromeOS Neural Network Hardware Abstraction Layer(NN HAL) provides the hardware acceleration
+for ChromeOS Neural Networks (NN) API. Intel NN-HAL takes the advantage of the Intel OpenVINO
+CPUPlugin, based on MKLDNN which enables high performance and low power implementation of Neural Networks API.
+Intel OpenVINO is available at https://github.com/openvinotoolkit/openvino
 
+## OpenVINO version
+This version of the HAL works with OpenVINO 2022.1.1 branch: https://github.com/openvinotoolkit/openvino/tree/releases/2022/1.1
 
 ## Supported Operations
 Following operations are currently supported by Android Neural Networks HAL for Intel MKL-DNN.
 
-* ANEURALNETWORKS_CONV_2D
-* ANEURALNETWORKS_ADD
-
-## Known issues
-Support for Multiple Tensor inputs at runtime to model/network is ongoing
+ADD
+AVERAGE_POOL_2D
+CONCATENATION
+CONV_2D
+Convolution2DTransposeBias*
+DEPTHWISE_CONV_2D
+DEQUANTIZE
+FULLY_CONNECTED
+LOGISTIC
+MAX_POOL_2D
+MUL
+PAD
+RELU
+RELU6
+RESHAPE
+RESIZE_BILINEAR
 
 ## License
-Android Neural Networks HAL is distributed under the Apache License, Version 2.0
+ChromeOS Neural Networks HAL is distributed under the Apache License, Version 2.0
 You may obtain a copy of the License at: http://www.apache.org/licenses/LICENSE-2.0
-Intel® Math Kernel Library for Deep Neural Networks (Intel® MKL-DNN) is an open source
-performance library for Deep Learning (DL) applications intended for acceleration of DL
-frameworks on Intel® architecture.
 
 
 ## How to provide feedback
