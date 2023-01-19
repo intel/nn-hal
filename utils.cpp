@@ -501,6 +501,14 @@ bool createDirs(std::string path) {
     return true;
 }
 
+bool getGrpcSocketPath(char *socket_path) {
+    if (property_get("vendor.nn.hal.grpc_socket_path", socket_path, NULL) <= 0) {
+        ALOGV("%s : failed to read vendor.nn.hal.grpc_socket_path", __func__);
+        return false;
+    }
+    return true;
+}
+
 bool getGrpcIpPort(char *ip_port) {
     if (property_get("vendor.nn.hal.grpc_ip_port", ip_port, NULL) <= 0) {
         ALOGV("%s : failed to read vendor.nn.hal.grpc_ip_port", __func__);

@@ -59,20 +59,26 @@ bool BasePreparedModel::initialize() {
 }
 
 bool BasePreparedModel::checkRemoteConnection() {
-    char ip_port[PROPERTY_VALUE_MAX] = "";
+    char grpc_prop[PROPERTY_VALUE_MAX] = "";
     bool is_success = false;
-    if (!getGrpcIpPort(ip_port)) {
-        ALOGV("Invalid value for ip_port property : %s", ip_port);
-        return is_success;
+    if(getGrpcIpPort(grpc_prop)) {
+        ALOGD("Attempting GRPC via TCP : %s", grpc_prop);
+        mDetectionClient = std::make_shared<DetectionClient>(
+            grpc::CreateChannel(grpc_prop, grpc::InsecureChannelCredentials()));
+        if(mDetectionClient) {
+            auto reply = mDetectionClient->prepare(is_success);
+            ALOGI("GRPC prepare response is %d : %s", is_success, reply.c_str());
+        }
     }
-    mDetectionClient = std::make_shared<DetectionClient>(
-        grpc::CreateChannel(ip_port, grpc::InsecureChannelCredentials()));
-    if(!mDetectionClient) {
-        ALOGV("Unable to create channel with ip_port: %s", ip_port);
-        return is_success;
+    if (!is_success && getGrpcSocketPath(grpc_prop)) {
+        ALOGD("Attempting GRPC via unix : %s", grpc_prop);
+        mDetectionClient = std::make_shared<DetectionClient>(
+            grpc::CreateChannel(std::string("unix:") + grpc_prop, grpc::InsecureChannelCredentials()));
+        if(mDetectionClient) {
+            auto reply = mDetectionClient->prepare(is_success);
+            ALOGI("GRPC prepare response is %d : %s", is_success, reply.c_str());
+        }
     }
-    auto reply = mDetectionClient->prepare(is_success);
-    ALOGI("GRPC (%s) prepare response - %d : %s", ip_port, is_success, reply.c_str());
     mRemoteCheck = is_success;
     return is_success;
 }
@@ -398,7 +404,7 @@ static std::tuple<ErrorStatus, hidl_vec<V1_2::OutputShape>, Timing> executeSynch
 
     if (measure == MeasureTiming::YES) deviceStart = now();
     if(mRemoteCheck) {
-        ALOGI("%s Remote Infer", __func__);
+        ALOGI("%s GRPC Remote Infer", __func__);
         auto reply = mDetectionClient->remote_infer();
         ALOGI("***********GRPC server response************* %s", reply.c_str());
     }
