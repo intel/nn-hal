@@ -42,7 +42,7 @@ const std::string& NgraphNodes::getNodeName(size_t index) {
 
 std::vector<size_t> NgraphNodes::getOutputShape(size_t index) {
 
-    ALOGD("outputshape of node %d index ", __func__, index);
+    ALOGD("%s outputshape of node %d index ", __func__, index);
     return mOutputAtOperandIndex[index].get_node_shared_ptr()->get_output_shape(0);
 }
 
