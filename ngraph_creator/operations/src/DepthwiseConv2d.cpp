@@ -41,6 +41,8 @@ bool DepthwiseConv2d::validate() {
 }
 
 std::shared_ptr<ngraph::Node> DepthwiseConv2d::createNode() {
+    std::shared_ptr<ngraph::Node> inputNode;
+    inputNode = getInputNode(0);
     const auto& inputsSize = sModelInfo->getOperationInputsSize(mNnapiOperationIndex);
     ALOGD("%s inputsSize %lu", __func__, inputsSize);
     bool isImplicit = false, isExplicit = false;
@@ -50,6 +52,9 @@ std::shared_ptr<ngraph::Node> DepthwiseConv2d::createNode() {
         isExplicit = true;
     } else if (inputsSize >= 8 && inputsSize <= 11) {
         isImplicit = true;
+    } else {
+        ALOGE("%s inputsSize %lu NOT SUPPORTED", __func__, inputsSize);
+        return inputNode;
     }
 
     int32_t padding_left, padding_right;
@@ -123,8 +128,7 @@ std::shared_ptr<ngraph::Node> DepthwiseConv2d::createNode() {
             }
         }
     }
-
-    if (isImplicit) {
+    else if (isImplicit) {
         padding_scheme = sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 3);
 
         stride_width = sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex, 4);
@@ -181,10 +185,9 @@ std::shared_ptr<ngraph::Node> DepthwiseConv2d::createNode() {
         }
     }
 
-    std::shared_ptr<ngraph::Node> inputNode, filterNode, biasNode;
+    std::shared_ptr<ngraph::Node> filterNode, biasNode;
     const auto& biasIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 2);
 
-    inputNode = getInputNode(0);
     filterNode = getInputNode(1);
     biasNode = getInputNode(2);
 

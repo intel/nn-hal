@@ -177,7 +177,7 @@ public:
         const hidl_vec<V1_3::Request::MemoryPool>& pools);
 
     bool updateRequestPoolInfos() {
-        for (auto runtimeInfo : mRequestPoolInfos) {
+        for (auto& runtimeInfo : mRequestPoolInfos) {
             runtimeInfo.update();
         }
 
@@ -187,7 +187,7 @@ public:
     std::vector<V1_2::OutputShape> getOutputShapes() { return mOutputShapes; }
 
     void unmapRuntimeMemPools() {
-        for (auto runtimeInfo : mRequestPoolInfos) {
+        for (auto& runtimeInfo : mRequestPoolInfos) {
             runtimeInfo.unmap_mem();
         }
     }

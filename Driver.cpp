@@ -124,7 +124,7 @@ Return<ErrorStatus> Driver::prepareModel(const V1_0_Model& model,
         ALOGE("failed to create preparedmodel");
         return ErrorStatus::INVALID_ARGUMENT;
     }
-    for (auto opn : model.operations) dumpOperation(opn);
+    for (auto& opn : model.operations) dumpOperation(opn);
 
     if (!driverPreparedModel->initialize()) {
         ALOGE("failed to initialize preparedmodel");
@@ -179,7 +179,7 @@ Return<ErrorStatus> Driver::prepareModel_1_1(const V1_1_Model& model,
         ALOGE("failed to create preparedmodel");
         return ErrorStatus::INVALID_ARGUMENT;
     }
-    for (auto opn : model.operations) dumpOperation(opn);
+    for (auto& opn : model.operations) dumpOperation(opn);
 
     if (!driverPreparedModel->initialize()) {
         ALOGE("failed to initialize preparedmodel");
@@ -284,7 +284,7 @@ Return<ErrorStatus> Driver::prepareModel_1_2(const V1_2_Model& model,
         ALOGE("failed to create preparedmodel");
         return ErrorStatus::INVALID_ARGUMENT;
     }
-    for (auto opn : model.operations) dumpOperation(opn);
+    for (auto& opn : model.operations) dumpOperation(opn);
 
     if (!driverPreparedModel->initialize()) {
         ALOGE("failed to initialize preparedmodel");

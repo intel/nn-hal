@@ -12,6 +12,8 @@ MaxPool2d::MaxPool2d(int operationIndex) : OperationsBase(operationIndex) {
 }
 
 std::shared_ptr<ngraph::Node> MaxPool2d::createNode() {
+    std::shared_ptr<ngraph::Node> inputNode;
+    inputNode = getInputNode(0);
     const auto& inputsSize = sModelInfo->getOperationInputsSize(mNnapiOperationIndex);
     ALOGD("%s inputsSize %lu", __func__, inputsSize);
 
@@ -21,6 +23,9 @@ std::shared_ptr<ngraph::Node> MaxPool2d::createNode() {
         isExplicit = true;
     } else if (inputsSize >= 7 && inputsSize <= 8) {
         isImplicit = true;
+    } else {
+        ALOGE("%s inputsSize %lu NOT SUPPORTED", __func__, inputsSize);
+        return inputNode;
     }
 
     int32_t padding_left, padding_right;
@@ -61,13 +66,6 @@ std::shared_ptr<ngraph::Node> MaxPool2d::createNode() {
         if (layout) useNchw = true;
 
         auto_pad = ngraph::op::PadType::EXPLICIT;
-        if (useNchw) {
-            input_width = inputDimensions[3];
-            input_height = inputDimensions[2];
-        } else {
-            input_width = inputDimensions[2];
-            input_height = inputDimensions[1];
-        }
     }
 
     if (isImplicit) {
@@ -111,9 +109,6 @@ std::shared_ptr<ngraph::Node> MaxPool2d::createNode() {
             padding_bottom = 0;
         }
     }
-
-    std::shared_ptr<ngraph::Node> inputNode;
-    inputNode = getInputNode(0);
 
     if (!useNchw) {  // No conversion needed if useNchw set
         inputNode = transpose(NHWC_NCHW, inputNode);

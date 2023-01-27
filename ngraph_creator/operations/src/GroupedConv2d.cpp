@@ -35,6 +35,8 @@ bool GroupedConv2d::validate() {
 }
 
 std::shared_ptr<ngraph::Node> GroupedConv2d::createNode() {
+    std::shared_ptr<ngraph::Node> inputNode;
+    inputNode = getInputNode(0);
     const auto& inputsSize = sModelInfo->getOperationInputsSize(mNnapiOperationIndex);
     bool isImplicit = false, isExplicit = false;
 
@@ -43,17 +45,20 @@ std::shared_ptr<ngraph::Node> GroupedConv2d::createNode() {
         isExplicit = true;
     } else if (inputsSize >= 8 && inputsSize <= 9) {
         isImplicit = true;
+    } else {
+        ALOGE("%s inputsSize %lu NOT SUPPORTED", __func__, inputsSize);
+        return inputNode;
     }
 
-    int32_t padding_left, padding_right;
-    int32_t padding_top, padding_bottom;
+    int32_t padding_left = 0, padding_right = 0;
+    int32_t padding_top = 0, padding_bottom = 0;
     int32_t stride_width, stride_height;
     int32_t dilation_width_factor = 1, dilation_height_factor = 1;
     int32_t number_groups;
     int32_t activationFn;
     int32_t layout = 0;
     int32_t padding_scheme;
-    int32_t input_width, input_height, input_channel;
+    int32_t input_width, input_height;
     int32_t filter_width, filter_height;
     bool useNchw = false;
     std::vector<size_t> strides;
@@ -89,17 +94,6 @@ std::shared_ptr<ngraph::Node> GroupedConv2d::createNode() {
         if (layout) useNchw = true;
 
         auto_pad = ngraph::op::PadType::EXPLICIT;
-        {
-            if (useNchw) {  // NCHW
-                input_width = inputDimensions[3];
-                input_height = inputDimensions[2];
-                input_channel = inputDimensions[1];
-            } else {  // NHWC
-                input_width = inputDimensions[2];
-                input_height = inputDimensions[1];
-                input_channel = inputDimensions[3];
-            }
-        }
     }
 
     if (isImplicit) {
@@ -120,11 +114,9 @@ std::shared_ptr<ngraph::Node> GroupedConv2d::createNode() {
         if (useNchw) {
             input_width = inputDimensions[3];
             input_height = inputDimensions[2];
-            input_channel = inputDimensions[1];
         } else {
             input_width = inputDimensions[2];
             input_height = inputDimensions[1];
-            input_channel = inputDimensions[3];
         }
 
         if (padding_scheme == 1) {
@@ -144,10 +136,9 @@ std::shared_ptr<ngraph::Node> GroupedConv2d::createNode() {
         }
     }
 
-    std::shared_ptr<ngraph::Node> inputNode, filterNode, biasNode;
+    std::shared_ptr<ngraph::Node> filterNode, biasNode;
     const auto& biasIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 2);
 
-    inputNode = getInputNode(0);
     filterNode = getInputNode(1);
     biasNode = getInputNode(2);
 

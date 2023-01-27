@@ -53,6 +53,9 @@ std::shared_ptr<ngraph::Node> AveragePool2D::createNode() {
         isExplicit = true;
     } else if (inputsSize >= 7 && inputsSize <= 8) {
         isImplicit = true;
+    } else {
+        ALOGE("%s inputsSize %lu NOT SUPPORTED", __func__, inputsSize);
+        return inputNode;
     }
 
     if (isExplicit) {

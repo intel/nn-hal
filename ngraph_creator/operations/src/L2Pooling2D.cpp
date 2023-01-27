@@ -12,6 +12,8 @@ L2Pooling2D::L2Pooling2D(int operationIndex) : OperationsBase(operationIndex) {
 }
 
 std::shared_ptr<ngraph::Node> L2Pooling2D::createNode() {
+    std::shared_ptr<ngraph::Node> inputNode;
+    inputNode = getInputNode(0);
     const auto& inputsSize = sModelInfo->getOperationInputsSize(mNnapiOperationIndex);
     bool isImplicit = false, isExplicit = false;
 
@@ -19,10 +21,13 @@ std::shared_ptr<ngraph::Node> L2Pooling2D::createNode() {
         isExplicit = true;
     } else if (inputsSize >= 7 && inputsSize <= 8) {
         isImplicit = true;
+    } else {
+        ALOGE("%s inputsSize %lu NOT SUPPORTED", __func__, inputsSize);
+        return inputNode;
     }
 
-    int32_t padding_left, padding_right;
-    int32_t padding_top, padding_bottom;
+    int32_t padding_left = 0, padding_right = 0;
+    int32_t padding_top = 0, padding_bottom = 0;
     int32_t stride_width, stride_height;
     int32_t activationFn;
     int32_t layout = 0;
@@ -59,13 +64,6 @@ std::shared_ptr<ngraph::Node> L2Pooling2D::createNode() {
         if (layout) useNchw = true;
 
         auto_pad = ngraph::op::PadType::EXPLICIT;
-        if (useNchw) {
-            input_width = inputDimensions[3];
-            input_height = inputDimensions[2];
-        } else {
-            input_width = inputDimensions[2];
-            input_height = inputDimensions[1];
-        }
     }
 
     if (isImplicit) {
@@ -110,8 +108,7 @@ std::shared_ptr<ngraph::Node> L2Pooling2D::createNode() {
         }
     }
 
-    std::shared_ptr<ngraph::Node> inputNode, inputSquared, sqrtOutput;
-    inputNode = getInputNode(0);
+    std::shared_ptr<ngraph::Node> inputSquared, sqrtOutput;
     inputSquared = std::make_shared<ngraph::op::v1::Multiply>(inputNode, inputNode);
 
     if (!useNchw) {

@@ -46,6 +46,8 @@ bool TransposeConv2D::validate() {
 }
 
 std::shared_ptr<ngraph::Node> TransposeConv2D::createNode() {
+    std::shared_ptr<ngraph::Node> inputNode;
+    inputNode = getInputNode(0);
     const auto& inputsSize = sModelInfo->getOperationInputsSize(mNnapiOperationIndex);
     ALOGD("%s inputsSize %lu", __func__, inputsSize);
 
@@ -55,6 +57,9 @@ std::shared_ptr<ngraph::Node> TransposeConv2D::createNode() {
         isExplicit = true;
     } else if (inputsSize == 9) {
         isImplicit = true;
+    } else {
+        ALOGE("%s inputsSize %lu NOT SUPPORTED", __func__, inputsSize);
+        return inputNode;
     }
 
     int32_t padding_left, padding_right;
@@ -152,10 +157,9 @@ std::shared_ptr<ngraph::Node> TransposeConv2D::createNode() {
         padding_bottom = 0;
     }
 
-    std::shared_ptr<ngraph::Node> inputNode, filterNode, biasNode;
+    std::shared_ptr<ngraph::Node> filterNode, biasNode;
     const auto& biasIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 2);
 
-    inputNode = getInputNode(0);
     filterNode = getInputNode(1);
     biasNode = getInputNode(2);
 

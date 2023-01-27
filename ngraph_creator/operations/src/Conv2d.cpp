@@ -39,6 +39,8 @@ bool Conv2d::validate() {
 }
 
 std::shared_ptr<ngraph::Node> Conv2d::createNode() {
+    std::shared_ptr<ngraph::Node> inputNode;
+    inputNode = getInputNode(0);
     const auto& inputsSize = sModelInfo->getOperationInputsSize(mNnapiOperationIndex);
     ALOGD("%s inputsSize %lu", __func__, inputsSize);
 
@@ -49,6 +51,9 @@ std::shared_ptr<ngraph::Node> Conv2d::createNode() {
         isExplicit = true;
     } else if (inputsSize >= 7 && inputsSize <= 10) {
         isImplicit = true;
+    } else {
+        ALOGE("%s inputsSize %lu NOT SUPPORTED", __func__, inputsSize);
+        return inputNode;
     }
 
     int32_t padding_left, padding_right;
@@ -108,15 +113,6 @@ std::shared_ptr<ngraph::Node> Conv2d::createNode() {
         if (layout) useNchw = true;
 
         auto_pad = ngraph::op::PadType::EXPLICIT;
-        {
-            if (useNchw) {
-                input_width = inputDimensions[3];
-                input_height = inputDimensions[2];
-            } else {
-                input_width = inputDimensions[2];
-                input_height = inputDimensions[1];
-            }
-        }
     }
 
     if (isImplicit) {
@@ -172,10 +168,9 @@ std::shared_ptr<ngraph::Node> Conv2d::createNode() {
         }
     }
 
-    std::shared_ptr<ngraph::Node> inputNode, filterNode, biasNode;
+    std::shared_ptr<ngraph::Node> filterNode, biasNode;
     const auto& biasIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, 2);
 
-    inputNode = getInputNode(0);
     filterNode = getInputNode(1);
     biasNode = getInputNode(2);
 
