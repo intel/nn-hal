@@ -27,7 +27,8 @@ Status DetectionClient::sendFile(std::string fileName,
     uint32_t CHUNK_SIZE = 1024 * 1024;
     std::ifstream fin(fileName, std::ifstream::binary);
     std::vector<char> buffer(CHUNK_SIZE, 0);
-    ALOGI("GRPC sendFile %d sized chunks from %s", CHUNK_SIZE, fileName.c_str());
+    ALOGV("GRPC sendFile %s", fileName.c_str());
+    ALOGI("GRPC sendFile %d sized chunks", CHUNK_SIZE);
 
     if (!fin.is_open()) ALOGE("GRPC sendFile file Open Error ");
     while (!fin.eof()) {
@@ -42,7 +43,7 @@ Status DetectionClient::sendFile(std::string fileName,
     }
 
     writer->WritesDone();
-    ALOGI("GRPC sendFile completed %s", fileName.c_str());
+    ALOGI("GRPC sendFile completed");
     return writer->Finish();
 }
 

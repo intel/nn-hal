@@ -55,7 +55,7 @@ bool CpuPreparedModel::initialize() {
             auto resp = loadRemoteModel();
             ALOGD("%s Load Remote Model returns %d", __func__, resp);
         } else {
-            ALOGI("%s Remote connection unavailable", __func__);
+            ALOGD("%s Remote connection unavailable", __func__);
         }
     } catch (const std::exception& ex) {
         ALOGE("%s Exception !!! %s", __func__, ex.what());

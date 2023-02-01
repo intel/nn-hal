@@ -31,12 +31,12 @@ std::shared_ptr<ngraph::Node> Concat::createNode() {
     auto axis = sModelInfo->ParseOperationInput<uint32_t>(mNnapiOperationIndex,
                                                           n);  // n: concatenation axis
     std::vector<ngraph::Output<ngraph::Node>> inputs;
-    ALOGD("createNode n %lu, axis %d", n, axis);
+    ALOGV("createNode n %lu, axis %d", n, axis);
     for (size_t i = 0; i < n; i++) {
         auto inputIndex = sModelInfo->getOperationInput(mNnapiOperationIndex, i);
         auto inputOp = getInputNode(i);
         const auto op = sModelInfo->getOperand(inputIndex);
-        ALOGD("createNode inputIndex %d, lifetime %d", inputIndex, op.lifetime);
+        ALOGV("createNode inputIndex %d, lifetime %d", inputIndex, op.lifetime);
         inputs.push_back(inputOp);
     }
 

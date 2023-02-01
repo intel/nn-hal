@@ -46,11 +46,11 @@ bool NnapiModelInfo::initializeRunTimeOperandInfo() {
         }
 
         to.scale = from.scale;
+        ALOGV("OperandType = %d\n", from.type);
         switch (from.type) {
             case OperandType::TENSOR_FLOAT32:
             case OperandType::FLOAT32:
                 to.type = OperandType::TENSOR_FLOAT32;
-                ALOGD("OperandType = %d\n", from.type);
                 break;
             case OperandType::INT32:
             case OperandType::UINT32:
@@ -170,7 +170,7 @@ const uint8_t* NnapiModelInfo::GetOperandMemory(int index, uint32_t& lenOut) {
 
 V1_3::ErrorStatus NnapiModelInfo::setRunTimePoolInfosFromHidlMemories(
     const hidl_vec<V1_3::Request::MemoryPool>& pools) {
-    ALOGD("Number of pools: %zu", pools.size());
+    ALOGV("Number of pools: %zu", pools.size());
     mRequestPoolInfos.resize(pools.size());
     for (size_t i = 0; i < pools.size(); i++) {
         auto& poolInfo = mRequestPoolInfos[i];
@@ -197,7 +197,7 @@ V1_3::ErrorStatus NnapiModelInfo::setRunTimePoolInfosFromHidlMemories(
 
 ErrorStatus NnapiModelInfo::setRunTimePoolInfosFromHidlMemories(
     const hidl_vec<hidl_memory>& pools) {
-    ALOGD("Number of pools: %zu", pools.size());
+    ALOGV("Number of pools: %zu", pools.size());
 
     mRequestPoolInfos.resize(pools.size());
     for (size_t i = 0; i < pools.size(); i++) {
@@ -229,7 +229,7 @@ void* NnapiModelInfo::getBlobFromMemoryPoolIn(const Request& request, uint32_t i
 
     operand.buffer = r.buffer + arg.location.offset;
     operand.length = arg.location.length;
-    ALOGI("%s Operand length:%d pointer:%p offset:%d pool index: %d", __func__, operand.length,
+    ALOGV("%s Operand length:%d pointer:%p offset:%d pool index: %d", __func__, operand.length,
           (r.buffer + arg.location.offset), arg.location.offset, poolIndex);
     rBufferLength = operand.length;
 
@@ -244,7 +244,7 @@ void* NnapiModelInfo::getBlobFromMemoryPoolOut(const Request& request, uint32_t 
     nnAssert(poolIndex < mRequestPoolInfos.size());
     auto& r = mRequestPoolInfos[poolIndex];
 
-    ALOGD("%s lifetime:%d location offset:%d length:%d pool index:%d", __func__, operand.lifetime,
+    ALOGV("%s lifetime:%d location offset:%d length:%d pool index:%d", __func__, operand.lifetime,
           arg.location.offset, arg.location.length, poolIndex);
 
     if (arg.dimensions.size() > 0) {
@@ -258,7 +258,7 @@ void* NnapiModelInfo::getBlobFromMemoryPoolOut(const Request& request, uint32_t 
     operand.buffer = r.buffer + arg.location.offset;
     operand.length = arg.location.length;
     rBufferLength = operand.length;
-    ALOGI("%s Operand length:%d pointer:%p", __func__, operand.length,
+    ALOGV("%s Operand length:%d pointer:%p", __func__, operand.length,
           (r.buffer + arg.location.offset));
     return (r.buffer + arg.location.offset);
 }

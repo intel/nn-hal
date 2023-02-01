@@ -11,7 +11,7 @@ namespace neuralnetworks {
 namespace nnhal {
 
 bool IENetwork::loadNetwork() {
-    ALOGD("%s", __func__);
+    ALOGV("%s", __func__);
 
 #if __ANDROID__
     InferenceEngine::Core ie(std::string("/vendor/etc/openvino/plugins.xml"));
@@ -22,7 +22,7 @@ bool IENetwork::loadNetwork() {
 
     if (mNetwork) {
         mExecutableNw = ie.LoadNetwork(*mNetwork, "CPU");
-        ALOGD("LoadNetwork is done....");
+        ALOGD("loadNetwork is done....");
         mInferRequest = mExecutableNw.CreateInferRequest();
         ALOGD("CreateInfereRequest is done....");
 
@@ -65,7 +65,7 @@ InferenceEngine::TBlob<float>::Ptr IENetwork::getBlob(const std::string& outName
 }
 
 void IENetwork::infer() {
-    ALOGI("Infer Network\n");
+    ALOGI("infer Network\n");
     mInferRequest.StartAsync();
     mInferRequest.Wait(10000);
     ALOGI("infer request completed");

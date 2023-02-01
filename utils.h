@@ -89,19 +89,19 @@ enum PaddingScheme {
 #define VLOGDIMS(l, d, header)                                                       \
     do {                                                                             \
         auto size = (d).size();                                                      \
-        ALOGI("%s: vectors {%d, %d, %d, %d}", header, (d)[0], size > 1 ? (d)[1] : 0, \
+        ALOGV("%s: vectors {%d, %d, %d, %d}", header, (d)[0], size > 1 ? (d)[1] : 0, \
               size > 2 ? (d)[2] : 0, size > 3 ? (d)[3] : 0);                         \
     } while (0)
 
 #define dumpOperand(index, model)                               \
     do {                                                        \
         const auto op = model.operands[index];                  \
-        ALOGI("Operand (%zu) %s", index, toString(op).c_str()); \
+        ALOGV("Operand (%zu) %s", index, toString(op).c_str()); \
     } while (0)
 
 #define dumpOperation(operation)                             \
     do {                                                     \
-        ALOGI("Operation: %s", toString(operation).c_str()); \
+        ALOGV("Operation: %s", toString(operation).c_str()); \
     } while (0)
 
 #define WRONG_DIM (-1)

@@ -62,21 +62,21 @@ bool BasePreparedModel::checkRemoteConnection() {
     char grpc_prop[PROPERTY_VALUE_MAX] = "";
     bool is_success = false;
     if(getGrpcIpPort(grpc_prop)) {
-        ALOGD("Attempting GRPC via TCP : %s", grpc_prop);
+        ALOGV("Attempting GRPC via TCP : %s", grpc_prop);
         mDetectionClient = std::make_shared<DetectionClient>(
             grpc::CreateChannel(grpc_prop, grpc::InsecureChannelCredentials()));
         if(mDetectionClient) {
             auto reply = mDetectionClient->prepare(is_success);
-            ALOGI("GRPC prepare response is %d : %s", is_success, reply.c_str());
+            ALOGI("GRPC(TCP) prepare response is %d : %s", is_success, reply.c_str());
         }
     }
     if (!is_success && getGrpcSocketPath(grpc_prop)) {
-        ALOGD("Attempting GRPC via unix : %s", grpc_prop);
+        ALOGV("Attempting GRPC via unix : %s", grpc_prop);
         mDetectionClient = std::make_shared<DetectionClient>(
             grpc::CreateChannel(std::string("unix:") + grpc_prop, grpc::InsecureChannelCredentials()));
         if(mDetectionClient) {
             auto reply = mDetectionClient->prepare(is_success);
-            ALOGI("GRPC prepare response is %d : %s", is_success, reply.c_str());
+            ALOGI("GRPC(unix) prepare response is %d : %s", is_success, reply.c_str());
         }
     }
     mRemoteCheck = is_success;
@@ -242,7 +242,7 @@ void asyncExecute(const Request& request, MeasureTiming measure, BasePreparedMod
             ALOGD("Ignorning output at index(%d), since it is invalid", outIndex);
             continue;
         }
-        ALOGD("Output index: %d layername : %s", outIndex, outputNodeName.c_str());
+        ALOGV("Output index: %d layername : %s", outIndex, outputNodeName.c_str());
         auto srcBlob = plugin->getBlob(outputNodeName);
         auto operandType = modelInfo->getOperandType(outIndex);
         uint32_t actualLength = srcBlob->byteSize();
@@ -378,7 +378,7 @@ static std::tuple<ErrorStatus, hidl_vec<V1_2::OutputShape>, Timing> executeSynch
             ALOGD("Ignorning input at index(%d), since it is invalid", inIndex);
             continue;
         }
-        ALOGD("Input index: %d layername : %s", inIndex, inputNodeName.c_str());
+        ALOGV("Input index: %d layername : %s", inIndex, inputNodeName.c_str());
         //check if remote infer is available
         //TODO: Need to add FLOAT16 support for remote inferencing
         if(mRemoteCheck && mDetectionClient) {
@@ -400,7 +400,7 @@ static std::tuple<ErrorStatus, hidl_vec<V1_2::OutputShape>, Timing> executeSynch
 
     }
 
-    ALOGD("%s Run", __func__);
+    ALOGV("%s Run", __func__);
 
     if (measure == MeasureTiming::YES) deviceStart = now();
     if(mRemoteCheck) {
@@ -410,7 +410,7 @@ static std::tuple<ErrorStatus, hidl_vec<V1_2::OutputShape>, Timing> executeSynch
     }
     if (!mRemoteCheck || !mDetectionClient->get_status()){
         try {
-            ALOGI("%s Client Infer", __func__);
+            ALOGV("%s Client Infer", __func__);
             plugin->infer();
         } catch (const std::exception& ex) {
             ALOGE("%s Exception !!! %s", __func__, ex.what());
@@ -421,13 +421,13 @@ static std::tuple<ErrorStatus, hidl_vec<V1_2::OutputShape>, Timing> executeSynch
 
     for (size_t i = 0; i < request.outputs.size(); i++) {
         auto outIndex = modelInfo->getModelOutputIndex(i);
-        ALOGI("OutputIndex: %d", outIndex);
+        ALOGV("OutputIndex: %d", outIndex);
         const std::string& outputNodeName = ngraphNw->getNodeName(outIndex);
         if (outputNodeName == "") {
             ALOGD("Ignorning output at index(%d), since it is invalid", outIndex);
             continue;
         }
-        ALOGD("Output index: %d layername : %s", outIndex, outputNodeName.c_str());
+        ALOGV("Output index: %d layername : %s", outIndex, outputNodeName.c_str());
         auto srcBlob = plugin->getBlob(outputNodeName);
         auto operandType = modelInfo->getOperandType(outIndex);
         uint32_t actualLength = srcBlob->byteSize();
@@ -435,7 +435,7 @@ static std::tuple<ErrorStatus, hidl_vec<V1_2::OutputShape>, Timing> executeSynch
         void* destPtr = modelInfo->getBlobFromMemoryPoolOut(request, i, expectedLength);
         auto outputBlobDims = srcBlob->getTensorDesc().getDims();
 
-        ALOGD("output precision: %d", static_cast<int>(srcBlob->getTensorDesc().getPrecision()));
+        ALOGV("output precision: %d", static_cast<int>(srcBlob->getTensorDesc().getPrecision()));
 
         switch (operandType) {
             case OperandType::TENSOR_BOOL8:
