@@ -193,7 +193,8 @@ shared_library("intel_nnhal") {
   lib_dirs = [
     "${sysroot}/usr/local/deployment_tools/inference_engine/lib/intel64/",
     "${sysroot}/usr/local/deployment_tools/ngraph/lib64/",
-    "${sysroot}/usr/local/lib64"
+    "${sysroot}/usr/local/lib64/",
+    "${sysroot}/usr/local/runtime/lib/intel64/"
   ]
 }
 
