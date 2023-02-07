@@ -9629,4 +9629,5 @@
 		<edge from-layer="555" from-port="0" to-layer="556" to-port="1" />
 		<edge from-layer="556" from-port="2" to-layer="557" to-port="0" />
 	</edges>
+	<rt_info />
 </net>

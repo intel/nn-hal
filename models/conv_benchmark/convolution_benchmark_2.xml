@@ -3090,4 +3090,5 @@
 		<edge from-layer="182" from-port="0" to-layer="183" to-port="1" />
 		<edge from-layer="183" from-port="2" to-layer="184" to-port="0" />
 	</edges>
+	<rt_info />
 </net>
