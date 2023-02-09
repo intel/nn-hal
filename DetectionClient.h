@@ -36,7 +36,7 @@ public:
 
     std::string sendIRs(bool& flag);
 
-    void add_input_data(std::string label, const uint8_t* buffer, std::vector<size_t> shape);
+    void add_input_data(std::string label, const uint8_t* buffer, std::vector<size_t> shape, uint32_t size);
     void get_output_data(std::string label, uint8_t* buffer, std::vector<size_t> shape);
     void clear_data();
     std::string remote_infer();

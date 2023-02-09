@@ -382,7 +382,7 @@ static std::tuple<ErrorStatus, hidl_vec<V1_2::OutputShape>, Timing> executeSynch
         //check if remote infer is available
         //TODO: Need to add FLOAT16 support for remote inferencing
         if(mRemoteCheck && mDetectionClient) {
-            mDetectionClient->add_input_data(inputNodeName, (uint8_t*)srcPtr, ngraphNw->getOutputShape(inIndex));
+            mDetectionClient->add_input_data(inputNodeName, (uint8_t*)srcPtr, ngraphNw->getOutputShape(inIndex), len);
         } else {
             auto destBlob = plugin->getBlob(inputNodeName);
             if (modelInfo->getOperandType(inIndex) == OperandType::TENSOR_FLOAT16) {
@@ -479,47 +479,46 @@ static std::tuple<ErrorStatus, hidl_vec<V1_2::OutputShape>, Timing> executeSynch
         //copy output from remote infer
         //TODO: Add support for other OperandType
         if (mRemoteCheck && mDetectionClient && mDetectionClient->get_status()) {
-            mDetectionClient->get_output_data(outputNodeName, (uint8_t*)destPtr,  ngraphNw->getOutputShape(outIndex));
-        } else {
-            switch (operandType) {
-                case OperandType::TENSOR_INT32:
-                case OperandType::TENSOR_FLOAT32: {
-                    std::memcpy((uint8_t*)destPtr, srcBlob->buffer().as<uint8_t*>(),
-                                srcBlob->byteSize());
-                    break;
-                }
-                case OperandType::TENSOR_BOOL8: {
-                    floatToUint8(srcBlob->buffer().as<float*>(), (uint8_t*)destPtr, srcBlob->size());
-                    break;
-                }
-                case OperandType::TENSOR_QUANT8_ASYMM: {
-                    floatToUint8(srcBlob->buffer().as<float*>(), (uint8_t*)destPtr, srcBlob->size());
-                    break;
-                }
-                case OperandType::TENSOR_QUANT8_SYMM:
-                case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL:
-                case OperandType::TENSOR_QUANT8_ASYMM_SIGNED: {
-                    floatToint8(srcBlob->buffer().as<float*>(), (int8_t*)destPtr, srcBlob->size());
-                    break;
-                }
-                case OperandType::TENSOR_FLOAT16: {
-                    floatToFloat16(srcBlob->buffer().as<float*>(), (_Float16*)destPtr, srcBlob->size());
-                    break;
-                }
-                case OperandType::TENSOR_QUANT16_SYMM: {
-                    floatToInt16(srcBlob->buffer().as<float*>(), (int16_t*)destPtr, srcBlob->size());
-                    break;
-                }
-                case OperandType::TENSOR_QUANT16_ASYMM: {
-                    floatToUInt16(srcBlob->buffer().as<float*>(), (uint16_t*)destPtr, srcBlob->size());
-                    break;
-                }
-                default:
-                    std::memcpy((uint8_t*)destPtr, srcBlob->buffer().as<uint8_t*>(),
-                                srcBlob->byteSize());
-                    break;
-            }
+            mDetectionClient->get_output_data(outputNodeName, srcBlob->buffer().as<uint8_t*>(),  ngraphNw->getOutputShape(outIndex));
+        }
 
+        switch (operandType) {
+            case OperandType::TENSOR_INT32:
+            case OperandType::TENSOR_FLOAT32: {
+                std::memcpy((uint8_t*)destPtr, srcBlob->buffer().as<uint8_t*>(),
+                            srcBlob->byteSize());
+                break;
+            }
+            case OperandType::TENSOR_BOOL8: {
+                floatToUint8(srcBlob->buffer().as<float*>(), (uint8_t*)destPtr, srcBlob->size());
+                break;
+            }
+            case OperandType::TENSOR_QUANT8_ASYMM: {
+                floatToUint8(srcBlob->buffer().as<float*>(), (uint8_t*)destPtr, srcBlob->size());
+                break;
+            }
+            case OperandType::TENSOR_QUANT8_SYMM:
+            case OperandType::TENSOR_QUANT8_SYMM_PER_CHANNEL:
+            case OperandType::TENSOR_QUANT8_ASYMM_SIGNED: {
+                floatToint8(srcBlob->buffer().as<float*>(), (int8_t*)destPtr, srcBlob->size());
+                break;
+            }
+            case OperandType::TENSOR_FLOAT16: {
+                floatToFloat16(srcBlob->buffer().as<float*>(), (_Float16*)destPtr, srcBlob->size());
+                break;
+            }
+            case OperandType::TENSOR_QUANT16_SYMM: {
+                floatToInt16(srcBlob->buffer().as<float*>(), (int16_t*)destPtr, srcBlob->size());
+                break;
+            }
+            case OperandType::TENSOR_QUANT16_ASYMM: {
+                floatToUInt16(srcBlob->buffer().as<float*>(), (uint16_t*)destPtr, srcBlob->size());
+                break;
+            }
+            default:
+                std::memcpy((uint8_t*)destPtr, srcBlob->buffer().as<uint8_t*>(),
+                            srcBlob->byteSize());
+                break;
         }
     }
 

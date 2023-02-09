@@ -68,18 +68,16 @@ std::string DetectionClient::sendIRs(bool& flag) {
     return std::string(status.error_message());
 }
 
-void DetectionClient::add_input_data(std::string label, const uint8_t* buffer, std::vector<size_t> shape) {
+void DetectionClient::add_input_data(std::string label, const uint8_t* buffer, std::vector<size_t> shape, uint32_t size) {
     const float* src;
     size_t index;
-    size_t size = 1;
 
     DataTensor* input = request.add_data_tensors();
     input->set_node_name(label);
     for (index = 0; index < shape.size(); index++) {
         input->add_tensor_shape(shape[index]);
-        size *= shape[index];
     }
-    input->set_data(buffer, size * sizeof(float));
+    input->set_data(buffer, size);
 }
 
 void DetectionClient::get_output_data(std::string label, uint8_t* buffer, std::vector<size_t> shape) {
