@@ -183,10 +183,11 @@ public:
 
     std::vector<V1_2::OutputShape> getOutputShapes() { return mOutputShapes; }
 
-    void unmapRuntimeMemPools() {
+    bool unmapRuntimeMemPools() {
         for (auto runtimeInfo : mRequestPoolInfos) {
             runtimeInfo.unmap_mem();
         }
+        return true;
     }
 
     bool isOmittedInput(int operationIndex, uint32_t index);
