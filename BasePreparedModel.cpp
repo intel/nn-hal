@@ -315,6 +315,9 @@ void asyncExecute(const Request& request, MeasureTiming measure, BasePreparedMod
     if (!returned.isOk()) {
         ALOGE("hidl callback failed to return properly: %s", returned.description().c_str());
     }
+    if (!modelInfo->unmapRuntimeMemPools()) {
+        ALOGE("Failed to unmap the request pool infos");
+    }
     ALOGV("Exiting %s", __func__);
 }
 
@@ -505,6 +508,9 @@ static std::tuple<ErrorStatus, hidl_vec<V1_2::OutputShape>, Timing> executeSynch
         return {ErrorStatus::NONE, modelInfo->getOutputShapes(), timing};
     }
     ALOGV("Exiting %s", __func__);
+    if (!modelInfo->unmapRuntimeMemPools()) {
+        ALOGE("Failed to unmap the request pool infos");
+    }
     return {ErrorStatus::NONE, modelInfo->getOutputShapes(), kNoTiming};
 }
 
@@ -534,7 +540,7 @@ Return<void> BasePreparedModel::executeSynchronously_1_3(const V1_3::Request& re
     time_point driverStart;
     if (measure == MeasureTiming::YES) driverStart = now();
 
-    if (!validateRequest(convertToV1_0(request), convertToV1_2(mModelInfo->getModel()))) {
+    if (!validateRequest(request, mModelInfo->getModel())) {
         cb(V1_3::ErrorStatus::INVALID_ARGUMENT, {}, kNoTiming);
         return Void();
     }

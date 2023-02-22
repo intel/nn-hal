@@ -28,6 +28,7 @@ std::shared_ptr<ov::Node> Mean::createNode() {
     std::shared_ptr<ov::Node> input;
 
     input = getInputNode(0);
+    input = transpose(NCHW_NHWC, input);
 
     auto reduction_axes = getInputNode(1);
     auto reduce_dims = sModelInfo->ParseOperationInput<int>(mNnapiOperationIndex, 2);
@@ -35,7 +36,7 @@ std::shared_ptr<ov::Node> Mean::createNode() {
 
     std::shared_ptr<ov::Node> outputNode;
     outputNode = std::make_shared<ov::opset3::ReduceMean>(input, reduction_axes, keep_dims);
-
+    outputNode = transpose(NHWC_NCHW, outputNode);
     return outputNode;
 }
 
