@@ -16,6 +16,7 @@ cc_library_static {
         "operations/src/Argmin.cpp",
         "operations/src/AveragePool2D.cpp",
         "operations/src/BatchToSpace.cpp",
+        "operations/src/BidirectionalSequenceLSTM.cpp",
         "operations/src/BidirectionalSequenceRNN.cpp",
         "operations/src/Cast.cpp",
         "operations/src/ChannelShuffle.cpp",
@@ -60,6 +61,7 @@ cc_library_static {
         "operations/src/Pow.cpp",
         "operations/src/PRelu.cpp",
         "operations/src/Quantize.cpp",
+        "operations/src/Quantized16BitLSTM.cpp",
         "operations/src/ReduceAll.cpp",
         "operations/src/ReduceAny.cpp",
         "operations/src/ReduceMax.cpp",
@@ -90,6 +92,7 @@ cc_library_static {
         "operations/src/TopkV2.cpp",
         "operations/src/TransposeConv2D.cpp",
         "operations/src/Transpose.cpp",
+        "operations/src/UnidirectionalSequenceLSTM.cpp",
         "operations/src/UnidirectionalSequenceRNN.cpp"
     ],
 

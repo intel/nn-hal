@@ -6,6 +6,7 @@
 #include <Argmin.hpp>
 #include <AveragePool2D.hpp>
 #include <BatchToSpace.hpp>
+#include <BidirectionalSequenceLSTM.hpp>
 #include <BidirectionalSequenceRNN.hpp>
 #include <Cast.hpp>
 #include <ChannelShuffle.hpp>
@@ -50,6 +51,7 @@
 #include <PadV2.hpp>
 #include <Pow.hpp>
 #include <Quantize.hpp>
+#include <Quantized16BitLSTM.hpp>
 #include <RNN.hpp>
 #include <ROIAlign.hpp>
 #include <ROIPooling.hpp>
@@ -80,6 +82,7 @@
 #include <TopkV2.hpp>
 #include <Transpose.hpp>
 #include <TransposeConv2D.hpp>
+#include <UnidirectionalSequenceLSTM.hpp>
 #include <UnidirectionalSequenceRNN.hpp>
 
 namespace android {

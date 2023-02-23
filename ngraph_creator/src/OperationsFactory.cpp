@@ -30,6 +30,8 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<AveragePool2D>(operationIndex);
         case OperationType::BATCH_TO_SPACE_ND:
             return std::make_shared<BatchToSpace>(operationIndex);
+        case OperationType::BIDIRECTIONAL_SEQUENCE_LSTM:
+            return std::make_shared<BidirectionalSequenceLSTM>(operationIndex);
         case OperationType::BIDIRECTIONAL_SEQUENCE_RNN:
             return std::make_shared<BidirectionalSequenceRNN>(operationIndex);
         case OperationType::CAST:
@@ -118,6 +120,8 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<PRelu>(operationIndex);
         case OperationType::QUANTIZE:
             return std::make_shared<Quantize>(operationIndex);
+        case OperationType::QUANTIZED_16BIT_LSTM:
+            return std::make_shared<Quantized16BitLSTM>(operationIndex);
         case OperationType::REDUCE_ALL:
             return std::make_shared<ReduceAll>(operationIndex);
         case OperationType::REDUCE_ANY:
@@ -178,6 +182,8 @@ std::shared_ptr<OperationsBase> OperationsFactory::getOperation(
             return std::make_shared<TransposeConv2D>(operationIndex);
         case OperationType::TRANSPOSE:
             return std::make_shared<Transpose>(operationIndex);
+        case OperationType::UNIDIRECTIONAL_SEQUENCE_LSTM:
+            return std::make_shared<UnidirectionalSequenceLSTM>(operationIndex);
         case OperationType::UNIDIRECTIONAL_SEQUENCE_RNN:
             return std::make_shared<UnidirectionalSequenceRNN>(operationIndex);
         default:
