@@ -110,7 +110,7 @@ std::shared_ptr<ov::Node> ResizeBilinear::createNode() {
     }
 
     // mode is passed as "linear" for bilinear interpolation
-    attrs.mode = ov::op::v4::Interpolate::InterpolateMode::linear;
+    attrs.mode = ov::op::v4::Interpolate::InterpolateMode::linear_onnx;
 
     std::vector<int32_t> output_shape = {out_height, out_width};
     auto outputShapeNode = createConstNode(ov::element::i32, {2}, output_shape);
