@@ -71,7 +71,7 @@ std::shared_ptr<ov::Node> ResizeBilinear::createNode() {
     if (checkInputOperandType(1, (int32_t)OperandType::FLOAT32)) {
         // In tensorflow lite, resizing by size is supported. Scaling factors are
         // calculated based on output shape.
-        attrs.shape_calculation_mode = ov::op::v4::Interpolate::ShapeCalcMode::sizes;
+        attrs.shape_calculation_mode = ov::op::v4::Interpolate::ShapeCalcMode::SIZES;
         width_scale = sModelInfo->ParseOperationInput<float>(mNnapiOperationIndex, 1);
         height_scale = sModelInfo->ParseOperationInput<float>(mNnapiOperationIndex, 2);
         out_width = (int)(input_width * width_scale);
@@ -81,7 +81,7 @@ std::shared_ptr<ov::Node> ResizeBilinear::createNode() {
         width_scale = (float)out_width / (float)input_width;
         height_scale = (float)out_height / (float)input_height;
     } else if (checkInputOperandType(1, (int32_t)OperandType::FLOAT16)) {
-        attrs.shape_calculation_mode = ov::op::v4::Interpolate::ShapeCalcMode::sizes;
+        attrs.shape_calculation_mode = ov::op::v4::Interpolate::ShapeCalcMode::SIZES;
         width_scale = sModelInfo->ParseOperationInput<_Float16>(mNnapiOperationIndex, 1);
         height_scale = sModelInfo->ParseOperationInput<_Float16>(mNnapiOperationIndex, 2);
         out_width = (int)(input_width * width_scale);
@@ -89,7 +89,7 @@ std::shared_ptr<ov::Node> ResizeBilinear::createNode() {
         width_scale = (float)out_width / (float)input_width;
         height_scale = (float)out_height / (float)input_height;
     } else if (checkInputOperandType(1, (int32_t)OperandType::INT32)) {
-        attrs.shape_calculation_mode = ov::op::v4::Interpolate::ShapeCalcMode::sizes;
+        attrs.shape_calculation_mode = ov::op::v4::Interpolate::ShapeCalcMode::SIZES;
         out_width = sModelInfo->ParseOperationInput<int>(mNnapiOperationIndex, 1);
         out_height = sModelInfo->ParseOperationInput<int>(mNnapiOperationIndex, 2);
         width_scale = (float)out_width / (float)input_width;
@@ -98,19 +98,19 @@ std::shared_ptr<ov::Node> ResizeBilinear::createNode() {
 
     if (align_corners == true) {
         attrs.coordinate_transformation_mode =
-            ov::op::v4::Interpolate::CoordinateTransformMode::align_corners;
+            ov::op::v4::Interpolate::CoordinateTransformMode::ALIGN_CORNERS;
     } else if (half_pixel == true) {
         attrs.coordinate_transformation_mode =
-            ov::op::v4::Interpolate::CoordinateTransformMode::half_pixel;
+            ov::op::v4::Interpolate::CoordinateTransformMode::HALF_PIXEL;
     } else {
         // If none of the align_corners and half_pixel are false, transformation
         // mode is set to asymmetric
         attrs.coordinate_transformation_mode =
-            ov::op::v4::Interpolate::CoordinateTransformMode::asymmetric;
+            ov::op::v4::Interpolate::CoordinateTransformMode::ASYMMETRIC;
     }
 
     // mode is passed as "linear" for bilinear interpolation
-    attrs.mode = ov::op::v4::Interpolate::InterpolateMode::linear_onnx;
+    attrs.mode = ov::op::v4::Interpolate::InterpolateMode::LINEAR_ONNX;
 
     std::vector<int32_t> output_shape = {out_height, out_width};
     auto outputShapeNode = createConstNode(ov::element::i32, {2}, output_shape);
