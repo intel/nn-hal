@@ -62,7 +62,7 @@ std::shared_ptr<ov::Node> ResizeNearestNeighbor::createNode() {
 
     if (!useNchw) inputNode = transpose(NHWC_NCHW, inputNode);
 
-    attrs.shape_calculation_mode = ov::op::v4::Interpolate::ShapeCalcMode::sizes;
+    attrs.shape_calculation_mode = ov::op::v4::Interpolate::ShapeCalcMode::SIZES;
     // mode is passed as "nearest" for Nearest Neighbor interpolation
     attrs.mode = ov::op::v4::Interpolate::InterpolateMode::nearest;
     attrs.nearest_mode = ov::op::v4::Interpolate::NearestMode::floor;
@@ -88,17 +88,17 @@ std::shared_ptr<ov::Node> ResizeNearestNeighbor::createNode() {
 
     if (align_corners == true) {
         attrs.coordinate_transformation_mode =
-            ov::op::v4::Interpolate::CoordinateTransformMode::align_corners;
+            ov::op::v4::Interpolate::CoordinateTransformMode::ALIGN_CORNERS;
         attrs.nearest_mode = ov::op::v4::Interpolate::NearestMode::round_prefer_ceil;
     } else if (half_pixel == true) {
         attrs.coordinate_transformation_mode =
-            ov::op::v4::Interpolate::CoordinateTransformMode::half_pixel;
+            ov::op::v4::Interpolate::CoordinateTransformMode::HALF_PIXEL;
         attrs.nearest_mode = ov::op::v4::Interpolate::NearestMode::round_prefer_ceil;
     } else {
         // If none of the align_corners and half_pixel are true, transformation
         // mode is set to asymmetric
         attrs.coordinate_transformation_mode =
-            ov::op::v4::Interpolate::CoordinateTransformMode::asymmetric;
+            ov::op::v4::Interpolate::CoordinateTransformMode::ASYMMETRIC;
     }
 
     std::vector<int32_t> output_shape = {out_height, out_width};
