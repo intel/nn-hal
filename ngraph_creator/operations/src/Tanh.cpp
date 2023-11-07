@@ -20,6 +20,13 @@ std::shared_ptr<ov::Node> Tanh::createNode() {
     std::shared_ptr<ov::Node> outputNode;
 
     outputNode = std::make_shared<ov::opset3::Tanh>(input);
+    //This is required where Tanh is the final node in the graph to convert back to
+    //NHWC format
+    auto outputIndex = sModelInfo->getOperationOutput(mNnapiOperationIndex, 0);
+    const auto op = sModelInfo->getOperand(outputIndex);
+    if (op.lifetime == OperandLifeTime::SUBGRAPH_OUTPUT) {
+        outputNode = transpose(NCHW_NHWC, outputNode);
+    }
 
     return outputNode;
 }
