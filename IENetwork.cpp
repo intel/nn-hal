@@ -27,8 +27,8 @@ bool IENetwork::loadNetwork() {
         case IntelDeviceType::GNA:
             deviceStr = "GNA";
             break;
-        case IntelDeviceType::VPU:
-            deviceStr = "VPUX";
+        case IntelDeviceType::NPU:
+            deviceStr = "NPU";
             break;
         case IntelDeviceType::CPU:
         default:

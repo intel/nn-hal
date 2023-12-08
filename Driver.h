@@ -39,7 +39,7 @@
 
 namespace android::hardware::neuralnetworks::nnhal {
 
-enum class IntelDeviceType { CPU, GPU, GNA, VPU, OTHER };
+enum class IntelDeviceType { CPU, GPU, GNA, NPU, OTHER };
 
 // For HAL-1.0 version
 using namespace ::android::hardware::neuralnetworks::V1_0;

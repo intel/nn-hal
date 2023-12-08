@@ -216,7 +216,7 @@ Return<void> Driver::getCapabilities_1_2(getCapabilities_1_2_cb cb) {
 
         ALOGI("GPU clDNN driver Capabilities .execTime = 0.95f, .powerUsage = 0.85f");
         cb(ErrorStatus::NONE, capabilities);
-    } else if (mDeviceType == IntelDeviceType::VPU) {
+    } else if (mDeviceType == IntelDeviceType::NPU) {
         ALOGI("Myriad driver getCapabilities()");
         V1_2::Capabilities capabilities = {
             .relaxedFloat32toFloat16PerformanceScalar = {.execTime = 0.8f, .powerUsage = 0.8f},
@@ -342,7 +342,7 @@ Return<void> Driver::getCapabilities_1_3(getCapabilities_1_3_cb cb) {
 
         ALOGI("GNA driver Capabilities .execTime = 0.95f, .powerUsage = 0.85f");
         cb(V1_3::ErrorStatus::NONE, capabilities);
-    } else if (mDeviceType == IntelDeviceType::VPU) {
+    } else if (mDeviceType == IntelDeviceType::NPU) {
         ALOGI("Driver getCapabilities()");
         Capabilities capabilities = {
             .relaxedFloat32toFloat16PerformanceScalar = {.execTime = 0.8f, .powerUsage = 0.8f},
