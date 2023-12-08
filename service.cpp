@@ -40,8 +40,8 @@ int main(int argc, char* argv[]) {
 
         if (strncmp(deviceType, "GNA", 3) == 0)
             device = new Driver(android::hardware::neuralnetworks::nnhal::IntelDeviceType::GNA);
-        else if (strncmp(deviceType, "VPU", 3) == 0)
-            device = new Driver(android::hardware::neuralnetworks::nnhal::IntelDeviceType::VPU);
+        else if (strncmp(deviceType, "NPU", 3) == 0)
+            device = new Driver(android::hardware::neuralnetworks::nnhal::IntelDeviceType::NPU);
         else if (strncmp(deviceType, "GPU", 3) == 0)
             device = new Driver(android::hardware::neuralnetworks::nnhal::IntelDeviceType::GPU);
         else
@@ -64,7 +64,7 @@ namespace nn {
 
 GeneralResult<SharedDevice> getService(const std::string& serviceName) {
     auto driver = new android::hardware::neuralnetworks::nnhal::Driver(
-        android::hardware::neuralnetworks::nnhal::IntelDeviceType::VPU);
+        android::hardware::neuralnetworks::nnhal::IntelDeviceType::NPU);
     return V1_3::utils::Device::create(serviceName, std::move(driver));
 }
 
