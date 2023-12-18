@@ -64,8 +64,8 @@ std::shared_ptr<ov::Node> ResizeNearestNeighbor::createNode() {
 
     attrs.shape_calculation_mode = ov::op::v4::Interpolate::ShapeCalcMode::SIZES;
     // mode is passed as "nearest" for Nearest Neighbor interpolation
-    attrs.mode = ov::op::v4::Interpolate::InterpolateMode::nearest;
-    attrs.nearest_mode = ov::op::v4::Interpolate::NearestMode::floor;
+    attrs.mode = ov::op::v4::Interpolate::InterpolateMode::NEAREST;
+    attrs.nearest_mode = ov::op::v4::Interpolate::NearestMode::FLOOR;
 
     if (checkInputOperandType(1, (int32_t)OperandType::FLOAT32)) {
         // In tensorflow lite, resizing by size is supported. Scaling factors are
@@ -89,11 +89,11 @@ std::shared_ptr<ov::Node> ResizeNearestNeighbor::createNode() {
     if (align_corners == true) {
         attrs.coordinate_transformation_mode =
             ov::op::v4::Interpolate::CoordinateTransformMode::ALIGN_CORNERS;
-        attrs.nearest_mode = ov::op::v4::Interpolate::NearestMode::round_prefer_ceil;
+        attrs.nearest_mode = ov::op::v4::Interpolate::NearestMode::ROUND_PREFER_CEIL;
     } else if (half_pixel == true) {
         attrs.coordinate_transformation_mode =
             ov::op::v4::Interpolate::CoordinateTransformMode::HALF_PIXEL;
-        attrs.nearest_mode = ov::op::v4::Interpolate::NearestMode::round_prefer_ceil;
+        attrs.nearest_mode = ov::op::v4::Interpolate::NearestMode::ROUND_PREFER_CEIL;
     } else {
         // If none of the align_corners and half_pixel are true, transformation
         // mode is set to asymmetric
