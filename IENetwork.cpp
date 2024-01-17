@@ -38,7 +38,9 @@ bool IENetwork::loadNetwork() {
 
     ALOGD("Creating infer request for Intel Device Type : %s", deviceStr.c_str());
     if (mNetwork) {
-        compiled_model = ie.compile_model(mNetwork, deviceStr);
+	ov::AnyMap config;
+	config["NPU_COMPILATION_MODE_PARAMS"] = "enable-se-ptrs-operations=true enable-sep-transposed-conv=true";
+	compiled_model = ie.compile_model(mNetwork, deviceStr, config);
         ALOGD("LoadNetwork is done....");
 
 #if __ANDROID__
