@@ -19,7 +19,7 @@ bool IENetwork::loadNetwork() {
 #if __ANDROID__
     ov::Core ie(std::string("/vendor/etc/openvino/plugins.xml"));
 #else
-    ov::Core ie(std::string("/usr/local/lib64/plugins.xml"));
+    ov::Core ie(std::string("/etc/openvino/plugins.xml"));
 #endif
     std::map<std::string, std::string> config;
     std::string deviceStr;
