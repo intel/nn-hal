@@ -47,12 +47,10 @@ config("target_defaults") {
         "${sysroot}/usr/include/aosp/hardware/interfaces/neuralnetworks/1.0/utils/include",
         "${sysroot}/usr/include/aosp/hardware/interfaces/neuralnetworks/1.3/utils/include/",
         "${sysroot}/usr/include/aosp/hardware/interfaces/neuralnetworks/utils/common/include",
-        "${sysroot}/usr/local/include/ie",
-        "${sysroot}/usr/local/include/ie/cpp",
-        "${sysroot}/usr/local/include/openvino",
-        "${sysroot}/usr/local/runtime/include/ie",
-        "${sysroot}/usr/local/runtime/include/ie/cpp",
-        "${sysroot}/usr/local/runtime/include/"
+        "${sysroot}/usr/include/ie",
+        "${sysroot}/usr/include/ie/cpp",
+        "${sysroot}/usr/include/openvino",
+        "${sysroot}/usr/include/"
     ]
 }
 
@@ -193,7 +191,7 @@ shared_library("intel_nnhal") {
   lib_dirs = [
     "${sysroot}/usr/local/deployment_tools/inference_engine/lib/intel64/",
     "${sysroot}/usr/local/deployment_tools/ngraph/lib64/",
-    "${sysroot}/usr/local/lib64/",
+    "${sysroot}/usr/lib64/",
     "${sysroot}/usr/local/runtime/lib/intel64/"
   ]
 }
